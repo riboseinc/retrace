@@ -18,8 +18,7 @@ putenv(char *string) {
 char
 *getenv(const char *envname) {
 	real_getenv = dlsym(RTLD_NEXT, "getenv");
-	trace_printf(1, "getenv(\"%s\");\n", envname);
-
-	// TODO: show contents of envname
-	return real_getenv(envname);
+	char *env = real_getenv(name);
+	trace_printf(1, "getenv(\"%s\"); [%s]\n", name, env);
+	return real_getenv(name);
 }

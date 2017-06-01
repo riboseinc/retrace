@@ -30,7 +30,7 @@ trace_printf(int hdr, char *buf, ...) {
 
 void
 trace_printf_str(const char *string) {
-	real_strlen = dlsym(RTLD_NEXT, "strlen");	
+	real_strlen = dlsym(RTLD_NEXT, "strlen");
 
 	int i;
 	size_t len = real_strlen(string);
@@ -38,7 +38,7 @@ trace_printf_str(const char *string) {
 	if (len > MAXLEN)
 		len = MAXLEN;
 
-	for(i = 0; i < len; i++)
+	for (i = 0; i < len; i++)
 		if (string[i] == '\n')
 			trace_printf(0, "%s\\n%s", VAR, RST);
 		else if (string[i] == '\t')

@@ -82,7 +82,6 @@ FILE
 DIR
 *opendir(const char *dirname) {
 	real_opendir = dlsym(RTLD_NEXT, "opendir");
-
 	trace_printf(1, "opendir(\"%s\");\n", dirname);
 	return real_opendir(dirname);
 }
@@ -90,9 +89,6 @@ DIR
 int
 closedir(DIR *dirp) {
 	real_closedir = dlsym(RTLD_NEXT, "closedir");
-
-	// XXX:
-	//trace_printf(1, "closedir(%d);\n", dfd);
 	trace_printf(1, "closedir();\n");
 	return real_closedir(dirp);
 }

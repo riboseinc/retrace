@@ -14,16 +14,30 @@ execve(const char *path, char *const argv[], char *const envp[]) {
 
 	int i;
 
-	// XXX: 16, this needs to be calculated runtime...
-	for(i = 0; i < 16 + 2; i++) {
-		trace_printf(1, "execve(\"%s\"); [arg %d]", argv[i], i);
+	trace_printf(1, "execve(\"%s\"", argv[0]);
 
+	for (i = 0;; i++) {
 		if (argv[i] == NULL)
-			return real_execve(path, argv, envp);
+			break;
+
+		trace_printf(0, ", \"%s\"", argv[i]);
 	}
 
-	trace_printf(0, "\n");
+	trace_printf(0, ", envp);\n");
+
+	trace_printf(1, "char *envp[]=\n");
+	trace_printf(1, "{\n");
+
+	for (i = 0;; i++) {
+		if (envp[i] == NULL)
+			break;
+
+		trace_printf(1, "\t\"%s\",\n", envp[i]);
+	}
+	trace_printf(1, "\t0\n");
+	trace_printf(1, "}\n");
 
 	return real_execve(path, argv, envp);
+
 	return(0);
 }

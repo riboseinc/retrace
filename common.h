@@ -13,8 +13,8 @@
 #include <string.h>
 #include <time.h>
 
-#define SOMAXCONN      128    
-#define MAXLEN         40     
+#define SOMAXCONN	128
+#define MAXLEN		40
 
 #define VAR "\e[33m"	/* ANSI yellow for variable values */
 #define INF "\e[31m"	/* ANSI red for information notices */
