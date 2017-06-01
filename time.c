@@ -1,5 +1,5 @@
 #include "common.h"
-#include "time.h"
+#include "rtr-time.h"
 
 char
 *ctime_r(const time_t *timep, char *buf) {

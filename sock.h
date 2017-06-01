@@ -1,3 +1,6 @@
+#ifndef __RETRACE_SOCK_H__
+#define __RETRACE_SOCK_H__
+
 #include <sys/types.h>
 
 #ifndef __socklen_t_defined
@@ -36,6 +39,12 @@ struct msghdr
 extern struct cmsghdr *__cmsg_nxthdr (struct msghdr *__mhdr,
 	struct cmsghdr *__cmsg) __THROW;
 
-static int (*real_atoi)(const char *str);
-static int (*real_bind)(int fd, const struct sockaddr *address, socklen_t len);
-static int (*real_connect)(int fd, const struct sockaddr *address, socklen_t len);
+typedef int (*rtr_atoi_t)(const char *str);
+typedef int (*rtr_bind_t)(int fd, const struct sockaddr *address, socklen_t len);
+typedef int (*rtr_connect_t)(int fd, const struct sockaddr *address, socklen_t len);
+
+rtr_atoi_t	real_atoi;
+rtr_bind_t	real_bind;
+rtr_connect_t	real_connect;
+
+#endif /* __RETRACE_SOCK_H__ */
