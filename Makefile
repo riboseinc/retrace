@@ -26,10 +26,14 @@ all: $(RETRACE_SO)
 $(RETRACE_SO): $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $(LIBS) $^
 
+$(SRCS:.c=.d):%.d:%.c
+	$(CC) $(CFLAGS) -MM $< >$@
+
+-include $(SRCS:.c=.d)
+
 test: $(RETRACE_SO)
 	$(MAKE) -C test
 
 clean:
 	$(MAKE) -C test clean
-	$(RM) $(RETRACE_SO) $(OBJS)
-
+	$(RM) $(RETRACE_SO) $(OBJS) $(SRCS:.c=.d)
