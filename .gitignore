@@ -1,2 +1,4 @@
 *.o
 *.so
+test/cmockatest
+test/*.o
