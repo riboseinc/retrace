@@ -19,13 +19,21 @@ SRCS		+= sock.c
 SRCS		+= str.c
 OBJS		= $(SRCS:.c=.o)
 
-.PHONY: all clean
+.PHONY: all clean test
 
 all: $(RETRACE_SO)
 
 $(RETRACE_SO): $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $(LIBS) $^
 
-clean:
-	$(RM) $(RETRACE_SO) $(OBJS)
+$(SRCS:.c=.d):%.d:%.c
+	$(CC) $(CFLAGS) -MM $< >$@
 
+-include $(SRCS:.c=.d)
+
+test: $(RETRACE_SO)
+	$(MAKE) -C test
+
+clean:
+	$(MAKE) -C test clean
+	$(RM) $(RETRACE_SO) $(OBJS) $(SRCS:.c=.d)
