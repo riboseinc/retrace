@@ -3,6 +3,10 @@
 #include <setjmp.h>
 #include <dlfcn.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <cmocka.h>
 
@@ -17,6 +21,7 @@
 #include "sock.h"
 #include "str.h"
 #include "rtr-time.h"
+#include "read.h"
 
 void *handle;
 
@@ -159,6 +164,19 @@ RTR_TEST_END
 RTR_TEST_START(ctime_r)
 RTR_TEST_END
 
+#define READ_BUF_SIZE 256
+RTR_TEST_START(read)
+	int fd;
+	ssize_t ret;
+	char buf[READ_BUF_SIZE];
+
+	fd = open("/dev/urandom", O_RDONLY);
+	assert_non_null(fd);
+
+	ret = rtr_read(fd, buf, sizeof(buf));
+	assert_int_equal(ret, sizeof(buf));
+RTR_TEST_END
+
 int main(void) 
 {
 	int ret;
@@ -208,6 +226,7 @@ int main(void)
 		cmocka_unit_test(test_strlen),
 		cmocka_unit_test(test_ctime),
 		cmocka_unit_test(test_ctime_r),
+		cmocka_unit_test(test_read),
 	};
 
 	handle = dlopen("../retrace.so", RTLD_LAZY);

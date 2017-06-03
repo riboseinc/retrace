@@ -17,6 +17,7 @@ SRCS		+= common.c
 SRCS		+= id.c
 SRCS		+= sock.c
 SRCS		+= str.c
+SRCS		+= read.c
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test
