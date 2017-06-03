@@ -26,6 +26,7 @@
 #include "malloc.h"
 #include "fork.h"
 #include "popen.h"
+#include "pipe.h"
 
 void *handle;
 
@@ -264,6 +265,35 @@ RTR_TEST_START(pclose)
 	assert_int_equal(ret, 0);
 RTR_TEST_END
 
+static void
+test_pipe_common(int ret, int pipefd[2])
+{
+	assert_int_equal(ret, 0);
+
+	assert_true(pipefd[0] >= 0);
+	assert_true(pipefd[1] >= 0);
+	assert_true(pipefd[0] != pipefd[1]);
+
+	close(pipefd[0]);
+	close(pipefd[1]);
+}
+
+RTR_TEST_START(pipe)
+	int ret;
+	int pipefd[2];
+
+	ret = rtr_pipe(pipefd);
+	test_pipe_common(ret, pipefd);
+RTR_TEST_END
+
+RTR_TEST_START(pipe2)
+	int ret;
+	int pipefd[2];
+
+	ret = rtr_pipe2(pipefd, O_NONBLOCK);
+	test_pipe_common(ret, pipefd);
+RTR_TEST_END
+
 int main(void) 
 {
 	int ret;
@@ -320,6 +350,8 @@ int main(void)
 		cmocka_unit_test(test_rtr_fork),
 		cmocka_unit_test(test_rtr_popen),
 		cmocka_unit_test(test_rtr_pclose),
+		cmocka_unit_test(test_rtr_pipe),
+		cmocka_unit_test(test_rtr_pipe2),
 	};
 
 	handle = dlopen("../retrace.so", RTLD_LAZY);
