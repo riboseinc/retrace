@@ -19,6 +19,7 @@ SRCS		+= sock.c
 SRCS		+= str.c
 SRCS		+= read.c
 SRCS		+= write.c
+SRCS		+= malloc.c
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test

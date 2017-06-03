@@ -1,9 +1,9 @@
 CFLAGS	= -I ../
 LDFLAGS	= -lcmocka -ldl
 
-CMOCKA-TEST-BIN		= cmockatest
-SRCS			= cmockatest.c
-OBJS			= $(SRCS:.c=.o)
+CMOCKA-TEST-BIN	= cmockatest
+SRCS		= cmockatest.c
+OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean run
 
