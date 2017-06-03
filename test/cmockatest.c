@@ -24,6 +24,7 @@
 #include "read.h"
 #include "write.h"
 #include "malloc.h"
+#include "fork.h"
 
 void *handle;
 
@@ -212,6 +213,22 @@ RTR_TEST_START(malloc)
 	assert_non_null(p);
 RTR_TEST_END
 
+RTR_TEST_START(fork)
+	pid_t pid, parent;
+
+	parent = getpid();
+
+	pid = rtr_fork();
+	assert_true(pid >= 0);
+
+	if (pid == 0) {
+		assert_true(getpid() != parent);
+		exit(0);
+	}
+
+	assert_int_equal(getpid(), parent);
+RTR_TEST_END
+
 int main(void) 
 {
 	int ret;
@@ -265,6 +282,7 @@ int main(void)
 		cmocka_unit_test(test_rtr_write),
 		cmocka_unit_test(test_rtr_malloc),
 		cmocka_unit_test(test_rtr_free),
+		cmocka_unit_test(test_rtr_fork),
 	};
 
 	handle = dlopen("../retrace.so", RTLD_LAZY);
