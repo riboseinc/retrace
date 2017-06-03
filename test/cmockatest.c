@@ -22,6 +22,7 @@
 #include "str.h"
 #include "rtr-time.h"
 #include "read.h"
+#include "write.h"
 
 void *handle;
 
@@ -177,6 +178,19 @@ RTR_TEST_START(read)
 	assert_int_equal(ret, sizeof(buf));
 RTR_TEST_END
 
+#define WRITE_BUF_SIZE 256
+RTR_TEST_START(write)
+	int fd;
+	ssize_t ret;
+	char buf[WRITE_BUF_SIZE];
+
+	fd = open("/dev/null", O_WRONLY);
+	assert_non_null(fd);
+
+	ret = rtr_write(fd, buf, sizeof(buf));
+	assert_int_equal(ret, sizeof(buf));
+RTR_TEST_END
+
 int main(void) 
 {
 	int ret;
@@ -227,6 +241,7 @@ int main(void)
 		cmocka_unit_test(test_ctime),
 		cmocka_unit_test(test_ctime_r),
 		cmocka_unit_test(test_read),
+		cmocka_unit_test(test_write),
 	};
 
 	handle = dlopen("../retrace.so", RTLD_LAZY);
