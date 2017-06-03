@@ -21,6 +21,7 @@ SRCS		+= read.c
 SRCS		+= write.c
 SRCS		+= malloc.c
 SRCS		+= fork.c
+SRCS		+= popen.c
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test

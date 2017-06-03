@@ -25,6 +25,7 @@
 #include "write.h"
 #include "malloc.h"
 #include "fork.h"
+#include "popen.h"
 
 void *handle;
 
@@ -229,6 +230,40 @@ RTR_TEST_START(fork)
 	assert_int_equal(getpid(), parent);
 RTR_TEST_END
 
+#define RTR_POPEN_CMD "which gcc 2>&1"
+#define RTR_POPEN_BUF_SIZE 256
+RTR_TEST_START(popen)
+	int ret;
+	FILE *file;
+	char buf[RTR_POPEN_BUF_SIZE];
+	char *p;
+
+	file = rtr_popen(RTR_POPEN_CMD, "r");
+	assert_non_null(file);
+
+	p = fgets(buf, sizeof(buf), file);
+	assert_non_null(p);
+
+	ret = pclose(file);
+	assert_int_equal(ret, 0);
+RTR_TEST_END
+
+RTR_TEST_START(pclose)
+	int ret;
+	FILE *file;
+	char buf[RTR_POPEN_BUF_SIZE];
+	char *p;
+
+	file = popen(RTR_POPEN_CMD, "r");
+	assert_non_null(file);
+
+	p = fgets(buf, sizeof(buf), file);
+	assert_non_null(p);
+
+	ret = rtr_pclose(file);
+	assert_int_equal(ret, 0);
+RTR_TEST_END
+
 int main(void) 
 {
 	int ret;
@@ -283,6 +318,8 @@ int main(void)
 		cmocka_unit_test(test_rtr_malloc),
 		cmocka_unit_test(test_rtr_free),
 		cmocka_unit_test(test_rtr_fork),
+		cmocka_unit_test(test_rtr_popen),
+		cmocka_unit_test(test_rtr_pclose),
 	};
 
 	handle = dlopen("../retrace.so", RTLD_LAZY);
