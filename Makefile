@@ -1,9 +1,9 @@
 LD		= ld
 GCC		= gcc
 RM		= rm -f
-CFLAGS		= -fPIC -D_GNU_SOURCE -rdynamic -Wall
-LDFLAGS		= -G -z text --export-dynamic
-LIBS		= -ldl -lncurses
+RETRACE_CFLAGS	= $(CFLAGS) -fPIC -D_GNU_SOURCE -rdynamic -Wall
+RETRACE_LDFLAGS	= $(LDFLAGS) -G -z text --export-dynamic
+RETRACE_LIBS	= -ldl -lncurses
 RETRACE_SO	= retrace.so
 
 SRCS		+= exit.c
@@ -30,12 +30,15 @@ OBJS		= $(SRCS:.c=.o)
 all: $(RETRACE_SO)
 
 $(RETRACE_SO): $(OBJS)
-	$(LD) $(LDFLAGS) -o $@ $(LIBS) $^
-
-$(SRCS:.c=.d):%.d:%.c
-	$(CC) $(CFLAGS) -MM $< >$@
+	$(LD) $(RETRACE_LDFLAGS) -o $@ $(RETRACE_LIBS) $^
 
 -include $(SRCS:.c=.d)
+
+$(SRCS:.c=.d):%.d:%.c
+	$(CC) $(RETRACE_CFLAGS) -MM $< >$@
+
+%.o: %.d
+	$(CC) -c $(RETRACE_CFLAGS) $(@:.o=.c) -o $@
 
 test: $(RETRACE_SO)
 	$(MAKE) -C test
