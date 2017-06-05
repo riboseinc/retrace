@@ -1,0 +1,22 @@
+dist: trusty
+sudo: false
+language: c
+
+branches:
+  only:
+    - master
+
+env:
+  global:
+    - CMOCKA_INSTALL="$HOME/builds/cmocka-install"
+    - LOGNAME="Travis"
+
+cache:
+  directories:
+    - "$CMOCKA_INSTALL"
+
+install:
+  - ./ci/install.sh
+
+script:
+  - ./ci/main.sh
