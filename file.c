@@ -72,18 +72,19 @@ fclose(FILE *stream)
     return real_fclose(stream);
 }
 
-FILE
-*fopen(const char *file, const char *mode) {
-	real_fopen = dlsym(RTLD_NEXT, "fopen");
-	real_fileno = dlsym(RTLD_NEXT, "fileno");
-	int fd = 0;
+FILE *
+fopen(const char *file, const char *mode)
+{
+    real_fopen = dlsym(RTLD_NEXT, "fopen");
+    real_fileno = dlsym(RTLD_NEXT, "fileno");
+    int fd = 0;
 
-	FILE *ret = real_fopen(file, mode);
+    FILE *ret = real_fopen(file, mode);
 
-	if (ret)
-		fd = real_fileno(ret);
+    if (ret)
+        fd = real_fileno(ret);
 
-	trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", file, mode, fd);
+    trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", file, mode, fd);
 
     return (ret);
 }

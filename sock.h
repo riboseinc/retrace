@@ -12,7 +12,6 @@ typedef __socklen_t socklen_t;
 #define AF_INET 2
 #endif
 
-
 #include <bits/sockaddr.h>
 
 struct sockaddr {
@@ -20,11 +19,9 @@ struct sockaddr {
     char sa_data[14];
 };
 
-struct in_addr
-  {
+struct in_addr {
     unsigned long s_addr;
-  };
-
+};
 
 #if ULONG_MAX > 0xffffffff
 #define __ss_aligntype __uint64_t
