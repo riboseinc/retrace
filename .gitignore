@@ -3,3 +3,4 @@
 *.so
 test/cmockatest
 test/*.o
+core

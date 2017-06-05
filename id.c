@@ -44,6 +44,13 @@ getegid()
 uid_t
 getuid()
 {
+    int redirect_id;
+    if (get_redirect("getuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
+        trace_printf(1, "getuid(); [redirection in effect: '%i']\n", redirect_id);
+
+        return redirect_id;
+    }
+
     real_getuid = dlsym(RTLD_NEXT, "getuid");
     trace_printf(1, "getuid();\n");
     return real_getuid();
@@ -52,6 +59,13 @@ getuid()
 uid_t
 geteuid()
 {
+    int redirect_id;
+    if (get_redirect("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
+        trace_printf(1, "geteuid(); [redirection in effect: '%i']\n", redirect_id);
+
+        return redirect_id;
+    }
+
     real_geteuid = dlsym(RTLD_NEXT, "geteuid");
     trace_printf(1, "geteuid();\n");
     return real_geteuid();

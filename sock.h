@@ -8,11 +8,19 @@ typedef __socklen_t socklen_t;
 #define __socklen_t_defined
 #endif
 
+#ifndef AF_INET
+#define AF_INET 2
+#endif
+
 #include <bits/sockaddr.h>
 
 struct sockaddr {
     __SOCKADDR_COMMON(sa_);
     char sa_data[14];
+};
+
+struct in_addr {
+    unsigned long s_addr;
 };
 
 #if ULONG_MAX > 0xffffffff
