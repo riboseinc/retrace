@@ -13,13 +13,13 @@
 #include <string.h>
 #include <time.h>
 
-#define SOMAXCONN	128
-#define MAXLEN		40
+#define SOMAXCONN 128
+#define MAXLEN 40
 
-#define VAR "\e[33m"	/* ANSI yellow for variable values */
-#define INF "\e[31m"	/* ANSI red for information notices */
-#define RST "\e[0m"	/* ANSI white */
-#define BEG "\e[100D"	/* ANSI goto 1st char */
+#define VAR "\e[33m"  /* ANSI yellow for variable values */
+#define INF "\e[31m"  /* ANSI red for information notices */
+#define RST "\e[0m"   /* ANSI white */
+#define BEG "\e[100D" /* ANSI goto 1st char */
 
 void trace_printf(int hdr, char *buf, ...);
 void trace_printf_str(const char *string);
