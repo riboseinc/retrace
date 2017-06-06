@@ -129,6 +129,23 @@ bind(int fd, const struct sockaddr *address, socklen_t len)
 }
 
 int
+accept(int fd, struct sockaddr *address, socklen_t len)
+{
+	real_accept = dlsym(RTLD_NEXT, "accept");
+	trace_printf(1,
+		     "accept(%d, \"%hu.%hu.%hu.%hu:%hu\", %zu);\n",
+		     fd,
+		     (unsigned short) address->sa_data[2] & 0xFF,
+		     (unsigned short) address->sa_data[3] & 0xFF,
+		     (unsigned short) address->sa_data[4] & 0xFF,
+		     (unsigned short) address->sa_data[5] & 0xFF,
+		     (256 * address->sa_data[0]) + address->sa_data[1],
+		     len);
+
+	return real_accept(fd, address, len);
+}
+
+int
 atoi(const char *str)
 {
 	real_atoi = dlsym(RTLD_NEXT, "atoi");

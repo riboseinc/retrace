@@ -45,10 +45,12 @@ struct msghdr {
 extern struct cmsghdr *__cmsg_nxthdr(struct msghdr *__mhdr, struct cmsghdr *__cmsg) __THROW;
 
 typedef int (*rtr_atoi_t)(const char *str);
+typedef int (*rtr_accept_t)(int fd, struct sockaddr *address, socklen_t len);
 typedef int (*rtr_bind_t)(int fd, const struct sockaddr *address, socklen_t len);
 typedef int (*rtr_connect_t)(int fd, const struct sockaddr *address, socklen_t len);
 
 rtr_atoi_t    real_atoi;
+rtr_accept_t    real_accept;
 rtr_bind_t    real_bind;
 rtr_connect_t real_connect;
 
