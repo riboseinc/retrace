@@ -29,85 +29,85 @@
 int
 setuid(uid_t uid)
 {
-    real_setuid = dlsym(RTLD_NEXT, "setuid");
-    trace_printf(1, "setuid(%d);\n", uid);
-    return real_setuid(uid);
+	real_setuid = dlsym(RTLD_NEXT, "setuid");
+	trace_printf(1, "setuid(%d);\n", uid);
+	return real_setuid(uid);
 }
 
 int
 seteuid(uid_t uid)
 {
-    real_seteuid = dlsym(RTLD_NEXT, "seteuid");
-    trace_printf(1, "seteuid(%d);\n", uid);
-    return real_seteuid(uid);
+	real_seteuid = dlsym(RTLD_NEXT, "seteuid");
+	trace_printf(1, "seteuid(%d);\n", uid);
+	return real_seteuid(uid);
 }
 
 int
 setgid(gid_t gid)
 {
-    real_setgid = dlsym(RTLD_NEXT, "setgid");
-    trace_printf(1, "setgid(%d);\n", gid);
-    return real_setgid(gid);
+	real_setgid = dlsym(RTLD_NEXT, "setgid");
+	trace_printf(1, "setgid(%d);\n", gid);
+	return real_setgid(gid);
 }
 
 gid_t
 getgid()
 {
-    real_getgid = dlsym(RTLD_NEXT, "getgid");
-    trace_printf(1, "getgid();\n");
-    return real_getgid();
+	real_getgid = dlsym(RTLD_NEXT, "getgid");
+	trace_printf(1, "getgid();\n");
+	return real_getgid();
 }
 
 gid_t
 getegid()
 {
-    real_getegid = dlsym(RTLD_NEXT, "getegid");
-    trace_printf(1, "getegid();\n");
-    return real_getegid();
+	real_getegid = dlsym(RTLD_NEXT, "getegid");
+	trace_printf(1, "getegid();\n");
+	return real_getegid();
 }
 
 uid_t
 getuid()
 {
-    int redirect_id;
-    if (get_redirect("getuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
-        trace_printf(1, "getuid(); [redirection in effect: '%i']\n", redirect_id);
+	int redirect_id;
+	if (get_redirect("getuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
+		trace_printf(1, "getuid(); [redirection in effect: '%i']\n", redirect_id);
 
-        return redirect_id;
-    }
+		return redirect_id;
+	}
 
-    real_getuid = dlsym(RTLD_NEXT, "getuid");
-    trace_printf(1, "getuid();\n");
-    return real_getuid();
+	real_getuid = dlsym(RTLD_NEXT, "getuid");
+	trace_printf(1, "getuid();\n");
+	return real_getuid();
 }
 
 uid_t
 geteuid()
 {
-    int redirect_id;
-    if (get_redirect("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
-        trace_printf(1, "geteuid(); [redirection in effect: '%i']\n", redirect_id);
+	int redirect_id;
+	if (get_redirect("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
+		trace_printf(1, "geteuid(); [redirection in effect: '%i']\n", redirect_id);
 
-        return redirect_id;
-    }
+		return redirect_id;
+	}
 
-    real_geteuid = dlsym(RTLD_NEXT, "geteuid");
-    trace_printf(1, "geteuid();\n");
-    return real_geteuid();
+	real_geteuid = dlsym(RTLD_NEXT, "geteuid");
+	trace_printf(1, "geteuid();\n");
+	return real_geteuid();
 }
 
 pid_t
 getpid(void)
 {
-    real_getpid = dlsym(RTLD_NEXT, "getpid");
-    trace_printf(1, "getpid();\n");
-    return real_getpid();
+	real_getpid = dlsym(RTLD_NEXT, "getpid");
+	trace_printf(1, "getpid();\n");
+	return real_getpid();
 }
 
 pid_t
 getppid(void)
 {
-    real_getppid = dlsym(RTLD_NEXT, "getppid");
-    trace_printf(1, "getppid(); [%d]\n", real_getppid());
-    return real_getppid();
+	real_getppid = dlsym(RTLD_NEXT, "getppid");
+	trace_printf(1, "getppid(); [%d]\n", real_getppid());
+	return real_getppid();
 }

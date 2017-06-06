@@ -37,7 +37,7 @@ DisableFormat:   false
 ExperimentalAutoDetectBinPacking: false
 IncludeIsMainRegex: '$'
 IndentCaseLabels: false
-IndentWidth:     4
+IndentWidth:     8
 IndentWrappedFunctionNames: false
 KeepEmptyLinesAtTheStartOfBlocks: false
 MacroBlockBegin: ''
@@ -62,6 +62,5 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 Standard:        Auto
 TabWidth:        8
-UseTab:          Never
+UseTab:          true
 ...
-
