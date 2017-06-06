@@ -203,6 +203,11 @@ get_redirect(const char *function, ...)
 
 			if (arg_end)
 				*arg_end = '\0';
+			else {
+				// skip the newline for the last string argument
+				if (arg_start && strlen(arg_start) && arg_start[strlen(arg_start) - 1] == '\n')
+					arg_start[strlen(arg_start) - 1] = '\0';
+			}
 
 			switch (current_argument) {
 			case ARGUMENT_TYPE_INT:
