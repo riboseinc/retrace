@@ -76,6 +76,7 @@ connect(int fd, const struct sockaddr *address, socklen_t len)
 			inet_pton(
 			  AF_INET, redirect_ip, (struct in_addr *) &redirect_addr.sa_data[2]);
 
+
 			trace_printf(
 			  1,
 			  "connect(%d, \"%hu.%hu.%hu.%hu:%u\", %zu); [redirection in effect: "
@@ -93,6 +94,10 @@ connect(int fd, const struct sockaddr *address, socklen_t len)
 			  (unsigned short) redirect_addr.sa_data[5] & 0xFF,
 			  redirect_port);
 
+            // cleanup
+            free(redirect_ip);
+            free(match_ip);
+
 			return real_connect(fd, &redirect_addr, len);
 		}
 	}
@@ -106,6 +111,10 @@ connect(int fd, const struct sockaddr *address, socklen_t len)
 		     (unsigned short) address->sa_data[5] & 0xFF,
 		     port,
 		     len);
+
+    // cleanup
+    free(redirect_ip);
+    free(match_ip);
 
 	return real_connect(fd, address, len);
 }
