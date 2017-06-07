@@ -29,7 +29,7 @@
 char *
 RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
 {
-	real_ctime_r = dlsym(RTLD_NEXT, "ctime_r");
+	real_ctime_r = rtr_dlsym(rtr_ctime_r);
 	trace_printf(1, "ctime_r(\"%s\", \"%s\");\n", timep, buf);
 	return real_ctime_r(timep, buf);
 }
@@ -39,7 +39,7 @@ RETRACE_REPLACE (ctime_r)
 char *
 RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 {
-	real_ctime = dlsym(RTLD_NEXT, "ctime");
+	real_ctime = rtr_dlsym(rtr_ctime);
 	trace_printf(1, "ctime(\"%s\");\n", timep);
 	return real_ctime(timep);
 }

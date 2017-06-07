@@ -30,7 +30,7 @@
 char *
 RETRACE_IMPLEMENTATION(strstr)(const char *s1, const char *s2)
 {
-	real_strstr = dlsym(RTLD_NEXT, "strstr");
+	real_strstr = rtr_dlsym(rtr_strstr);
 
 	trace_printf(1, "strstr(\"");
 	trace_printf_str(s1);
@@ -46,7 +46,7 @@ RETRACE_REPLACE (strstr)
 size_t
 RETRACE_IMPLEMENTATION(strlen)(const char *s)
 {
-	real_strlen = dlsym(RTLD_NEXT, "strlen");
+	real_strlen = rtr_dlsym(rtr_strlen);
 
 	size_t len = real_strlen(s);
 
@@ -62,7 +62,7 @@ RETRACE_REPLACE (strlen)
 int
 RETRACE_IMPLEMENTATION(strncmp)(const char *s1, const char *s2, size_t n)
 {
-	real_strncmp = dlsym(RTLD_NEXT, "strncmp");
+	real_strncmp = rtr_dlsym(rtr_strncmp);
 
 	trace_printf(1, "strncmp(\"");
 	trace_printf_str(s1);
@@ -78,7 +78,7 @@ RETRACE_REPLACE (strncmp)
 int
 RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 {
-	real_strcmp = dlsym(RTLD_NEXT, "strcmp");
+	real_strcmp = rtr_dlsym(rtr_strcmp);
 
 	trace_printf(1, "strcmp(\"");
 	trace_printf_str(s1);
@@ -94,8 +94,8 @@ RETRACE_REPLACE (strcmp)
 char *
 RETRACE_IMPLEMENTATION(strncpy)(char *s1, const char *s2, size_t n)
 {
-	real_strncpy = dlsym(RTLD_NEXT, "strncpy");
-	real_strlen = dlsym(RTLD_NEXT, "strlen");
+	real_strncpy = rtr_dlsym(rtr_strncpy);
+	real_strlen = rtr_dlsym(rtr_strlen);
 
 	size_t len = real_strlen(s2);
 
@@ -111,8 +111,8 @@ RETRACE_REPLACE (strncpy)
 char *
 RETRACE_IMPLEMENTATION(strcat)(char *s1, const char *s2)
 {
-	real_strcat = dlsym(RTLD_NEXT, "strcat");
-	real_strlen = dlsym(RTLD_NEXT, "strlen");
+	real_strcat = rtr_dlsym(rtr_strcat);
+	real_strlen = rtr_dlsym(rtr_strlen);
 
 	size_t len = real_strlen(s2);
 
@@ -128,8 +128,8 @@ RETRACE_REPLACE (strcat)
 char *
 RETRACE_IMPLEMENTATION(strncat)(char *s1, const char *s2, size_t n)
 {
-	real_strncat = dlsym(RTLD_NEXT, "strncat");
-	real_strlen = dlsym(RTLD_NEXT, "strlen");
+	real_strncat = rtr_dlsym(rtr_strncat);
+	real_strlen = rtr_dlsym(rtr_strlen);
 
 	size_t len = real_strlen(s2) + 1;
 
@@ -145,8 +145,8 @@ RETRACE_REPLACE (strncat)
 char *
 RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
 {
-	real_strcpy = dlsym(RTLD_NEXT, "strcpy");
-	real_strlen = dlsym(RTLD_NEXT, "strlen");
+	real_strcpy = rtr_dlsym(rtr_strcpy);
+	real_strlen = rtr_dlsym(rtr_strlen);
 
 	size_t len = real_strlen(s2);
 
