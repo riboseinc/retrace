@@ -27,7 +27,7 @@
 #include "read.h"
 
 ssize_t
-read(int fd, void *buf, size_t nbytes)
+RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 {
 	ssize_t ret;
 
@@ -37,3 +37,5 @@ read(int fd, void *buf, size_t nbytes)
 
 	return ret;
 }
+
+RETRACE_REPLACE (read)

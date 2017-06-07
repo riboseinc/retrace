@@ -27,15 +27,17 @@
 #include "malloc.h"
 
 void
-free(void *mem)
+RETRACE_IMPLEMENTATION(free)(void *mem)
 {
 	real_free = dlsym(RTLD_NEXT, "free");
 	trace_printf(1, "free(%p);\n", mem);
 	real_free(mem);
 }
 
+RETRACE_REPLACE (free)
+
 void *
-malloc(size_t bytes)
+RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 {
 	void *p;
 
@@ -45,3 +47,5 @@ malloc(size_t bytes)
 
 	return p;
 }
+
+RETRACE_REPLACE (malloc)

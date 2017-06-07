@@ -25,17 +25,20 @@
 
 #include "common.h"
 #include "exec.h"
+#include <unistd.h>
 
 int
-system(const char *command)
+RETRACE_IMPLEMENTATION(system)(const char *command)
 {
 	real_system = dlsym(RTLD_NEXT, "system");
 	trace_printf(1, "system(\"%s\");\n", command);
 	return real_system(command);
 }
 
+RETRACE_REPLACE (system)
+
 int
-execve(const char *path, char *const argv[], char *const envp[])
+RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *const envp[])
 {
 	real_execve = dlsym(RTLD_NEXT, "execve");
 
@@ -66,5 +69,8 @@ execve(const char *path, char *const argv[], char *const envp[])
 
 	return real_execve(path, argv, envp);
 
-	return (0);
+	return(0);
 }
+
+RETRACE_REPLACE (execve)
+

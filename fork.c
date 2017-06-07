@@ -27,7 +27,7 @@
 #include "fork.h"
 
 pid_t
-fork(void)
+RETRACE_IMPLEMENTATION(fork)(void)
 {
 	pid_t p;
 
@@ -37,3 +37,5 @@ fork(void)
 
 	return p;
 }
+
+RETRACE_REPLACE (fork)

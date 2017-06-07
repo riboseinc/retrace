@@ -28,7 +28,7 @@
 #include "popen.h"
 
 FILE *
-popen(const char *command, const char *type)
+RETRACE_IMPLEMENTATION(popen)(const char *command, const char *type)
 {
 	FILE *ret;
 
@@ -41,8 +41,10 @@ popen(const char *command, const char *type)
 	return ret;
 }
 
+RETRACE_REPLACE (popen)
+
 int
-pclose(FILE *stream)
+RETRACE_IMPLEMENTATION(pclose)(FILE *stream)
 {
 	int ret;
 
@@ -54,3 +56,5 @@ pclose(FILE *stream)
 
 	return ret;
 }
+
+RETRACE_REPLACE (pclose)
