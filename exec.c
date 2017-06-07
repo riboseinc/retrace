@@ -35,13 +35,125 @@ system(const char *command)
 }
 
 int
+execl(const char *path, const char *arg0, ... /*, (char *)0 */)
+{
+	real_execv = dlsym(RTLD_NEXT, "execv");
+
+	trace_printf(1, "execl(\"%s\"", path);
+
+	va_list arglist;
+	va_start(arglist, arg0);
+
+	char *p = NULL;
+	int i = 1;
+	while ((p = va_arg(arglist, char *)) != NULL)
+		i++;
+
+	const char **argv = malloc(i * sizeof (char *));
+
+	i = 0;
+	argv[i] = arg0;
+
+	va_start (arglist, arg0);
+
+	while ((p = va_arg(arglist, char *)) != NULL) {
+		argv[++i] = p;
+
+		trace_printf(0, ", \"%s\"", p);
+	}
+
+	trace_printf(0, ");\n");
+
+	va_end(arglist);
+
+	int retVal = real_execv(path, (char * const *)argv);
+
+	free(argv);
+
+	return retVal;
+}
+
+int
+execv(const char *path, char *const argv[])
+{
+	real_execv = dlsym(RTLD_NEXT, "execv");
+
+	int i;
+
+	trace_printf(1, "execv(\"%s\"", path);
+
+	for (i = 0;; i++) {
+		if (argv[i] == NULL)
+			break;
+
+		trace_printf(0, ", \"%s\"", argv[i]);
+	}
+
+	trace_printf(0, ");\n");
+
+	return real_execv(path, argv);
+}
+
+int execle(const char *path, const char *arg0, ... /*, (char *)0, char *const envp[]*/)
+{
+	real_execve = dlsym(RTLD_NEXT, "execve");
+
+	trace_printf(1, "execle(\"%s\"", path);
+
+	va_list arglist;
+	va_start(arglist, arg0);
+
+	char *p = NULL;
+	int i = 1;
+	while ((p = va_arg(arglist, char *)) != NULL)
+		i++;
+
+	const char **argv = malloc(i * sizeof (char *));
+
+	i = 0;
+	argv[i] = arg0;
+
+	va_start (arglist, arg0);
+
+	while ((p = va_arg(arglist, char *)) != NULL) {
+		argv[++i] = p;
+
+		trace_printf(0, ", \"%s\"", p);
+	}
+
+	char * const *envp = va_arg(arglist, char **);
+
+	trace_printf(0, ", envp);\n");
+
+	trace_printf(1, "char *envp[]=\n");
+	trace_printf(1, "{\n");
+
+	for (i = 0;; i++) {
+		if (envp[i] == NULL)
+			break;
+
+		trace_printf(1, "\t\"%s\",\n", envp[i]);
+	}
+	trace_printf(1, "\t0\n");
+	trace_printf(1, "}\n");
+
+	va_end(arglist);
+
+	int retVal = real_execve(path, (char * const *)argv, envp);
+
+	free(argv);
+
+	return retVal;
+}
+
+int
 execve(const char *path, char *const argv[], char *const envp[])
 {
 	real_execve = dlsym(RTLD_NEXT, "execve");
 
 	int i;
 
-	trace_printf(1, "execve(\"%s\"", argv[0]);
+	trace_printf(1, "execve(\"%s\"", path);
 
 	for (i = 0;; i++) {
 		if (argv[i] == NULL)
@@ -65,6 +177,66 @@ execve(const char *path, char *const argv[], char *const envp[])
 	trace_printf(1, "}\n");
 
 	return real_execve(path, argv, envp);
-
-	return (0);
 }
+
+int
+execlp(const char *file, const char *arg0, ... /*, (char *)0 */)
+{
+	real_execvp = dlsym(RTLD_NEXT, "execvp");
+
+	trace_printf(1, "execlp(\"%s\"", file);
+
+	va_list arglist;
+	va_start(arglist, arg0);
+
+	char *p = NULL;
+	int i = 1;
+	while ((p = va_arg(arglist, char *)) != NULL)
+		i++;
+
+	const char **argv = malloc(i * sizeof (char *));
+
+	i = 0;
+	argv[i] = arg0;
+
+	va_start (arglist, arg0);
+
+	while ((p = va_arg(arglist, char *)) != NULL) {
+		argv[++i] = p;
+
+		trace_printf(0, ", \"%s\"", p);
+	}
+
+	trace_printf(0, ");\n");
+
+	va_end(arglist);
+
+	int retVal = real_execvp(file, (char * const *)argv);
+
+	free(argv);
+
+	return retVal;
+}
+
+int
+execvp(const char *file, char *const argv[])
+{
+	real_execvp = dlsym(RTLD_NEXT, "execvp");
+
+	int i;
+
+	trace_printf(1, "execvp(\"%s\"", file);
+
+	for (i = 0;; i++) {
+		if (argv[i] == NULL)
+			break;
+
+		trace_printf(0, ", \"%s\"", argv[i]);
+	}
+
+	trace_printf(0, ");\n");
+
+	return real_execvp(file, argv);
+}
+
+/*execvpe, fexecve, execveat*/
