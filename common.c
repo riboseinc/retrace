@@ -55,7 +55,7 @@ trace_printf(int hdr, char *buf, ...)
 	if (!get_tracing_enabled())
 		return;
 
-	real_getpid = dlsym(RTLD_NEXT, "getpid");
+	real_getpid = rtr_dlsym(rtr_getpid);
 
 	char str[1024];
 
@@ -82,7 +82,7 @@ trace_printf_str(const char *string)
 	if (!get_tracing_enabled())
 		return;
 
-	real_strlen = dlsym(RTLD_NEXT, "strlen");
+	real_strlen = rtr_dlsym(rtr_strlen);
 
 	int    i;
 	size_t len = real_strlen(string);
@@ -144,7 +144,7 @@ get_redirect(const char *function, ...)
 	// Other functions that we have replaced
 	int old_tracing_enabled = set_tracing_enabled(0);
 
-	real_fopen = dlsym(RTLD_NEXT, "fopen");
+	real_fopen = rtr_dlsym(rtr_fopen);
 
 	config_file = real_fopen("/etc/retrace.conf", "r");
 
@@ -233,4 +233,67 @@ Cleanup:
 	set_tracing_enabled(old_tracing_enabled);
 
 	return retval;
+}
+
+void *
+rtr_dlsym(rtr_func_id id)
+{
+    static void * func_ptrs[rtr_end_func];
+
+    if (func_ptrs[id] == NULL) {
+        func_ptrs[rtr_accept] = dlsym(RTLD_NEXT, "accept");
+        func_ptrs[rtr_atoi] = dlsym(RTLD_NEXT, "atoi");
+        func_ptrs[rtr_bind] = dlsym(RTLD_NEXT, "bind");
+        func_ptrs[rtr_chmod] = dlsym(RTLD_NEXT, "chmod");
+        func_ptrs[rtr_close] = dlsym(RTLD_NEXT, "close");
+        func_ptrs[rtr_closedir] = dlsym(RTLD_NEXT, "closedir");
+        func_ptrs[rtr_connect] = dlsym(RTLD_NEXT, "connect");
+        func_ptrs[rtr_ctime] = dlsym(RTLD_NEXT, "ctime");
+        func_ptrs[rtr_ctime_r] = dlsym(RTLD_NEXT, "ctime_r");
+        func_ptrs[rtr_dup2] = dlsym(RTLD_NEXT, "dup2");
+        func_ptrs[rtr_dup] = dlsym(RTLD_NEXT, "dup");
+        func_ptrs[rtr_execve] = dlsym(RTLD_NEXT, "execve");
+        func_ptrs[rtr_exit] = dlsym(RTLD_NEXT, "exit");
+        func_ptrs[rtr_fchmod] = dlsym(RTLD_NEXT, "fchmod");
+        func_ptrs[rtr_fclose] = dlsym(RTLD_NEXT, "fclose");
+        func_ptrs[rtr_fileno] = dlsym(RTLD_NEXT, "fileno");
+        func_ptrs[rtr_fopen] = dlsym(RTLD_NEXT, "fopen");
+        func_ptrs[rtr_fork] = dlsym(RTLD_NEXT, "fork");
+        func_ptrs[rtr_free] = dlsym(RTLD_NEXT, "free");
+        func_ptrs[rtr_fseek] = dlsym(RTLD_NEXT, "fseek");
+        func_ptrs[rtr_getegid] = dlsym(RTLD_NEXT, "getegid");
+        func_ptrs[rtr_getenv] = dlsym(RTLD_NEXT, "getenv");
+        func_ptrs[rtr_geteuid] = dlsym(RTLD_NEXT, "geteuid");
+        func_ptrs[rtr_getgid] = dlsym(RTLD_NEXT, "getgid");
+        func_ptrs[rtr_getpid] = dlsym(RTLD_NEXT, "getpid");
+        func_ptrs[rtr_getppid] = dlsym(RTLD_NEXT, "getppid");
+        func_ptrs[rtr_getuid] = dlsym(RTLD_NEXT, "getuid");
+        func_ptrs[rtr_malloc] = dlsym(RTLD_NEXT, "malloc");
+        func_ptrs[rtr_opendir] = dlsym(RTLD_NEXT, "opendir");
+        func_ptrs[rtr_pclose] = dlsym(RTLD_NEXT, "pclose");
+        func_ptrs[rtr_perror] = dlsym(RTLD_NEXT, "perror");
+        func_ptrs[rtr_pipe2] = dlsym(RTLD_NEXT, "pipe2");
+        func_ptrs[rtr_pipe] = dlsym(RTLD_NEXT, "pipe");
+        func_ptrs[rtr_popen] = dlsym(RTLD_NEXT, "popen");
+        func_ptrs[rtr_putenv] = dlsym(RTLD_NEXT, "putenv");
+        func_ptrs[rtr_read] = dlsym(RTLD_NEXT, "read");
+        func_ptrs[rtr_seteuid] = dlsym(RTLD_NEXT, "seteuid");
+        func_ptrs[rtr_setgid] = dlsym(RTLD_NEXT, "setgid");
+        func_ptrs[rtr_setuid] = dlsym(RTLD_NEXT, "setuid");
+        func_ptrs[rtr_stat] = dlsym(RTLD_NEXT, "stat");
+        func_ptrs[rtr_strcat] = dlsym(RTLD_NEXT, "strcat");
+        func_ptrs[rtr_strcmp] = dlsym(RTLD_NEXT, "strcmp");
+        func_ptrs[rtr_strcpy] = dlsym(RTLD_NEXT, "strcpy");
+        func_ptrs[rtr_strlen] = dlsym(RTLD_NEXT, "strlen");
+        func_ptrs[rtr_strncat] = dlsym(RTLD_NEXT, "strncat");
+        func_ptrs[rtr_strncmp] = dlsym(RTLD_NEXT, "strncmp");
+        func_ptrs[rtr_strncpy] = dlsym(RTLD_NEXT, "strncpy");
+        func_ptrs[rtr_strstr] = dlsym(RTLD_NEXT, "strstr");
+        func_ptrs[rtr_system] = dlsym(RTLD_NEXT, "system");
+        func_ptrs[rtr_tolower] = dlsym(RTLD_NEXT, "tolower");
+        func_ptrs[rtr_toupper] = dlsym(RTLD_NEXT, "toupper");
+        func_ptrs[rtr_unsetenv] = dlsym(RTLD_NEXT, "unsetenv");
+        func_ptrs[rtr_write] = dlsym(RTLD_NEXT, "write");
+    }
+    return func_ptrs[id];
 }

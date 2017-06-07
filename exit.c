@@ -29,7 +29,7 @@
 void
 RETRACE_IMPLEMENTATION(exit)(int status)
 {
-	real_exit = dlsym(RTLD_NEXT, "exit");
+	real_exit = rtr_dlsym(rtr_exit);
 	trace_printf(1, "exit(%s%d%s);\n", VAR, status, RST);
 	real_exit(status);
 }

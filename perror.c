@@ -29,7 +29,7 @@
 void
 RETRACE_IMPLEMENTATION(perror)(const char *s)
 {
-	real_perror = dlsym(RTLD_NEXT, "perror");
+	real_perror = rtr_dlsym(rtr_perror);
 	trace_printf(1, "perror(\"%s\");\n", s);
 	return real_perror(s);
 }

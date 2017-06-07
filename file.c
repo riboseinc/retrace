@@ -30,7 +30,7 @@
 int
 RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 {
-	real_stat = dlsym(RTLD_NEXT, "stat");
+	real_stat = rtr_dlsym(rtr_stat);
 
 	trace_printf(1, "stat(\"%s\", \"\");\n", path);
 	return real_stat(path, buf);
@@ -41,7 +41,7 @@ RETRACE_REPLACE (stat)
 int
 RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode) 
 {
-	real_chmod = dlsym(RTLD_NEXT, "chmod");
+	real_chmod = rtr_dlsym(rtr_chmod);
 
 	trace_printf(1, "chmod(\"%s\", %o);\n", path, mode);
 	return real_chmod(path, mode);
@@ -52,7 +52,7 @@ RETRACE_REPLACE (chmod)
 int
 RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
 {
-	real_fchmod = dlsym(RTLD_NEXT, "fchmod");
+	real_fchmod = rtr_dlsym(rtr_fchmod);
 
 	trace_printf(1, "fchmod(%d, %o);\n", fd, mode);
 	return real_fchmod(fd, mode);
@@ -63,7 +63,7 @@ RETRACE_REPLACE (fchmod)
 int
 RETRACE_IMPLEMENTATION(fileno)(FILE *stream)
 {
-	real_fileno = dlsym(RTLD_NEXT, "fileno");
+	real_fileno = rtr_dlsym(rtr_fileno);
 	int fd = real_fileno(stream);
 
 	trace_printf(1, "fileno(%d);\n", fd);
@@ -75,8 +75,8 @@ RETRACE_REPLACE (fileno)
 int
 RETRACE_IMPLEMENTATION(fseek)(FILE *stream, long offset, int whence)
 {
-	real_fseek = dlsym(RTLD_NEXT, "fseek");
-	real_fileno = dlsym(RTLD_NEXT, "fileno");
+	real_fseek = rtr_dlsym(rtr_fseek);
+	real_fileno = rtr_dlsym(rtr_fileno);
 	int fd = real_fileno(stream);
 
 	trace_printf(1, "fseek(%d, %lx, ", fd, offset);
@@ -100,8 +100,8 @@ RETRACE_REPLACE (fseek)
 int
 RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
 {
-	real_fclose = dlsym(RTLD_NEXT, "fclose");
-	real_fileno = dlsym(RTLD_NEXT, "fileno");
+	real_fclose = rtr_dlsym(rtr_fclose);
+	real_fileno = rtr_dlsym(rtr_fileno);
 	int fd = real_fileno(stream);
 
 	trace_printf(1, "fclose(%d);\n", fd);
@@ -113,8 +113,8 @@ RETRACE_REPLACE (fclose)
 FILE *
 RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 {
-	real_fopen = dlsym(RTLD_NEXT, "fopen");
-	real_fileno = dlsym(RTLD_NEXT, "fileno");
+	real_fopen = rtr_dlsym(rtr_fopen);
+	real_fileno = rtr_dlsym(rtr_fileno);
 	int fd = 0;
 
 	FILE *ret = real_fopen(file, mode);
@@ -132,7 +132,7 @@ RETRACE_REPLACE (fopen)
 DIR *
 RETRACE_IMPLEMENTATION(opendir)(const char *dirname)
 {
-	real_opendir = dlsym(RTLD_NEXT, "opendir");
+	real_opendir = rtr_dlsym(rtr_opendir);
 	trace_printf(1, "opendir(\"%s\");\n", dirname);
 	return real_opendir(dirname);
 }
@@ -142,7 +142,7 @@ RETRACE_REPLACE (opendir)
 int
 RETRACE_IMPLEMENTATION(closedir)(DIR *dirp)
 {
-	real_closedir = dlsym(RTLD_NEXT, "closedir");
+	real_closedir = rtr_dlsym(rtr_closedir);
 	trace_printf(1, "closedir();\n");
 	return real_closedir(dirp);
 }
@@ -152,7 +152,7 @@ RETRACE_REPLACE (closedir)
 int
 RETRACE_IMPLEMENTATION(close)(int fd)
 {
-	real_close = dlsym(RTLD_NEXT, "close");
+	real_close = rtr_dlsym(rtr_close);
 	trace_printf(1, "close(%d);\n", fd);
 	return real_close(fd);
 }
@@ -162,7 +162,7 @@ RETRACE_REPLACE (close)
 int
 RETRACE_IMPLEMENTATION(dup)(int oldfd)
 {
-	real_dup = dlsym(RTLD_NEXT, "dup");
+	real_dup = rtr_dlsym(rtr_dup);
 	trace_printf(1, "dup(%d)\n", oldfd);
 	return real_dup(oldfd);
 }
@@ -172,7 +172,7 @@ RETRACE_REPLACE (dup)
 int
 RETRACE_IMPLEMENTATION(dup2)(int oldfd, int newfd)
 {
-	real_dup2 = dlsym(RTLD_NEXT, "dup2");
+	real_dup2 = rtr_dlsym(rtr_dup2);
 	trace_printf(1, "dup2(%d, %d)\n", oldfd, newfd);
 	return real_dup2(oldfd, newfd);
 }
