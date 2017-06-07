@@ -70,7 +70,7 @@ RETRACE_IMPLEMENTATION(strncmp)(const char *s1, const char *s2, size_t n)
 	trace_printf_str(s2);
 	trace_printf(0, "\", %zu);\n", n);
 
-	return strncmp(s1, s2, n);
+	return real_strncmp(s1, s2, n);
 }
 
 RETRACE_REPLACE (strncmp)
