@@ -2,7 +2,17 @@ OS 		= $(shell uname)
 LD		= ld
 GCC		= gcc
 RM		= rm -f
-RETRACE_CFLAGS	= $(CFLAGS) -fPIC -D_GNU_SOURCE -rdynamic -Wall
+
+ifeq ($(OS),Darwin)
+	RETRACE_CFLAGS = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
+else
+	RETRACE_CFLAGS  = $(CFLAGS) -fPIC -D_GNU_SOURCE -rdynamic -Wall
+endif
+
+# assume Sierra for now to silence ld warnings
+ifeq ($(OS),Darwin)
+	export MACOSX_DEPLOYMENT_TARGET = 10.12
+endif
 
 ifeq ($(OS),Darwin)
 	RETRACE_LDFLAGS = $(LDFLAGS) -dylib
