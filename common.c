@@ -71,10 +71,7 @@ trace_printf(int hdr, char *buf, ...)
 	if (hdr == 1)
 		fprintf(stderr, "(%d) ", real_getpid());
 
-	if (str != NULL)
-		fprintf(stderr, "%s", str);
-	else
-		fprintf(stderr, "%s(NULL)%s\n", VAR, RST);
+	fprintf(stderr, "%s", str);
 
 	va_end(arglist);
 }

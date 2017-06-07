@@ -26,48 +26,60 @@
 #include "common.h"
 #include "id.h"
 
+#include <unistd.h>
+
 int
-setuid(uid_t uid)
+RETRACE_IMPLEMENTATION(setuid)(uid_t uid)
 {
 	real_setuid = dlsym(RTLD_NEXT, "setuid");
 	trace_printf(1, "setuid(%d);\n", uid);
 	return real_setuid(uid);
 }
 
+RETRACE_REPLACE (setuid)
+
 int
-seteuid(uid_t uid)
+RETRACE_IMPLEMENTATION(seteuid)(uid_t uid)
 {
 	real_seteuid = dlsym(RTLD_NEXT, "seteuid");
 	trace_printf(1, "seteuid(%d);\n", uid);
 	return real_seteuid(uid);
 }
 
+RETRACE_REPLACE (seteuid)
+
 int
-setgid(gid_t gid)
+RETRACE_IMPLEMENTATION(setgid)(gid_t gid)
 {
 	real_setgid = dlsym(RTLD_NEXT, "setgid");
 	trace_printf(1, "setgid(%d);\n", gid);
 	return real_setgid(gid);
 }
 
+RETRACE_REPLACE (setgid)
+
 gid_t
-getgid()
+RETRACE_IMPLEMENTATION(getgid)()
 {
 	real_getgid = dlsym(RTLD_NEXT, "getgid");
 	trace_printf(1, "getgid();\n");
 	return real_getgid();
 }
 
+RETRACE_REPLACE (getgid)
+
 gid_t
-getegid()
+RETRACE_IMPLEMENTATION(getegid)()
 {
 	real_getegid = dlsym(RTLD_NEXT, "getegid");
 	trace_printf(1, "getegid();\n");
 	return real_getegid();
 }
 
+RETRACE_REPLACE (getegid)
+
 uid_t
-getuid()
+RETRACE_IMPLEMENTATION(getuid)()
 {
 	int redirect_id;
 	if (get_redirect("getuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
@@ -81,11 +93,13 @@ getuid()
 	return real_getuid();
 }
 
+RETRACE_REPLACE (getuid)
+
 uid_t
-geteuid()
+RETRACE_IMPLEMENTATION(geteuid)()
 {
 	int redirect_id;
-	if (get_redirect("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
+	if (get_redirect ("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 		trace_printf(1, "geteuid(); [redirection in effect: '%i']\n", redirect_id);
 
 		return redirect_id;
@@ -96,18 +110,25 @@ geteuid()
 	return real_geteuid();
 }
 
+RETRACE_REPLACE (geteuid)
+
 pid_t
-getpid(void)
+RETRACE_IMPLEMENTATION(getpid)(void)
 {
 	real_getpid = dlsym(RTLD_NEXT, "getpid");
 	trace_printf(1, "getpid();\n");
 	return real_getpid();
 }
 
+RETRACE_REPLACE (getpid)
+
 pid_t
-getppid(void)
+RETRACE_IMPLEMENTATION(getppid)(void)
 {
 	real_getppid = dlsym(RTLD_NEXT, "getppid");
 	trace_printf(1, "getppid(); [%d]\n", real_getppid());
 	return real_getppid();
 }
+
+RETRACE_REPLACE (getppid)
+

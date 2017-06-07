@@ -1,10 +1,22 @@
+OS 		= $(shell uname)
 LD		= ld
 GCC		= gcc
 RM		= rm -f
 RETRACE_CFLAGS	= $(CFLAGS) -fPIC -D_GNU_SOURCE -rdynamic -Wall
-RETRACE_LDFLAGS	= $(LDFLAGS) -G -z text --export-dynamic
+
+ifeq ($(OS),Darwin)
+	RETRACE_LDFLAGS = $(LDFLAGS) -dylib
+else
+	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
+endif
+
 RETRACE_LIBS	= -ldl -lncurses
-RETRACE_SO	= retrace.so
+
+ifeq ($(OS),Darwin)
+	RETRACE_SO	= retrace.dylib
+else
+	RETRACE_SO     = retrace.so
+endif
 
 SRCS		+= exit.c
 SRCS		+= perror.c

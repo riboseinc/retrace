@@ -26,8 +26,11 @@
 #include "common.h"
 #include "pipe.h"
 
+#include <unistd.h>
+
+
 int
-pipe(int pipefd[2])
+RETRACE_IMPLEMENTATION(pipe)(int pipefd[2])
 {
 	int ret;
 
@@ -38,8 +41,12 @@ pipe(int pipefd[2])
 	return ret;
 }
 
+RETRACE_REPLACE (pipe)
+
+#ifndef __APPLE__
+
 int
-pipe2(int pipefd[2], int flags)
+RETRACE_IMPLEMENTATION(pipe2)(int pipefd[2], int flags)
 {
 	int ret;
 
@@ -49,3 +56,7 @@ pipe2(int pipefd[2], int flags)
 
 	return ret;
 }
+
+RETRACE_REPLACE (pipe2)
+
+#endif

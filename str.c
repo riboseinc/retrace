@@ -22,12 +22,13 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <string.h>
 
 #include "common.h"
 #include "str.h"
 
 char *
-strstr(const char *s1, const char *s2)
+RETRACE_IMPLEMENTATION(strstr)(const char *s1, const char *s2)
 {
 	real_strstr = dlsym(RTLD_NEXT, "strstr");
 
@@ -40,8 +41,10 @@ strstr(const char *s1, const char *s2)
 	return real_strstr(s1, s2);
 }
 
+RETRACE_REPLACE (strstr)
+
 size_t
-strlen(const char *s)
+RETRACE_IMPLEMENTATION(strlen)(const char *s)
 {
 	real_strlen = dlsym(RTLD_NEXT, "strlen");
 
@@ -52,8 +55,10 @@ strlen(const char *s)
 	return len;
 }
 
+RETRACE_REPLACE (strlen)
+
 int
-strncmp(const char *s1, const char *s2, size_t n)
+RETRACE_IMPLEMENTATION(strncmp)(const char *s1, const char *s2, size_t n)
 {
 	real_strncmp = dlsym(RTLD_NEXT, "strncmp");
 
@@ -66,8 +71,10 @@ strncmp(const char *s1, const char *s2, size_t n)
 	return real_strncmp(s1, s2, n);
 }
 
+RETRACE_REPLACE (strncmp)
+
 int
-strcmp(const char *s1, const char *s2)
+RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 {
 	real_strcmp = dlsym(RTLD_NEXT, "strcmp");
 
@@ -80,8 +87,10 @@ strcmp(const char *s1, const char *s2)
 	return real_strcmp(s1, s2);
 }
 
+RETRACE_REPLACE (strcmp)
+
 char *
-strncpy(char *s1, const char *s2, size_t n)
+RETRACE_IMPLEMENTATION(strncpy)(char *s1, const char *s2, size_t n)
 {
 	real_strncpy = dlsym(RTLD_NEXT, "strncpy");
 	real_strlen = dlsym(RTLD_NEXT, "strlen");
@@ -95,8 +104,10 @@ strncpy(char *s1, const char *s2, size_t n)
 	return real_strncpy(s1, s2, n);
 }
 
+RETRACE_REPLACE (strncpy)
+
 char *
-strcat(char *s1, const char *s2)
+RETRACE_IMPLEMENTATION(strcat)(char *s1, const char *s2)
 {
 	real_strcat = dlsym(RTLD_NEXT, "strcat");
 	real_strlen = dlsym(RTLD_NEXT, "strlen");
@@ -110,8 +121,11 @@ strcat(char *s1, const char *s2)
 	return real_strcat(s1, s2);
 }
 
+RETRACE_REPLACE (strcat)
+
+
 char *
-strncat(char *s1, const char *s2, size_t n)
+RETRACE_IMPLEMENTATION(strncat)(char *s1, const char *s2, size_t n)
 {
 	real_strncat = dlsym(RTLD_NEXT, "strncat");
 	real_strlen = dlsym(RTLD_NEXT, "strlen");
@@ -125,8 +139,10 @@ strncat(char *s1, const char *s2, size_t n)
 	return real_strncat(s1, s2, n);
 }
 
+RETRACE_REPLACE (strncat)
+
 char *
-strcpy(char *s1, const char *s2)
+RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
 {
 	real_strcpy = dlsym(RTLD_NEXT, "strcpy");
 	real_strlen = dlsym(RTLD_NEXT, "strlen");
@@ -139,3 +155,6 @@ strcpy(char *s1, const char *s2)
 
 	return real_strcpy(s1, s2);
 }
+
+RETRACE_REPLACE (strcpy)
+
