@@ -50,7 +50,9 @@ RETRACE_IMPLEMENTATION(strlen)(const char *s)
 
 	size_t len = real_strlen(s);
 
-	trace_printf(1, "strlen(\"%s\"); [len: %zu]\n", s, len);
+	trace_printf(1, "strlen(\"");
+	trace_printf_str(s);
+	trace_printf(0, "\"); [len: %zu]\n", len);
 
 	return len;
 }
@@ -99,7 +101,7 @@ RETRACE_IMPLEMENTATION(strncpy)(char *s1, const char *s2, size_t n)
 
 	trace_printf(1, "strncpy(%p, \"", s2);
 	trace_printf_str(s2);
-	trace_printf(0, "\" [len: %d], %zu);\n", len, n);
+	trace_printf(0, "\", %zu); [len: %d]\n", n, len);
 
 	return real_strncpy(s1, s2, n);
 }
@@ -123,7 +125,6 @@ RETRACE_IMPLEMENTATION(strcat)(char *s1, const char *s2)
 
 RETRACE_REPLACE (strcat)
 
-
 char *
 RETRACE_IMPLEMENTATION(strncat)(char *s1, const char *s2, size_t n)
 {
@@ -134,7 +135,7 @@ RETRACE_IMPLEMENTATION(strncat)(char *s1, const char *s2, size_t n)
 
 	trace_printf(1, "strncat(%p, \"", s1);
 	trace_printf_str(s2);
-	trace_printf(0, "\", %zu\"); [len: %zu]\n", len, n);
+	trace_printf(0, "\", %zu); [len: %zu]\n", n, len);
 
 	return real_strncat(s1, s2, n);
 }
@@ -151,10 +152,9 @@ RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
 
 	trace_printf(1, "strcpy(%p, \"", s1);
 	trace_printf_str(s2);
-	trace_printf(0, "\" [%zu]);\n", len);
+	trace_printf(0, "\"); [len: %zu]\n", len);
 
 	return real_strcpy(s1, s2);
 }
 
 RETRACE_REPLACE (strcpy)
-
