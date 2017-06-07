@@ -31,7 +31,7 @@ RETRACE_IMPLEMENTATION(fork)(void)
 {
 	pid_t p;
 
-	real_fork = dlsym(RTLD_NEXT, "fork");
+	real_fork = RETRACE_GET_REAL(fork);
 	p = real_fork();
 	trace_printf(1, "fork(); [%d]\n", p);
 

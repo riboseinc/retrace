@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "str.h"
@@ -55,7 +56,7 @@ trace_printf(int hdr, char *buf, ...)
 	if (!get_tracing_enabled())
 		return;
 
-	real_getpid = dlsym(RTLD_NEXT, "getpid");
+	int old_tracing_enabled = set_tracing_enabled(0);
 
 	char str[1024];
 
@@ -69,11 +70,13 @@ trace_printf(int hdr, char *buf, ...)
 	str[sizeof(str) - 1] = '\0';
 
 	if (hdr == 1)
-		fprintf(stderr, "(%d) ", real_getpid());
+		fprintf(stderr, "(%d) ", getpid());
 
 	fprintf(stderr, "%s", str);
 
 	va_end(arglist);
+
+	set_tracing_enabled(old_tracing_enabled);
 }
 
 void
@@ -82,10 +85,10 @@ trace_printf_str(const char *string)
 	if (!get_tracing_enabled())
 		return;
 
-	real_strlen = dlsym(RTLD_NEXT, "strlen");
+	int old_tracing_enabled = set_tracing_enabled(0);
 
 	int    i;
-	size_t len = real_strlen(string);
+	size_t len = strlen(string);
 
 	if (len > MAXLEN)
 		len = MAXLEN;
@@ -104,6 +107,8 @@ trace_printf_str(const char *string)
 
 	if (len > (MAXLEN - 1))
 		trace_printf(0, "%s[SNIP]%s", VAR, RST);
+
+	set_tracing_enabled(old_tracing_enabled);
 }
 
 int
