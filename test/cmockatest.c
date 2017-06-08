@@ -310,7 +310,6 @@ assert_true(r > 0 && r == r1);
 assert_string_equal(buf, buf1);
 RTR_TEST_END
 
-#include <errno.h>
 RTR_TEST_START(fprintf)
 char buf[256], buf1[256];
 FILE *f = fmemopen(buf, 256, "w");
@@ -388,6 +387,28 @@ assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 int
+to_vfprintf(rtr_vfprintf_t fn, FILE *f, const char * fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	int result = fn(f, fmt, ap);
+	va_end(ap);
+	return result;
+}
+
+RTR_TEST_START(vfprintf)
+char buf[256], buf1[256];
+FILE *f = fmemopen(buf, 256, "w");
+FILE *f1 = fmemopen(buf1, 256, "w");
+int r = to_vfprintf(rtr_vfprintf, f, "%d %s %c", 42, "forty two", 42);
+int r1 = to_vfprintf(vfprintf, f1, "%d %s %c", 42, "forty two", 42);
+fclose(f);
+fclose(f1);
+assert_true(r > 0 && r == r1);
+assert_string_equal(buf, buf1);
+RTR_TEST_END
+
+int
 main(void)
 {
     int                     ret;
@@ -422,6 +443,7 @@ main(void)
       cmocka_unit_test(test_rtr_printf),   cmocka_unit_test(test_rtr_fprintf),
       cmocka_unit_test(test_rtr_dprintf),  cmocka_unit_test(test_rtr_sprintf),
       cmocka_unit_test(test_rtr_snprintf), cmocka_unit_test(test_rtr_vprintf),
+      cmocka_unit_test(test_rtr_vfprintf),
     };
 
     handle = dlopen("../retrace.so", RTLD_LAZY);

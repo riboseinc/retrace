@@ -167,11 +167,35 @@ RETRACE_IMPLEMENTATION(vprintf)(const char *fmt, va_list ap)
 	vsnprintf_(buf, 1024, fmt, ap1);
 	va_end(ap1);
 
-	trace_printf(1, "printf(\"");
+	trace_printf(1, "vprintf(\"");
 	trace_printf_str(fmt);
 	trace_printf(0, "\" > \"");
 	trace_printf_str(buf);
 	trace_printf(0, "\")[%d]\n", result);
+
+	return result;
+}
+
+int
+RETRACE_IMPLEMENTATION(vfprintf)(FILE *stream, const char *fmt, va_list ap)
+{
+	char buf[1024];
+	rtr_vfprintf_t vfprintf_ = dlsym(RTLD_NEXT, "vfprintf");
+	rtr_vsnprintf_t vsnprintf_ = dlsym(RTLD_NEXT, "vsnprintf");
+	rtr_fileno_t fileno_ = dlsym(RTLD_NEXT, "fileno");
+
+	va_list ap1;
+	va_copy(ap1, ap);
+
+	int result = vfprintf_(stream, fmt, ap);
+	vsnprintf_(buf, 1024, fmt, ap1);
+	va_end(ap1);
+
+	trace_printf(1, "vfprintf(\"");
+	trace_printf_str(fmt);
+	trace_printf(0, "\" > \"");
+	trace_printf_str(buf);
+	trace_printf(0, "\")[fd=%d][%d]\n", fileno_(stream), result);
 
 	return result;
 }
