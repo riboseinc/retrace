@@ -300,23 +300,46 @@ RTR_TEST_START(printf)
 char buf[256], buf1[256];
 FILE *oldstdout = stdout;
 stdout = fmemopen(buf, 256, "w");
-rtr_printf("%d %s %c", 42, "forty two", 42);
+int r = rtr_printf("%d %s %c", 42, "forty two", 42);
 fclose(stdout);
 stdout = fmemopen(buf1, 256, "w");
-printf("%d %s %c", 42, "forty two", 42);
+int r1 = printf("%d %s %c", 42, "forty two", 42);
 fclose(stdout);
 stdout = oldstdout;
+assert_true(r > 0 && r == r1);
 assert_string_equal(buf, buf1);
 RTR_TEST_END
 
+#include <errno.h>
 RTR_TEST_START(fprintf)
 char buf[256], buf1[256];
 FILE *f = fmemopen(buf, 256, "w");
 FILE *f1 = fmemopen(buf1, 256, "w");
-rtr_fprintf(f, "%d %s %c", 42, "forty two", 42);
-fprintf(f1, "%d %s %c", 42, "forty two", 42);
+int r = rtr_fprintf(f, "%d %s %c", 42, "forty two", 42);
+int r1 = fprintf(f1, "%d %s %c", 42, "forty two", 42);
 fclose(f);
 fclose(f1);
+assert_true(r > 0 && r == r1);
+assert_string_equal(buf, buf1);
+RTR_TEST_END
+
+RTR_TEST_START(dprintf)
+char buf[256], buf1[256];
+int fd[2], fd1[2];
+
+pipe(fd);
+int r = rtr_dprintf(fd[1], "%d %s %c", 42, "forty two", 42);
+read(fd[0], buf, 256);
+close(fd[0]);
+close(fd[1]);
+
+pipe(fd1);
+int r1 = dprintf(fd1[1], "%d %s %c", 42, "forty two", 42);
+read(fd1[0], buf1, 256);
+close(fd1[0]);
+close(fd1[1]);
+
+assert_true(r > 0 && r == r1);
 assert_string_equal(buf, buf1);
 RTR_TEST_END
 
@@ -353,6 +376,7 @@ main(void)
       cmocka_unit_test(test_rtr_popen),    cmocka_unit_test(test_rtr_pclose),
       cmocka_unit_test(test_rtr_pipe),     cmocka_unit_test(test_rtr_pipe2),
       cmocka_unit_test(test_rtr_printf),   cmocka_unit_test(test_rtr_fprintf),
+      cmocka_unit_test(test_rtr_dprintf),
     };
 
     handle = dlopen("../retrace.so", RTLD_LAZY);

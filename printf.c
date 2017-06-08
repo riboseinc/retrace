@@ -81,3 +81,29 @@ RETRACE_IMPLEMENTATION(fprintf)(FILE *stream, const char *fmt, ...)
 
 	return result;
 }
+
+int
+RETRACE_IMPLEMENTATION(dprintf)(int fd, const char *fmt, ...)
+{
+	char buf[1024];
+	rtr_vdprintf_t vdprintf_ = dlsym(RTLD_NEXT, "vdprintf");
+	rtr_vsnprintf_t vsnprintf_ = dlsym(RTLD_NEXT, "vsnprintf");
+
+	va_list arglist;
+
+	va_start(arglist, fmt);
+	int result = vdprintf_(fd, fmt, arglist);
+	va_end(arglist);
+
+	va_start(arglist, fmt);
+	vsnprintf_(buf, 1024, fmt, arglist);
+	va_end(arglist);
+
+	trace_printf(1, "dprintf(\"");
+	trace_printf_str(fmt);
+	trace_printf(0, "\" > \"");
+	trace_printf_str(buf);
+	trace_printf(0, "\")[fd=%d][%d]\n", fd, result);
+
+	return result;
+}
