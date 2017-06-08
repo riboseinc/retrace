@@ -27,6 +27,7 @@
 #include "fork.h"
 #include "popen.h"
 #include "pipe.h"
+#include "printf.h"
 
 void *handle;
 
@@ -295,6 +296,19 @@ ret = rtr_pipe2(pipefd, O_NONBLOCK);
 test_pipe_common(ret, pipefd);
 RTR_TEST_END
 
+RTR_TEST_START(printf)
+char buf[256], buf1[256];
+FILE *oldstdout = stdout;
+stdout = fmemopen(buf, 256, "w");
+rtr_printf("%d %s %c", 42, "forty two", 42);
+fclose(stdout);
+stdout = fmemopen(buf1, 256, "w");
+printf("%d %s %c", 42, "forty two", 42);
+fclose(stdout);
+stdout = oldstdout;
+assert_string_equal(buf, buf1);
+RTR_TEST_END
+
 int
 main(void)
 {
@@ -327,6 +341,7 @@ main(void)
       cmocka_unit_test(test_rtr_free),     cmocka_unit_test(test_rtr_fork),
       cmocka_unit_test(test_rtr_popen),    cmocka_unit_test(test_rtr_pclose),
       cmocka_unit_test(test_rtr_pipe),     cmocka_unit_test(test_rtr_pipe2),
+      cmocka_unit_test(test_rtr_printf),
     };
 
     handle = dlopen("../retrace.so", RTLD_LAZY);
