@@ -343,6 +343,16 @@ assert_true(r > 0 && r == r1);
 assert_string_equal(buf, buf1);
 RTR_TEST_END
 
+RTR_TEST_START(sprintf)
+char buf[256], buf1[256];
+
+int r = rtr_sprintf(buf, "%d %s %c", 42, "forty two", 42);
+int r1 = sprintf(buf1, "%d %s %c", 42, "forty two", 42);
+
+assert_true(r > 0 && r == r1);
+assert_string_equal(buf, buf1);
+RTR_TEST_END
+
 int
 main(void)
 {
@@ -376,7 +386,7 @@ main(void)
       cmocka_unit_test(test_rtr_popen),    cmocka_unit_test(test_rtr_pclose),
       cmocka_unit_test(test_rtr_pipe),     cmocka_unit_test(test_rtr_pipe2),
       cmocka_unit_test(test_rtr_printf),   cmocka_unit_test(test_rtr_fprintf),
-      cmocka_unit_test(test_rtr_dprintf),
+      cmocka_unit_test(test_rtr_dprintf),  cmocka_unit_test(test_rtr_sprintf),
     };
 
     handle = dlopen("../retrace.so", RTLD_LAZY);
