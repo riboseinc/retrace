@@ -27,15 +27,17 @@
 #include "exec.h"
 
 int
-system(const char *command)
+RETRACE_IMPLEMENTATION(system)(const char *command)
 {
 	real_system = dlsym(RTLD_NEXT, "system");
 	trace_printf(1, "system(\"%s\");\n", command);
 	return real_system(command);
 }
 
+RETRACE_REPLACE (system)
+
 int
-execl(const char *path, const char *arg0, ... /*, (char *)0 */)
+RETRACE_IMPLEMENTATION(execl)(const char *path, const char *arg0, ... /*, (char *)0 */)
 {
 	real_execv = dlsym(RTLD_NEXT, "execv");
 
@@ -73,8 +75,10 @@ execl(const char *path, const char *arg0, ... /*, (char *)0 */)
 	return retVal;
 }
 
+RETRACE_IMPLEMENTATION(execl)
+
 int
-execv(const char *path, char *const argv[])
+RETRACE_IMPLEMENTATION(execv)(const char *path, char *const argv[])
 {
 	real_execv = dlsym(RTLD_NEXT, "execv");
 
@@ -94,8 +98,10 @@ execv(const char *path, char *const argv[])
 	return real_execv(path, argv);
 }
 
+RETRACE_IMPLEMENTATION(execv)
+
 int
-execle(const char *path, const char *arg0, ... /*, (char *)0, char *const envp[]*/)
+RETRACE_IMPLEMENTATION(execle)(const char *path, const char *arg0, ... /*, (char *)0, char *const envp[]*/)
 {
 	real_execve = dlsym(RTLD_NEXT, "execve");
 
@@ -147,8 +153,10 @@ execle(const char *path, const char *arg0, ... /*, (char *)0, char *const envp[]
 	return retVal;
 }
 
+RETRACE_IMPLEMENTATION(execle)
+
 int
-execve(const char *path, char *const argv[], char *const envp[])
+RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *const envp[])
 {
 	real_execve = dlsym(RTLD_NEXT, "execve");
 
@@ -180,8 +188,10 @@ execve(const char *path, char *const argv[], char *const envp[])
 	return real_execve(path, argv, envp);
 }
 
+RETRACE_IMPLEMENTATION(execve)
+
 int
-execlp(const char *file, const char *arg0, ... /*, (char *)0 */)
+RETRACE_IMPLEMENTATION(execlp)(const char *file, const char *arg0, ... /*, (char *)0 */)
 {
 	real_execvp = dlsym(RTLD_NEXT, "execvp");
 
@@ -219,8 +229,10 @@ execlp(const char *file, const char *arg0, ... /*, (char *)0 */)
 	return retVal;
 }
 
+RETRACE_IMPLEMENTATION(execlp)
+
 int
-execvp(const char *file, char *const argv[])
+RETRACE_IMPLEMENTATION(execvp)(const char *file, char *const argv[])
 {
 	real_execvp = dlsym(RTLD_NEXT, "execvp");
 
@@ -240,8 +252,10 @@ execvp(const char *file, char *const argv[])
 	return real_execvp(file, argv);
 }
 
+RETRACE_IMPLEMENTATION(execvp)
+
 int
-execvpe(const char *file, char *const argv[], char *const envp[])
+RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *const envp[])
 {
 	real_execvpe = dlsym(RTLD_NEXT, "execvpe");
 
@@ -273,8 +287,10 @@ execvpe(const char *file, char *const argv[], char *const envp[])
 	return real_execvpe(file, argv, envp);
 }
 
+RETRACE_IMPLEMENTATION(execvpe)
+
 int
-execveat(int dirfd, const char *pathname, char *const argv[], char *const envp[], int flags)
+RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname, char *const argv[], char *const envp[], int flags)
 {
 	real_execveat = dlsym(RTLD_NEXT, "execveat");
 
@@ -307,7 +323,10 @@ execveat(int dirfd, const char *pathname, char *const argv[], char *const envp[]
 	return real_execveat(dirfd, pathname, argv, envp, flags);
 }
 
-int fexecve(int fd, char *const argv[], char *const envp[])
+RETRACE_IMPLEMENTATION(execveat)
+
+int
+RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp[])
 {
 	real_fexecve = dlsym(RTLD_NEXT, "fexecve");
 
@@ -340,4 +359,4 @@ int fexecve(int fd, char *const argv[], char *const envp[])
 	return fexecve(fd, argv, envp);
 }
 
-/*fexecve*/
+RETRACE_IMPLEMENTATION(fexecve)
