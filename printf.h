@@ -24,5 +24,7 @@
  */
 
 typedef int (*rtr_printf_t)(const char *fmt, ...);
+typedef int (*rtr_fprintf_t)(FILE *stream, const char *fmt, ...);
 typedef int (*rtr_vprintf_t)(const char *fmt, va_list ap);
+typedef int (*rtr_vfprintf_t)(FILE *stream, const char *fmt, va_list ap);
 typedef int (*rtr_vsnprintf_t)(char *buf, size_t size, const char *fmt, va_list ap);

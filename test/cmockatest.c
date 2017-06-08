@@ -309,6 +309,17 @@ stdout = oldstdout;
 assert_string_equal(buf, buf1);
 RTR_TEST_END
 
+RTR_TEST_START(fprintf)
+char buf[256], buf1[256];
+FILE *f = fmemopen(buf, 256, "w");
+FILE *f1 = fmemopen(buf1, 256, "w");
+rtr_fprintf(f, "%d %s %c", 42, "forty two", 42);
+fprintf(f1, "%d %s %c", 42, "forty two", 42);
+fclose(f);
+fclose(f1);
+assert_string_equal(buf, buf1);
+RTR_TEST_END
+
 int
 main(void)
 {
@@ -341,7 +352,7 @@ main(void)
       cmocka_unit_test(test_rtr_free),     cmocka_unit_test(test_rtr_fork),
       cmocka_unit_test(test_rtr_popen),    cmocka_unit_test(test_rtr_pclose),
       cmocka_unit_test(test_rtr_pipe),     cmocka_unit_test(test_rtr_pipe2),
-      cmocka_unit_test(test_rtr_printf),
+      cmocka_unit_test(test_rtr_printf),   cmocka_unit_test(test_rtr_fprintf),
     };
 
     handle = dlopen("../retrace.so", RTLD_LAZY);

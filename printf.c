@@ -27,6 +27,7 @@
 
 #include "common.h"
 #include "printf.h"
+#include "file.h"
 
 int
 RETRACE_IMPLEMENTATION(printf)(const char *fmt, ...)
@@ -49,7 +50,34 @@ RETRACE_IMPLEMENTATION(printf)(const char *fmt, ...)
 	trace_printf_str(fmt);
 	trace_printf(0, "\" > \"");
 	trace_printf_str(buf);
-	trace_printf(0, "\") [%d]\n", result);
+	trace_printf(0, "\")[%d]\n", result);
+
+	return result;
+}
+
+int
+RETRACE_IMPLEMENTATION(fprintf)(FILE *stream, const char *fmt, ...)
+{
+	char buf[1024];
+	rtr_vfprintf_t vfprintf_ = dlsym(RTLD_NEXT, "vfprintf");
+	rtr_vsnprintf_t vsnprintf_ = dlsym(RTLD_NEXT, "vsnprintf");
+	rtr_fileno_t fileno_ = dlsym(RTLD_NEXT, "fileno");
+
+	va_list arglist;
+
+	va_start(arglist, fmt);
+	int result = vfprintf_(stream, fmt, arglist);
+	va_end(arglist);
+
+	va_start(arglist, fmt);
+	vsnprintf_(buf, 1024, fmt, arglist);
+	va_end(arglist);
+
+	trace_printf(1, "fprintf(\"");
+	trace_printf_str(fmt);
+	trace_printf(0, "\" > \"");
+	trace_printf_str(buf);
+	trace_printf(0, "\")[fd=%d][%d]\n", fileno_(stream), result);
 
 	return result;
 }
