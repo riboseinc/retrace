@@ -26,7 +26,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
+#include <sys/types.h>
+#include <pwd.h>
+      
 #include "common.h"
 #include "str.h"
 #include "id.h"
@@ -146,7 +148,38 @@ get_redirect(const char *function, ...)
 
 	real_fopen = dlsym(RTLD_NEXT, "fopen");
 
-	config_file = real_fopen("/etc/retrace.conf", "r");
+	// If we have a RETRACE_CONFIG env var, try to open the config file
+	// from there
+	char *file_path = getenv("RETRACE_CONFIG");
+
+	if (file_path)
+		config_file = real_fopen(file_path, "r");
+
+
+	// If we couldn't open the file from the env var try to home it from ~/.retrace.conf
+	if (!config_file) {
+		struct passwd *pw = getpwuid(getuid());
+
+		if (pw && pw->pw_dir) {
+			char *file_name_user = ".retrace.conf";
+			char *file_path_user = (char *) malloc (strlen (pw->pw_dir) + strlen (file_name_user) + 2);
+
+			if (file_path_user) {
+				strcpy (file_path_user, pw->pw_dir);
+				strcat (file_path_user, "/");
+				strcat (file_path_user, file_name_user);
+
+				config_file = real_fopen(file_path_user, "r");
+
+				free (file_path_user);
+			}
+		}
+	}
+
+	// Finally if the above failed try to open /etc/retrace.conf
+	if (!config_file) {
+		config_file = real_fopen("/etc/retrace.conf", "r");
+	}
 
 	if (!config_file)
 		goto Cleanup;
