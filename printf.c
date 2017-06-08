@@ -125,7 +125,7 @@ RETRACE_IMPLEMENTATION(sprintf)(char *str, const char *fmt, ...)
 	vsnprintf_(buf, 1024, fmt, arglist);
 	va_end(arglist);
 
-	trace_printf(1, "dprintf(\"");
+	trace_printf(1, "sprintf(\"");
 	trace_printf_str(fmt);
 	trace_printf(0, "\" > \"");
 	trace_printf_str(buf);
@@ -144,7 +144,7 @@ RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
 	int result = vsnprintf_(str, size, fmt, arglist);
 	va_end(arglist);
 
-	trace_printf(1, "dprintf(\"");
+	trace_printf(1, "snprintf(\"");
 	trace_printf_str(fmt);
 	trace_printf(0, "\" > \"");
 	trace_printf_str(str);
@@ -196,6 +196,29 @@ RETRACE_IMPLEMENTATION(vfprintf)(FILE *stream, const char *fmt, va_list ap)
 	trace_printf(0, "\" > \"");
 	trace_printf_str(buf);
 	trace_printf(0, "\")[fd=%d][%d]\n", fileno_(stream), result);
+
+	return result;
+}
+
+int
+RETRACE_IMPLEMENTATION(vdprintf)(int fd, const char *fmt, va_list ap)
+{
+	char buf[1024];
+	rtr_vdprintf_t vdprintf_ = dlsym(RTLD_NEXT, "vdprintf");
+	rtr_vsnprintf_t vsnprintf_ = dlsym(RTLD_NEXT, "vsnprintf");
+
+	va_list ap1;
+	va_copy(ap1, ap);
+
+	int result = vdprintf_(fd, fmt, ap);
+	vsnprintf_(buf, 1024, fmt, ap1);
+	va_end(ap1);
+
+	trace_printf(1, "%s(\"", __func__);
+	trace_printf_str(fmt);
+	trace_printf(0, "\" > \"");
+	trace_printf_str(buf);
+	trace_printf(0, "\")[fd=%d][%d]\n", fd, result);
 
 	return result;
 }

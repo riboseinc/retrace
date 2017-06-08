@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <ctype.h>
+#include <string.h>
 
 #include <cmocka.h>
 
@@ -35,7 +37,8 @@ void *handle;
     static void test_rtr_##func(void **state)             \
     {                                                     \
         rtr_##func##_t rtr_##func = dlsym(handle, #func); \
-        assert_non_null(rtr_##func);
+        assert_non_null(rtr_##func);					  \
+		assert_ptr_not_equal(rtr_##func, func);
 
 #define RTR_TEST_END }
 
@@ -362,7 +365,7 @@ assert_true(r > 0 && r == r1);
 assert_string_equal(buf, buf1);
 RTR_TEST_END
 
-int
+static int
 to_vprintf(rtr_vprintf_t fn, const char * fmt, ...)
 {
 	va_list ap;
@@ -386,7 +389,7 @@ assert_true(r > 0 && r == r1);
 assert_string_equal(buf, buf1);
 RTR_TEST_END
 
-int
+static int
 to_vfprintf(rtr_vfprintf_t fn, FILE *f, const char * fmt, ...)
 {
 	va_list ap;
@@ -404,6 +407,36 @@ int r = to_vfprintf(rtr_vfprintf, f, "%d %s %c", 42, "forty two", 42);
 int r1 = to_vfprintf(vfprintf, f1, "%d %s %c", 42, "forty two", 42);
 fclose(f);
 fclose(f1);
+assert_true(r > 0 && r == r1);
+assert_string_equal(buf, buf1);
+RTR_TEST_END
+
+static int
+to_vdprintf(rtr_vdprintf_t fn, int fd, const char * fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	int result = fn(fd, fmt, ap);
+	va_end(ap);
+	return result;
+}
+
+RTR_TEST_START(vdprintf)
+char buf[256], buf1[256];
+int fd[2], fd1[2];
+
+pipe(fd);
+int r = to_vdprintf(rtr_vdprintf, fd[1], "%d %s %c", 42, "forty two", 42);
+read(fd[0], buf, 256);
+close(fd[0]);
+close(fd[1]);
+
+pipe(fd1);
+int r1 = to_vdprintf(vdprintf, fd1[1], "%d %s %c", 42, "forty two", 42);
+read(fd1[0], buf1, 256);
+close(fd1[0]);
+close(fd1[1]);
+
 assert_true(r > 0 && r == r1);
 assert_string_equal(buf, buf1);
 RTR_TEST_END
@@ -443,7 +476,7 @@ main(void)
       cmocka_unit_test(test_rtr_printf),   cmocka_unit_test(test_rtr_fprintf),
       cmocka_unit_test(test_rtr_dprintf),  cmocka_unit_test(test_rtr_sprintf),
       cmocka_unit_test(test_rtr_snprintf), cmocka_unit_test(test_rtr_vprintf),
-      cmocka_unit_test(test_rtr_vfprintf),
+      cmocka_unit_test(test_rtr_vfprintf), cmocka_unit_test(test_rtr_vdprintf),
     };
 
     handle = dlopen("../retrace.so", RTLD_LAZY);
