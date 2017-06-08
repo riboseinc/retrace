@@ -1,7 +1,7 @@
 # Introduction
-"retrace" is Linux shared object that displays C library calls and has the ability to redirect function inputs and outputs.
+"retrace" is Linux (shared object) and macOS (dynamic library) that displays C library calls and has the ability to redirect function inputs and outputs.
 
-retrace can be used to assist revese engineering/debugging dynamically linked binary Linux software.
+retrace can be used to assist revese engineering/debugging dynamically linked binary Linux ELF and macOS Mach-O executables.
 
 # Compilation
 ```
@@ -10,7 +10,7 @@ $ make
 
 # Trace usage example
 ```
-$ LD_PRELOAD=./retrace.so /usr/bin/id
+$ ./retrace.sh /usr/bin/id
 (2051) geteuid();
 (2051) getuid();
 (2051) getegid();
@@ -33,7 +33,8 @@ uid=1000(test) gid=1000(test) groups=1000(test),10(wheel)
 
 # Redirect usage example
 ```
-$ LD_PRELOAD=./retrace.so /usr/bin/id
+$ export RETRACE_CONFIG="/home/test/retrace_redirect.conf"
+$ ./retrace.sh /usr/bin/id
 (4982) geteuid(); [redirection in effect: '0']
 (4982) getuid(); [redirection in effect: '0']
 (4982) getegid(); [redirection in effect: '0']

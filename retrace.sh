@@ -2,16 +2,42 @@
 
 readonly __progname="$(basename $0)"
 
-if [ -z "$1" ]; then
+errx() {
+	echo -e "${__progname}: $@" >&2
+	exit 1
+}
+
+usage() {
 	echo "usage: ${__progname} <executable>"
 	exit 1
-fi
+}
 
-readonly so="./retrace.so"
+main() {
+	[ -z "$1" ] && \
+		usage
 
-if [ ! -f "${so}" ]; then
-	echo "${__progname}: cannot open '${so}'"
-	exit 1
-fi
+	if [[ "${RETRACE_CONFIG}" ]]; then
+		readonly local config="${RETRACE_CONFIG}"
 
-LD_PRELOAD="${so}" "$@"
+		[ ! -f "${config}" ] && \
+			errx "cannot open '${config}'"
+	fi
+
+	if $(uname | grep -q ^Darwin); then
+		readonly lib="./retrace.dylib"
+		[ ! -f "${lib}" ] && \
+			errx "cannot open '${lib}'"
+
+		DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${lib}" "$@"
+	else
+		readonly lib="./retrace.so"
+		[ ! -f "${lib}" ] && \
+			errx "cannot open '${lib}'"
+
+		LD_PRELOAD="${lib}" "$@"
+	fi
+}
+
+main "$@"
+
+exit $?

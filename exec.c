@@ -25,6 +25,7 @@
 
 #include "common.h"
 #include "exec.h"
+#include <unistd.h>
 
 int
 RETRACE_IMPLEMENTATION(system)(const char *command)

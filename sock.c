@@ -25,19 +25,18 @@
 
 #include "common.h"
 #include "sock.h"
+#include <arpa/inet.h>
 
 int inet_pton(int af, const char *src, void *dst);
-unsigned short htons(unsigned short hostshort);
-unsigned short ntohs(unsigned short netshort);
 
 int
-connect(int fd, const struct sockaddr *address, socklen_t len)
+RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_t len)
 {
-	char *	 redirect_ip = NULL;
-	char *	 match_ip = NULL;
-	int	    match_port;
-	int	    redirect_port;
-	unsigned short port = ntohs(*(unsigned short *) &address->sa_data[0]);
+	char *redirect_ip = NULL;
+	char *match_ip = NULL;
+	int match_port;
+	int redirect_port;
+	unsigned short port = ntohs(*(unsigned short *)&address->sa_data[0]);
 
 	real_connect = dlsym(RTLD_NEXT, "connect");
 
@@ -76,6 +75,7 @@ connect(int fd, const struct sockaddr *address, socklen_t len)
 			inet_pton(
 			  AF_INET, redirect_ip, (struct in_addr *) &redirect_addr.sa_data[2]);
 
+
 			trace_printf(
 			  1,
 			  "connect(%d, \"%hu.%hu.%hu.%hu:%u\", %zu); [redirection in effect: "
@@ -93,6 +93,10 @@ connect(int fd, const struct sockaddr *address, socklen_t len)
 			  (unsigned short) redirect_addr.sa_data[5] & 0xFF,
 			  redirect_port);
 
+            // cleanup
+            free(redirect_ip);
+            free(match_ip);
+
 			return real_connect(fd, &redirect_addr, len);
 		}
 	}
@@ -107,11 +111,17 @@ connect(int fd, const struct sockaddr *address, socklen_t len)
 		     port,
 		     len);
 
+    // cleanup
+    free(redirect_ip);
+    free(match_ip);
+
 	return real_connect(fd, address, len);
 }
 
+RETRACE_REPLACE(connect)
+
 int
-bind(int fd, const struct sockaddr *address, socklen_t len)
+RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen_t len)
 {
 	real_bind = dlsym(RTLD_NEXT, "bind");
 
@@ -128,8 +138,10 @@ bind(int fd, const struct sockaddr *address, socklen_t len)
 	return real_bind(fd, address, len);
 }
 
+RETRACE_REPLACE(bind)
+
 int
-accept(int fd, struct sockaddr *address, socklen_t len)
+RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *len)
 {
 	real_accept = dlsym(RTLD_NEXT, "accept");
 	trace_printf(1,
@@ -140,15 +152,19 @@ accept(int fd, struct sockaddr *address, socklen_t len)
 		     (unsigned short) address->sa_data[4] & 0xFF,
 		     (unsigned short) address->sa_data[5] & 0xFF,
 		     (256 * address->sa_data[0]) + address->sa_data[1],
-		     len);
+		     *len);
 
 	return real_accept(fd, address, len);
 }
 
+RETRACE_REPLACE(accept)
+
 int
-atoi(const char *str)
+RETRACE_IMPLEMENTATION(atoi)(const char *str)
 {
 	real_atoi = dlsym(RTLD_NEXT, "atoi");
 	trace_printf(1, "atoi(%s);\n", str);
 	return real_atoi(str);
 }
+
+RETRACE_REPLACE(atoi)
