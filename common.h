@@ -36,7 +36,7 @@ __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long
 
 
 
-void trace_printf(int hdr, char *buf, ...);
+void trace_printf(int hdr, const char *fmt, ...);
 void trace_printf_str(const char *string);
 
 int get_redirect(const char *function, ...);
