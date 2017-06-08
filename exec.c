@@ -240,4 +240,104 @@ execvp(const char *file, char *const argv[])
 	return real_execvp(file, argv);
 }
 
-/*execvpe, fexecve, execveat*/
+int
+execvpe(const char *file, char *const argv[], char *const envp[])
+{
+	real_execvpe = dlsym(RTLD_NEXT, "execvpe");
+
+	int i;
+
+	trace_printf(1, "execvpe(\"%s\"", file);
+
+	for (i = 0;; i++) {
+		if (argv[i] == NULL)
+			break;
+
+		trace_printf(0, ", \"%s\"", argv[i]);
+	}
+
+	trace_printf(0, ", envp);\n");
+
+	trace_printf(1, "char *envp[]=\n");
+	trace_printf(1, "{\n");
+
+	for (i = 0;; i++) {
+		if (envp[i] == NULL)
+			break;
+
+		trace_printf(1, "\t\"%s\",\n", envp[i]);
+	}
+	trace_printf(1, "\t0\n");
+	trace_printf(1, "}\n");
+
+	return real_execvpe(file, argv, envp);
+}
+
+int
+execveat(int dirfd, const char *pathname, char *const argv[], char *const envp[], int flags)
+{
+	real_execveat = dlsym(RTLD_NEXT, "execveat");
+
+	int i;
+
+	trace_printf(1, "execveat(%d, \"%s\"", dirfd, pathname);
+
+	for (i = 0;; i++) {
+		if (argv[i] == NULL)
+			break;
+
+		trace_printf(0, ", \"%s\"", argv[i]);
+	}
+
+	trace_printf(0, ", envp);\n");
+
+	trace_printf(1, "char *envp[]=\n");
+	trace_printf(1, "{\n");
+
+	for (i = 0;; i++) {
+		if (envp[i] == NULL)
+			break;
+
+		trace_printf(1, "\t\"%s\",\n", envp[i]);
+	}
+	trace_printf(1, "\t0\n");
+	trace_printf(1, "}\n");
+	trace_printf(1, "%d\n", flags);
+
+	return real_execveat(dirfd, pathname, argv, envp, flags);
+}
+
+int fexecve(int fd, char *const argv[], char *const envp[])
+{
+	real_fexecve = dlsym(RTLD_NEXT, "fexecve");
+
+	int i;
+
+	trace_printf(1, "fexecve(%d", fd);
+
+	for (i = 0;; i++) {
+		if (argv[i] == NULL)
+			break;
+
+		trace_printf(0, ", \"%s\"", argv[i]);
+	}
+
+	trace_printf(0, ", envp);\n");
+
+	trace_printf(1, "char *envp[]=\n");
+	trace_printf(1, "{\n");
+
+	for (i = 0;; i++) {
+		if (envp[i] == NULL)
+			break;
+
+		trace_printf(1, "\t\"%s\",\n", envp[i]);
+	}
+	trace_printf(1, "\t0\n");
+	trace_printf(1, "}\n");
+
+
+	return fexecve(fd, argv, envp);
+}
+
+/*fexecve*/
