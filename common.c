@@ -106,6 +106,45 @@ trace_printf_str(const char *string)
 		trace_printf(0, "%s[SNIP]%s", VAR, RST);
 }
 
+void
+trace_dump_data(const void *buf, size_t nbytes)
+{
+#define DUMP_LINE_SIZE 20
+	int i;
+	int print_newline = 0;
+	char current_string[DUMP_LINE_SIZE + 1];
+
+	for (i = 0; i < nbytes; i++) {
+		if (i % DUMP_LINE_SIZE == 0) {
+			if (print_newline) {
+				trace_printf(0, " | %s\n", current_string);
+			}
+
+			memset (current_string, '\0', DUMP_LINE_SIZE);
+			trace_printf(0, "\t%07u\t", i/2);
+		}
+
+		if (i % 2 == 0) {
+			trace_printf(0, " ");
+		}
+
+		unsigned char c = ((unsigned char *)buf)[i];
+
+		print_newline = 1;
+		trace_printf(0, "%02x", c);
+
+		// Only print ASCII characters
+		if (c > 31 && c < 128)
+			current_string[i % 20] = c;
+		else
+			current_string[i % 20] = '.';
+	}
+
+	if (print_newline) {
+		trace_printf(0, " | %s\n", current_string);
+	}
+}
+
 int
 get_tracing_enabled()
 {
