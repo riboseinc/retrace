@@ -94,7 +94,8 @@ execv(const char *path, char *const argv[])
 	return real_execv(path, argv);
 }
 
-int execle(const char *path, const char *arg0, ... /*, (char *)0, char *const envp[]*/)
+int
+execle(const char *path, const char *arg0, ... /*, (char *)0, char *const envp[]*/)
 {
 	real_execve = dlsym(RTLD_NEXT, "execve");
 
