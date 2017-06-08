@@ -133,3 +133,22 @@ RETRACE_IMPLEMENTATION(sprintf)(char *str, const char *fmt, ...)
 
 	return result;
 }
+
+int
+RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
+{
+	rtr_vsnprintf_t vsnprintf_ = dlsym(RTLD_NEXT, "vsnprintf");
+	va_list arglist;
+
+	va_start(arglist, fmt);
+	int result = vsnprintf_(str, size, fmt, arglist);
+	va_end(arglist);
+
+	trace_printf(1, "dprintf(\"");
+	trace_printf_str(fmt);
+	trace_printf(0, "\" > \"");
+	trace_printf_str(str);
+	trace_printf(0, "\")[%d]\n", result);
+
+	return result;
+}
