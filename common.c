@@ -49,6 +49,16 @@
  **************************************************/
 int g_enable_tracing = 1;
 
+
+/*************************************************
+* Global list of file descriptors so we can track
+* their usage across different functions
+*
+ **************************************************/
+#define DESCRIPTOR_LIST_INITIAL_SIZE 8
+descriptor_info_t **g_descriptor_list = NULL;
+unsigned int g_descriptor_list_size = 0;
+
 void
 trace_printf(int hdr, char *buf, ...)
 {
@@ -234,3 +244,135 @@ Cleanup:
 
 	return retval;
 }
+
+descriptor_info_t *descriptor_info_new(int fd, unsigned int type, char *location, int port)
+{
+	descriptor_info_t *di;
+
+	int old_tracing_enabled = set_tracing_enabled(0);
+
+	di = (descriptor_info_t *) malloc (sizeof(descriptor_info_t));
+
+        if (di) {
+		di->fd = fd;
+		di->type = type;
+
+		if (location)
+			di->location = strdup(location);
+                else
+                        di->location = NULL;
+
+		di->port = port;
+	}
+
+	set_tracing_enabled(old_tracing_enabled);
+
+	return di;
+}
+
+void descriptor_info_free(descriptor_info_t *di)
+{
+	int old_tracing_enabled = set_tracing_enabled(0);
+
+	if (di->location)
+		free  (di->location);
+
+	free (di);
+
+	set_tracing_enabled(old_tracing_enabled);
+}
+
+
+void file_descriptor_add (int fd, unsigned int type, char *location, int port)
+{
+	int free_spot = -1;
+	int i = 0;
+
+	int old_tracing_enabled = set_tracing_enabled(0);
+
+	descriptor_info_t *di = descriptor_info_new(fd, type, location, port);
+
+	if (!di) {
+		return;
+		set_tracing_enabled(old_tracing_enabled);
+	}
+
+	if (g_descriptor_list == NULL) {
+		g_descriptor_list_size = DESCRIPTOR_LIST_INITIAL_SIZE;
+		g_descriptor_list = (descriptor_info_t **) malloc (DESCRIPTOR_LIST_INITIAL_SIZE * sizeof (descriptor_info_t *));
+
+		memset (g_descriptor_list, 0, DESCRIPTOR_LIST_INITIAL_SIZE * sizeof (descriptor_info_t *));
+	}
+
+	for (i = 0; i < g_descriptor_list_size; i++) {
+		if (g_descriptor_list[i] == NULL);
+			free_spot = i;
+			break;
+	}
+
+	if (free_spot == -1) {
+		// If we don't have any free spots double the list size
+		int new_size = g_descriptor_list_size * 2;
+
+		g_descriptor_list = (descriptor_info_t **) realloc(g_descriptor_list, new_size * sizeof(descriptor_info_t *));
+
+		if (g_descriptor_list) {
+			// clear the new spots we added
+			memset (g_descriptor_list + g_descriptor_list_size, 0, new_size - g_descriptor_list_size);
+
+			// Insert at the end of old list
+			free_spot = g_descriptor_list_size;
+
+			g_descriptor_list_size = new_size;
+		}
+	}
+
+	if (free_spot != -1) {
+		g_descriptor_list[free_spot] = di;
+	}
+
+	set_tracing_enabled(old_tracing_enabled);
+}
+
+descriptor_info_t *file_descriptor_get (int fd)
+{
+	int i;
+	for (i = 0; i < g_descriptor_list_size; i++) {
+		if (g_descriptor_list[i] && g_descriptor_list[i]->fd == fd)
+			return g_descriptor_list[i];
+	}
+
+	return NULL;
+}
+
+void file_descriptor_update(int fd, unsigned int type, char *location, int port)
+{
+	descriptor_info_t *di = file_descriptor_get (fd);
+
+	/* If found, update */
+	if (di) {
+		di->type = type;
+		if (di->location)
+			free (di->location);
+
+		di->port = port;
+	} else {
+		/* If not found, add it */
+		file_descriptor_add (fd, type, location, port);
+	}
+}
+
+
+void file_descriptor_remove (int fd)
+{
+	int i;
+
+	for (i = 0; i < g_descriptor_list_size; i++) {
+		if (g_descriptor_list[i] && g_descriptor_list[i]->fd == fd) {
+			descriptor_info_free (g_descriptor_list[i]);
+			g_descriptor_list[i] = NULL;
+		}
+	}
+}
+
+

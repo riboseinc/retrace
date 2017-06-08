@@ -22,6 +22,12 @@
 #define ARGUMENT_TYPE_INT (int) 1
 #define ARGUMENT_TYPE_STRING (int) 2
 
+#define FILE_DESCRIPTOR_TYPE_UNKNOW		0
+#define FILE_DESCRIPTOR_TYPE_FILE		1 // from open()
+#define FILE_DESCRIPTOR_TYPE_IPV4_CONNECT	2 // from connect()
+#define FILE_DESCRIPTOR_TYPE_IPV4_BIND		3 // from bind()
+#define FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT	4 // from accept()
+
 #ifdef __APPLE__
 
 #define DYLD_INTERPOSE(_replacment,_replacee) \
@@ -34,6 +40,12 @@ __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long
 #define RETRACE_REPLACE(func)
 #endif
 
+typedef struct {
+	int fd;
+	unsigned int type;
+	char *location; // File name or address
+	int port;
+} descriptor_info_t;
 
 
 void trace_printf(int hdr, char *buf, ...);
@@ -43,5 +55,12 @@ int get_redirect(const char *function, ...);
 
 int get_tracing_enabled();
 int set_tracing_enabled(int enabled);
+
+
+/* Descriptor tracking */
+void file_descriptor_update(int fd, unsigned int type, char *location, int port);
+descriptor_info_t *file_descriptor_get (int fd);
+void file_descriptor_remove (int fd);
+
 
 #endif /* __RETRACE_COMMON_H__ */

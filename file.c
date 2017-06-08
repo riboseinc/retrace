@@ -153,7 +153,16 @@ int
 RETRACE_IMPLEMENTATION(close)(int fd)
 {
 	real_close = dlsym(RTLD_NEXT, "close");
-	trace_printf(1, "close(%d);\n", fd);
+
+       descriptor_info_t *di = file_descriptor_get (fd);
+
+	if (di && di->location) {
+		trace_printf(1, "close(%d) [was pointing to %s];\n", fd, di->location);
+	} else {
+		trace_printf(1, "close(%d);\n", fd);
+	}
+
+	file_descriptor_remove (fd);
 	return real_close(fd);
 }
 
