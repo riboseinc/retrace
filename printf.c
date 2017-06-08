@@ -152,3 +152,26 @@ RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
 
 	return result;
 }
+
+int
+RETRACE_IMPLEMENTATION(vprintf)(const char *fmt, va_list ap)
+{
+	char buf[1024];
+	rtr_vprintf_t vprintf_ = dlsym(RTLD_NEXT, "vprintf");
+	rtr_vsnprintf_t vsnprintf_ = dlsym(RTLD_NEXT, "vsnprintf");
+
+	va_list ap1;
+	va_copy(ap1, ap);
+
+	int result = vprintf_(fmt, ap);
+	vsnprintf_(buf, 1024, fmt, ap1);
+	va_end(ap1);
+
+	trace_printf(1, "printf(\"");
+	trace_printf_str(fmt);
+	trace_printf(0, "\" > \"");
+	trace_printf_str(buf);
+	trace_printf(0, "\")[%d]\n", result);
+
+	return result;
+}
