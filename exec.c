@@ -76,7 +76,7 @@ RETRACE_IMPLEMENTATION(execl)(const char *path, const char *arg0, ... /*, (char 
 	return retVal;
 }
 
-RETRACE_IMPLEMENTATION(execl)
+RETRACE_REPLACE(execl)
 
 int
 RETRACE_IMPLEMENTATION(execv)(const char *path, char *const argv[])
@@ -99,7 +99,7 @@ RETRACE_IMPLEMENTATION(execv)(const char *path, char *const argv[])
 	return real_execv(path, argv);
 }
 
-RETRACE_IMPLEMENTATION(execv)
+RETRACE_REPLACE(execv)
 
 int
 RETRACE_IMPLEMENTATION(execle)(const char *path, const char *arg0, ... /*, (char *)0, char *const envp[]*/)
@@ -154,7 +154,7 @@ RETRACE_IMPLEMENTATION(execle)(const char *path, const char *arg0, ... /*, (char
 	return retVal;
 }
 
-RETRACE_IMPLEMENTATION(execle)
+RETRACE_REPLACE(execle)
 
 int
 RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *const envp[])
@@ -189,7 +189,7 @@ RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *const
 	return real_execve(path, argv, envp);
 }
 
-RETRACE_IMPLEMENTATION(execve)
+RETRACE_REPLACE(execve)
 
 int
 RETRACE_IMPLEMENTATION(execlp)(const char *file, const char *arg0, ... /*, (char *)0 */)
@@ -230,7 +230,7 @@ RETRACE_IMPLEMENTATION(execlp)(const char *file, const char *arg0, ... /*, (char
 	return retVal;
 }
 
-RETRACE_IMPLEMENTATION(execlp)
+RETRACE_REPLACE(execlp)
 
 int
 RETRACE_IMPLEMENTATION(execvp)(const char *file, char *const argv[])
@@ -253,7 +253,7 @@ RETRACE_IMPLEMENTATION(execvp)(const char *file, char *const argv[])
 	return real_execvp(file, argv);
 }
 
-RETRACE_IMPLEMENTATION(execvp)
+RETRACE_REPLACE(execvp)
 
 int
 RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *const envp[])
@@ -288,7 +288,7 @@ RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *cons
 	return real_execvpe(file, argv, envp);
 }
 
-RETRACE_IMPLEMENTATION(execvpe)
+RETRACE_REPLACE(execvpe)
 
 int
 RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname, char *const argv[], char *const envp[], int flags)
@@ -324,7 +324,7 @@ RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname, char *const ar
 	return real_execveat(dirfd, pathname, argv, envp, flags);
 }
 
-RETRACE_IMPLEMENTATION(execveat)
+RETRACE_REPLACE(execveat)
 
 int
 RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp[])
@@ -360,4 +360,4 @@ RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp[])
 	return fexecve(fd, argv, envp);
 }
 
-RETRACE_IMPLEMENTATION(fexecve)
+RETRACE_REPLACE(fexecve)
