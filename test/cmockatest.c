@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
 
 #include <cmocka.h>
 
@@ -295,6 +296,68 @@ ret = rtr_pipe2(pipefd, O_NONBLOCK);
 test_pipe_common(ret, pipefd);
 RTR_TEST_END
 
+static void
+test_trace_printf(void **state)
+{
+    void (*trace_printf)(int, const char *, ...) = dlsym(handle, "trace_printf");
+	FILE *oldstderr = stderr;
+	char ebuf[256];
+	char pbuf[256];
+
+	stderr = fmemopen(ebuf, 256, "w");
+	trace_printf(1, "%d %s %c", 42, "forty two", 42);
+	fclose(stderr);
+	stderr = oldstderr;
+	sprintf(pbuf, "(%d) %d %s %c", getpid(), 42, "forty two", 42);
+	assert_string_equal(ebuf, pbuf);
+
+	stderr = fmemopen(ebuf, 256, "w");
+	trace_printf(0, "%d %s %c", 42, "forty two", 42);
+	fclose(stderr);
+	stderr = oldstderr;
+	sprintf(pbuf, "%d %s %c", 42, "forty two", 42);
+	assert_string_equal(ebuf, pbuf);
+}
+
+static void
+test_trace_printf_str(void **state)
+{
+    void (*trace_printf_str)(const char *) = dlsym(handle, "trace_printf_str");
+	FILE *oldstderr = stderr;
+	char buf[256];
+	char s[MAXLEN+1];
+	char s1[MAXLEN+2];
+	memset(s, '1', MAXLEN+1);
+	memset(s1, '1', MAXLEN+2);
+	s[MAXLEN] = '\0';
+	s1[MAXLEN+1] = '\0';
+	const char snip[] = "[SNIP]";
+
+	// special characters are handled correctly
+	stderr = fmemopen(buf, 256, "w");
+	trace_printf_str("abc\r\n\tdef");
+	fclose(stderr);
+	stderr = oldstderr;
+	assert_string_equal(buf,
+		"abc" VAR "\\r" RST VAR "\\n" RST VAR "\\t" RST "def");
+
+	// MAXLEN string is unmodified
+	stderr = fmemopen(buf, 256, "w");
+	trace_printf_str(s);
+	fclose(stderr);
+	stderr = oldstderr;
+	assert_string_equal(buf, s);
+
+	// MAXLEN+1 string is [SNIP]ped
+	stderr = fmemopen(buf, 256, "w");
+	trace_printf_str(s1);
+	fclose(stderr);
+	stderr = oldstderr;
+	assert_int_equal(strlen(buf), MAXLEN + sizeof(snip) -1);
+	assert_int_equal(strncmp(s, buf, MAXLEN), 0);
+	assert_string_equal(buf+MAXLEN, snip);
+}
+
 int
 main(void)
 {
@@ -327,6 +390,7 @@ main(void)
       cmocka_unit_test(test_rtr_free),     cmocka_unit_test(test_rtr_fork),
       cmocka_unit_test(test_rtr_popen),    cmocka_unit_test(test_rtr_pclose),
       cmocka_unit_test(test_rtr_pipe),     cmocka_unit_test(test_rtr_pipe2),
+      cmocka_unit_test(test_trace_printf), cmocka_unit_test(test_trace_printf_str),
     };
 
     handle = dlopen("../retrace.so", RTLD_LAZY);
