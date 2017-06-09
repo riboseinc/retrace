@@ -45,6 +45,7 @@ SRCS		+= malloc.c
 SRCS		+= fork.c
 SRCS		+= popen.c
 SRCS		+= pipe.c
+SRCS		+= dir.c
 SRCS		+= printf.c
 OBJS		= $(SRCS:.c=.o)
 
