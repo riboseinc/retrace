@@ -327,8 +327,6 @@ RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname, char *const ar
 
 RETRACE_REPLACE(execveat)
 
-#endif
-
 int
 RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp[])
 {
@@ -364,3 +362,5 @@ RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp[])
 }
 
 RETRACE_REPLACE(fexecve)
+
+#endif

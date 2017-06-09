@@ -10,8 +10,8 @@ typedef int (*rtr_execv_t)(const char *path, char *const argv[]);
 #ifndef __APPLE__
 typedef int (*rtr_execvpe_t)(const char *file, char *const argv[], char *const envp[]);
 typedef int (*rtr_execveat_t)(int dirfd, const char *pathname, char *const argv[], char *const envp[], int flags);
-#endif
 typedef int (*rtr_fexecve_t)(int fd, char *const argv[], char *const envp[]);
+#endif
 typedef int (*rtr_system_t)(const char *command);
 
 rtr_execvp_t real_execvp;
@@ -20,8 +20,8 @@ rtr_execv_t real_execv;
 #ifndef __APPLE__
 rtr_execvpe_t real_execvpe;
 rtr_execveat_t real_execveat;
-#endif
 rtr_fexecve_t real_fexecve;
+#endif
 rtr_system_t real_system;
 
 #endif /* __RETRACE_EXEC_H__ */
