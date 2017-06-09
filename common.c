@@ -36,6 +36,7 @@
 #include "id.h"
 #include "file.h"
 #include "malloc.h"
+#include "printf.h"
 
 /*************************************************
  *  Global setting, we set this to disable all our
@@ -64,32 +65,27 @@ descriptor_info_t **g_descriptor_list = NULL;
 unsigned int	g_descriptor_list_size = 0;
 
 void
-trace_printf(int hdr, char *buf, ...)
+trace_printf(int hdr, const char *fmt, ...)
 {
 	if (!get_tracing_enabled())
 		return;
 
 	int old_tracing_enabled = set_tracing_enabled(0);
-
-	real_getpid = RETRACE_GET_REAL(getpid);
-
+ 
 	char str[1024];
 
+	if (hdr == 1) {
+		rtr_getpid_t getpid_ = RETRACE_GET_REAL(getpid);
+		fprintf(stderr, "(%d) ", getpid_());
+	}
+
 	va_list arglist;
-	va_start(arglist, buf);
-
-	memset(str, 0, sizeof(str));
-
-	vsnprintf(str, sizeof(str), buf, arglist);
-
-	str[sizeof(str) - 1] = '\0';
-
-	if (hdr == 1)
-		fprintf(stderr, "(%d) ", real_getpid());
-
-	fprintf(stderr, "%s", str);
-
+	va_start(arglist, fmt);
+	rtr_vsnprintf_t vsnprintf_ = RETRACE_GET_REAL(vsnprintf);
+	vsnprintf_(str, sizeof(str), fmt, arglist);
 	va_end(arglist);
+
+	fputs(str, stderr);
 
 	set_tracing_enabled(old_tracing_enabled);
 }
@@ -97,35 +93,43 @@ trace_printf(int hdr, char *buf, ...)
 void
 trace_printf_str(const char *string)
 {
-	if (!get_tracing_enabled())
+	static const char CR[] = VAR "\\r" RST;
+	static const char LF[] = VAR "\\n" RST;
+	static const char TAB[] = VAR "\\t" RST;
+	static const char SNIP[] = "[SNIP]";
+
+	if (!get_tracing_enabled() || *string == '\0')
 		return;
 
 	int old_tracing_enabled = set_tracing_enabled(0);
 
-	real_strlen = RETRACE_GET_REAL(strlen);
+	char buf[MAXLEN * (sizeof(CR)-1) + sizeof(SNIP)];
+	int i;
+	char *p;
+	rtr_strcpy_t strcpy_ = RETRACE_GET_REAL(strcpy);
 
-	int    i;
-	size_t len = real_strlen(string);
-
-	if (len > MAXLEN)
-		len = MAXLEN;
-
-	for (i = 0; i < len; i++)
+	for (i = 0, p = buf; i < MAXLEN && string[i] != '\0'; i++) {
 		if (string[i] == '\n')
-			trace_printf(0, "%s\\n%s", VAR, RST);
-		else if (string[i] == '\t')
-			trace_printf(0, "%s\\t%s", VAR, RST);
+			strcpy_(p, LF);
 		else if (string[i] == '\r')
-			trace_printf(0, "%s\\r%s", VAR, RST);
-		else if (string[i] == '\0')
-			trace_printf(0, "%s\\0%s", VAR, RST);
-		else
-			trace_printf(0, "%c", string[i]);
-
-	if (len > (MAXLEN - 1))
-		trace_printf(0, "%s[SNIP]%s", VAR, RST);
+			strcpy_(p, CR);
+		else if (string[i] == '\t')
+			strcpy_(p, TAB);
+		else if (string[i] == '%')
+			strcpy_(p, "%%");
+		else {
+			*(p++) = string[i];
+			*p = '\0';
+		}
+		while (*p)
+			++p;
+	}
+	if (string[i] != '\0')
+		strcpy_(p, SNIP);
 
 	set_tracing_enabled(old_tracing_enabled);
+
+	trace_printf(0, buf);
 }
 
 void
