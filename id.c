@@ -76,7 +76,7 @@ RETRACE_REPLACE(getegid)
 uid_t RETRACE_IMPLEMENTATION(getuid)()
 {
 	int redirect_id;
-	if (get_redirect("getuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
+	if (rtr_get_config_single("getuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 		trace_printf(1, "getuid(); [redirection in effect: '%i']\n", redirect_id);
 
 		return redirect_id;
@@ -92,7 +92,7 @@ RETRACE_REPLACE(getuid)
 uid_t RETRACE_IMPLEMENTATION(geteuid)()
 {
 	int redirect_id;
-	if (get_redirect("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
+	if (rtr_get_config_single("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 		trace_printf(1, "geteuid(); [redirection in effect: '%i']\n", redirect_id);
 
 		return redirect_id;
