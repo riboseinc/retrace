@@ -23,14 +23,19 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/types.h>
+
+#include <pwd.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "str.h"
 #include "id.h"
 #include "file.h"
+#include "malloc.h"
 
 /*************************************************
  *  Global setting, we set this to disable all our
@@ -65,7 +70,9 @@ trace_printf(int hdr, char *buf, ...)
 	if (!get_tracing_enabled())
 		return;
 
-	real_getpid = dlsym(RTLD_NEXT, "getpid");
+	int old_tracing_enabled = set_tracing_enabled(0);
+
+	real_getpid = RETRACE_GET_REAL(getpid);
 
 	char str[1024];
 
@@ -84,6 +91,8 @@ trace_printf(int hdr, char *buf, ...)
 	fprintf(stderr, "%s", str);
 
 	va_end(arglist);
+
+	set_tracing_enabled(old_tracing_enabled);
 }
 
 void
@@ -92,7 +101,9 @@ trace_printf_str(const char *string)
 	if (!get_tracing_enabled())
 		return;
 
-	real_strlen = dlsym(RTLD_NEXT, "strlen");
+	int old_tracing_enabled = set_tracing_enabled(0);
+
+	real_strlen = RETRACE_GET_REAL(strlen);
 
 	int    i;
 	size_t len = real_strlen(string);
@@ -114,6 +125,47 @@ trace_printf_str(const char *string)
 
 	if (len > (MAXLEN - 1))
 		trace_printf(0, "%s[SNIP]%s", VAR, RST);
+
+	set_tracing_enabled(old_tracing_enabled);
+}
+
+void
+trace_dump_data(const void *buf, size_t nbytes)
+{
+#define DUMP_LINE_SIZE 20
+	int i;
+	int print_newline = 0;
+	char current_string[DUMP_LINE_SIZE + 1];
+
+	for (i = 0; i < nbytes; i++) {
+		if (i % DUMP_LINE_SIZE == 0) {
+			if (print_newline) {
+				trace_printf(0, " | %s\n", current_string);
+			}
+
+			memset (current_string, '\0', DUMP_LINE_SIZE);
+			trace_printf(0, "\t%07u\t", i/2);
+		}
+
+		if (i % 2 == 0) {
+			trace_printf(0, " ");
+		}
+
+		unsigned char c = ((unsigned char *)buf)[i];
+
+		print_newline = 1;
+		trace_printf(0, "%02x", c);
+
+		// Only print ASCII characters
+		if (c > 31 && c < 128)
+			current_string[i % 20] = c;
+		else
+			current_string[i % 20] = '.';
+	}
+
+	if (print_newline) {
+		trace_printf(0, " | %s\n", current_string);
+	}
 }
 
 int
@@ -154,9 +206,42 @@ get_redirect(const char *function, ...)
 	// Other functions that we have replaced
 	int old_tracing_enabled = set_tracing_enabled(0);
 
-	real_fopen = dlsym(RTLD_NEXT, "fopen");
+	real_fopen = RETRACE_GET_REAL(fopen);
+	real_strncmp = RETRACE_GET_REAL(strncmp);
+	real_free = RETRACE_GET_REAL(free);
 
-	config_file = real_fopen("/etc/retrace.conf", "r");
+	// If we have a RETRACE_CONFIG env var, try to open the config file
+	// from there
+	char *file_path = getenv("RETRACE_CONFIG");
+
+	if (file_path)
+		config_file = real_fopen(file_path, "r");
+
+
+	// If we couldn't open the file from the env var try to home it from ~/.retrace.conf
+	if (!config_file) {
+		struct passwd *pw = getpwuid(getuid());
+
+		if (pw && pw->pw_dir) {
+			char *file_name_user = ".retrace.conf";
+			char *file_path_user = (char *) malloc (strlen (pw->pw_dir) + strlen (file_name_user) + 2);
+
+			if (file_path_user) {
+				strcpy (file_path_user, pw->pw_dir);
+				strcat (file_path_user, "/");
+				strcat (file_path_user, file_name_user);
+
+				config_file = real_fopen(file_path_user, "r");
+
+				free (file_path_user);
+			}
+		}
+	}
+
+	// Finally if the above failed try to open /etc/retrace.conf
+	if (!config_file) {
+		config_file = real_fopen("/etc/retrace.conf", "r");
+	}
 
 	if (!config_file)
 		goto Cleanup;
@@ -169,14 +254,14 @@ get_redirect(const char *function, ...)
 		if (function_end) {
 			*function_end = '\0';
 
-			if (strncmp(function, config_line, len) == 0) {
+			if (real_strncmp(function, config_line, len) == 0) {
 				arg_start = function_end + 1;
 				retval = 1;
 				break;
 			}
 		}
 
-		free(config_line);
+		real_free(config_line);
 		config_line = NULL;
 	}
 
@@ -237,7 +322,7 @@ get_redirect(const char *function, ...)
 
 Cleanup:
 	if (config_line)
-		free(config_line);
+		real_free(config_line);
 
 	// Restore tracing
 	set_tracing_enabled(old_tracing_enabled);
