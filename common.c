@@ -187,7 +187,7 @@ set_tracing_enabled(int enabled)
 int
 get_redirect(const char *function, ...)
 {
-	FILE * config_file;
+	FILE * config_file = NULL;
 	size_t line_size = 0;
 	char * config_line = NULL;
 	char * current_function = NULL;
@@ -216,7 +216,6 @@ get_redirect(const char *function, ...)
 
 	if (file_path)
 		config_file = real_fopen(file_path, "r");
-
 
 	// If we couldn't open the file from the env var try to home it from ~/.retrace.conf
 	if (!config_file) {
@@ -390,9 +389,10 @@ void file_descriptor_add (int fd, unsigned int type, char *location, int port)
 	}
 
 	for (i = 0; i < g_descriptor_list_size; i++) {
-		if (g_descriptor_list[i] == NULL);
+		if (g_descriptor_list[i] == NULL) {
 			free_spot = i;
 			break;
+		}
 	}
 
 	if (free_spot == -1) {
