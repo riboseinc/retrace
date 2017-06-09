@@ -83,8 +83,10 @@ RTR_TEST_END
 RTR_TEST_START(execvpe)
 RTR_TEST_END
 
+/*
 RTR_TEST_START(execveat)
 RTR_TEST_END
+*/
 
 RTR_TEST_START(fexecve)
 RTR_TEST_END
@@ -522,7 +524,7 @@ main(void)
       cmocka_unit_test(test_rtr_unsetenv), cmocka_unit_test(test_rtr_execlp),
       cmocka_unit_test(test_rtr_unsetenv), cmocka_unit_test(test_rtr_execvp),
       cmocka_unit_test(test_rtr_unsetenv), cmocka_unit_test(test_rtr_execvpe),
-      cmocka_unit_test(test_rtr_unsetenv), cmocka_unit_test(test_rtr_execveat),
+      cmocka_unit_test(test_rtr_unsetenv), /* cmocka_unit_test(test_rtr_execveat), */
       cmocka_unit_test(test_rtr_unsetenv), cmocka_unit_test(test_rtr_fexecve),
       cmocka_unit_test(test_rtr_system),   cmocka_unit_test(test_rtr_exit),
       cmocka_unit_test(test_rtr_fopen),    cmocka_unit_test(test_rtr_opendir),
