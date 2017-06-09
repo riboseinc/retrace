@@ -1,13 +1,17 @@
-CFLAGS	+= -I ../ -fPIC -D_GNU_SOURCE -rdynamic -Wall
+CFLAGS	+= -I ../ -fPIC -D_GNU_SOURCE -rdynamic -Wall -g
 LDFLAGS	+= -ldl -lcmocka -z text -export-dynamic
 
 CMOCKA-TEST-BIN	= cmockatest
 SRCS		= cmockatest.c
 OBJS		= $(SRCS:.c=.o)
+BINARIES	= id env time fork exit malloc str pipe sock
 
 .PHONY: all clean run
 
-all: run
+all: $(BINARIES) run
+
+$(BINARIES): %: %.c
+	$(CC) $(CFLAGS) -o $@ $<
 
 $(CMOCKA-TEST-BIN): $(OBJS)
 	$(CC) -o $@ $(CFLAGS) $< $(LDFLAGS)
@@ -21,4 +25,4 @@ $(SRCS:.c=.d):%.d:%.c
 	$(CC) $(CFLAGS) -MM $< >$@
 
 clean:
-	$(RM) $(CMOCKA-TEST-BIN) $(OBJS) $(OBJS:.o=.d)
+	$(RM) $(CMOCKA-TEST-BIN) $(OBJS) $(OBJS:.o=.d) $(BINARIES)
