@@ -36,6 +36,7 @@
 #include "id.h"
 #include "file.h"
 #include "malloc.h"
+#include "printf.h"
 
 /*************************************************
  *  Global setting, we set this to disable all our
@@ -71,8 +72,6 @@ trace_printf(int hdr, const char *fmt, ...)
 
 	int old_tracing_enabled = set_tracing_enabled(0);
  
-	real_getpid = RETRACE_GET_REAL(getpid);
-
 	char str[1024];
 
 	if (hdr == 1) {
@@ -82,7 +81,8 @@ trace_printf(int hdr, const char *fmt, ...)
 
 	va_list arglist;
 	va_start(arglist, fmt);
-	vsnprintf(str, sizeof(str), fmt, arglist);
+	rtr_vsnprintf_t vsnprintf_ = RETRACE_GET_REAL(vsnprintf);
+	vsnprintf_(str, sizeof(str), fmt, arglist);
 	va_end(arglist);
 
 	fputs(str, stderr);
@@ -115,6 +115,8 @@ trace_printf_str(const char *string)
 			strcpy_(p, CR);
 		else if (string[i] == '\t')
 			strcpy_(p, TAB);
+		else if (string[i] == '%')
+			strcpy_(p, "%%");
 		else {
 			*(p++) = string[i];
 			*p = '\0';
@@ -125,7 +127,6 @@ trace_printf_str(const char *string)
 	if (string[i] != '\0')
 		strcpy_(p, SNIP);
 
-	puts(buf);
 	set_tracing_enabled(old_tracing_enabled);
 
 	trace_printf(0, buf);
