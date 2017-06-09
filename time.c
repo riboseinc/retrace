@@ -50,3 +50,19 @@ char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 }
 
 RETRACE_REPLACE(ctime)
+
+int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz)
+{
+        real_gettimeofday = RETRACE_GET_REAL(gettimeofday);
+
+        int ret = real_gettimeofday(tv, tz);
+        if (ret == 0)
+                trace_printf(1, "gettimeofday(timeval:[%ld, %ld], timezone:[%d, %d]);\n",
+                                tv->tv_sec, tv->tv_usec, tz->tz_minuteswest, tz->tz_dsttime);
+        else
+                trace_printf(1, "gettimeofday(); -1\n");
+
+        return ret;
+}
+
+RETRACE_REPLACE(gettimeofday)

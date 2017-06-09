@@ -3,6 +3,7 @@
 
 #include <sys/stat.h>
 #include <sys/utsname.h>
+#include <sys/time.h>
 
 #include <dlfcn.h>
 #include <dirent.h>
