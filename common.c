@@ -26,11 +26,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "str.h"
 #include "id.h"
 #include "file.h"
+#include "malloc.h"
 
 /*************************************************
  *  Global setting, we set this to disable all our
@@ -55,7 +57,9 @@ trace_printf(int hdr, char *buf, ...)
 	if (!get_tracing_enabled())
 		return;
 
-	real_getpid = dlsym(RTLD_NEXT, "getpid");
+	int old_tracing_enabled = set_tracing_enabled(0);
+
+	real_getpid = RETRACE_GET_REAL(getpid);
 
 	char str[1024];
 
@@ -74,6 +78,8 @@ trace_printf(int hdr, char *buf, ...)
 	fprintf(stderr, "%s", str);
 
 	va_end(arglist);
+
+	set_tracing_enabled(old_tracing_enabled);
 }
 
 void
@@ -82,7 +88,9 @@ trace_printf_str(const char *string)
 	if (!get_tracing_enabled())
 		return;
 
-	real_strlen = dlsym(RTLD_NEXT, "strlen");
+	int old_tracing_enabled = set_tracing_enabled(0);
+
+	real_strlen = RETRACE_GET_REAL(strlen);
 
 	int    i;
 	size_t len = real_strlen(string);
@@ -104,6 +112,8 @@ trace_printf_str(const char *string)
 
 	if (len > (MAXLEN - 1))
 		trace_printf(0, "%s[SNIP]%s", VAR, RST);
+
+	set_tracing_enabled(old_tracing_enabled);
 }
 
 int
@@ -144,7 +154,9 @@ get_redirect(const char *function, ...)
 	// Other functions that we have replaced
 	int old_tracing_enabled = set_tracing_enabled(0);
 
-	real_fopen = dlsym(RTLD_NEXT, "fopen");
+	real_fopen = RETRACE_GET_REAL(fopen);
+	real_strncmp = RETRACE_GET_REAL(strncmp);
+	real_free = RETRACE_GET_REAL(free);
 
 	config_file = real_fopen("/etc/retrace.conf", "r");
 
@@ -159,14 +171,14 @@ get_redirect(const char *function, ...)
 		if (function_end) {
 			*function_end = '\0';
 
-			if (strncmp(function, config_line, len) == 0) {
+			if (real_strncmp(function, config_line, len) == 0) {
 				arg_start = function_end + 1;
 				retval = 1;
 				break;
 			}
 		}
 
-		free(config_line);
+		real_free(config_line);
 		config_line = NULL;
 	}
 
@@ -227,7 +239,7 @@ get_redirect(const char *function, ...)
 
 Cleanup:
 	if (config_line)
-		free(config_line);
+		real_free(config_line);
 
 	// Restore tracing
 	set_tracing_enabled(old_tracing_enabled);

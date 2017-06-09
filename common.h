@@ -29,9 +29,11 @@ __attribute__((used)) static struct{ const void* replacment; const void* replace
 __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long)&_replacment, (const void*)(unsigned long)&_replacee };
 #define RETRACE_IMPLEMENTATION(func) retrace_impl_##func
 #define RETRACE_REPLACE(func) DYLD_INTERPOSE(retrace_impl_##func, func)
+#define RETRACE_GET_REAL(func) func
 #else
 #define RETRACE_IMPLEMENTATION(func) func
 #define RETRACE_REPLACE(func)
+#define RETRACE_GET_REAL(func) dlsym(RTLD_NEXT, #func)
 #endif
 
 

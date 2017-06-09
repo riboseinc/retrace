@@ -30,7 +30,7 @@
 int
 RETRACE_IMPLEMENTATION(system)(const char *command)
 {
-	real_system = dlsym(RTLD_NEXT, "system");
+	real_system = RETRACE_GET_REAL(system);
 	trace_printf(1, "system(\"%s\");\n", command);
 	return real_system(command);
 }
@@ -40,7 +40,7 @@ RETRACE_REPLACE (system)
 int
 RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *const envp[])
 {
-	real_execve = dlsym(RTLD_NEXT, "execve");
+	real_execve = RETRACE_GET_REAL(execve);
 
 	int i;
 
