@@ -331,7 +331,7 @@ Cleanup:
 }
 
 descriptor_info_t *
-descriptor_info_new(int fd, unsigned int type, char *location, int port)
+descriptor_info_new(int fd, unsigned int type, const char *location, int port)
 {
 	descriptor_info_t *di;
 
@@ -370,7 +370,7 @@ descriptor_info_free(descriptor_info_t *di)
 }
 
 void
-file_descriptor_add(int fd, unsigned int type, char *location, int port)
+file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 {
 	int free_spot = -1;
 	int i = 0;
@@ -441,7 +441,7 @@ file_descriptor_get(int fd)
 }
 
 void
-file_descriptor_update(int fd, unsigned int type, char *location, int port)
+file_descriptor_update(int fd, unsigned int type, const char *location, int port)
 {
 	descriptor_info_t *di = file_descriptor_get(fd);
 
