@@ -37,7 +37,7 @@ trace(const char *func, bool showfd, int fd, int result,
 	char buf[1024];
 
 	if (str == NULL) {
-		rtr_vsnprintf_t vsnprintf_ = dlsym(RTLD_NEXT, "vsnprintf");
+		rtr_vsnprintf_t vsnprintf_ = RETRACE_GET_REAL(vsnprintf);
 		vsnprintf_(buf, 1024, fmt, ap);
 		str = buf;
 	}
@@ -55,7 +55,7 @@ trace(const char *func, bool showfd, int fd, int result,
 int
 RETRACE_IMPLEMENTATION(printf)(const char *fmt, ...)
 {
-	rtr_vprintf_t vprintf_ = dlsym(RTLD_NEXT, "vprintf");
+	rtr_vprintf_t vprintf_ = RETRACE_GET_REAL(vprintf);
 	va_list ap;
 
 	va_start(ap, fmt);
@@ -72,8 +72,8 @@ RETRACE_IMPLEMENTATION(printf)(const char *fmt, ...)
 int
 RETRACE_IMPLEMENTATION(fprintf)(FILE *stream, const char *fmt, ...)
 {
-	rtr_vfprintf_t vfprintf_ = dlsym(RTLD_NEXT, "vfprintf");
-	rtr_fileno_t fileno_ = dlsym(RTLD_NEXT, "fileno");
+	rtr_vfprintf_t vfprintf_ = RETRACE_GET_REAL(vfprintf);
+	rtr_fileno_t fileno_ = RETRACE_GET_REAL(fileno);
 	va_list ap;
 
 	va_start(ap, fmt);
@@ -90,7 +90,7 @@ RETRACE_IMPLEMENTATION(fprintf)(FILE *stream, const char *fmt, ...)
 int
 RETRACE_IMPLEMENTATION(dprintf)(int fd, const char *fmt, ...)
 {
-	rtr_vdprintf_t vdprintf_ = dlsym(RTLD_NEXT, "vdprintf");
+	rtr_vdprintf_t vdprintf_ = RETRACE_GET_REAL(vdprintf);
 	va_list ap;
 
 	va_start(ap, fmt);
@@ -107,7 +107,7 @@ RETRACE_IMPLEMENTATION(dprintf)(int fd, const char *fmt, ...)
 int
 RETRACE_IMPLEMENTATION(sprintf)(char *str, const char *fmt, ...)
 {
-	rtr_vsprintf_t vsprintf_ = dlsym(RTLD_NEXT, "vsprintf");
+	rtr_vsprintf_t vsprintf_ = RETRACE_GET_REAL(vsprintf);
 	va_list ap;
 
 	va_start(ap, fmt);
@@ -124,7 +124,7 @@ RETRACE_IMPLEMENTATION(sprintf)(char *str, const char *fmt, ...)
 int
 RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
 {
-	rtr_vsnprintf_t vsnprintf_ = dlsym(RTLD_NEXT, "vsnprintf");
+	rtr_vsnprintf_t vsnprintf_ = RETRACE_GET_REAL(vsnprintf);
 	va_list ap;
 
 	va_start(ap, fmt);
@@ -139,7 +139,7 @@ RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
 int
 RETRACE_IMPLEMENTATION(vprintf)(const char *fmt, va_list ap)
 {
-	rtr_vprintf_t vprintf_ = dlsym(RTLD_NEXT, "vprintf");
+	rtr_vprintf_t vprintf_ = RETRACE_GET_REAL(vprintf);
 	va_list ap1;
 
 	va_copy(ap1, ap);
@@ -153,8 +153,8 @@ RETRACE_IMPLEMENTATION(vprintf)(const char *fmt, va_list ap)
 int
 RETRACE_IMPLEMENTATION(vfprintf)(FILE *stream, const char *fmt, va_list ap)
 {
-	rtr_vfprintf_t vfprintf_ = dlsym(RTLD_NEXT, "vfprintf");
-	rtr_fileno_t fileno_ = dlsym(RTLD_NEXT, "fileno");
+	rtr_vfprintf_t vfprintf_ = RETRACE_GET_REAL(vfprintf);
+	rtr_fileno_t fileno_ = RETRACE_GET_REAL(fileno);
 	va_list ap1;
 
 	va_copy(ap1, ap);
@@ -168,7 +168,7 @@ RETRACE_IMPLEMENTATION(vfprintf)(FILE *stream, const char *fmt, va_list ap)
 int
 RETRACE_IMPLEMENTATION(vdprintf)(int fd, const char *fmt, va_list ap)
 {
-	rtr_vdprintf_t vdprintf_ = dlsym(RTLD_NEXT, "vdprintf");
+	rtr_vdprintf_t vdprintf_ = RETRACE_GET_REAL(vdprintf);
 	va_list ap1;
 
 	va_copy(ap1, ap);
@@ -182,7 +182,7 @@ RETRACE_IMPLEMENTATION(vdprintf)(int fd, const char *fmt, va_list ap)
 int
 RETRACE_IMPLEMENTATION(vsprintf)(char *str, const char *fmt, va_list ap)
 {
-	rtr_vsprintf_t vsprintf_ = dlsym(RTLD_NEXT, "vsprintf");
+	rtr_vsprintf_t vsprintf_ = RETRACE_GET_REAL(vsprintf);
 	va_list ap1;
 
 	va_copy(ap1, ap);
@@ -196,7 +196,7 @@ RETRACE_IMPLEMENTATION(vsprintf)(char *str, const char *fmt, va_list ap)
 int
 RETRACE_IMPLEMENTATION(vsnprintf)(char *str, size_t size, const char *fmt, va_list ap)
 {
-	rtr_vsnprintf_t vsnprintf_ = dlsym(RTLD_NEXT, "vsnprintf");
+	rtr_vsnprintf_t vsnprintf_ = RETRACE_GET_REAL(vsnprintf);
 
 	int result = vsnprintf_(str, size, fmt, ap);
 
