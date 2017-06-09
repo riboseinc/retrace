@@ -23,30 +23,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "common.h"
-#include "rtr-time.h"
-
-char *RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
-{
-	real_ctime_r = RETRACE_GET_REAL(ctime_r);
-
-	char *r = real_ctime_r (timep, buf);
-
-	trace_printf(1, "ctime_r(\"%u\", \"%s\");\n", timep ? timep : 0, buf);
-	return r;
-}
-
-RETRACE_REPLACE(ctime_r)
-
-char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
-{
-	real_ctime = RETRACE_GET_REAL(ctime);
-
-	char *r = real_ctime(timep);
-
-	trace_printf(1, "ctime(\"%u\") [return: %s];\n", timep ? timep : 0, r);
-
-	return r;
-}
-
-RETRACE_REPLACE(ctime)
+typedef int (*rtr_printf_t)(const char *fmt, ...);
+typedef int (*rtr_fprintf_t)(FILE *stream, const char *fmt, ...);
+typedef int (*rtr_dprintf_t)(int fd, const char *fmt, ...);
+typedef int (*rtr_sprintf_t)(char *str, const char *fmt, ...);
+typedef int (*rtr_snprintf_t)(char *str, size_t size, const char *fmt, ...);
+typedef int (*rtr_vprintf_t)(const char *fmt, va_list ap);
+typedef int (*rtr_vfprintf_t)(FILE *stream, const char *fmt, va_list ap);
+typedef int (*rtr_vdprintf_t)(int fd, const char *fmt, va_list ap);
+typedef int (*rtr_vsprintf_t)(char *str, const char *fmt, va_list ap);
+typedef int (*rtr_vsnprintf_t)(char *buf, size_t size, const char *fmt, va_list ap);
