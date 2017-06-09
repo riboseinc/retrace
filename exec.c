@@ -255,6 +255,7 @@ RETRACE_IMPLEMENTATION(execvp)(const char *file, char *const argv[])
 
 RETRACE_REPLACE(execvp)
 
+#ifndef __APPLE__
 int
 RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *const envp[])
 {
@@ -325,6 +326,8 @@ RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname, char *const ar
 }
 
 RETRACE_REPLACE(execveat)
+
+#endif
 
 int
 RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp[])
