@@ -26,13 +26,11 @@
 #include "common.h"
 #include "perror.h"
 
-void
-RETRACE_IMPLEMENTATION(perror)(const char *s)
+void RETRACE_IMPLEMENTATION(perror)(const char *s)
 {
 	real_perror = RETRACE_GET_REAL(perror);
 	trace_printf(1, "perror(\"%s\");\n", s);
 	return real_perror(s);
 }
 
-RETRACE_REPLACE (perror)
-
+RETRACE_REPLACE(perror)

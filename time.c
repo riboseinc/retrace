@@ -26,22 +26,20 @@
 #include "common.h"
 #include "rtr-time.h"
 
-char *
-RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
+char *RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
 {
 	real_ctime_r = RETRACE_GET_REAL(ctime_r);
 	trace_printf(1, "ctime_r(\"%s\", \"%s\");\n", timep, buf);
 	return real_ctime_r(timep, buf);
 }
 
-RETRACE_REPLACE (ctime_r)
+RETRACE_REPLACE(ctime_r)
 
-char *
-RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
+char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 {
 	real_ctime = RETRACE_GET_REAL(ctime);
 	trace_printf(1, "ctime(\"%s\");\n", timep);
 	return real_ctime(timep);
 }
 
-RETRACE_REPLACE (ctime)
+RETRACE_REPLACE(ctime)

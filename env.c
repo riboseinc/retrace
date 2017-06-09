@@ -26,28 +26,25 @@
 #include "common.h"
 #include "env.h"
 
-int
-RETRACE_IMPLEMENTATION(unsetenv)(const char *name)
+int RETRACE_IMPLEMENTATION(unsetenv)(const char *name)
 {
 	real_unsetenv = RETRACE_GET_REAL(unsetenv);
 	trace_printf(1, "unsetenv(\"%s\");\n", name);
 	return real_unsetenv(name);
 }
 
-RETRACE_REPLACE (unsetenv)
+RETRACE_REPLACE(unsetenv)
 
-int
-RETRACE_IMPLEMENTATION(putenv)(char *string)
+int RETRACE_IMPLEMENTATION(putenv)(char *string)
 {
 	real_putenv = RETRACE_GET_REAL(putenv);
 	trace_printf(1, "putenv(\"%s\");\n", string);
 	return real_putenv(string);
 }
 
-RETRACE_REPLACE (putenv)
+RETRACE_REPLACE(putenv)
 
-char *
-RETRACE_IMPLEMENTATION(getenv)(const char *envname)
+char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 {
 	real_getenv = RETRACE_GET_REAL(getenv);
 	char *env = real_getenv(envname);
@@ -55,4 +52,4 @@ RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 	return real_getenv(envname);
 }
 
-RETRACE_REPLACE (getenv)
+RETRACE_REPLACE(getenv)

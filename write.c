@@ -26,17 +26,16 @@
 #include "common.h"
 #include "write.h"
 
-ssize_t
-RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
+ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 {
 	ssize_t ret;
 
 	real_write = RETRACE_GET_REAL(write);
 	ret = real_write(fd, buf, nbytes);
 	trace_printf(1, "write(%d, %p, %d); [%d]\n", fd, buf, nbytes, ret);
-	trace_dump_data (buf, nbytes);
+	trace_dump_data(buf, nbytes);
 
 	return ret;
 }
 
-RETRACE_REPLACE (write)
+RETRACE_REPLACE(write)
