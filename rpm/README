@@ -1,0 +1,13 @@
+
+1. Define version number in retrace.spec
+2. Rename the directory of source code into retrace-[version]
+3. Make tar.gz archive file
+
+        > tar cvzf retrace-[version].tar.gz retrace-[version]
+
+4. Copy archive file into /root/rpmbuild/SOURCES
+5. Run rpmbuild command
+
+        > rpmbuild -ba retrace.spec
+
+6. The RPM file will be generated in /root/rpmbuild/RPMS directory
