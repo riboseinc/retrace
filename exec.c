@@ -38,13 +38,132 @@ RETRACE_IMPLEMENTATION(system)(const char *command)
 RETRACE_REPLACE (system)
 
 int
+RETRACE_IMPLEMENTATION(execl)(const char *path, const char *arg0, ... /*, (char *)0 */)
+{
+	real_execv = dlsym(RTLD_NEXT, "execv");
+
+	trace_printf(1, "execl(\"%s\"", path);
+
+	va_list arglist;
+	va_start(arglist, arg0);
+
+	char *p = NULL;
+	int i = 1;
+	while ((p = va_arg(arglist, char *)) != NULL)
+		i++;
+
+	const char **argv = malloc(i * sizeof (char *));
+
+	i = 0;
+	argv[i] = arg0;
+
+	va_start (arglist, arg0);
+
+	while ((p = va_arg(arglist, char *)) != NULL) {
+		argv[++i] = p;
+
+		trace_printf(0, ", \"%s\"", p);
+	}
+
+	trace_printf(0, ");\n");
+
+	va_end(arglist);
+
+	int retVal = real_execv(path, (char * const *)argv);
+
+	free(argv);
+
+	return retVal;
+}
+
+RETRACE_REPLACE(execl)
+
+int
+RETRACE_IMPLEMENTATION(execv)(const char *path, char *const argv[])
+{
+	real_execv = dlsym(RTLD_NEXT, "execv");
+
+	int i;
+
+	trace_printf(1, "execv(\"%s\"", path);
+
+	for (i = 0;; i++) {
+		if (argv[i] == NULL)
+			break;
+
+		trace_printf(0, ", \"%s\"", argv[i]);
+	}
+
+	trace_printf(0, ");\n");
+
+	return real_execv(path, argv);
+}
+
+RETRACE_REPLACE(execv)
+
+int
+RETRACE_IMPLEMENTATION(execle)(const char *path, const char *arg0, ... /*, (char *)0, char *const envp[]*/)
+{
+	real_execve = dlsym(RTLD_NEXT, "execve");
+
+	trace_printf(1, "execle(\"%s\"", path);
+
+	va_list arglist;
+	va_start(arglist, arg0);
+
+	char *p = NULL;
+	int i = 1;
+	while ((p = va_arg(arglist, char *)) != NULL)
+		i++;
+
+	const char **argv = malloc(i * sizeof (char *));
+
+	i = 0;
+	argv[i] = arg0;
+
+	va_start (arglist, arg0);
+
+	while ((p = va_arg(arglist, char *)) != NULL) {
+		argv[++i] = p;
+
+		trace_printf(0, ", \"%s\"", p);
+	}
+
+	char * const *envp = va_arg(arglist, char **);
+
+	trace_printf(0, ", envp);\n");
+
+	trace_printf(1, "char *envp[]=\n");
+	trace_printf(1, "{\n");
+
+	for (i = 0;; i++) {
+		if (envp[i] == NULL)
+			break;
+
+		trace_printf(1, "\t\"%s\",\n", envp[i]);
+	}
+	trace_printf(1, "\t0\n");
+	trace_printf(1, "}\n");
+
+	va_end(arglist);
+
+	int retVal = real_execve(path, (char * const *)argv, envp);
+
+	free(argv);
+
+	return retVal;
+}
+
+RETRACE_REPLACE(execle)
+
+int
 RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *const envp[])
 {
 	real_execve = RETRACE_GET_REAL(execve);
 
 	int i;
 
-	trace_printf(1, "execve(\"%s\"", argv[0]);
+	trace_printf(1, "execve(\"%s\"", path);
 
 	for (i = 0;; i++) {
 		if (argv[i] == NULL)
@@ -68,9 +187,180 @@ RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *const
 	trace_printf(1, "}\n");
 
 	return real_execve(path, argv, envp);
-
-	return(0);
 }
 
-RETRACE_REPLACE (execve)
+RETRACE_REPLACE(execve)
 
+int
+RETRACE_IMPLEMENTATION(execlp)(const char *file, const char *arg0, ... /*, (char *)0 */)
+{
+	real_execvp = dlsym(RTLD_NEXT, "execvp");
+
+	trace_printf(1, "execlp(\"%s\"", file);
+
+	va_list arglist;
+	va_start(arglist, arg0);
+
+	char *p = NULL;
+	int i = 1;
+	while ((p = va_arg(arglist, char *)) != NULL)
+		i++;
+
+	const char **argv = malloc(i * sizeof (char *));
+
+	i = 0;
+	argv[i] = arg0;
+
+	va_start (arglist, arg0);
+
+	while ((p = va_arg(arglist, char *)) != NULL) {
+		argv[++i] = p;
+
+		trace_printf(0, ", \"%s\"", p);
+	}
+
+	trace_printf(0, ");\n");
+
+	va_end(arglist);
+
+	int retVal = real_execvp(file, (char * const *)argv);
+
+	free(argv);
+
+	return retVal;
+}
+
+RETRACE_REPLACE(execlp)
+
+int
+RETRACE_IMPLEMENTATION(execvp)(const char *file, char *const argv[])
+{
+	real_execvp = dlsym(RTLD_NEXT, "execvp");
+
+	int i;
+
+	trace_printf(1, "execvp(\"%s\"", file);
+
+	for (i = 0;; i++) {
+		if (argv[i] == NULL)
+			break;
+
+		trace_printf(0, ", \"%s\"", argv[i]);
+	}
+
+	trace_printf(0, ");\n");
+
+	return real_execvp(file, argv);
+}
+
+RETRACE_REPLACE(execvp)
+
+#ifndef __APPLE__
+int
+RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *const envp[])
+{
+	real_execvpe = dlsym(RTLD_NEXT, "execvpe");
+
+	int i;
+
+	trace_printf(1, "execvpe(\"%s\"", file);
+
+	for (i = 0;; i++) {
+		if (argv[i] == NULL)
+			break;
+
+		trace_printf(0, ", \"%s\"", argv[i]);
+	}
+
+	trace_printf(0, ", envp);\n");
+
+	trace_printf(1, "char *envp[]=\n");
+	trace_printf(1, "{\n");
+
+	for (i = 0;; i++) {
+		if (envp[i] == NULL)
+			break;
+
+		trace_printf(1, "\t\"%s\",\n", envp[i]);
+	}
+	trace_printf(1, "\t0\n");
+	trace_printf(1, "}\n");
+
+	return real_execvpe(file, argv, envp);
+}
+
+RETRACE_REPLACE(execvpe)
+
+int
+RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname, char *const argv[], char *const envp[], int flags)
+{
+	real_execveat = dlsym(RTLD_NEXT, "execveat");
+
+	int i;
+
+	trace_printf(1, "execveat(%d, \"%s\"", dirfd, pathname);
+
+	for (i = 0;; i++) {
+		if (argv[i] == NULL)
+			break;
+
+		trace_printf(0, ", \"%s\"", argv[i]);
+	}
+
+	trace_printf(0, ", envp);\n");
+
+	trace_printf(1, "char *envp[]=\n");
+	trace_printf(1, "{\n");
+
+	for (i = 0;; i++) {
+		if (envp[i] == NULL)
+			break;
+
+		trace_printf(1, "\t\"%s\",\n", envp[i]);
+	}
+	trace_printf(1, "\t0\n");
+	trace_printf(1, "}\n");
+	trace_printf(1, "%d\n", flags);
+
+	return real_execveat(dirfd, pathname, argv, envp, flags);
+}
+
+RETRACE_REPLACE(execveat)
+
+#endif
+
+int
+RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp[])
+{
+	real_fexecve = dlsym(RTLD_NEXT, "fexecve");
+
+	int i;
+
+	trace_printf(1, "fexecve(%d", fd);
+
+	for (i = 0;; i++) {
+		if (argv[i] == NULL)
+			break;
+
+		trace_printf(0, ", \"%s\"", argv[i]);
+	}
+
+	trace_printf(0, ", envp);\n");
+
+	trace_printf(1, "char *envp[]=\n");
+	trace_printf(1, "{\n");
+
+	for (i = 0;; i++) {
+		if (envp[i] == NULL)
+			break;
+
+		trace_printf(1, "\t\"%s\",\n", envp[i]);
+	}
+	trace_printf(1, "\t0\n");
+	trace_printf(1, "}\n");
+
+
+	return fexecve(fd, argv, envp);
+}
+
+RETRACE_REPLACE(fexecve)
