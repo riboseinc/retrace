@@ -29,8 +29,11 @@
 char *RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
 {
 	real_ctime_r = RETRACE_GET_REAL(ctime_r);
-	trace_printf(1, "ctime_r(\"%s\", \"%s\");\n", timep, buf);
-	return real_ctime_r(timep, buf);
+
+	char *r = real_ctime_r (timep, buf);
+
+	trace_printf(1, "ctime_r(\"%u\", \"%s\");\n", timep ? timep : 0, buf);
+	return r;
 }
 
 RETRACE_REPLACE(ctime_r)
@@ -38,8 +41,12 @@ RETRACE_REPLACE(ctime_r)
 char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 {
 	real_ctime = RETRACE_GET_REAL(ctime);
-	trace_printf(1, "ctime(\"%s\");\n", timep);
-	return real_ctime(timep);
+
+	char *r = real_ctime(timep);
+
+	trace_printf(1, "ctime(\"%u\") [return: %s];\n", timep ? timep : 0, r);
+
+	return r;
 }
 
 RETRACE_REPLACE(ctime)
