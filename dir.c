@@ -26,6 +26,34 @@
 #include "common.h"
 #include "dir.h"
 
+DIR *RETRACE_IMPLEMENTATION(opendir)(const char *dirname)
+{
+        real_opendir = RETRACE_GET_REAL(opendir);
+        real_dirfd = RETRACE_GET_REAL(dirfd);
+
+        DIR *dirp = real_opendir(dirname);
+        if (dirp)
+                trace_printf(1, "opendir(\"%s\"); [%d]\n", dirname, real_dirfd(dirp));
+        else
+                trace_printf(1, "opendir(\"%s\"); NULL\n", dirname);
+
+        return dirp;
+}
+
+RETRACE_REPLACE(opendir)
+
+int RETRACE_IMPLEMENTATION(closedir)(DIR *dirp)
+{
+        real_closedir = RETRACE_GET_REAL(closedir);
+        real_dirfd = RETRACE_GET_REAL(dirfd);
+
+        trace_printf(1, "closedir(%d);\n", real_dirfd(dirp));
+        
+        return real_closedir(dirp);
+}
+
+RETRACE_REPLACE(closedir)
+
 DIR *RETRACE_IMPLEMENTATION(fdopendir)(int fd)
 {
         real_fdopendir = RETRACE_GET_REAL(fdopendir);

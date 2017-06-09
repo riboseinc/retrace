@@ -2,9 +2,7 @@
 #define __RETRACE_FILE_H__
 
 typedef FILE *(*rtr_fopen_t)(const char *filename, const char *mode);
-typedef DIR *(*rtr_opendir_t)(const char *dirname);
 typedef int (*rtr_fclose_t)(FILE *stream);
-typedef int (*rtr_closedir_t)(DIR *dirp);
 typedef int (*rtr_fseek_t)(FILE *stream, long offset, int whence);
 typedef int (*rtr_fileno_t)(FILE *stream);
 typedef int (*rtr_chmod_t)(const char *path, mode_t mode);
@@ -18,9 +16,7 @@ typedef mode_t (*rtr_umask_t)(mode_t mask);
 typedef int (*rtr_mkfifo_t)(const char *pathname, mode_t mode);
 
 rtr_fopen_t    real_fopen;
-rtr_opendir_t  real_opendir;
 rtr_fclose_t   real_fclose;
-rtr_closedir_t real_closedir;
 rtr_fseek_t    real_fseek;
 rtr_fileno_t   real_fileno;
 rtr_chmod_t    real_chmod;

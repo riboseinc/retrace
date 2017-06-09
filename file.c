@@ -130,24 +130,6 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 
 RETRACE_REPLACE(fopen)
 
-DIR *RETRACE_IMPLEMENTATION(opendir)(const char *dirname)
-{
-	real_opendir = RETRACE_GET_REAL(opendir);
-	trace_printf(1, "opendir(\"%s\");\n", dirname);
-	return real_opendir(dirname);
-}
-
-RETRACE_REPLACE(opendir)
-
-int RETRACE_IMPLEMENTATION(closedir)(DIR *dirp)
-{
-	real_closedir = RETRACE_GET_REAL(closedir);
-	trace_printf(1, "closedir();\n");
-	return real_closedir(dirp);
-}
-
-RETRACE_REPLACE(closedir)
-
 int RETRACE_IMPLEMENTATION(close)(int fd)
 {
 	real_close = dlsym(RTLD_NEXT, "close");
