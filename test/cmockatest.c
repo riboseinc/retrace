@@ -48,8 +48,10 @@ RTR_TEST_END
 RTR_TEST_START(toupper)
 RTR_TEST_END
 
+/*
 RTR_TEST_START(putc)
 RTR_TEST_END
+*/
 
 RTR_TEST_START(getenv)
 RTR_TEST_END
@@ -487,7 +489,7 @@ main(void)
     int                     ret;
     const struct CMUnitTest tests[] = {
       cmocka_unit_test(test_rtr_perror),   cmocka_unit_test(test_rtr_tolower),
-      cmocka_unit_test(test_rtr_toupper),  cmocka_unit_test(test_rtr_putc),
+      cmocka_unit_test(test_rtr_toupper),  /* cmocka_unit_test(test_rtr_putc), */
       cmocka_unit_test(test_rtr_getenv),   cmocka_unit_test(test_rtr_putenv),
       cmocka_unit_test(test_rtr_unsetenv), cmocka_unit_test(test_rtr_execve),
       cmocka_unit_test(test_rtr_system),   cmocka_unit_test(test_rtr_exit),
