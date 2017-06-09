@@ -26,8 +26,7 @@
 #include "common.h"
 #include "read.h"
 
-ssize_t
-RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
+ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 {
 	ssize_t ret;
 
@@ -38,4 +37,4 @@ RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 	return ret;
 }
 
-RETRACE_REPLACE (read)
+RETRACE_REPLACE(read)

@@ -27,8 +27,7 @@
 #include "common.h"
 #include "file.h"
 
-int
-RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
+int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 {
 	real_stat = RETRACE_GET_REAL(stat);
 
@@ -36,10 +35,9 @@ RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 	return real_stat(path, buf);
 }
 
-RETRACE_REPLACE (stat)
+RETRACE_REPLACE(stat)
 
-int
-RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode) 
+int RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode)
 {
 	real_chmod = RETRACE_GET_REAL(chmod);
 
@@ -51,10 +49,9 @@ RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode)
 	return real_chmod(path, mode);
 }
 
-RETRACE_REPLACE (chmod)
+RETRACE_REPLACE(chmod)
 
-int
-RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
+int RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
 {
 	real_fchmod = RETRACE_GET_REAL(fchmod);
 
@@ -66,10 +63,9 @@ RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
 	return real_fchmod(fd, mode);
 }
 
-RETRACE_REPLACE (fchmod)
+RETRACE_REPLACE(fchmod)
 
-int
-RETRACE_IMPLEMENTATION(fileno)(FILE *stream)
+int RETRACE_IMPLEMENTATION(fileno)(FILE *stream)
 {
 	real_fileno = RETRACE_GET_REAL(fileno);
 	int fd = real_fileno(stream);
@@ -78,10 +74,9 @@ RETRACE_IMPLEMENTATION(fileno)(FILE *stream)
 	return real_fileno(stream);
 }
 
-RETRACE_REPLACE (fileno)
+RETRACE_REPLACE(fileno)
 
-int
-RETRACE_IMPLEMENTATION(fseek)(FILE *stream, long offset, int whence)
+int RETRACE_IMPLEMENTATION(fseek)(FILE *stream, long offset, int whence)
 {
 	real_fseek = RETRACE_GET_REAL(fseek);
 	real_fileno = RETRACE_GET_REAL(fileno);
@@ -103,10 +98,9 @@ RETRACE_IMPLEMENTATION(fseek)(FILE *stream, long offset, int whence)
 	return real_fseek(stream, offset, whence);
 }
 
-RETRACE_REPLACE (fseek)
+RETRACE_REPLACE(fseek)
 
-int
-RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
+int RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
 {
 	real_fclose = RETRACE_GET_REAL(fclose);
 	real_fileno = RETRACE_GET_REAL(fileno);
@@ -116,10 +110,9 @@ RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
 	return real_fclose(stream);
 }
 
-RETRACE_REPLACE (fclose)
+RETRACE_REPLACE(fclose)
 
-FILE *
-RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
+FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 {
 	real_fopen = RETRACE_GET_REAL(fopen);
 	real_fileno = RETRACE_GET_REAL(fileno);
@@ -132,37 +125,34 @@ RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 
 	trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", file, mode, fd);
 
-	return(ret);
+	return (ret);
 }
 
-RETRACE_REPLACE (fopen)
+RETRACE_REPLACE(fopen)
 
-DIR *
-RETRACE_IMPLEMENTATION(opendir)(const char *dirname)
+DIR *RETRACE_IMPLEMENTATION(opendir)(const char *dirname)
 {
 	real_opendir = RETRACE_GET_REAL(opendir);
 	trace_printf(1, "opendir(\"%s\");\n", dirname);
 	return real_opendir(dirname);
 }
 
-RETRACE_REPLACE (opendir)
+RETRACE_REPLACE(opendir)
 
-int
-RETRACE_IMPLEMENTATION(closedir)(DIR *dirp)
+int RETRACE_IMPLEMENTATION(closedir)(DIR *dirp)
 {
 	real_closedir = RETRACE_GET_REAL(closedir);
 	trace_printf(1, "closedir();\n");
 	return real_closedir(dirp);
 }
 
-RETRACE_REPLACE (closedir)
+RETRACE_REPLACE(closedir)
 
-int
-RETRACE_IMPLEMENTATION(close)(int fd)
+int RETRACE_IMPLEMENTATION(close)(int fd)
 {
 	real_close = dlsym(RTLD_NEXT, "close");
 
-  descriptor_info_t *di = file_descriptor_get (fd);
+	descriptor_info_t *di = file_descriptor_get(fd);
 
 	if (di && di->location) {
 		trace_printf(1, "close(%d) [was pointing to %s];\n", fd, di->location);
@@ -170,29 +160,27 @@ RETRACE_IMPLEMENTATION(close)(int fd)
 		trace_printf(1, "close(%d);\n", fd);
 	}
 
-	file_descriptor_remove (fd);
+	file_descriptor_remove(fd);
 
 	return real_close(fd);
 }
 
-RETRACE_REPLACE (close)
+RETRACE_REPLACE(close)
 
-int
-RETRACE_IMPLEMENTATION(dup)(int oldfd)
+int RETRACE_IMPLEMENTATION(dup)(int oldfd)
 {
 	real_dup = RETRACE_GET_REAL(dup);
 	trace_printf(1, "dup(%d)\n", oldfd);
 	return real_dup(oldfd);
 }
 
-RETRACE_REPLACE (dup)
+RETRACE_REPLACE(dup)
 
-int
-RETRACE_IMPLEMENTATION(dup2)(int oldfd, int newfd)
+int RETRACE_IMPLEMENTATION(dup2)(int oldfd, int newfd)
 {
 	real_dup2 = RETRACE_GET_REAL(dup2);
 	trace_printf(1, "dup2(%d, %d)\n", oldfd, newfd);
 	return real_dup2(oldfd, newfd);
 }
 
-RETRACE_REPLACE (dup2)
+RETRACE_REPLACE(dup2)

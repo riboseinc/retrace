@@ -29,16 +29,15 @@
 
 int inet_pton(int af, const char *src, void *dst);
 
-int
-RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_t len)
+int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_t len)
 {
-	#define RETRACE_MAX_IP_ADDR_LEN 15
-	char ip_address[RETRACE_MAX_IP_ADDR_LEN + 1];
-	char *redirect_ip = NULL;
-	char *match_ip = NULL;
-	int match_port;
-	int redirect_port;
-	unsigned short port = ntohs(*(unsigned short *)&address->sa_data[0]);
+#define RETRACE_MAX_IP_ADDR_LEN 15
+	char	   ip_address[RETRACE_MAX_IP_ADDR_LEN + 1];
+	char *	 redirect_ip = NULL;
+	char *	 match_ip = NULL;
+	int	    match_port;
+	int	    redirect_port;
+	unsigned short port = ntohs(*(unsigned short *) &address->sa_data[0]);
 
 	real_connect = RETRACE_GET_REAL(connect);
 
@@ -77,7 +76,6 @@ RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_
 			inet_pton(
 			  AF_INET, redirect_ip, (struct in_addr *) &redirect_addr.sa_data[2]);
 
-
 			trace_printf(
 			  1,
 			  "connect(%d, \"%hu.%hu.%hu.%hu:%u\", %zu); [redirection in effect: "
@@ -95,7 +93,8 @@ RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_
 			  (unsigned short) redirect_addr.sa_data[5] & 0xFF,
 			  redirect_port);
 
-			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, redirect_ip, redirect_port);
+			file_descriptor_update(
+			  fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, redirect_ip, redirect_port);
 
 			/* cleanup */
 			free(redirect_ip);
@@ -105,23 +104,19 @@ RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_
 		}
 	}
 
-	snprintf (ip_address, RETRACE_MAX_IP_ADDR_LEN, "%d.%d.%d.%d",
-                     (int) address->sa_data[2] & 0xFF,
-                     (int) address->sa_data[3] & 0xFF,
-                     (int) address->sa_data[4] & 0xFF,
-                     (int) address->sa_data[5] & 0xFF);
+	snprintf(ip_address,
+		 RETRACE_MAX_IP_ADDR_LEN,
+		 "%d.%d.%d.%d",
+		 (int) address->sa_data[2] & 0xFF,
+		 (int) address->sa_data[3] & 0xFF,
+		 (int) address->sa_data[4] & 0xFF,
+		 (int) address->sa_data[5] & 0xFF);
 
-
-	trace_printf(1,
-		     "connect(%d, \"%s\", %zu);\n",
-		     fd,
-		     ip_address,
-		     port,
-		     len);
+	trace_printf(1, "connect(%d, \"%s\", %zu);\n", fd, ip_address, port, len);
 
 	file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, ip_address, port);
 
-    	/* cleanup */
+	/* cleanup */
 	free(redirect_ip);
 	free(match_ip);
 
@@ -130,8 +125,7 @@ RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_
 
 RETRACE_REPLACE(connect)
 
-int
-RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen_t len)
+int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen_t len)
 {
 	real_bind = RETRACE_GET_REAL(bind);
 
@@ -150,8 +144,7 @@ RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen_t l
 
 RETRACE_REPLACE(bind)
 
-int
-RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *len)
+int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *len)
 {
 	real_accept = RETRACE_GET_REAL(accept);
 	trace_printf(1,
@@ -169,8 +162,7 @@ RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *len)
 
 RETRACE_REPLACE(accept)
 
-int
-RETRACE_IMPLEMENTATION(atoi)(const char *str)
+int RETRACE_IMPLEMENTATION(atoi)(const char *str)
 {
 	real_atoi = RETRACE_GET_REAL(atoi);
 	trace_printf(1, "atoi(%s);\n", str);
