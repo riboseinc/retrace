@@ -43,7 +43,11 @@ RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode)
 {
 	real_chmod = RETRACE_GET_REAL(chmod);
 
-	trace_printf(1, "chmod(\"%s\", %o);\n", path, mode);
+	char perm[10];
+
+	trace_mode(mode, perm);
+
+	trace_printf(1, "chmod(\"%s\", %o); [%s]\n", path, mode, perm);
 	return real_chmod(path, mode);
 }
 
@@ -54,7 +58,11 @@ RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
 {
 	real_fchmod = RETRACE_GET_REAL(fchmod);
 
-	trace_printf(1, "fchmod(%d, %o);\n", fd, mode);
+	char perm[10];
+
+	trace_mode(mode, perm);
+
+	trace_printf(1, "fchmod(%d, %o); [%s]\n", fd, mode, perm);
 	return real_fchmod(fd, mode);
 }
 
