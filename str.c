@@ -27,8 +27,7 @@
 #include "common.h"
 #include "str.h"
 
-char *
-RETRACE_IMPLEMENTATION(strstr)(const char *s1, const char *s2)
+char *RETRACE_IMPLEMENTATION(strstr)(const char *s1, const char *s2)
 {
 	real_strstr = RETRACE_GET_REAL(strstr);
 
@@ -41,10 +40,9 @@ RETRACE_IMPLEMENTATION(strstr)(const char *s1, const char *s2)
 	return real_strstr(s1, s2);
 }
 
-RETRACE_REPLACE (strstr)
+RETRACE_REPLACE(strstr)
 
-size_t
-RETRACE_IMPLEMENTATION(strlen)(const char *s)
+size_t RETRACE_IMPLEMENTATION(strlen)(const char *s)
 {
 	real_strlen = RETRACE_GET_REAL(strlen);
 
@@ -57,10 +55,9 @@ RETRACE_IMPLEMENTATION(strlen)(const char *s)
 	return len;
 }
 
-RETRACE_REPLACE (strlen)
+RETRACE_REPLACE(strlen)
 
-int
-RETRACE_IMPLEMENTATION(strncmp)(const char *s1, const char *s2, size_t n)
+int RETRACE_IMPLEMENTATION(strncmp)(const char *s1, const char *s2, size_t n)
 {
 	real_strncmp = RETRACE_GET_REAL(strncmp);
 
@@ -73,10 +70,9 @@ RETRACE_IMPLEMENTATION(strncmp)(const char *s1, const char *s2, size_t n)
 	return real_strncmp(s1, s2, n);
 }
 
-RETRACE_REPLACE (strncmp)
+RETRACE_REPLACE(strncmp)
 
-int
-RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
+int RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 {
 	real_strcmp = RETRACE_GET_REAL(strcmp);
 
@@ -89,10 +85,9 @@ RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 	return real_strcmp(s1, s2);
 }
 
-RETRACE_REPLACE (strcmp)
+RETRACE_REPLACE(strcmp)
 
-char *
-RETRACE_IMPLEMENTATION(strncpy)(char *s1, const char *s2, size_t n)
+char *RETRACE_IMPLEMENTATION(strncpy)(char *s1, const char *s2, size_t n)
 {
 	size_t len = 0;
 
@@ -109,10 +104,9 @@ RETRACE_IMPLEMENTATION(strncpy)(char *s1, const char *s2, size_t n)
 	return real_strncpy(s1, s2, n);
 }
 
-RETRACE_REPLACE (strncpy)
+RETRACE_REPLACE(strncpy)
 
-char *
-RETRACE_IMPLEMENTATION(strcat)(char *s1, const char *s2)
+char *RETRACE_IMPLEMENTATION(strcat)(char *s1, const char *s2)
 {
 	real_strcat = RETRACE_GET_REAL(strcat);
 	real_strlen = RETRACE_GET_REAL(strlen);
@@ -126,10 +120,9 @@ RETRACE_IMPLEMENTATION(strcat)(char *s1, const char *s2)
 	return real_strcat(s1, s2);
 }
 
-RETRACE_REPLACE (strcat)
+RETRACE_REPLACE(strcat)
 
-char *
-RETRACE_IMPLEMENTATION(strncat)(char *s1, const char *s2, size_t n)
+char *RETRACE_IMPLEMENTATION(strncat)(char *s1, const char *s2, size_t n)
 {
 	real_strncat = RETRACE_GET_REAL(strncat);
 	real_strlen = RETRACE_GET_REAL(strlen);
@@ -143,10 +136,9 @@ RETRACE_IMPLEMENTATION(strncat)(char *s1, const char *s2, size_t n)
 	return real_strncat(s1, s2, n);
 }
 
-RETRACE_REPLACE (strncat)
+RETRACE_REPLACE(strncat)
 
-char *
-RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
+char *RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
 {
 	real_strcpy = RETRACE_GET_REAL(strcpy);
 	real_strlen = RETRACE_GET_REAL(strlen);
@@ -160,4 +152,4 @@ RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
 	return real_strcpy(s1, s2);
 }
 
-RETRACE_REPLACE (strcpy)
+RETRACE_REPLACE(strcpy)

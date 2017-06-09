@@ -26,18 +26,16 @@
 #include "common.h"
 #include "malloc.h"
 
-void
-RETRACE_IMPLEMENTATION(free)(void *mem)
+void RETRACE_IMPLEMENTATION(free)(void *mem)
 {
 	real_free = RETRACE_GET_REAL(free);
 	trace_printf(1, "free(%p);\n", mem);
 	real_free(mem);
 }
 
-RETRACE_REPLACE (free)
+RETRACE_REPLACE(free)
 
-void *
-RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
+void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 {
 	void *p;
 
@@ -48,4 +46,4 @@ RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 	return p;
 }
 
-RETRACE_REPLACE (malloc)
+RETRACE_REPLACE(malloc)
