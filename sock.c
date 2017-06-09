@@ -105,11 +105,11 @@ RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_
 		}
 	}
 
-	snprintf (ip_address, RETRACE_MAX_IP_ADDR_LEN, "%hu.%hu.%hu.%hu",
-                     (unsigned short) address->sa_data[2] & 0xFF,
-                     (unsigned short) address->sa_data[3] & 0xFF,
-                     (unsigned short) address->sa_data[4] & 0xFF,
-                     (unsigned short) address->sa_data[5] & 0xFF);
+	snprintf (ip_address, RETRACE_MAX_IP_ADDR_LEN, "%d.%d.%d.%d",
+                     (int) address->sa_data[2] & 0xFF,
+                     (int) address->sa_data[3] & 0xFF,
+                     (int) address->sa_data[4] & 0xFF,
+                     (int) address->sa_data[5] & 0xFF);
 
 
 	trace_printf(1,
