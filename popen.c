@@ -27,13 +27,12 @@
 #include "file.h"
 #include "popen.h"
 
-FILE *
-RETRACE_IMPLEMENTATION(popen)(const char *command, const char *type)
+FILE *RETRACE_IMPLEMENTATION(popen)(const char *command, const char *type)
 {
 	FILE *ret;
 
-	real_popen = dlsym(RTLD_NEXT, "popen");
-	real_fileno = dlsym(RTLD_NEXT, "fileno");
+	real_popen = RETRACE_GET_REAL(popen);
+	real_fileno = RETRACE_GET_REAL(fileno);
 
 	ret = real_popen(command, type);
 	trace_printf(1, "popen(\"%s\", \"%s\"); [%d]\n", command, type, real_fileno(ret));
@@ -41,15 +40,14 @@ RETRACE_IMPLEMENTATION(popen)(const char *command, const char *type)
 	return ret;
 }
 
-RETRACE_REPLACE (popen)
+RETRACE_REPLACE(popen)
 
-int
-RETRACE_IMPLEMENTATION(pclose)(FILE *stream)
+int RETRACE_IMPLEMENTATION(pclose)(FILE *stream)
 {
 	int ret;
 
-	real_pclose = dlsym(RTLD_NEXT, "pclose");
-	real_fileno = dlsym(RTLD_NEXT, "fileno");
+	real_pclose = RETRACE_GET_REAL(pclose);
+	real_fileno = RETRACE_GET_REAL(fileno);
 
 	ret = real_pclose(stream);
 	trace_printf(1, "pclose(%d); [%d]\n", real_fileno(stream), ret);
@@ -57,4 +55,4 @@ RETRACE_IMPLEMENTATION(pclose)(FILE *stream)
 	return ret;
 }
 
-RETRACE_REPLACE (pclose)
+RETRACE_REPLACE(pclose)

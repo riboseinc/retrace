@@ -26,16 +26,15 @@
 #include "common.h"
 #include "read.h"
 
-ssize_t
-RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
+ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 {
 	ssize_t ret;
 
-	real_read = dlsym(RTLD_NEXT, "read");
+	real_read = RETRACE_GET_REAL(read);
 	ret = real_read(fd, buf, nbytes);
 	trace_printf(1, "read(%d, %p, %d); [%d]\n", fd, buf, nbytes, ret);
 
 	return ret;
 }
 
-RETRACE_REPLACE (read)
+RETRACE_REPLACE(read)

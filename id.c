@@ -28,58 +28,52 @@
 
 #include <unistd.h>
 
-int
-RETRACE_IMPLEMENTATION(setuid)(uid_t uid)
+int RETRACE_IMPLEMENTATION(setuid)(uid_t uid)
 {
-	real_setuid = dlsym(RTLD_NEXT, "setuid");
+	real_setuid = RETRACE_GET_REAL(setuid);
 	trace_printf(1, "setuid(%d);\n", uid);
 	return real_setuid(uid);
 }
 
-RETRACE_REPLACE (setuid)
+RETRACE_REPLACE(setuid)
 
-int
-RETRACE_IMPLEMENTATION(seteuid)(uid_t uid)
+int RETRACE_IMPLEMENTATION(seteuid)(uid_t uid)
 {
-	real_seteuid = dlsym(RTLD_NEXT, "seteuid");
+	real_seteuid = RETRACE_GET_REAL(seteuid);
 	trace_printf(1, "seteuid(%d);\n", uid);
 	return real_seteuid(uid);
 }
 
-RETRACE_REPLACE (seteuid)
+RETRACE_REPLACE(seteuid)
 
-int
-RETRACE_IMPLEMENTATION(setgid)(gid_t gid)
+int RETRACE_IMPLEMENTATION(setgid)(gid_t gid)
 {
-	real_setgid = dlsym(RTLD_NEXT, "setgid");
+	real_setgid = RETRACE_GET_REAL(setgid);
 	trace_printf(1, "setgid(%d);\n", gid);
 	return real_setgid(gid);
 }
 
-RETRACE_REPLACE (setgid)
+RETRACE_REPLACE(setgid)
 
-gid_t
-RETRACE_IMPLEMENTATION(getgid)()
+gid_t RETRACE_IMPLEMENTATION(getgid)()
 {
-	real_getgid = dlsym(RTLD_NEXT, "getgid");
+	real_getgid = RETRACE_GET_REAL(getgid);
 	trace_printf(1, "getgid();\n");
 	return real_getgid();
 }
 
-RETRACE_REPLACE (getgid)
+RETRACE_REPLACE(getgid)
 
-gid_t
-RETRACE_IMPLEMENTATION(getegid)()
+gid_t RETRACE_IMPLEMENTATION(getegid)()
 {
-	real_getegid = dlsym(RTLD_NEXT, "getegid");
+	real_getegid = RETRACE_GET_REAL(getegid);
 	trace_printf(1, "getegid();\n");
 	return real_getegid();
 }
 
-RETRACE_REPLACE (getegid)
+RETRACE_REPLACE(getegid)
 
-uid_t
-RETRACE_IMPLEMENTATION(getuid)()
+uid_t RETRACE_IMPLEMENTATION(getuid)()
 {
 	int redirect_id;
 	if (get_redirect("getuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
@@ -88,47 +82,43 @@ RETRACE_IMPLEMENTATION(getuid)()
 		return redirect_id;
 	}
 
-	real_getuid = dlsym(RTLD_NEXT, "getuid");
+	real_getuid = RETRACE_GET_REAL(getuid);
 	trace_printf(1, "getuid();\n");
 	return real_getuid();
 }
 
-RETRACE_REPLACE (getuid)
+RETRACE_REPLACE(getuid)
 
-uid_t
-RETRACE_IMPLEMENTATION(geteuid)()
+uid_t RETRACE_IMPLEMENTATION(geteuid)()
 {
 	int redirect_id;
-	if (get_redirect ("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
+	if (get_redirect("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 		trace_printf(1, "geteuid(); [redirection in effect: '%i']\n", redirect_id);
 
 		return redirect_id;
 	}
 
-	real_geteuid = dlsym(RTLD_NEXT, "geteuid");
+	real_geteuid = RETRACE_GET_REAL(geteuid);
 	trace_printf(1, "geteuid();\n");
 	return real_geteuid();
 }
 
-RETRACE_REPLACE (geteuid)
+RETRACE_REPLACE(geteuid)
 
-pid_t
-RETRACE_IMPLEMENTATION(getpid)(void)
+pid_t RETRACE_IMPLEMENTATION(getpid)(void)
 {
-	real_getpid = dlsym(RTLD_NEXT, "getpid");
+	real_getpid = RETRACE_GET_REAL(getpid);
 	trace_printf(1, "getpid();\n");
 	return real_getpid();
 }
 
-RETRACE_REPLACE (getpid)
+RETRACE_REPLACE(getpid)
 
-pid_t
-RETRACE_IMPLEMENTATION(getppid)(void)
+pid_t RETRACE_IMPLEMENTATION(getppid)(void)
 {
-	real_getppid = dlsym(RTLD_NEXT, "getppid");
+	real_getppid = RETRACE_GET_REAL(getppid);
 	trace_printf(1, "getppid(); [%d]\n", real_getppid());
 	return real_getppid();
 }
 
-RETRACE_REPLACE (getppid)
-
+RETRACE_REPLACE(getppid)
