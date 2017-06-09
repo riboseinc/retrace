@@ -130,15 +130,21 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 
 	FILE *ret = real_fopen(file, mode);
 
-	if (ret)
-		fd = real_fileno(ret);
+	if(get_tracing_enabled()) {
+		int old_tracing_enabled = set_tracing_enabled(0);
 
-	if (fd > 0) {
-		file_descriptor_update(
-			fd, FILE_DESCRIPTOR_TYPE_FILE, file, 0);
+		if (ret)
+			fd = real_fileno(ret);
+
+		if (fd > 0) {
+			file_descriptor_update(
+				fd, FILE_DESCRIPTOR_TYPE_FILE, file, 0);
+		}
+
+		trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", file, mode, fd);
+
+		set_tracing_enabled(old_tracing_enabled);
 	}
-
-	trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", file, mode, fd);
 
 	return (ret);
 }
@@ -371,6 +377,7 @@ int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 
 RETRACE_REPLACE(fgetc)
 
+#if 0
 char* RETRACE_IMPLEMENTATION(fgets)(char *s, int size, FILE *stream)
 {
 	int fd;
@@ -398,5 +405,5 @@ char* RETRACE_IMPLEMENTATION(fgets)(char *s, int size, FILE *stream)
 }
 
 RETRACE_REPLACE(fgets)
-
+#endif
 
