@@ -184,3 +184,27 @@ int RETRACE_IMPLEMENTATION(dup2)(int oldfd, int newfd)
 }
 
 RETRACE_REPLACE(dup2)
+
+mode_t RETRACE_IMPLEMENTATION(umask)(mode_t mask)
+{
+	real_umask = RETRACE_GET_REAL(umask);
+
+	mode_t old_mask = real_umask(mask);
+	trace_printf(1, "umask(%d); [%d]\n", mask, old_mask);
+
+	return old_mask;
+}
+
+RETRACE_REPLACE(umask)
+
+int RETRACE_IMPLEMENTATION(mkfifo)(const char *pathname, mode_t mode)
+{
+	real_mkfifo = RETRACE_GET_REAL(mkfifo);
+
+	int ret = real_mkfifo(pathname, mode);
+	trace_printf(1, "mkfifo(%s, %d); [%d]\n", pathname, mode, ret);
+
+	return ret;
+}
+
+RETRACE_REPLACE(mkfifo)

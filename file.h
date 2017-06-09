@@ -13,6 +13,9 @@ typedef int (*rtr_stat_t)(const char *path, struct stat *buf);
 typedef int (*rtr_dup_t)(int oldfd);
 typedef int (*rtr_dup2_t)(int oldfd, int newfd);
 typedef int (*rtr_close_t)(int fd);
+typedef mode_t (*rtr_umask_t)(mode_t mask);
+
+typedef int (*rtr_mkfifo_t)(const char *pathname, mode_t mode);
 
 rtr_fopen_t    real_fopen;
 rtr_opendir_t  real_opendir;
@@ -26,5 +29,7 @@ rtr_stat_t     real_stat;
 rtr_dup_t      real_dup;
 rtr_dup2_t     real_dup2;
 rtr_close_t    real_close;
+rtr_umask_t    real_umask;
+rtr_mkfifo_t   real_mkfifo;
 
 #endif /* __RETRACE_FILE_H__ */
