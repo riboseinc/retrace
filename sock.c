@@ -32,13 +32,15 @@ int inet_pton(int af, const char *src, void *dst);
 int
 RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_t len)
 {
+	#define RETRACE_MAX_IP_ADDR_LEN 15
+	char ip_address[RETRACE_MAX_IP_ADDR_LEN + 1];
 	char *redirect_ip = NULL;
 	char *match_ip = NULL;
 	int match_port;
 	int redirect_port;
 	unsigned short port = ntohs(*(unsigned short *)&address->sa_data[0]);
 
-	real_connect = dlsym(RTLD_NEXT, "connect");
+	real_connect = RETRACE_GET_REAL(connect);
 
 	// Only implemented for IPv4 right now
 	if (get_tracing_enabled() && address->sa_family == AF_INET &&
@@ -93,27 +95,35 @@ RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_
 			  (unsigned short) redirect_addr.sa_data[5] & 0xFF,
 			  redirect_port);
 
-            // cleanup
-            free(redirect_ip);
-            free(match_ip);
+			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, redirect_ip, redirect_port);
+
+			/* cleanup */
+			free(redirect_ip);
+			free(match_ip);
 
 			return real_connect(fd, &redirect_addr, len);
 		}
 	}
 
+	snprintf (ip_address, RETRACE_MAX_IP_ADDR_LEN, "%d.%d.%d.%d",
+                     (int) address->sa_data[2] & 0xFF,
+                     (int) address->sa_data[3] & 0xFF,
+                     (int) address->sa_data[4] & 0xFF,
+                     (int) address->sa_data[5] & 0xFF);
+
+
 	trace_printf(1,
-		     "connect(%d, \"%hu.%hu.%hu.%hu:%u\", %zu);\n",
+		     "connect(%d, \"%s\", %zu);\n",
 		     fd,
-		     (unsigned short) address->sa_data[2] & 0xFF,
-		     (unsigned short) address->sa_data[3] & 0xFF,
-		     (unsigned short) address->sa_data[4] & 0xFF,
-		     (unsigned short) address->sa_data[5] & 0xFF,
+		     ip_address,
 		     port,
 		     len);
 
-    // cleanup
-    free(redirect_ip);
-    free(match_ip);
+	file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, ip_address, port);
+
+    	/* cleanup */
+	free(redirect_ip);
+	free(match_ip);
 
 	return real_connect(fd, address, len);
 }
@@ -123,7 +133,7 @@ RETRACE_REPLACE(connect)
 int
 RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen_t len)
 {
-	real_bind = dlsym(RTLD_NEXT, "bind");
+	real_bind = RETRACE_GET_REAL(bind);
 
 	trace_printf(1,
 		     "bind(%d, \"%hu.%hu.%hu.%hu:%hu\", %zu);\n",
@@ -143,7 +153,7 @@ RETRACE_REPLACE(bind)
 int
 RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *len)
 {
-	real_accept = dlsym(RTLD_NEXT, "accept");
+	real_accept = RETRACE_GET_REAL(accept);
 	trace_printf(1,
 		     "accept(%d, \"%hu.%hu.%hu.%hu:%hu\", %zu);\n",
 		     fd,
@@ -162,7 +172,7 @@ RETRACE_REPLACE(accept)
 int
 RETRACE_IMPLEMENTATION(atoi)(const char *str)
 {
-	real_atoi = dlsym(RTLD_NEXT, "atoi");
+	real_atoi = RETRACE_GET_REAL(atoi);
 	trace_printf(1, "atoi(%s);\n", str);
 	return real_atoi(str);
 }
