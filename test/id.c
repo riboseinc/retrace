@@ -37,7 +37,8 @@ int main (void)
 	geteuid();
 	getpid();
 	getppid();
-	struct passwd *pw = getpwuid(getuid());
+
+//	struct passwd *pw = getpwuid(getuid());
 
 	return 0;
 }
