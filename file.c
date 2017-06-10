@@ -24,6 +24,8 @@
  */
 
 #include <unistd.h>
+#include <string.h>
+#include <fcntl.h>
 
 #include "common.h"
 #include "file.h"
@@ -164,9 +166,6 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 	if (!did_redirect)
 		ret = real_fopen(file, mode);
 
-	//if(get_tracing_enabled()) {
-	//	int old_tracing_enabled = set_tracing_enabled(0);
-
 	trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", did_redirect ? redirect_file : file , mode, fd);
 
 	if (did_redirect) {
@@ -234,11 +233,17 @@ int RETRACE_IMPLEMENTATION(dup2)(int oldfd, int newfd)
 
 RETRACE_REPLACE(dup2)
 
-int RETRACE_IMPLEMENTATION(open)(const char *pathname, int flags, mode_t mode)
+int RETRACE_IMPLEMENTATION(open)(const char *pathname, int flags, ...)
 {
 	real_open = RETRACE_GET_REAL(open);
+	mode_t mode;
+	va_list arglist;
+	va_start(arglist, flags);
+	mode = va_arg(arglist, int);
 
 	int fd = real_open (pathname, flags, mode);
+
+	va_end(arglist);
 
 	trace_printf(1, "open(%s, %u, %u) [return: fd]\n", pathname, flags, mode, fd);
 
@@ -254,9 +259,9 @@ RETRACE_REPLACE(open)
 
 size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
-	int i;
-	int r;
-	int fd;
+	int i, r, fd;
+	descriptor_info_t *di = NULL;
+
 	real_fwrite = RETRACE_GET_REAL(fwrite);
 	real_fileno = RETRACE_GET_REAL(fileno);
 
@@ -265,10 +270,11 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 	if(get_tracing_enabled()) {
 		int old_tracing_enabled = set_tracing_enabled(0);
 
-	        if (stream)
+	        if (stream) {
 			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
 
-		descriptor_info_t *di = file_descriptor_get(fd);
 	        if (di && di->location)
 			trace_printf(1, "fwrite(%p, %u, %u, %p) [to: \"%s\", return: %u]\n", ptr, size, nmemb, stream, di->location, r);
 		else
@@ -287,21 +293,21 @@ RETRACE_REPLACE(fwrite)
 
 size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
-	int i;
-	int r;
-	int fd;
+	int i, r, fd;
 	real_fread = RETRACE_GET_REAL(fread);
 	real_fileno = RETRACE_GET_REAL(fileno);
+	descriptor_info_t *di = NULL;
 
 	r = real_fread(ptr, size, nmemb, stream);
 
 	if(get_tracing_enabled()) {
 		int old_tracing_enabled = set_tracing_enabled(0);
 
-		if (stream)
+		if (stream) {
 			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
 
-		descriptor_info_t *di = file_descriptor_get(fd);
 		if (di && di->location)
 		        trace_printf(1, "fread(%p, %u, %u, %p) [to: \"%s\", return: %u]\n", ptr, size, nmemb, stream, di->location, r);
 		else
@@ -324,16 +330,18 @@ int RETRACE_IMPLEMENTATION(fputc)(int c, FILE *stream)
 	int fd;
 	real_fputc = RETRACE_GET_REAL(fputc);
 	real_fileno = RETRACE_GET_REAL(fileno);
+	descriptor_info_t *di = NULL;
 
 	r = real_fputc(c, stream);
 
 	if(get_tracing_enabled()) {
 		int old_tracing_enabled = set_tracing_enabled(0);
 
-		if (stream)
+		if (stream) {
 			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
 
-		descriptor_info_t *di = file_descriptor_get(fd);
 		if (di && di->location)
 		        trace_printf(1, "fputc('%c'(%d), %p) [to: \"%s\", return: %d]\n", c, c, stream, di->location, r);
 		else
@@ -349,20 +357,21 @@ RETRACE_REPLACE(fputc)
 
 int RETRACE_IMPLEMENTATION(fputs)(const char *s, FILE *stream)
 {
-	int r;
-	int fd;
+	int r, fd;
 	real_fputs = RETRACE_GET_REAL(fputs);
 	real_fileno = RETRACE_GET_REAL(fileno);
+	descriptor_info_t *di = NULL;
 
 	r = real_fputs(s, stream);
 
 	if(get_tracing_enabled()) {
 		int old_tracing_enabled = set_tracing_enabled(0);
 
-		if (stream)
+		if (stream) {
 			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
 
-		descriptor_info_t *di = file_descriptor_get(fd);
 		if (di && di->location)
 		        trace_printf(1, "fputs(\"%s\", %p) [to: \"%s\", return: %d]\n", s, stream, di->location, r);
 		else
@@ -382,16 +391,18 @@ int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 	int fd;
 	real_fgetc = RETRACE_GET_REAL(fgetc);
 	real_fileno = RETRACE_GET_REAL(fileno);
+	descriptor_info_t *di = NULL;
 
 	r = real_fgetc(stream);
 
 	if(get_tracing_enabled()) {
 		int old_tracing_enabled = set_tracing_enabled(0);
 
-		if (stream)
+		if (stream) {
 			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
 
-		descriptor_info_t *di = file_descriptor_get(fd);
 		if (di && di->location)
 		        trace_printf(1, "fgetc(%p) [to: \"%s\", return: '%c'(%d)]\n", stream, di->location, r, r);
 		else
@@ -411,16 +422,18 @@ char* RETRACE_IMPLEMENTATION(fgets)(char *s, int size, FILE *stream)
 	int fd;
 	real_fgets = RETRACE_GET_REAL(fgets);
 	real_fileno = RETRACE_GET_REAL(fileno);
+	descriptor_info_t *di = NULL;
 
 	real_fgets(s, size, stream);
 
 	if(get_tracing_enabled()) {
 		int old_tracing_enabled = set_tracing_enabled(0);
 
-		if (stream)
+		if (stream) {
 			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
 
-		descriptor_info_t *di = file_descriptor_get(fd);
 		if (di && di->location)
 		        trace_printf(1, "fgets(\"%s\", %d, %p) [to: \"%s\"]\n", s, size, stream, di->location);
 		else

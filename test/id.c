@@ -25,7 +25,7 @@
 
 #include <sys/types.h>
 #include <unistd.h>
-
+#include <pwd.h>
 
 int main (void)
 {
@@ -37,6 +37,8 @@ int main (void)
 	geteuid();
 	getpid();
 	getppid();
+
+//	struct passwd *pw = getpwuid(getuid());
 
 	return 0;
 }
