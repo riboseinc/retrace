@@ -47,6 +47,7 @@ SRCS		+= popen.c
 SRCS		+= pipe.c
 SRCS		+= dir.c
 SRCS		+= printf.c
+SRCS            += trace.c
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test
