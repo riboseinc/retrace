@@ -62,7 +62,7 @@ int set_tracing_enabled(int enabled);
 
 
 /* Descriptor tracking */
-void file_descriptor_update(int fd, unsigned int type, char *location, int port);
+void file_descriptor_update(int fd, unsigned int type, const char *location, int port);
 descriptor_info_t *file_descriptor_get (int fd);
 void file_descriptor_remove (int fd);
 

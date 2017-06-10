@@ -71,14 +71,26 @@ trace_printf(int hdr, const char *fmt, ...)
 		return;
 
 	int old_tracing_enabled = set_tracing_enabled(0);
- 
+
+	real_vsnprintf = RETRACE_GET_REAL(vsnprintf);
+	real_fprintf = RETRACE_GET_REAL(fprintf);
+	real_getpid = RETRACE_GET_REAL(getpid);
+
 	char str[1024];
 
-	if (hdr == 1) {
-		rtr_getpid_t getpid_ = RETRACE_GET_REAL(getpid);
-		fprintf(stderr, "(%d) ", getpid_());
-	}
+	va_list arglist;
+	va_start(arglist, buf);
 
+	memset(str, 0, sizeof(str));
+
+	real_vsnprintf(str, sizeof(str), buf, arglist);
+
+	str[sizeof(str) - 1] = '\0';
+
+	if (hdr == 1)
+		real_fprintf(stderr, "(%d) ", real_getpid());
+
+	real_fprintf(stderr, "%s", str);
 	va_list arglist;
 	va_start(arglist, fmt);
 	rtr_vsnprintf_t vsnprintf_ = RETRACE_GET_REAL(vsnprintf);
@@ -335,7 +347,7 @@ Cleanup:
 }
 
 descriptor_info_t *
-descriptor_info_new(int fd, unsigned int type, char *location, int port)
+descriptor_info_new(int fd, unsigned int type, const char *location, int port)
 {
 	descriptor_info_t *di;
 
@@ -374,7 +386,7 @@ descriptor_info_free(descriptor_info_t *di)
 }
 
 void
-file_descriptor_add(int fd, unsigned int type, char *location, int port)
+file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 {
 	int free_spot = -1;
 	int i = 0;
@@ -445,7 +457,7 @@ file_descriptor_get(int fd)
 }
 
 void
-file_descriptor_update(int fd, unsigned int type, char *location, int port)
+file_descriptor_update(int fd, unsigned int type, const char *location, int port)
 {
 	descriptor_info_t *di = file_descriptor_get(fd);
 

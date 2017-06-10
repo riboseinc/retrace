@@ -32,7 +32,14 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 
 	real_write = RETRACE_GET_REAL(write);
 	ret = real_write(fd, buf, nbytes);
-	trace_printf(1, "write(%d, %p, %d); [%d]\n", fd, buf, nbytes, ret);
+
+	descriptor_info_t *di = file_descriptor_get(fd);
+
+	if (di && di->location)
+		trace_printf(1, "write(%d, %p, %d); [to %s, return: %d] \n", fd, buf, nbytes, di->location, ret);
+	else
+		trace_printf(1, "write(%d, %p, %d); [return: %d]\n", fd, buf, nbytes, ret);
+
 	trace_dump_data(buf, nbytes);
 
 	return ret;
