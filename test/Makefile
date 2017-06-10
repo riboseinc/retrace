@@ -8,7 +8,7 @@ OBJS		= $(SRCS:.c=.o)
 BINARIES	= id env time fork exit malloc str pipe sock file
 
 ifneq ($(OS),Darwin)
-	BINARIES += $(CMOCKA-TEST-BIN)
+	BINARIES += $(CMOCKA-TEST-BIN) -fno-builtin
 	LDFLAGS += -lcmocka -z text -export-dynamic
 endif
 
