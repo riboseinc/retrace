@@ -30,6 +30,7 @@
 #include "popen.h"
 #include "pipe.h"
 #include "printf.h"
+#include "dir.h"
 
 void *handle;
 
@@ -527,8 +528,7 @@ main(void)
       cmocka_unit_test(test_rtr_unsetenv), /* cmocka_unit_test(test_rtr_execveat), */
       cmocka_unit_test(test_rtr_unsetenv), cmocka_unit_test(test_rtr_fexecve),
       cmocka_unit_test(test_rtr_system),   cmocka_unit_test(test_rtr_exit),
-      cmocka_unit_test(test_rtr_fopen),    cmocka_unit_test(test_rtr_opendir),
-      cmocka_unit_test(test_rtr_fclose),   cmocka_unit_test(test_rtr_closedir),
+      cmocka_unit_test(test_rtr_fopen),    cmocka_unit_test(test_rtr_fclose),
       cmocka_unit_test(test_rtr_fseek),    cmocka_unit_test(test_rtr_fileno),
       cmocka_unit_test(test_rtr_chmod),    cmocka_unit_test(test_rtr_fchmod),
       cmocka_unit_test(test_rtr_stat),     cmocka_unit_test(test_rtr_dup),
@@ -554,6 +554,12 @@ main(void)
       cmocka_unit_test(test_rtr_snprintf), cmocka_unit_test(test_rtr_vprintf),
       cmocka_unit_test(test_rtr_vfprintf), cmocka_unit_test(test_rtr_vdprintf),
       cmocka_unit_test(test_rtr_vsprintf), cmocka_unit_test(test_rtr_vsnprintf),
+
+      /* dir functions */
+      cmocka_unit_test(test_rtr_opendir),  cmocka_unit_test(test_rtr_closedir),
+      cmocka_unit_test(test_rtr_fdopendir),  cmocka_unit_test(test_rtr_readdir_r),
+      cmocka_unit_test(test_rtr_telldir), cmocka_unit_test(test_rtr_seekdir),
+      cmocka_unit_test(test_rtr_rewinddir), cmocka_unit_test(test_rtr_dirfd),
     };
 
     handle = dlopen("../retrace.so", RTLD_LAZY);
