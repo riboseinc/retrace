@@ -53,7 +53,7 @@ typedef struct {
 typedef void* rtr_config;
 
 
-void trace_printf(int hdr, char *buf, ...);
+void trace_printf(int hdr, const char *fmt, ...);
 void trace_printf_str(const char *string);
 void trace_dump_data(const void *buf, size_t nbytes);
 void trace_mode(mode_t mode, char *p);
@@ -68,7 +68,7 @@ int set_tracing_enabled(int enabled);
 
 
 /* Descriptor tracking */
-void file_descriptor_update(int fd, unsigned int type, char *location, int port);
+void file_descriptor_update(int fd, unsigned int type, const char *location, int port);
 descriptor_info_t *file_descriptor_get (int fd);
 void file_descriptor_remove (int fd);
 

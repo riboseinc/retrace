@@ -4,7 +4,7 @@ LDFLAGS	+= -ldl -lcmocka -z text -export-dynamic
 CMOCKA-TEST-BIN	= cmockatest
 SRCS		= cmockatest.c
 OBJS		= $(SRCS:.c=.o)
-BINARIES	= id env time fork exit malloc str pipe sock
+BINARIES	= id env time fork exit malloc str pipe sock file
 
 .PHONY: all clean run
 
