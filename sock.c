@@ -30,8 +30,6 @@
 
 #define RETRACE_MAX_IP_ADDR_LEN 15
 
-int inet_pton(int af, const char *src, void *dst);
-
 int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_t len)
 {
 	// get connect function pointer
@@ -67,7 +65,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 				&redirect_ip,
 				&redirect_port))
 		{
-			trace_printf(1, "try matching config 'match_addr-%s:%d, redirect_addr-%s:%d'\n",
+			trace_printf(1, "try matching with config 'match_addr-%s:%d, redirect_addr-%s:%d'\n",
 							match_ip, match_port, redirect_ip, redirect_port);
 
 			// check IP address and port number is matched
