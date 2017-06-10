@@ -52,8 +52,6 @@ trace(const char *func, bool showfd, int fd, int result,
 		trace_printf(0, "\")[%d]\n", result);
 }
 
-RETRACE_REPLACE(trace)
-
 int
 RETRACE_IMPLEMENTATION(printf)(const char *fmt, ...)
 {

@@ -13,7 +13,7 @@ typedef int (*rtr_stat_t)(const char *path, struct stat *buf);
 typedef int (*rtr_dup_t)(int oldfd);
 typedef int (*rtr_dup2_t)(int oldfd, int newfd);
 typedef int (*rtr_close_t)(int fd);
-typedef int (*rtr_open_t)(const char *pathname, int flags, mode_t mode);
+typedef int (*rtr_open_t)(const char *pathname, int flags, ...);
 typedef size_t (*rtr_fread_t)(void *ptr, size_t size, size_t nmemb, FILE *stream);
 typedef size_t (*rtr_fwrite_t)(const void *ptr, size_t size, size_t nmemb, FILE *stream);
 typedef int (*rtr_fputc)(int c, FILE *stream);

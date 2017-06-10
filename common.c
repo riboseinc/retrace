@@ -77,13 +77,12 @@ trace_printf(int hdr, const char *fmt, ...)
 	real_getpid = RETRACE_GET_REAL(getpid);
 
 	char str[1024];
-	char *buf = NULL;
 	va_list arglist;
-	va_start(arglist, buf);
+	va_start(arglist, fmt);
 
 	memset(str, 0, sizeof(str));
 
-	real_vsnprintf(str, sizeof(str), buf, arglist);
+	real_vsnprintf(str, sizeof(str), fmt, arglist);
 
 	str[sizeof(str) - 1] = '\0';
 
@@ -92,14 +91,7 @@ trace_printf(int hdr, const char *fmt, ...)
 
 	real_fprintf(stderr, "%s", str);
 
-	va_start(arglist, fmt);
-
-	rtr_vsnprintf_t vsnprintf_ = RETRACE_GET_REAL(vsnprintf);
-
-	vsnprintf_(str, sizeof(str), fmt, arglist);
 	va_end(arglist);
-
-	fputs(str, stderr);
 
 	set_tracing_enabled(old_tracing_enabled);
 }
@@ -212,6 +204,9 @@ get_config_file ()
 	int old_tracing_enabled = set_tracing_enabled(0);
 
 	real_fopen = RETRACE_GET_REAL(fopen);
+	real_getuid = RETRACE_GET_REAL(getuid);
+	real_malloc =  RETRACE_GET_REAL(malloc);
+	real_free = RETRACE_GET_REAL(free);
 
   	// If we have a RETRACE_CONFIG env var, try to open the config file
 	// from there
@@ -222,12 +217,12 @@ get_config_file ()
 
 	// If we couldn't open the file from the env var try to home it from ~/.retrace.conf
 	if (!config_file) {
-		struct passwd *pw = getpwuid(getuid());
+		struct passwd *pw = getpwuid(real_getuid());
 
 		if (pw && pw->pw_dir) {
 			char *file_name_user = ".retrace.conf";
 			char *file_path_user =
-			  (char *) malloc(strlen(pw->pw_dir) + strlen(file_name_user) + 2);
+			  (char *) real_malloc(strlen(pw->pw_dir) + strlen(file_name_user) + 2);
 
 			if (file_path_user) {
 				strcpy(file_path_user, pw->pw_dir);
@@ -236,7 +231,7 @@ get_config_file ()
 
 				config_file = real_fopen(file_path_user, "r");
 
-				free(file_path_user);
+				real_free(file_path_user);
 			}
 		}
 	}
@@ -298,7 +293,7 @@ rtr_parse_config_file(rtr_config config_file, const char *function, va_list arg_
 	}
 
 	if (current_function)
-		free(current_function);
+		real_free(current_function);
 
 	if (arg_start) {
 		// Count how many arguments we have

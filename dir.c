@@ -93,7 +93,7 @@ void RETRACE_IMPLEMENTATION(seekdir)(DIR *dirp, long loc)
         return;
 }
 
-RETRACE_REPLACE(telldir)
+RETRACE_REPLACE(seekdir)
 
 void RETRACE_IMPLEMENTATION(rewinddir)(DIR *dirp)
 {

@@ -31,7 +31,9 @@ int main (void)
 	int fd[2];
 
 	pipe (fd);
+#ifndef __APPLE__
 	pipe2(fd, 42);
+#endif
 
         return 0;
 }
