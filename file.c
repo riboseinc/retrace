@@ -163,8 +163,8 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 	if (!did_redirect)
 		ret = real_fopen(file, mode);
 
-	if(get_tracing_enabled()) {
-		int old_tracing_enabled = set_tracing_enabled(0);
+	//if(get_tracing_enabled()) {
+	//	int old_tracing_enabled = set_tracing_enabled(0);
 
 	trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", did_redirect ? redirect_file : file , mode, fd);
 
