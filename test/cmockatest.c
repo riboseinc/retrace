@@ -222,7 +222,6 @@ RTR_TEST_END
 RTR_TEST_START(ctime_r)
 RTR_TEST_END
 
-#if 0
 /* dir functions test */
 RTR_TEST_START(opendir)
 RTR_TEST_END
@@ -247,7 +246,6 @@ RTR_TEST_END
 
 RTR_TEST_START(dirfd)
 RTR_TEST_END
-#endif
 
 #define READ_BUF_SIZE 256
 RTR_TEST_START(read)
@@ -660,13 +658,11 @@ main(void)
       cmocka_unit_test(test_rtr_vfprintf), cmocka_unit_test(test_rtr_vdprintf),
       cmocka_unit_test(test_rtr_vsprintf), cmocka_unit_test(test_rtr_vsnprintf),
 
-#if 0
       /* dir functions */
       cmocka_unit_test(test_rtr_opendir),  cmocka_unit_test(test_rtr_closedir),
       cmocka_unit_test(test_rtr_fdopendir),  cmocka_unit_test(test_rtr_readdir_r),
       cmocka_unit_test(test_rtr_telldir), cmocka_unit_test(test_rtr_seekdir),
       cmocka_unit_test(test_rtr_rewinddir), cmocka_unit_test(test_rtr_dirfd),
-#endif
     };
 
     handle = dlopen("../retrace.so", RTLD_LAZY);
