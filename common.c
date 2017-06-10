@@ -77,7 +77,7 @@ trace_printf(int hdr, const char *fmt, ...)
 	real_getpid = RETRACE_GET_REAL(getpid);
 
 	char str[1024];
-
+	char *buf = NULL;
 	va_list arglist;
 	va_start(arglist, buf);
 
@@ -91,9 +91,11 @@ trace_printf(int hdr, const char *fmt, ...)
 		real_fprintf(stderr, "(%d) ", real_getpid());
 
 	real_fprintf(stderr, "%s", str);
-	va_list arglist;
+
 	va_start(arglist, fmt);
+
 	rtr_vsnprintf_t vsnprintf_ = RETRACE_GET_REAL(vsnprintf);
+
 	vsnprintf_(str, sizeof(str), fmt, arglist);
 	va_end(arglist);
 
@@ -248,8 +250,6 @@ get_config_file ()
 
 	return config_file;
 }
-
-
 
 static int
 rtr_parse_config_file(rtr_config config_file, const char *function, va_list arg_types)
