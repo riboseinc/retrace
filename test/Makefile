@@ -1,23 +1,30 @@
-CFLAGS	+= -I ../ -fPIC -D_GNU_SOURCE -rdynamic -Wall -g
-LDFLAGS	+= -ldl -lcmocka -z text -export-dynamic
+CFLAGS	+= -I ../ -fPIC -D_GNU_SOURCE -rdynamic -Wall -g 
+LDFLAGS	+= -ldl 
 
-CMOCKA-TEST-BIN	= cmockatest
-SRCS		= cmockatest.c
+OS              = $(shell uname)
+AUTOMATED-TEST  = runtests.sh
+CMOCKA-TEST-BIN = cmockatest
 OBJS		= $(SRCS:.c=.o)
-BINARIES	= id env time fork exit malloc str pipe sock
+BINARIES	= id env time fork exit malloc str pipe sock file
+
+ifneq ($(OS),Darwin)
+	BINARIES += $(CMOCKA-TEST-BIN)
+	LDFLAGS += -lcmocka -z text -export-dynamic
+endif
+
 
 .PHONY: all clean run
 
 all: $(BINARIES) run
 
 $(BINARIES): %: %.c
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-$(CMOCKA-TEST-BIN): $(OBJS)
-	$(CC) -o $@ $(CFLAGS) $< $(LDFLAGS)
-
-run: $(CMOCKA-TEST-BIN)
+run:
+ifneq ($(OS),Darwin)
 	./$(CMOCKA-TEST-BIN)
+endif
+	./$(AUTOMATED-TEST)
 
 -include $(SRCS:.c=.d)
 
@@ -25,4 +32,4 @@ $(SRCS:.c=.d):%.d:%.c
 	$(CC) $(CFLAGS) -MM $< >$@
 
 clean:
-	$(RM) $(CMOCKA-TEST-BIN) $(OBJS) $(OBJS:.o=.d) $(BINARIES)
+	$(RM) $(OBJS) $(OBJS:.o=.d) $(BINARIES)

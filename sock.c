@@ -10,17 +10,17 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
- * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "common.h"
@@ -42,8 +42,11 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 	real_connect = RETRACE_GET_REAL(connect);
 
 	// Only implemented for IPv4 right now
-	if (get_tracing_enabled() && address->sa_family == AF_INET &&
-	    get_redirect("connect",
+	if (get_tracing_enabled() && address->sa_family == AF_INET)
+	{
+		rtr_config config = NULL;
+
+		while (rtr_get_config_multiple (&config, "connect", 
 			 ARGUMENT_TYPE_STRING, // match_ip
 			 ARGUMENT_TYPE_INT,    // match_port
 			 ARGUMENT_TYPE_STRING, // redirect_ip
@@ -53,55 +56,72 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 			 &match_port,
 			 &redirect_ip,
 			 &redirect_port)) {
-		struct sockaddr match_addr;
+	
+			struct sockaddr match_addr;
 
-		// Convert the ip address and port to a struct sockaddr to compare
-		// if we want to redirect this connection
-		match_addr.sa_family = address->sa_family;
-		*((unsigned short *) &match_addr.sa_data[0]) = htons(match_port);
-		inet_pton(AF_INET, match_ip, (struct in_addr *) &match_addr.sa_data[2]);
+			// Convert the ip address and port to a struct sockaddr to compare
+			// if we want to redirect this connection
+			match_addr.sa_family = address->sa_family;
+			*((unsigned short *) &match_addr.sa_data[0]) = htons(match_port);
+			inet_pton(AF_INET, match_ip, (struct in_addr *) &match_addr.sa_data[2]);
 
-		if (match_addr.sa_data[0] == address->sa_data[0] &&
-		    match_addr.sa_data[1] == address->sa_data[1] &&
-		    match_addr.sa_data[2] == address->sa_data[2] &&
-		    match_addr.sa_data[3] == address->sa_data[3] &&
-		    match_addr.sa_data[4] == address->sa_data[4] &&
-		    match_addr.sa_data[5] == address->sa_data[5]) {
-			// We have a match! Construct a struct sockaddr of where we want to
-			// redirect to.
-			struct sockaddr redirect_addr;
+			if (match_addr.sa_data[0] == address->sa_data[0] &&
+			    match_addr.sa_data[1] == address->sa_data[1] &&
+			    match_addr.sa_data[2] == address->sa_data[2] &&
+			    match_addr.sa_data[3] == address->sa_data[3] &&
+			    match_addr.sa_data[4] == address->sa_data[4] &&
+			    match_addr.sa_data[5] == address->sa_data[5]) {
+				// We have a match! Construct a struct sockaddr of where we want to
+				// redirect to.
+				struct sockaddr redirect_addr;
 
-			redirect_addr.sa_family = address->sa_family;
-			*((unsigned short *) &redirect_addr.sa_data[0]) = htons(redirect_port);
-			inet_pton(
-			  AF_INET, redirect_ip, (struct in_addr *) &redirect_addr.sa_data[2]);
+				redirect_addr.sa_family = address->sa_family;
+				*((unsigned short *) &redirect_addr.sa_data[0]) = htons(redirect_port);
+				inet_pton(
+				  AF_INET, redirect_ip, (struct in_addr *) &redirect_addr.sa_data[2]);
 
-			trace_printf(
-			  1,
-			  "connect(%d, \"%hu.%hu.%hu.%hu:%u\", %zu); [redirection in effect: "
-			  "\"%hu.%hu.%hu.%hu:%u\"]\n",
-			  fd,
-			  (unsigned short) address->sa_data[2] & 0xFF,
-			  (unsigned short) address->sa_data[3] & 0xFF,
-			  (unsigned short) address->sa_data[4] & 0xFF,
-			  (unsigned short) address->sa_data[5] & 0xFF,
-			  port,
-			  len,
-			  (unsigned short) redirect_addr.sa_data[2] & 0xFF,
-			  (unsigned short) redirect_addr.sa_data[3] & 0xFF,
-			  (unsigned short) redirect_addr.sa_data[4] & 0xFF,
-			  (unsigned short) redirect_addr.sa_data[5] & 0xFF,
-			  redirect_port);
+				trace_printf(
+				  1,
+				  "connect(%d, \"%hu.%hu.%hu.%hu:%u\", %zu); [redirection in effect: "
+				  "\"%hu.%hu.%hu.%hu:%u\"]\n",
+				  fd,
+				  (unsigned short) address->sa_data[2] & 0xFF,
+				  (unsigned short) address->sa_data[3] & 0xFF,
+				  (unsigned short) address->sa_data[4] & 0xFF,
+				  (unsigned short) address->sa_data[5] & 0xFF,
+				  port,
+				  len,
+				  (unsigned short) redirect_addr.sa_data[2] & 0xFF,
+				  (unsigned short) redirect_addr.sa_data[3] & 0xFF,
+				  (unsigned short) redirect_addr.sa_data[4] & 0xFF,
+				  (unsigned short) redirect_addr.sa_data[5] & 0xFF,
+				  redirect_port);
 
-			file_descriptor_update(
-			  fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, redirect_ip, redirect_port);
+				file_descriptor_update(
+				  fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, redirect_ip, redirect_port);
 
-			/* cleanup */
-			free(redirect_ip);
-			free(match_ip);
+				/* cleanup */
+				free(redirect_ip);
+				free(match_ip);
 
-			return real_connect(fd, &redirect_addr, len);
+				rtr_confing_close (config);
+
+				return real_connect(fd, &redirect_addr, len);
+			}
+
+			if (redirect_ip) {
+				free(redirect_ip);
+				redirect_ip = NULL;
+			}
+
+			if (match_ip) {
+	                        free(match_ip);
+				match_ip = NULL;
+			}
 		}
+
+		if (config)
+			rtr_confing_close (config);
 	}
 
 	snprintf(ip_address,
@@ -115,10 +135,6 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 	trace_printf(1, "connect(%d, \"%s\", %zu);\n", fd, ip_address, port, len);
 
 	file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, ip_address, port);
-
-	/* cleanup */
-	free(redirect_ip);
-	free(match_ip);
 
 	return real_connect(fd, address, len);
 }

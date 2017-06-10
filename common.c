@@ -10,17 +10,17 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
- * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <sys/types.h>
@@ -36,6 +36,7 @@
 #include "id.h"
 #include "file.h"
 #include "malloc.h"
+#include "printf.h"
 
 /*************************************************
  *  Global setting, we set this to disable all our
@@ -64,30 +65,31 @@ descriptor_info_t **g_descriptor_list = NULL;
 unsigned int	g_descriptor_list_size = 0;
 
 void
-trace_printf(int hdr, char *buf, ...)
+trace_printf(int hdr, const char *fmt, ...)
 {
 	if (!get_tracing_enabled())
 		return;
 
 	int old_tracing_enabled = set_tracing_enabled(0);
 
+	real_vsnprintf = RETRACE_GET_REAL(vsnprintf);
+	real_fprintf = RETRACE_GET_REAL(fprintf);
 	real_getpid = RETRACE_GET_REAL(getpid);
 
 	char str[1024];
-
 	va_list arglist;
-	va_start(arglist, buf);
+	va_start(arglist, fmt);
 
 	memset(str, 0, sizeof(str));
 
-	vsnprintf(str, sizeof(str), buf, arglist);
+	real_vsnprintf(str, sizeof(str), fmt, arglist);
 
 	str[sizeof(str) - 1] = '\0';
 
 	if (hdr == 1)
-		fprintf(stderr, "(%d) ", real_getpid());
+		real_fprintf(stderr, "(%d) ", real_getpid());
 
-	fprintf(stderr, "%s", str);
+	real_fprintf(stderr, "%s", str);
 
 	va_end(arglist);
 
@@ -97,35 +99,43 @@ trace_printf(int hdr, char *buf, ...)
 void
 trace_printf_str(const char *string)
 {
-	if (!get_tracing_enabled())
+	static const char CR[] = VAR "\\r" RST;
+	static const char LF[] = VAR "\\n" RST;
+	static const char TAB[] = VAR "\\t" RST;
+	static const char SNIP[] = "[SNIP]";
+
+	if (!get_tracing_enabled() || *string == '\0')
 		return;
 
 	int old_tracing_enabled = set_tracing_enabled(0);
 
-	real_strlen = RETRACE_GET_REAL(strlen);
+	char buf[MAXLEN * (sizeof(CR)-1) + sizeof(SNIP)];
+	int i;
+	char *p;
+	rtr_strcpy_t strcpy_ = RETRACE_GET_REAL(strcpy);
 
-	int    i;
-	size_t len = real_strlen(string);
-
-	if (len > MAXLEN)
-		len = MAXLEN;
-
-	for (i = 0; i < len; i++)
+	for (i = 0, p = buf; i < MAXLEN && string[i] != '\0'; i++) {
 		if (string[i] == '\n')
-			trace_printf(0, "%s\\n%s", VAR, RST);
-		else if (string[i] == '\t')
-			trace_printf(0, "%s\\t%s", VAR, RST);
+			strcpy_(p, LF);
 		else if (string[i] == '\r')
-			trace_printf(0, "%s\\r%s", VAR, RST);
-		else if (string[i] == '\0')
-			trace_printf(0, "%s\\0%s", VAR, RST);
-		else
-			trace_printf(0, "%c", string[i]);
-
-	if (len > (MAXLEN - 1))
-		trace_printf(0, "%s[SNIP]%s", VAR, RST);
+			strcpy_(p, CR);
+		else if (string[i] == '\t')
+			strcpy_(p, TAB);
+		else if (string[i] == '%')
+			strcpy_(p, "%%");
+		else {
+			*(p++) = string[i];
+			*p = '\0';
+		}
+		while (*p)
+			++p;
+	}
+	if (string[i] != '\0')
+		strcpy_(p, SNIP);
 
 	set_tracing_enabled(old_tracing_enabled);
+
+	trace_printf(0, buf);
 }
 
 void
@@ -183,10 +193,62 @@ set_tracing_enabled(int enabled)
 	return oldvalue;
 }
 
-int
-get_redirect(const char *function, ...)
+static FILE *
+get_config_file ()
 {
-	FILE * config_file = NULL;
+	FILE *config_file = NULL;
+
+	if (!get_tracing_enabled())
+        	return NULL;
+
+	int old_tracing_enabled = set_tracing_enabled(0);
+
+	real_fopen = RETRACE_GET_REAL(fopen);
+	real_getuid = RETRACE_GET_REAL(getuid);
+	real_malloc =  RETRACE_GET_REAL(malloc);
+	real_free = RETRACE_GET_REAL(free);
+
+  	// If we have a RETRACE_CONFIG env var, try to open the config file
+	// from there
+	char *file_path = getenv("RETRACE_CONFIG");
+
+	if (file_path)
+		config_file = real_fopen(file_path, "r");
+
+	// If we couldn't open the file from the env var try to home it from ~/.retrace.conf
+	if (!config_file) {
+		struct passwd *pw = getpwuid(real_getuid());
+
+		if (pw && pw->pw_dir) {
+			char *file_name_user = ".retrace.conf";
+			char *file_path_user =
+			  (char *) real_malloc(strlen(pw->pw_dir) + strlen(file_name_user) + 2);
+
+			if (file_path_user) {
+				strcpy(file_path_user, pw->pw_dir);
+				strcat(file_path_user, "/");
+				strcat(file_path_user, file_name_user);
+
+				config_file = real_fopen(file_path_user, "r");
+
+				real_free(file_path_user);
+			}
+		}
+	}
+
+	// Finally if the above failed try to open /etc/retrace.conf
+	if (!config_file) {
+		config_file = real_fopen("/etc/retrace.conf", "r");
+	}
+
+	set_tracing_enabled(old_tracing_enabled);
+
+	return config_file;
+}
+
+static int
+rtr_parse_config_file(rtr_config config_file, const char *function, va_list arg_types)
+{
 	size_t line_size = 0;
 	char * config_line = NULL;
 	char * current_function = NULL;
@@ -205,42 +267,8 @@ get_redirect(const char *function, ...)
 	// Other functions that we have replaced
 	int old_tracing_enabled = set_tracing_enabled(0);
 
-	real_fopen = RETRACE_GET_REAL(fopen);
 	real_strncmp = RETRACE_GET_REAL(strncmp);
 	real_free = RETRACE_GET_REAL(free);
-
-	// If we have a RETRACE_CONFIG env var, try to open the config file
-	// from there
-	char *file_path = getenv("RETRACE_CONFIG");
-
-	if (file_path)
-		config_file = real_fopen(file_path, "r");
-
-	// If we couldn't open the file from the env var try to home it from ~/.retrace.conf
-	if (!config_file) {
-		struct passwd *pw = getpwuid(getuid());
-
-		if (pw && pw->pw_dir) {
-			char *file_name_user = ".retrace.conf";
-			char *file_path_user =
-			  (char *) malloc(strlen(pw->pw_dir) + strlen(file_name_user) + 2);
-
-			if (file_path_user) {
-				strcpy(file_path_user, pw->pw_dir);
-				strcat(file_path_user, "/");
-				strcat(file_path_user, file_name_user);
-
-				config_file = real_fopen(file_path_user, "r");
-
-				free(file_path_user);
-			}
-		}
-	}
-
-	// Finally if the above failed try to open /etc/retrace.conf
-	if (!config_file) {
-		config_file = real_fopen("/etc/retrace.conf", "r");
-	}
 
 	if (!config_file)
 		goto Cleanup;
@@ -264,19 +292,15 @@ get_redirect(const char *function, ...)
 		config_line = NULL;
 	}
 
-	fclose(config_file);
-
 	if (current_function)
-		free(current_function);
+		real_free(current_function);
 
 	if (arg_start) {
 		// Count how many arguments we have
-		va_list arg_types;
 		va_list arg_values;
 		int     current_argument;
 
-		va_start(arg_types, function);
-		va_start(arg_values, function);
+		va_copy (arg_values, arg_types);
 
 		// Advance past the types until we find the values
 		do {
@@ -330,8 +354,52 @@ Cleanup:
 	return retval;
 }
 
+void
+rtr_confing_close (rtr_config config)
+{
+	fclose ((FILE *) config); 
+}
+
+int rtr_get_config_multiple(rtr_config *config, const char *function, ...)
+{
+	int ret = 0;
+
+	if (*config == NULL)
+		*config = get_config_file ();
+
+	if (*config) {
+		va_list args;
+		va_start (args, function);
+		ret = rtr_parse_config_file (*config, function, args);
+
+		if (!ret) {
+			rtr_confing_close (*config);
+			*config = NULL;
+		}
+        }
+
+	return ret;
+}
+
+int rtr_get_config_single(const char *function, ...)
+{
+	rtr_config config_file = get_config_file ();
+	int ret = 0;
+
+	if (config_file) {
+		va_list args;
+                va_start (args, function);
+		ret = rtr_parse_config_file (config_file, function, args);
+
+		rtr_confing_close (config_file);
+	}
+
+	return ret;
+}
+
+
 descriptor_info_t *
-descriptor_info_new(int fd, unsigned int type, char *location, int port)
+descriptor_info_new(int fd, unsigned int type, const char *location, int port)
 {
 	descriptor_info_t *di;
 
@@ -370,7 +438,7 @@ descriptor_info_free(descriptor_info_t *di)
 }
 
 void
-file_descriptor_add(int fd, unsigned int type, char *location, int port)
+file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 {
 	int free_spot = -1;
 	int i = 0;
@@ -441,7 +509,7 @@ file_descriptor_get(int fd)
 }
 
 void
-file_descriptor_update(int fd, unsigned int type, char *location, int port)
+file_descriptor_update(int fd, unsigned int type, const char *location, int port)
 {
 	descriptor_info_t *di = file_descriptor_get(fd);
 

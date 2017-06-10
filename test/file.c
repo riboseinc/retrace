@@ -23,36 +23,33 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "common.h"
-#include "file.h"
-#include "popen.h"
+#include <stdio.h>
+#include <string.h>
 
-FILE *RETRACE_IMPLEMENTATION(popen)(const char *command, const char *type)
+int main(void)
 {
-	FILE *ret;
+	FILE *f;
+	char *s = "This is a test string :)";
+	char buf[1024];
 
-	real_popen = RETRACE_GET_REAL(popen);
-	real_fileno = RETRACE_GET_REAL(fileno);
+	f = fopen ("retracetest.deleteme", "w+");
 
-	ret = real_popen(command, type);
-	trace_printf(1, "popen(\"%s\", \"%s\"); [%d]\n", command, type, real_fileno(ret));
+	if (f) {
+		fwrite (s, strlen(s), 1, f);
+		fputs (s,  f);
+		fputc ('6', f);
 
-	return ret;
+		rewind (f);
+
+		fread(buf, strlen(s), 1, f);
+
+		rewind (f);
+
+		fgets (buf, strlen(s), f);
+		fgetc (f);
+
+		fclose (f);
+	}
+
+	return 0;
 }
-
-RETRACE_REPLACE(popen)
-
-int RETRACE_IMPLEMENTATION(pclose)(FILE *stream)
-{
-	int ret;
-
-	real_pclose = RETRACE_GET_REAL(pclose);
-	real_fileno = RETRACE_GET_REAL(fileno);
-
-	ret = real_pclose(stream);
-	trace_printf(1, "pclose(%d); [%d]\n", real_fileno(stream), ret);
-
-	return ret;
-}
-
-RETRACE_REPLACE(pclose)
