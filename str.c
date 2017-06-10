@@ -10,18 +10,19 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
- * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <string.h>
 
 #include "common.h"
@@ -48,9 +49,13 @@ size_t RETRACE_IMPLEMENTATION(strlen)(const char *s)
 
 	size_t len = real_strlen(s);
 
-	trace_printf(1, "strlen(\"");
-	trace_printf_str(s);
-	trace_printf(0, "\"); [len: %zu]\n", len);
+	if(get_tracing_enabled()) {
+		int old_tracing_enabled = set_tracing_enabled(0);
+		trace_printf(1, "strlen(\"%p", s);
+		trace_printf_str(s);
+		trace_printf(0, "\"); [len: %zu]\n", len);
+		set_tracing_enabled(old_tracing_enabled);
+	}
 
 	return len;
 }
@@ -76,11 +81,18 @@ int RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 {
 	real_strcmp = RETRACE_GET_REAL(strcmp);
 
-	trace_printf(1, "strcmp(\"");
-	trace_printf_str(s1);
-	trace_printf(0, "\", \"");
-	trace_printf_str(s2);
-	trace_printf(0, "\");\n");
+
+	if(get_tracing_enabled()) {
+		int old_tracing_enabled = set_tracing_enabled(0);
+
+		trace_printf(1, "strcmp(\"");
+		trace_printf_str(s1);
+		trace_printf(0, "\", \"");
+		trace_printf_str(s2);
+		trace_printf(0, "\");\n");
+
+		set_tracing_enabled(old_tracing_enabled);
+	}
 
 	return real_strcmp(s1, s2);
 }

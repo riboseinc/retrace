@@ -10,22 +10,26 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
- * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <unistd.h>
+#include <string.h>
+#include <fcntl.h>
 
 #include "common.h"
 #include "file.h"
+#include "str.h"
 
 int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 {
@@ -106,7 +110,17 @@ int RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
 	real_fileno = RETRACE_GET_REAL(fileno);
 	int fd = real_fileno(stream);
 
-	trace_printf(1, "fclose(%d);\n", fd);
+        if (fd > 0)
+		fd = real_fileno(stream);
+
+	descriptor_info_t *di = file_descriptor_get(fd);
+	if (di && di->location)
+		trace_printf(1, "fclose(%d); [to: \"%s\"]\n", fd, di->location);
+	else
+		trace_printf(1, "fclose(%d);\n", fd);
+
+	file_descriptor_remove(fd);
+
 	return real_fclose(stream);
 }
 
@@ -116,14 +130,48 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 {
 	real_fopen = RETRACE_GET_REAL(fopen);
 	real_fileno = RETRACE_GET_REAL(fileno);
+	real_strcmp = RETRACE_GET_REAL(strcmp);
 	int fd = 0;
+	int did_redirect = 0;
+	FILE *ret;
+        char *match_file = NULL;
+        char *redirect_file = NULL;
 
-	FILE *ret = real_fopen(file, mode);
+	if (get_tracing_enabled() && file) {
+		rtr_config config = NULL;
 
-	if (ret)
-		fd = real_fileno(ret);
+		while (rtr_get_config_multiple (&config, "fopen",
+				ARGUMENT_TYPE_STRING,
+				ARGUMENT_TYPE_STRING,
+				ARGUMENT_TYPE_END,
+				&match_file,
+				&redirect_file)) {
 
-	trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", file, mode, fd);
+			if (real_strcmp (match_file, file) == 0) {
+				did_redirect = 1;
+
+				ret = real_fopen(redirect_file, mode);
+
+				if (config)
+					rtr_confing_close (config);
+
+				break;
+			}
+
+			free (match_file);
+			free (redirect_file);
+		}
+	}
+
+	if (!did_redirect)
+		ret = real_fopen(file, mode);
+
+	trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", did_redirect ? redirect_file : file , mode, fd);
+
+	if (did_redirect) {
+		free (match_file);
+	        free (redirect_file);
+	}
 
 	return (ret);
 }
@@ -190,3 +238,218 @@ int RETRACE_IMPLEMENTATION(mkfifo)(const char *pathname, mode_t mode)
 }
 
 RETRACE_REPLACE(mkfifo)
+
+int RETRACE_IMPLEMENTATION(open)(const char *pathname, int flags, ...)
+{
+	real_open = RETRACE_GET_REAL(open);
+	mode_t mode;
+	va_list arglist;
+	va_start(arglist, flags);
+	mode = va_arg(arglist, int);
+
+	int fd = real_open (pathname, flags, mode);
+
+	va_end(arglist);
+
+	trace_printf(1, "open(%s, %u, %u) [return: fd]\n", pathname, flags, mode, fd);
+
+	if (fd > 0) {
+		file_descriptor_update(
+			fd, FILE_DESCRIPTOR_TYPE_FILE, pathname, 0);
+	}
+
+	return fd;
+}
+
+RETRACE_REPLACE(open)
+
+size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+	int i, r, fd;
+	descriptor_info_t *di = NULL;
+
+	real_fwrite = RETRACE_GET_REAL(fwrite);
+	real_fileno = RETRACE_GET_REAL(fileno);
+
+	r = real_fwrite(ptr, size, nmemb, stream);
+
+	if(get_tracing_enabled()) {
+		int old_tracing_enabled = set_tracing_enabled(0);
+
+	        if (stream) {
+			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
+
+	        if (di && di->location)
+			trace_printf(1, "fwrite(%p, %u, %u, %p) [to: \"%s\", return: %u]\n", ptr, size, nmemb, stream, di->location, r);
+		else
+			trace_printf(1, "fwrite(%p, %u, %u, %p) [return: %u]\n", ptr, size, nmemb, stream, r);
+
+		for (i = 0; i < nmemb; i++)
+			trace_dump_data(ptr + i, size);
+
+		set_tracing_enabled(old_tracing_enabled);
+	}
+
+	return r;
+}
+
+RETRACE_REPLACE(fwrite)
+
+size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+	int i, r, fd;
+	real_fread = RETRACE_GET_REAL(fread);
+	real_fileno = RETRACE_GET_REAL(fileno);
+	descriptor_info_t *di = NULL;
+
+	r = real_fread(ptr, size, nmemb, stream);
+
+	if(get_tracing_enabled()) {
+		int old_tracing_enabled = set_tracing_enabled(0);
+
+		if (stream) {
+			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
+
+		if (di && di->location)
+		        trace_printf(1, "fread(%p, %u, %u, %p) [to: \"%s\", return: %u]\n", ptr, size, nmemb, stream, di->location, r);
+		else
+			trace_printf(1, "fread(%p, %u, %u, %p) [return: %u]\n", ptr, size, nmemb, stream, r);
+
+		for (i = 0; i < r; i++) 
+			trace_dump_data(ptr + i, size);
+
+		set_tracing_enabled(old_tracing_enabled);
+	}
+
+        return r;
+}
+
+RETRACE_REPLACE(fread)
+
+int RETRACE_IMPLEMENTATION(fputc)(int c, FILE *stream)
+{
+	int r;
+	int fd;
+	real_fputc = RETRACE_GET_REAL(fputc);
+	real_fileno = RETRACE_GET_REAL(fileno);
+	descriptor_info_t *di = NULL;
+
+	r = real_fputc(c, stream);
+
+	if(get_tracing_enabled()) {
+		int old_tracing_enabled = set_tracing_enabled(0);
+
+		if (stream) {
+			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
+
+		if (di && di->location)
+		        trace_printf(1, "fputc('%c'(%d), %p) [to: \"%s\", return: %d]\n", c, c, stream, di->location, r);
+		else
+			trace_printf(1, "fputc('%c'(%d), %p) [return: %d]\n", c, c, stream, r);
+
+		set_tracing_enabled(old_tracing_enabled);
+	}
+
+        return r;
+}
+
+RETRACE_REPLACE(fputc)
+
+int RETRACE_IMPLEMENTATION(fputs)(const char *s, FILE *stream)
+{
+	int r, fd;
+	real_fputs = RETRACE_GET_REAL(fputs);
+	real_fileno = RETRACE_GET_REAL(fileno);
+	descriptor_info_t *di = NULL;
+
+	r = real_fputs(s, stream);
+
+	if(get_tracing_enabled()) {
+		int old_tracing_enabled = set_tracing_enabled(0);
+
+		if (stream) {
+			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
+
+		if (di && di->location)
+		        trace_printf(1, "fputs(\"%s\", %p) [to: \"%s\", return: %d]\n", s, stream, di->location, r);
+		else
+			trace_printf(1, "fputs(\"%s\", %p) [return: %d]\n", s, stream, r);
+
+		set_tracing_enabled(old_tracing_enabled);
+	}
+
+        return r;
+}
+
+RETRACE_REPLACE(fputs)
+
+int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
+{
+	int r;
+	int fd;
+	real_fgetc = RETRACE_GET_REAL(fgetc);
+	real_fileno = RETRACE_GET_REAL(fileno);
+	descriptor_info_t *di = NULL;
+
+	r = real_fgetc(stream);
+
+	if(get_tracing_enabled()) {
+		int old_tracing_enabled = set_tracing_enabled(0);
+
+		if (stream) {
+			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
+
+		if (di && di->location)
+		        trace_printf(1, "fgetc(%p) [to: \"%s\", return: '%c'(%d)]\n", stream, di->location, r, r);
+		else
+			trace_printf(1, "fgetc(%p) [return: '%c'(%d)])\n", stream, r, r);
+
+		set_tracing_enabled(old_tracing_enabled);
+	}
+
+        return r;
+}
+
+RETRACE_REPLACE(fgetc)
+
+#if 0
+char* RETRACE_IMPLEMENTATION(fgets)(char *s, int size, FILE *stream)
+{
+	int fd;
+	real_fgets = RETRACE_GET_REAL(fgets);
+	real_fileno = RETRACE_GET_REAL(fileno);
+	descriptor_info_t *di = NULL;
+
+	real_fgets(s, size, stream);
+
+	if(get_tracing_enabled()) {
+		int old_tracing_enabled = set_tracing_enabled(0);
+
+		if (stream) {
+			fd = real_fileno(stream);
+			di = file_descriptor_get(fd);
+		}
+
+		if (di && di->location)
+		        trace_printf(1, "fgets(\"%s\", %d, %p) [to: \"%s\"]\n", s, size, stream, di->location);
+		else
+			trace_printf(1, "fgets(\"%s\", %d, %p)\n", s, size, stream);
+
+		set_tracing_enabled(old_tracing_enabled);
+	}
+
+        return s;
+}
+
+RETRACE_REPLACE(fgets)
+#endif
