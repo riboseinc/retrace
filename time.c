@@ -51,14 +51,29 @@ char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 
 RETRACE_REPLACE(ctime)
 
+#ifdef __APPLE__
+int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *restrict tp, void *restrict tzp)
+#else
 int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz)
+#endif
 {
         real_gettimeofday = RETRACE_GET_REAL(gettimeofday);
 
+#ifdef __APPLE__
+        struct timezone *tz = (struct timezone *) tzp;
+#endif
+
         int ret = real_gettimeofday(tv, tz);
         if (ret == 0)
+        {
+                time_t tv_sec = tv ? tv->tv_sec : 0;
+                suseconds_t tv_usec = tv ? tv->tv_usec : 0;
+                int tz_minuteswest = tz ? tz->tz_minuteswest : 0;
+                int tz_dsttime = tz ? tz->tz_dsttime : 0;
+
                 trace_printf(1, "gettimeofday(timeval:[%ld, %ld], timezone:[%d, %d]);\n",
-                                tv->tv_sec, tv->tv_usec, tz->tz_minuteswest, tz->tz_dsttime);
+                                tv_sec, tv_usec, tz_minuteswest, tz_dsttime);
+        }
         else
                 trace_printf(1, "gettimeofday(); -1\n");
 

@@ -5,7 +5,12 @@
 
 typedef char *(*rtr_ctime_t)(const time_t *timep);
 typedef char *(*rtr_ctime_r_t)(const time_t *timep, char *buf);
+
+#ifdef __APPLE__
+typedef int (*rtr_gettimeofday_t)(struct timeval *restrict tp, void *restrict tzp);
+#else
 typedef int (*rtr_gettimeofday_t)(struct timeval *tv, struct timezone *tz);
+#endif        
 
 rtr_ctime_t   real_ctime;
 rtr_ctime_r_t real_ctime_r;
