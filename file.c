@@ -26,6 +26,7 @@
 
 #include "common.h"
 #include "file.h"
+#include "str.h"
 
 int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 {
@@ -126,24 +127,50 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 {
 	real_fopen = RETRACE_GET_REAL(fopen);
 	real_fileno = RETRACE_GET_REAL(fileno);
+	real_strcmp = RETRACE_GET_REAL(strcmp);
 	int fd = 0;
+	int did_redirect = 0;
+	FILE *ret;
+        char *match_file = NULL;
+        char *redirect_file = NULL;
 
-	FILE *ret = real_fopen(file, mode);
+	if (get_tracing_enabled() && file) {
+		rtr_config config = NULL;
+
+		while (rtr_get_config_multiple (&config, "fopen",
+				ARGUMENT_TYPE_STRING,
+				ARGUMENT_TYPE_STRING,
+				ARGUMENT_TYPE_END,
+				&match_file,
+				&redirect_file)) {
+
+			if (real_strcmp (match_file, file) == 0) {
+				did_redirect = 1;
+
+				ret = real_fopen(redirect_file, mode);
+
+				if (config)
+					rtr_confing_close (config);
+
+				break;
+			}
+
+			free (match_file);
+			free (redirect_file);
+		}
+	}
+
+	if (!did_redirect)
+		ret = real_fopen(file, mode);
 
 	if(get_tracing_enabled()) {
 		int old_tracing_enabled = set_tracing_enabled(0);
 
-		if (ret)
-			fd = real_fileno(ret);
+	trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", did_redirect ? redirect_file : file , mode, fd);
 
-		if (fd > 0) {
-			file_descriptor_update(
-				fd, FILE_DESCRIPTOR_TYPE_FILE, file, 0);
-		}
-
-		trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", file, mode, fd);
-
-		set_tracing_enabled(old_tracing_enabled);
+	if (did_redirect) {
+		free (match_file);
+	        free (redirect_file);
 	}
 
 	return (ret);

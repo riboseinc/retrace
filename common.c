@@ -199,33 +199,19 @@ set_tracing_enabled(int enabled)
 	return oldvalue;
 }
 
-int
-get_redirect(const char *function, ...)
+static FILE *
+get_config_file ()
 {
-	FILE * config_file = NULL;
-	size_t line_size = 0;
-	char * config_line = NULL;
-	char * current_function = NULL;
-	char * arg_start = NULL;
-	size_t len;
-	int    retval = 0;
+	FILE *config_file = NULL;
 
-	// If we disabled tracing because we are
-	// executing some internal code, don't honor
-	// any redirections
 	if (!get_tracing_enabled())
-		return 0;
+        	return NULL;
 
-	// Disable tracing so we don't get in loops
-	// when the functions we called here, call
-	// Other functions that we have replaced
 	int old_tracing_enabled = set_tracing_enabled(0);
 
 	real_fopen = RETRACE_GET_REAL(fopen);
-	real_strncmp = RETRACE_GET_REAL(strncmp);
-	real_free = RETRACE_GET_REAL(free);
 
-	// If we have a RETRACE_CONFIG env var, try to open the config file
+  	// If we have a RETRACE_CONFIG env var, try to open the config file
 	// from there
 	char *file_path = getenv("RETRACE_CONFIG");
 
@@ -258,6 +244,37 @@ get_redirect(const char *function, ...)
 		config_file = real_fopen("/etc/retrace.conf", "r");
 	}
 
+	set_tracing_enabled(old_tracing_enabled);
+
+	return config_file;
+}
+
+
+
+static int
+rtr_parse_config_file(rtr_config config_file, const char *function, va_list arg_types)
+{
+	size_t line_size = 0;
+	char * config_line = NULL;
+	char * current_function = NULL;
+	char * arg_start = NULL;
+	size_t len;
+	int    retval = 0;
+
+	// If we disabled tracing because we are
+	// executing some internal code, don't honor
+	// any redirections
+	if (!get_tracing_enabled())
+		return 0;
+
+	// Disable tracing so we don't get in loops
+	// when the functions we called here, call
+	// Other functions that we have replaced
+	int old_tracing_enabled = set_tracing_enabled(0);
+
+	real_strncmp = RETRACE_GET_REAL(strncmp);
+	real_free = RETRACE_GET_REAL(free);
+
 	if (!config_file)
 		goto Cleanup;
 
@@ -280,19 +297,15 @@ get_redirect(const char *function, ...)
 		config_line = NULL;
 	}
 
-	fclose(config_file);
-
 	if (current_function)
 		free(current_function);
 
 	if (arg_start) {
 		// Count how many arguments we have
-		va_list arg_types;
 		va_list arg_values;
 		int     current_argument;
 
-		va_start(arg_types, function);
-		va_start(arg_values, function);
+		va_copy (arg_values, arg_types);
 
 		// Advance past the types until we find the values
 		do {
@@ -345,6 +358,50 @@ Cleanup:
 
 	return retval;
 }
+
+void
+rtr_confing_close (rtr_config config)
+{
+	fclose ((FILE *) config); 
+}
+
+int rtr_get_config_multiple(rtr_config *config, const char *function, ...)
+{
+	int ret = 0;
+
+	if (*config == NULL)
+		*config = get_config_file ();
+
+	if (*config) {
+		va_list args;
+		va_start (args, function);
+		ret = rtr_parse_config_file (*config, function, args);
+
+		if (!ret) {
+			rtr_confing_close (*config);
+			*config = NULL;
+		}
+        }
+
+	return ret;
+}
+
+int rtr_get_config_single(const char *function, ...)
+{
+	rtr_config config_file = get_config_file ();
+	int ret = 0;
+
+	if (config_file) {
+		va_list args;
+                va_start (args, function);
+		ret = rtr_parse_config_file (config_file, function, args);
+
+		rtr_confing_close (config_file);
+	}
+
+	return ret;
+}
+
 
 descriptor_info_t *
 descriptor_info_new(int fd, unsigned int type, const char *location, int port)
