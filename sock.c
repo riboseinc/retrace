@@ -24,117 +24,96 @@
  */
 
 #include "common.h"
+#include "str.h"
+#include "malloc.h"
 #include "sock.h"
-#include <arpa/inet.h>
+
+#define RETRACE_MAX_IP_ADDR_LEN 15
 
 int inet_pton(int af, const char *src, void *dst);
 
 int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_t len)
 {
-#define RETRACE_MAX_IP_ADDR_LEN 15
-	char	   ip_address[RETRACE_MAX_IP_ADDR_LEN + 1];
-	char *	 redirect_ip = NULL;
-	char *	 match_ip = NULL;
-	int	    match_port;
-	int	    redirect_port;
-	unsigned short port = ntohs(*(unsigned short *) &address->sa_data[0]);
-
+	// get connect function pointer
 	real_connect = RETRACE_GET_REAL(connect);
 
-	// Only implemented for IPv4 right now
-	if (get_tracing_enabled() && address->sa_family == AF_INET)
+	real_free = RETRACE_GET_REAL(free);
+
+	// check tracing enabled
+	if (!get_tracing_enabled())
+		return real_connect(fd, address, len);
+
+	// check socket family
+	if (address->sa_family == AF_INET)
 	{
+		char *match_ip = NULL, *redirect_ip = NULL;
+		int match_port, redirect_port;
+
+		const char *dst_ipaddr = inet_ntoa(((struct sockaddr_in *) address)->sin_addr);
+		int dst_port = ntohs(((struct sockaddr_in *) address)->sin_port);
+
 		rtr_config config = NULL;
 
-		while (rtr_get_config_multiple (&config, "connect", 
-			 ARGUMENT_TYPE_STRING, // match_ip
-			 ARGUMENT_TYPE_INT,    // match_port
-			 ARGUMENT_TYPE_STRING, // redirect_ip
-			 ARGUMENT_TYPE_INT,    // redirect_port
-			 ARGUMENT_TYPE_END,
-			 &match_ip,
-			 &match_port,
-			 &redirect_ip,
-			 &redirect_port)) {
-	
-			struct sockaddr match_addr;
+		trace_printf(1, "connect(%d, %s:%d, %d), [%s]\n", fd, dst_ipaddr, dst_port, len, "AF_INET");
 
-			// Convert the ip address and port to a struct sockaddr to compare
-			// if we want to redirect this connection
-			match_addr.sa_family = address->sa_family;
-			*((unsigned short *) &match_addr.sa_data[0]) = htons(match_port);
-			inet_pton(AF_INET, match_ip, (struct in_addr *) &match_addr.sa_data[2]);
+		while (rtr_get_config_multiple(&config, "connect",
+				ARGUMENT_TYPE_STRING,
+				ARGUMENT_TYPE_INT,
+				ARGUMENT_TYPE_STRING,
+				ARGUMENT_TYPE_INT,
+				ARGUMENT_TYPE_END,
+				&match_ip,
+				&match_port,
+				&redirect_ip,
+				&redirect_port))
+		{
+			trace_printf(1, "try matching config 'match_addr-%s:%d, redirect_addr-%s:%d'\n",
+							match_ip, match_port, redirect_ip, redirect_port);
 
-			if (match_addr.sa_data[0] == address->sa_data[0] &&
-			    match_addr.sa_data[1] == address->sa_data[1] &&
-			    match_addr.sa_data[2] == address->sa_data[2] &&
-			    match_addr.sa_data[3] == address->sa_data[3] &&
-			    match_addr.sa_data[4] == address->sa_data[4] &&
-			    match_addr.sa_data[5] == address->sa_data[5]) {
-				// We have a match! Construct a struct sockaddr of where we want to
-				// redirect to.
-				struct sockaddr redirect_addr;
+			// check IP address and port number is matched
+			if (strcmp(match_ip, dst_ipaddr) == 0 && match_port == dst_port)
+			{
+				struct sockaddr_in redirect_addr;
 
-				redirect_addr.sa_family = address->sa_family;
-				*((unsigned short *) &redirect_addr.sa_data[0]) = htons(redirect_port);
-				inet_pton(
-				  AF_INET, redirect_ip, (struct in_addr *) &redirect_addr.sa_data[2]);
+				// set redirect address
+				memset(&redirect_addr, 0, sizeof(redirect_addr));
 
-				trace_printf(
-				  1,
-				  "connect(%d, \"%hu.%hu.%hu.%hu:%u\", %zu); [redirection in effect: "
-				  "\"%hu.%hu.%hu.%hu:%u\"]\n",
-				  fd,
-				  (unsigned short) address->sa_data[2] & 0xFF,
-				  (unsigned short) address->sa_data[3] & 0xFF,
-				  (unsigned short) address->sa_data[4] & 0xFF,
-				  (unsigned short) address->sa_data[5] & 0xFF,
-				  port,
-				  len,
-				  (unsigned short) redirect_addr.sa_data[2] & 0xFF,
-				  (unsigned short) redirect_addr.sa_data[3] & 0xFF,
-				  (unsigned short) redirect_addr.sa_data[4] & 0xFF,
-				  (unsigned short) redirect_addr.sa_data[5] & 0xFF,
-				  redirect_port);
+				redirect_addr.sin_family = AF_INET;
+				redirect_addr.sin_addr.s_addr = inet_addr(redirect_ip);
+				redirect_addr.sin_port = htons(redirect_port);
 
-				file_descriptor_update(
-				  fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, redirect_ip, redirect_port);
+				trace_printf(1, "redirect connect(%d, %s:%d, %d), [%s]\n", fd, redirect_ip, redirect_port,
+								sizeof(struct sockaddr_in), "AF_INET");
 
-				/* cleanup */
-				free(redirect_ip);
-				free(match_ip);
+				// update file descriptor
+				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, redirect_ip, redirect_port);
 
-				rtr_confing_close (config);
+				// free buffers
+				real_free(match_ip);
+				real_free(redirect_ip);
 
-				return real_connect(fd, &redirect_addr, len);
+				rtr_confing_close(config);
+
+				return real_connect(fd, (struct sockaddr *) &redirect_addr, sizeof(redirect_addr));
 			}
 
-			if (redirect_ip) {
-				free(redirect_ip);
-				redirect_ip = NULL;
-			}
+			// free buffers
+			if (match_ip)
+				real_free(match_ip);
 
-			if (match_ip) {
-	                        free(match_ip);
-				match_ip = NULL;
-			}
+			if (redirect_ip)
+				real_free(redirect_ip);
+
+			match_ip = redirect_ip = NULL;
 		}
 
+		// close config
 		if (config)
-			rtr_confing_close (config);
+		{
+			rtr_confing_close(config);
+			config = NULL;
+		}
 	}
-
-	snprintf(ip_address,
-		 RETRACE_MAX_IP_ADDR_LEN,
-		 "%d.%d.%d.%d",
-		 (int) address->sa_data[2] & 0xFF,
-		 (int) address->sa_data[3] & 0xFF,
-		 (int) address->sa_data[4] & 0xFF,
-		 (int) address->sa_data[5] & 0xFF);
-
-	trace_printf(1, "connect(%d, \"%s\", %zu);\n", fd, ip_address, port, len);
-
-	file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, ip_address, port);
 
 	return real_connect(fd, address, len);
 }

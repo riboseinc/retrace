@@ -37,7 +37,7 @@
 
 
 #define PORT 80
-#define IP "127.0.0.1"
+#define IP "172.16.117.130"
 
 int main(int argc, char *argv[])
 {
