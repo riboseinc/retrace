@@ -23,6 +23,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __RETRACE_PRINT_H__
+#define __RETRACE_PRINT_H__
 typedef int (*rtr_printf_t)(const char *fmt, ...);
 typedef int (*rtr_fprintf_t)(FILE *stream, const char *fmt, ...);
 typedef int (*rtr_dprintf_t)(int fd, const char *fmt, ...);
@@ -37,3 +39,4 @@ typedef int (*rtr_vsnprintf_t)(char *buf, size_t size, const char *fmt, va_list 
 rtr_vsnprintf_t	real_vsnprintf;
 rtr_fprintf_t	real_fprintf;
 rtr_printf_t	real_printf;
+#endif

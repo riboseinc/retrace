@@ -50,7 +50,7 @@ typedef struct {
 } descriptor_info_t;
 
 
-void trace_printf(int hdr, char *buf, ...);
+void trace_printf(int hdr, const char *fmt, ...);
 void trace_printf_str(const char *string);
 void trace_dump_data(const void *buf, size_t nbytes);
 void trace_mode(mode_t mode, char *p);
