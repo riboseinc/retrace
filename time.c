@@ -52,7 +52,7 @@ char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 RETRACE_REPLACE(ctime)
 
 #ifdef __APPLE__
-int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *restrict tp, void *restrict tzp)
+int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *restrict tv, void *restrict tzp)
 #else
 int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz)
 #endif
