@@ -370,8 +370,8 @@ int rtr_get_config_multiple(rtr_config *config, const char *function, ...)
 	if (*config) {
 		va_list args;
 		va_start (args, function);
-		ret = rtr_parse_config_file (*config, function, args);
 
+		ret = rtr_parse_config_file (*config, function, args);
 		if (!ret) {
 			rtr_confing_close (*config);
 			*config = NULL;

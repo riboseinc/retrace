@@ -1,0 +1,16 @@
+
+1. Compile HTTP plugin module
+
+cd plugin/
+make
+
+2. Edit http_plugin.conf
+
+plugin,0,http,./plugin/http_plugin.so
+connect,172.16.117.130,80,127.0.0.1,80
+send,GET / HTTP/1.1,/tmp/1.txt
+send,GET /status HTTP/1.1,/tmp/recv-status.txt
+
+2. Run retrace
+
+RETRACE_CONFIG=./plugin/http_plugin.conf ./retrace.sh ./plugin/http_plugin_test [Server IP Address]

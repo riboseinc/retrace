@@ -26,6 +26,8 @@
 #include "common.h"
 #include "str.h"
 #include "malloc.h"
+#include "plugin.h"
+
 #include "sock.h"
 
 #define RETRACE_MAX_IP_ADDR_LEN 15
@@ -34,12 +36,16 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 {
 	// get connect function pointer
 	real_connect = RETRACE_GET_REAL(connect);
-
 	real_free = RETRACE_GET_REAL(free);
 
 	// check tracing enabled
 	if (!get_tracing_enabled())
 		return real_connect(fd, address, len);
+
+	// check plugin is enabled
+	rtr_plugin_sock_t *sock_plugin = rtr_plugin_get(RTR_PLUGIN_TYPE_SOCK);
+	if (sock_plugin && sock_plugin->p_connect)
+		return sock_plugin->p_connect(fd, address, len);
 
 	// check socket family
 	if (address->sa_family == AF_INET)
@@ -163,3 +169,39 @@ int RETRACE_IMPLEMENTATION(atoi)(const char *str)
 }
 
 RETRACE_REPLACE(atoi)
+
+ssize_t RETRACE_IMPLEMENTATION(send)(int fd, const void *buf, size_t len, int flags)
+{
+	real_send = RETRACE_GET_REAL(send);
+
+	// check tracing enabled
+	if (!get_tracing_enabled())
+		return real_send(fd, buf, len, flags);
+
+	// check plugin is enabled
+	rtr_plugin_sock_t *sock_plugin = rtr_plugin_get(RTR_PLUGIN_TYPE_SOCK);
+	if (sock_plugin && sock_plugin->p_send)
+		return sock_plugin->p_send(fd, buf, len, flags);
+
+	return real_send(fd, buf, len, flags);
+}
+
+RETRACE_REPLACE(send)
+
+ssize_t RETRACE_IMPLEMENTATION(recv)(int fd, void *buf, size_t len, int flags)
+{
+	real_recv = RETRACE_GET_REAL(recv);
+
+	// check tracing enabled
+	if (!get_tracing_enabled())
+		return real_recv(fd, buf, len, flags);
+
+	// check plugin is enabled
+	rtr_plugin_sock_t *sock_plugin = rtr_plugin_get(RTR_PLUGIN_TYPE_SOCK);
+	if (sock_plugin && sock_plugin->p_recv)
+		return sock_plugin->p_recv(fd, buf, len, flags);
+
+	return real_recv(fd, buf, len, flags);
+}
+
+RETRACE_REPLACE(recv)
