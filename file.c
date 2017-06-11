@@ -35,7 +35,33 @@ int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 {
 	real_stat = RETRACE_GET_REAL(stat);
 
-	trace_printf(1, "stat(\"%s\", \"\");\n", path);
+	char perm[10];
+
+	trace_printf(1, "stat(\"%s\", buf);\n", path);
+
+	if (real_stat(path, buf) == 0) {
+		trace_printf(1, "struct stat {\n");
+		trace_printf(1, "\tst_dev = %lu\n", buf->st_dev);
+		trace_printf(1, "\tst_ino = %i\n", buf->st_ino);
+	        trace_mode(buf->st_mode, perm);
+		trace_printf(1, "\tst_mode = %d [%s]\n", buf->st_mode, perm);
+		trace_printf(1, "\tst_nlink = %lu\n", buf->st_nlink);
+		trace_printf(1, "\tst_uid = %d\n", buf->st_uid);
+		trace_printf(1, "\tst_gid = %d\n", buf->st_gid);
+		trace_printf(1, "\tst_rdev = %r\n", buf->st_rdev);
+		trace_printf(1, "\tst_atime = %lu\n", buf->st_atime);
+		trace_printf(1, "\tst_mtime = %lu\n", buf->st_mtime);
+		trace_printf(1, "\tst_ctime = %lu\n", buf->st_ctime);
+		trace_printf(1, "\tst_size = %zu\n", buf->st_size);
+		trace_printf(1, "\tst_blocks = %lu\n", buf->st_blocks);
+		trace_printf(1, "\tst_blksize = %lu\n", buf->st_blksize);
+#if __APPLE__
+		trace_printf(1, "\tst_flags = %d\n", buf->st_flags);
+		trace_printf(1, "\tst_gen = %d\n", buf->st_gen);
+#endif
+		trace_printf(1, "}\n");
+	}
+
 	return real_stat(path, buf);
 }
 
