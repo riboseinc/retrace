@@ -29,6 +29,7 @@
 
 #include "common.h"
 #include "file.h"
+#include "plugin.h"
 #include "str.h"
 
 int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
@@ -209,6 +210,11 @@ int RETRACE_IMPLEMENTATION(close)(int fd)
 	}
 
 	file_descriptor_remove(fd);
+
+	// check plugin is enabled
+	rtr_plugin_sock_t *sock_plugin = rtr_plugin_get(RTR_PLUGIN_TYPE_SOCK);
+	if (sock_plugin && sock_plugin->p_close)
+		return sock_plugin->p_close(fd);
 
 	return real_close(fd);
 }

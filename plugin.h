@@ -23,6 +23,8 @@ typedef struct rtr_plugin_sock
 
         ssize_t (*p_write)(int fd, const void *buf, size_t count);
         ssize_t (*p_read)(int fd, void *buf, size_t count);
+
+        int (*p_close)(int fd);
 } rtr_plugin_sock_t;
 
 // retrace plugin functions

@@ -91,6 +91,52 @@ static int add_http_session(int sockfd)
         return 0;
 }
 
+// free http session
+static void free_http_session(struct http_session *p)
+{
+        real_free = RETRACE_GET_REAL(free);
+
+        // free buffers
+        if (p->send_buffer)
+                real_free(p->send_buffer);
+
+        if (p->recv_buffer)
+                real_free(p->recv_buffer);
+
+        // free self
+        real_free(p);
+
+        return;
+}
+
+// remove http session
+static void remove_http_session(struct http_session *p)
+{
+        // lock mutex
+        pthread_mutex_lock(&g_http_ctx.mutex);
+
+        // set list
+        if (g_http_ctx.sessions = p)
+                g_http_ctx.sessions = NULL;
+        else
+        {
+                if (p->prev)
+                        p->prev->next = p->next;
+                if (p->next)
+                        p->next->prev = p->prev;
+        }
+
+        // free http session
+        free_http_session(p);
+
+        g_http_ctx.sessions_count--;
+
+        // unlock mutex
+        pthread_mutex_unlock(&g_http_ctx.mutex);
+
+        return;
+}
+
 // get session by socket
 static struct http_session *get_http_session_by_sock(int sockfd)
 {
@@ -441,15 +487,33 @@ static ssize_t http_plugin_recv(int sockfd, void *buf, size_t len, int flags)
 // HTTP plugin write function
 static ssize_t http_plugin_write(int sockfd, const void *buf, size_t len)
 {
-        real_write = RETRACE_GET_REAL(real_write);
+        real_write = RETRACE_GET_REAL(write);
         return real_write(sockfd, buf, len);
 }
 
 // HTTP plugin read function
 static ssize_t http_plugin_read(int sockfd, void *buf, size_t len)
 {
-        real_read = RETRACE_GET_REAL(real_read);
+        real_read = RETRACE_GET_REAL(read);
         return real_read(sockfd, buf, len);
+}
+
+// HTTP plugin close function
+static int http_plugin_close(int sockfd)
+{
+        real_close = RETRACE_GET_REAL(close);
+
+        // get session by socket
+        struct http_session *p = get_http_session_by_sock(sockfd);
+        if (!p)
+                return real_close(sockfd);
+
+        trace_printf(1, "http_plugin: Close socket (%d)\n", sockfd);
+
+        // remove session
+        remove_http_session(p);
+
+        return real_close(sockfd);
 }
 
 // initialize http plugin context
@@ -472,6 +536,7 @@ rtr_plugin_sock_t rtr_http_data =
         .p_recv = http_plugin_recv,
         .p_write = http_plugin_write,
         .p_read= http_plugin_read,
+        .p_close = http_plugin_close,
 };
 
 // register plugin
