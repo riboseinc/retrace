@@ -157,7 +157,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
                         request_str = "PTRACE_LISTEN";
                         break;
 		case PTRACE_PEEKSIGINFO:
-                        request_str = "PTRACE_LISTEN";
+                        request_str = "PTRACE_PEEKSIGINFO";
                         break;
 #endif
         }
