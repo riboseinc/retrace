@@ -53,3 +53,19 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 }
 
 RETRACE_REPLACE(getenv)
+
+int RETRACE_IMPLEMENTATION(uname)(struct utsname *buf)
+{
+	real_uname = RETRACE_GET_REAL(uname);
+	
+	int ret = real_uname(buf);
+	if (ret == 0)
+		trace_printf(1, "uname(); [%s, %s, %s, %s, %s]\n", buf->sysname, buf->nodename,
+					buf->release, buf->version, buf->machine);
+	else
+		trace_printf(1, "uname(); NULL");
+
+	return ret;
+}
+
+RETRACE_REPLACE(uname)
