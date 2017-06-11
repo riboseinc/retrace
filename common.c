@@ -37,6 +37,7 @@
 #include "file.h"
 #include "malloc.h"
 #include "printf.h"
+#include "env.h"
 
 /*************************************************
  *  Global setting, we set this to disable all our
@@ -53,7 +54,7 @@
  * get into an infinite loop.
  *
  **************************************************/
-int g_enable_tracing = 1;
+static __thread  int g_enable_tracing = 1;
 
 /*************************************************
  * Global list of file descriptors so we can track
@@ -207,10 +208,11 @@ get_config_file ()
 	real_getuid = RETRACE_GET_REAL(getuid);
 	real_malloc =  RETRACE_GET_REAL(malloc);
 	real_free = RETRACE_GET_REAL(free);
+	real_getenv = RETRACE_GET_REAL(getenv);
 
   	// If we have a RETRACE_CONFIG env var, try to open the config file
 	// from there
-	char *file_path = getenv("RETRACE_CONFIG");
+	char *file_path = real_getenv("RETRACE_CONFIG");
 
 	if (file_path)
 		config_file = real_fopen(file_path, "r");
@@ -218,7 +220,7 @@ get_config_file ()
 	// If we couldn't open the file from the env var try to home it from ~/.retrace.conf
 	if (!config_file) {
 		
-		file_path = getenv("HOME");
+		file_path = real_getenv("HOME");
 
 		if (file_path) {
 			char *file_name_user = ".retrace.conf";
