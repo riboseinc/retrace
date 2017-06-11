@@ -41,7 +41,7 @@ static void print_fds(int max_fd, fd_set *fds)
 int RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
                         fd_set *exceptfds, struct timeval *timeout)
 {
-        real_select = RETRACE_GET_REAL(select);
+        rtr_select_t real_select = RETRACE_GET_REAL(select);
         int ret;
 
         // print original fdsets

@@ -6,7 +6,7 @@
 typedef FILE *(*rtr_popen_t)(const char *command, const char *type);
 typedef int (*rtr_pclose_t)(FILE *stream);
 
-rtr_popen_t  real_popen;
-rtr_pclose_t real_pclose;
+RETRACE_DECL(popen);
+RETRACE_DECL(pclose);
 
 #endif /* __RETRACE_POPEN_H__ */

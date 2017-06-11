@@ -72,9 +72,9 @@ trace_printf(int hdr, const char *fmt, ...)
 
 	int old_tracing_enabled = set_tracing_enabled(0);
 
-	real_vsnprintf = RETRACE_GET_REAL(vsnprintf);
-	real_fprintf = RETRACE_GET_REAL(fprintf);
-	real_getpid = RETRACE_GET_REAL(getpid);
+	rtr_vsnprintf_t real_vsnprintf = RETRACE_GET_REAL(vsnprintf);
+	rtr_fprintf_t real_fprintf = RETRACE_GET_REAL(fprintf);
+	rtr_getpid_t real_getpid = RETRACE_GET_REAL(getpid);
 
 	char str[1024];
 	va_list arglist;
@@ -203,10 +203,9 @@ get_config_file ()
 
 	int old_tracing_enabled = set_tracing_enabled(0);
 
-	real_fopen = RETRACE_GET_REAL(fopen);
-	real_getuid = RETRACE_GET_REAL(getuid);
-	real_malloc =  RETRACE_GET_REAL(malloc);
-	real_free = RETRACE_GET_REAL(free);
+	rtr_fopen_t real_fopen = RETRACE_GET_REAL(fopen);
+	rtr_malloc_t real_malloc =  RETRACE_GET_REAL(malloc);
+	rtr_free_t real_free = RETRACE_GET_REAL(free);
 
   	// If we have a RETRACE_CONFIG env var, try to open the config file
 	// from there
@@ -268,8 +267,8 @@ rtr_parse_config_file(rtr_config config_file, const char *function, va_list arg_
 	// Other functions that we have replaced
 	int old_tracing_enabled = set_tracing_enabled(0);
 
-	real_strncmp = RETRACE_GET_REAL(strncmp);
-	real_free = RETRACE_GET_REAL(free);
+	rtr_strncmp_t real_strncmp = RETRACE_GET_REAL(strncmp);
+	rtr_free_t real_free = RETRACE_GET_REAL(free);
 
 	if (!config_file)
 		goto Cleanup;

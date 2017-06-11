@@ -5,6 +5,6 @@
 
 typedef ssize_t (*rtr_read_t)(int fd, void *buf, size_t nbytes);
 
-rtr_read_t real_read;
+RETRACE_DECL(read);
 
 #endif /* __RETRACE_READ_H__ */

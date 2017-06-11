@@ -13,14 +13,13 @@ typedef void (*rtr_rewinddir_t)(DIR *dirp);
 
 typedef int (*rtr_dirfd_t)(DIR *dirp);
 
-rtr_opendir_t           real_opendir;
-rtr_closedir_t          real_closedir;
-
-rtr_fdopendir_t         real_fdopendir;
-rtr_readdir_r_t         real_readdir_r;
-rtr_telldir_t           real_telldir;
-rtr_seekdir_t           real_seekdir;
-rtr_rewinddir_t         real_rewinddir;
-rtr_dirfd_t             real_dirfd;
+RETRACE_DECL(opendir);
+RETRACE_DECL(closedir);
+RETRACE_DECL(fdopendir);
+RETRACE_DECL(readdir_r);
+RETRACE_DECL(telldir);
+RETRACE_DECL(seekdir);
+RETRACE_DECL(rewinddir);
+RETRACE_DECL(dirfd);
 
 #endif /* __DIR_H__ */

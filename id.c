@@ -30,7 +30,7 @@
 
 int RETRACE_IMPLEMENTATION(setuid)(uid_t uid)
 {
-	real_setuid = RETRACE_GET_REAL(setuid);
+	rtr_setuid_t real_setuid = RETRACE_GET_REAL(setuid);
 	trace_printf(1, "setuid(%d);\n", uid);
 	return real_setuid(uid);
 }
@@ -39,7 +39,7 @@ RETRACE_REPLACE(setuid)
 
 int RETRACE_IMPLEMENTATION(seteuid)(uid_t uid)
 {
-	real_seteuid = RETRACE_GET_REAL(seteuid);
+	rtr_seteuid_t real_seteuid = RETRACE_GET_REAL(seteuid);
 	trace_printf(1, "seteuid(%d);\n", uid);
 	return real_seteuid(uid);
 }
@@ -48,7 +48,7 @@ RETRACE_REPLACE(seteuid)
 
 int RETRACE_IMPLEMENTATION(setgid)(gid_t gid)
 {
-	real_setgid = RETRACE_GET_REAL(setgid);
+	rtr_setgid_t real_setgid = RETRACE_GET_REAL(setgid);
 	trace_printf(1, "setgid(%d);\n", gid);
 	return real_setgid(gid);
 }
@@ -57,7 +57,7 @@ RETRACE_REPLACE(setgid)
 
 gid_t RETRACE_IMPLEMENTATION(getgid)()
 {
-	real_getgid = RETRACE_GET_REAL(getgid);
+	rtr_getgid_t real_getgid = RETRACE_GET_REAL(getgid);
 	int gid = real_getgid();
 	trace_printf(1, "getgid(); [%d]\n", gid);
 	return(gid);
@@ -67,7 +67,7 @@ RETRACE_REPLACE(getgid)
 
 gid_t RETRACE_IMPLEMENTATION(getegid)()
 {
-	real_getegid = RETRACE_GET_REAL(getegid);
+	rtr_getegid_t real_getegid = RETRACE_GET_REAL(getegid);
 	int egid = real_getegid();
 	trace_printf(1, "getegid(); [%d]\n", egid);
 	return(egid);
@@ -84,7 +84,7 @@ uid_t RETRACE_IMPLEMENTATION(getuid)()
 		return redirect_id;
 	}
 
-	real_getuid = RETRACE_GET_REAL(getuid);
+	rtr_getuid_t real_getuid = RETRACE_GET_REAL(getuid);
 
 	int uid = real_getuid();
 	trace_printf(1, "getuid(); [%d]\n", uid);
@@ -102,7 +102,7 @@ uid_t RETRACE_IMPLEMENTATION(geteuid)()
 		return redirect_id;
 	}
 
-	real_geteuid = RETRACE_GET_REAL(geteuid);
+	rtr_geteuid_t real_geteuid = RETRACE_GET_REAL(geteuid);
 
 	int euid = real_geteuid();
 	trace_printf(1, "geteuid(); [%d]\n", euid);
@@ -113,7 +113,7 @@ RETRACE_REPLACE(geteuid)
 
 pid_t RETRACE_IMPLEMENTATION(getpid)(void)
 {
-	real_getpid = RETRACE_GET_REAL(getpid);
+	rtr_getpid_t real_getpid = RETRACE_GET_REAL(getpid);
 	int pid = real_getpid();
 	trace_printf(1, "getpid(); [%d]\n", pid);
 	return(pid);
@@ -123,7 +123,7 @@ RETRACE_REPLACE(getpid)
 
 pid_t RETRACE_IMPLEMENTATION(getppid)(void)
 {
-	real_getppid = RETRACE_GET_REAL(getppid);
+	rtr_getppid_t real_getppid = RETRACE_GET_REAL(getppid);
 	int ppid = real_getppid();
 	trace_printf(1, "getppid(); [%d]\n", ppid);
 	return(ppid);

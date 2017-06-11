@@ -14,14 +14,17 @@ typedef int (*rtr_fexecve_t)(int fd, char *const argv[], char *const envp[]);
 #endif
 typedef int (*rtr_system_t)(const char *command);
 
-rtr_execvp_t real_execvp;
-rtr_execve_t real_execve;
-rtr_execv_t real_execv;
+RETRACE_DECL(execl);
+RETRACE_DECL(execvp);
+RETRACE_DECL(execve);
+RETRACE_DECL(execle);
+RETRACE_DECL(execlp);
+RETRACE_DECL(execv);
 #ifndef __APPLE__
-rtr_execvpe_t real_execvpe;
-rtr_execveat_t real_execveat;
-rtr_fexecve_t real_fexecve;
+RETRACE_DECL(execvpe);
+RETRACE_DECL(execveat);
+RETRACE_DECL(fexecve);
 #endif
-rtr_system_t real_system;
+RETRACE_DECL(system);
 
 #endif /* __RETRACE_EXEC_H__ */

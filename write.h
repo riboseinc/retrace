@@ -5,6 +5,6 @@
 
 typedef ssize_t (*rtr_write_t)(int fd, const void *buf, size_t nbytes);
 
-rtr_write_t real_write;
+RETRACE_DECL(write);
 
 #endif /* __RETRACE_WRITE_H__ */
