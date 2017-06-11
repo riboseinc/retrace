@@ -217,15 +217,16 @@ get_config_file ()
 
 	// If we couldn't open the file from the env var try to home it from ~/.retrace.conf
 	if (!config_file) {
-		struct passwd *pw = getpwuid(real_getuid());
+		
+		file_path = getenv("HOME");
 
-		if (pw && pw->pw_dir) {
+		if (file_path) {
 			char *file_name_user = ".retrace.conf";
 			char *file_path_user =
-			  (char *) real_malloc(strlen(pw->pw_dir) + strlen(file_name_user) + 2);
+			  (char *) real_malloc(strlen(file_path) + strlen(file_name_user) + 2);
 
 			if (file_path_user) {
-				strcpy(file_path_user, pw->pw_dir);
+				strcpy(file_path_user, file_path);
 				strcat(file_path_user, "/");
 				strcat(file_path_user, file_name_user);
 
