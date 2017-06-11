@@ -178,24 +178,6 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 
 RETRACE_REPLACE(fopen)
 
-DIR *RETRACE_IMPLEMENTATION(opendir)(const char *dirname)
-{
-	real_opendir = RETRACE_GET_REAL(opendir);
-	trace_printf(1, "opendir(\"%s\");\n", dirname);
-	return real_opendir(dirname);
-}
-
-RETRACE_REPLACE(opendir)
-
-int RETRACE_IMPLEMENTATION(closedir)(DIR *dirp)
-{
-	real_closedir = RETRACE_GET_REAL(closedir);
-	trace_printf(1, "closedir();\n");
-	return real_closedir(dirp);
-}
-
-RETRACE_REPLACE(closedir)
-
 int RETRACE_IMPLEMENTATION(close)(int fd)
 {
 	real_close = dlsym(RTLD_NEXT, "close");
@@ -232,6 +214,30 @@ int RETRACE_IMPLEMENTATION(dup2)(int oldfd, int newfd)
 }
 
 RETRACE_REPLACE(dup2)
+
+mode_t RETRACE_IMPLEMENTATION(umask)(mode_t mask)
+{
+	real_umask = RETRACE_GET_REAL(umask);
+
+	mode_t old_mask = real_umask(mask);
+	trace_printf(1, "umask(%d); [%d]\n", mask, old_mask);
+
+	return old_mask;
+}
+
+RETRACE_REPLACE(umask)
+
+int RETRACE_IMPLEMENTATION(mkfifo)(const char *pathname, mode_t mode)
+{
+	real_mkfifo = RETRACE_GET_REAL(mkfifo);
+
+	int ret = real_mkfifo(pathname, mode);
+	trace_printf(1, "mkfifo(%s, %d); [%d]\n", pathname, mode, ret);
+
+	return ret;
+}
+
+RETRACE_REPLACE(mkfifo)
 
 int RETRACE_IMPLEMENTATION(open)(const char *pathname, int flags, ...)
 {
@@ -447,4 +453,3 @@ char* RETRACE_IMPLEMENTATION(fgets)(char *s, int size, FILE *stream)
 
 RETRACE_REPLACE(fgets)
 #endif
-

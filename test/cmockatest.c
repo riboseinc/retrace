@@ -55,6 +55,7 @@
 #include "popen.h"
 #include "pipe.h"
 #include "printf.h"
+#include "dir.h"
 
 void *handle;
 
@@ -125,13 +126,7 @@ RTR_TEST_END
 RTR_TEST_START(fopen)
 RTR_TEST_END
 
-RTR_TEST_START(opendir)
-RTR_TEST_END
-
 RTR_TEST_START(fclose)
-RTR_TEST_END
-
-RTR_TEST_START(closedir)
 RTR_TEST_END
 
 RTR_TEST_START(fseek)
@@ -225,6 +220,31 @@ RTR_TEST_START(ctime)
 RTR_TEST_END
 
 RTR_TEST_START(ctime_r)
+RTR_TEST_END
+
+/* dir functions test */
+RTR_TEST_START(opendir)
+RTR_TEST_END
+
+RTR_TEST_START(closedir)
+RTR_TEST_END
+
+RTR_TEST_START(fdopendir)
+RTR_TEST_END
+
+RTR_TEST_START(readdir_r)
+RTR_TEST_END
+
+RTR_TEST_START(telldir)
+RTR_TEST_END
+
+RTR_TEST_START(seekdir)
+RTR_TEST_END
+
+RTR_TEST_START(rewinddir)
+RTR_TEST_END
+
+RTR_TEST_START(dirfd)
 RTR_TEST_END
 
 #define READ_BUF_SIZE 256
@@ -610,8 +630,7 @@ main(void)
       cmocka_unit_test(test_rtr_execvp),   cmocka_unit_test(test_rtr_execvpe),
       /* cmocka_unit_test(test_rtr_execveat), */ cmocka_unit_test(test_rtr_fexecve),
       cmocka_unit_test(test_rtr_system),   cmocka_unit_test(test_rtr_exit),
-      cmocka_unit_test(test_rtr_fopen),    cmocka_unit_test(test_rtr_opendir),
-      cmocka_unit_test(test_rtr_fclose),   cmocka_unit_test(test_rtr_closedir),
+      cmocka_unit_test(test_rtr_fopen),    cmocka_unit_test(test_rtr_fclose),
       cmocka_unit_test(test_rtr_fseek),    cmocka_unit_test(test_rtr_fileno),
       cmocka_unit_test(test_rtr_chmod),    cmocka_unit_test(test_rtr_fchmod),
       cmocka_unit_test(test_rtr_stat),     cmocka_unit_test(test_rtr_dup),
@@ -638,6 +657,12 @@ main(void)
       cmocka_unit_test(test_rtr_snprintf), cmocka_unit_test(test_rtr_vprintf),
       cmocka_unit_test(test_rtr_vfprintf), cmocka_unit_test(test_rtr_vdprintf),
       cmocka_unit_test(test_rtr_vsprintf), cmocka_unit_test(test_rtr_vsnprintf),
+
+      /* dir functions */
+      cmocka_unit_test(test_rtr_opendir),  cmocka_unit_test(test_rtr_closedir),
+      cmocka_unit_test(test_rtr_fdopendir),  cmocka_unit_test(test_rtr_readdir_r),
+      cmocka_unit_test(test_rtr_telldir), cmocka_unit_test(test_rtr_seekdir),
+      cmocka_unit_test(test_rtr_rewinddir), cmocka_unit_test(test_rtr_dirfd),
     };
 
     handle = dlopen("../retrace.so", RTLD_LAZY);
