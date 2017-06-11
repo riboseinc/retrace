@@ -1,6 +1,9 @@
 #ifndef __DIR_H__
 #define __DIR_H__
 
+typedef DIR *(*rtr_opendir_t)(const char *dirname);
+typedef int (*rtr_closedir_t)(DIR *dirp);
+
 typedef DIR *(*rtr_fdopendir_t)(int fd);
 
 typedef int (*rtr_readdir_r_t)(DIR *dirp, struct dirent *entry, struct dirent **result);

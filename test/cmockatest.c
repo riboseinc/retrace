@@ -30,6 +30,7 @@
 #include "popen.h"
 #include "pipe.h"
 #include "printf.h"
+#include "dir.h"
 
 void *handle;
 
