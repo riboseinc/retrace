@@ -10,17 +10,17 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
- * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <stdarg.h>
@@ -69,6 +69,8 @@ RETRACE_IMPLEMENTATION(printf)(const char *fmt, ...)
 	return result;
 }
 
+RETRACE_REPLACE(printf)
+
 int
 RETRACE_IMPLEMENTATION(fprintf)(FILE *stream, const char *fmt, ...)
 {
@@ -87,6 +89,8 @@ RETRACE_IMPLEMENTATION(fprintf)(FILE *stream, const char *fmt, ...)
 	return result;
 }
 
+RETRACE_REPLACE(fprintf)
+
 int
 RETRACE_IMPLEMENTATION(dprintf)(int fd, const char *fmt, ...)
 {
@@ -103,6 +107,8 @@ RETRACE_IMPLEMENTATION(dprintf)(int fd, const char *fmt, ...)
 
 	return result;
 }
+
+RETRACE_REPLACE(dprintf)
 
 int
 RETRACE_IMPLEMENTATION(sprintf)(char *str, const char *fmt, ...)
@@ -121,6 +127,8 @@ RETRACE_IMPLEMENTATION(sprintf)(char *str, const char *fmt, ...)
 	return result;
 }
 
+RETRACE_REPLACE(sprintf)
+
 int
 RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
 {
@@ -136,6 +144,8 @@ RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
 	return result;
 }
 
+RETRACE_REPLACE(snprintf)
+
 int
 RETRACE_IMPLEMENTATION(vprintf)(const char *fmt, va_list ap)
 {
@@ -149,6 +159,8 @@ RETRACE_IMPLEMENTATION(vprintf)(const char *fmt, va_list ap)
 
 	return result;
 }
+
+RETRACE_REPLACE(vprintf)
 
 int
 RETRACE_IMPLEMENTATION(vfprintf)(FILE *stream, const char *fmt, va_list ap)
@@ -165,6 +177,8 @@ RETRACE_IMPLEMENTATION(vfprintf)(FILE *stream, const char *fmt, va_list ap)
 	return result;
 }
 
+RETRACE_REPLACE(vfprintf)
+
 int
 RETRACE_IMPLEMENTATION(vdprintf)(int fd, const char *fmt, va_list ap)
 {
@@ -178,6 +192,8 @@ RETRACE_IMPLEMENTATION(vdprintf)(int fd, const char *fmt, va_list ap)
 
 	return result;
 }
+
+RETRACE_REPLACE(vdprintf)
 
 int
 RETRACE_IMPLEMENTATION(vsprintf)(char *str, const char *fmt, va_list ap)
@@ -193,6 +209,8 @@ RETRACE_IMPLEMENTATION(vsprintf)(char *str, const char *fmt, va_list ap)
 	return result;
 }
 
+RETRACE_REPLACE(vsprintf)
+
 int
 RETRACE_IMPLEMENTATION(vsnprintf)(char *str, size_t size, const char *fmt, va_list ap)
 {
@@ -204,3 +222,5 @@ RETRACE_IMPLEMENTATION(vsnprintf)(char *str, size_t size, const char *fmt, va_li
 
 	return result;
 }
+
+RETRACE_REPLACE(vsnprintf)

@@ -47,6 +47,8 @@ SRCS		+= popen.c
 SRCS		+= pipe.c
 SRCS		+= dir.c
 SRCS		+= printf.c
+SRCS		+= select.c
+SRCS    += trace.c
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test
@@ -70,3 +72,10 @@ test: $(RETRACE_SO)
 clean:
 	$(MAKE) -C test clean
 	$(RM) $(RETRACE_SO) $(OBJS) $(SRCS:.c=.d)
+
+install:
+	mkdir -p $(DEST_DIR)/usr/bin
+	mkdir -p $(DEST_DIR)/usr/lib64
+
+	install -m 755 retrace.sh $(DEST_DIR)/usr/bin
+	install -c $(RETRACE_SO) $(DEST_DIR)/usr/lib64
