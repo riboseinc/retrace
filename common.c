@@ -516,8 +516,10 @@ file_descriptor_update(int fd, unsigned int type, const char *location, int port
 	/* If found, update */
 	if (di) {
 		di->type = type;
-		if (di->location)
+		if (di->location) {
 			free(di->location);
+		}
+		di->location = strdup (location);
 
 		di->port = port;
 	} else {

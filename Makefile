@@ -48,6 +48,7 @@ SRCS		+= pipe.c
 SRCS		+= dir.c
 SRCS		+= printf.c
 SRCS		+= select.c
+SRCS            += ssl.c
 SRCS    += trace.c
 OBJS		= $(SRCS:.c=.o)
 
