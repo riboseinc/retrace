@@ -23,8 +23,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "trace.h"
 #include "common.h"
+#include "trace.h"
 
 #include <sys/types.h>
 #include <sys/ptrace.h>
@@ -35,7 +35,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(int request, ...)
 long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 #endif
 {
-        real_ptrace = RETRACE_GET_REAL(ptrace);
+        rtr_ptrace_t real_ptrace = RETRACE_GET_REAL(ptrace);
         char *request_str = "UNKNOW";
         int r;
         pid_t pid;
@@ -157,7 +157,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
                         request_str = "PTRACE_LISTEN";
                         break;
 		case PTRACE_PEEKSIGINFO:
-                        request_str = "PTRACE_LISTEN";
+                        request_str = "PTRACE_PEEKSIGINFO";
                         break;
 #endif
         }

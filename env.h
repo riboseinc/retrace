@@ -7,10 +7,8 @@ typedef int (*rtr_unsetenv_t)(const char *name);
 
 typedef int (*rtr_uname_t)(struct utsname *buf);
 
-rtr_getenv_t   real_getenv;
-rtr_putenv_t   real_putenv;
-rtr_unsetenv_t real_unsetenv;
-
-rtr_uname_t    real_uname;
-
+RETRACE_DECL(getenv);
+RETRACE_DECL(putenv);
+RETRACE_DECL(unsetenv);
+RETRACE_DECL(uname);
 #endif /* __RETRACE_ENV_H__ */

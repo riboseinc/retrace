@@ -30,7 +30,7 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 {
 	ssize_t ret;
 
-	real_write = RETRACE_GET_REAL(write);
+	rtr_write_t real_write = RETRACE_GET_REAL(write);
 	ret = real_write(fd, buf, nbytes);
 
 	descriptor_info_t *di = file_descriptor_get(fd);

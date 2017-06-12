@@ -35,13 +35,21 @@
 #define DYLD_INTERPOSE(_replacment,_replacee) \
 __attribute__((used)) static struct{ const void* replacment; const void* replacee; } _interpose_##_replacee \
 __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long)&_replacment, (const void*)(unsigned long)&_replacee };
+#define RETRACE_DECL(func)
 #define RETRACE_IMPLEMENTATION(func) retrace_impl_##func
 #define RETRACE_REPLACE(func) DYLD_INTERPOSE(retrace_impl_##func, func)
 #define RETRACE_GET_REAL(func) func
 #else
+#define RETRACE_DECL(func) rtr_##func##_t rtr_get_real_##func()
 #define RETRACE_IMPLEMENTATION(func) func
-#define RETRACE_REPLACE(func)
-#define RETRACE_GET_REAL(func) dlsym(RTLD_NEXT, #func)
+#define RETRACE_REPLACE(func)                                              \
+rtr_##func##_t rtr_get_real_##func() {                                     \
+	static rtr_##func##_t ptr;                                             \
+	if (__atomic_load_n(&ptr, __ATOMIC_RELAXED) == NULL)                   \
+		__atomic_store_n(&ptr, dlsym(RTLD_NEXT, #func), __ATOMIC_RELAXED); \
+	return ptr;                                                            \
+}
+#define RETRACE_GET_REAL(func) rtr_get_real_##func()
 #endif
 
 typedef struct {

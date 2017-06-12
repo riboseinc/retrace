@@ -39,7 +39,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 	int	    redirect_port;
 	unsigned short port = ntohs(*(unsigned short *) &address->sa_data[0]);
 
-	real_connect = RETRACE_GET_REAL(connect);
+	rtr_connect_t real_connect = RETRACE_GET_REAL(connect);
 
 	// Only implemented for IPv4 right now
 	if (get_tracing_enabled() && address->sa_family == AF_INET)
@@ -143,7 +143,7 @@ RETRACE_REPLACE(connect)
 
 int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen_t len)
 {
-	real_bind = RETRACE_GET_REAL(bind);
+	rtr_bind_t real_bind = RETRACE_GET_REAL(bind);
 
 	trace_printf(1,
 		     "bind(%d, \"%hu.%hu.%hu.%hu:%hu\", %zu);\n",
@@ -162,7 +162,7 @@ RETRACE_REPLACE(bind)
 
 int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *len)
 {
-	real_accept = RETRACE_GET_REAL(accept);
+	rtr_accept_t real_accept = RETRACE_GET_REAL(accept);
 	trace_printf(1,
 		     "accept(%d, \"%hu.%hu.%hu.%hu:%hu\", %zu);\n",
 		     fd,
@@ -180,7 +180,7 @@ RETRACE_REPLACE(accept)
 
 int RETRACE_IMPLEMENTATION(atoi)(const char *str)
 {
-	real_atoi = RETRACE_GET_REAL(atoi);
+	rtr_atoi_t real_atoi = RETRACE_GET_REAL(atoi);
 	trace_printf(1, "atoi(%s);\n", str);
 	return real_atoi(str);
 }

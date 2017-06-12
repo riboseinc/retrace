@@ -30,7 +30,7 @@
 
 char *RETRACE_IMPLEMENTATION(strstr)(const char *s1, const char *s2)
 {
-	real_strstr = RETRACE_GET_REAL(strstr);
+	rtr_strstr_t real_strstr = RETRACE_GET_REAL(strstr);
 
 	trace_printf(1, "strstr(\"");
 	trace_printf_str(s1);
@@ -45,7 +45,7 @@ RETRACE_REPLACE(strstr)
 
 size_t RETRACE_IMPLEMENTATION(strlen)(const char *s)
 {
-	real_strlen = RETRACE_GET_REAL(strlen);
+	rtr_strlen_t real_strlen = RETRACE_GET_REAL(strlen);
 
 	size_t len = real_strlen(s);
 
@@ -64,7 +64,7 @@ RETRACE_REPLACE(strlen)
 
 int RETRACE_IMPLEMENTATION(strncmp)(const char *s1, const char *s2, size_t n)
 {
-	real_strncmp = RETRACE_GET_REAL(strncmp);
+	rtr_strncmp_t real_strncmp = RETRACE_GET_REAL(strncmp);
 
 	trace_printf(1, "strncmp(\"");
 	trace_printf_str(s1);
@@ -79,7 +79,7 @@ RETRACE_REPLACE(strncmp)
 
 int RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 {
-	real_strcmp = RETRACE_GET_REAL(strcmp);
+	rtr_strcmp_t real_strcmp = RETRACE_GET_REAL(strcmp);
 
 
 	if(get_tracing_enabled()) {
@@ -103,8 +103,8 @@ char *RETRACE_IMPLEMENTATION(strncpy)(char *s1, const char *s2, size_t n)
 {
 	size_t len = 0;
 
-	real_strncpy = RETRACE_GET_REAL(strncpy);
-	real_strlen = RETRACE_GET_REAL(strlen);
+	rtr_strncpy_t real_strncpy = RETRACE_GET_REAL(strncpy);
+	rtr_strlen_t real_strlen = RETRACE_GET_REAL(strlen);
 
 	if (s2)
 		len = real_strlen(s2);
@@ -120,8 +120,8 @@ RETRACE_REPLACE(strncpy)
 
 char *RETRACE_IMPLEMENTATION(strcat)(char *s1, const char *s2)
 {
-	real_strcat = RETRACE_GET_REAL(strcat);
-	real_strlen = RETRACE_GET_REAL(strlen);
+	rtr_strcat_t real_strcat = RETRACE_GET_REAL(strcat);
+	rtr_strlen_t real_strlen = RETRACE_GET_REAL(strlen);
 
 	size_t len = real_strlen(s2);
 
@@ -136,8 +136,8 @@ RETRACE_REPLACE(strcat)
 
 char *RETRACE_IMPLEMENTATION(strncat)(char *s1, const char *s2, size_t n)
 {
-	real_strncat = RETRACE_GET_REAL(strncat);
-	real_strlen = RETRACE_GET_REAL(strlen);
+	rtr_strncat_t real_strncat = RETRACE_GET_REAL(strncat);
+	rtr_strlen_t real_strlen = RETRACE_GET_REAL(strlen);
 
 	size_t len = real_strlen(s2) + 1;
 
@@ -152,8 +152,8 @@ RETRACE_REPLACE(strncat)
 
 char *RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
 {
-	real_strcpy = RETRACE_GET_REAL(strcpy);
-	real_strlen = RETRACE_GET_REAL(strlen);
+	rtr_strcpy_t real_strcpy = RETRACE_GET_REAL(strcpy);
+	rtr_strlen_t real_strlen = RETRACE_GET_REAL(strlen);
 
 	size_t len = real_strlen(s2);
 
