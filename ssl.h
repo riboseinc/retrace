@@ -7,7 +7,7 @@
 
 
 typedef int (*rtr_SSL_write_t)(SSL *ssl, const void *buf, int num);
-typedef int (*rtr_SSL_read_t)(SSL *ssl, const void *buf, int num);
+typedef int (*rtr_SSL_read_t)(SSL *ssl, void *buf, int num);
 typedef int (*rtr_SSL_accept_t)(SSL *ssl);
 typedef int (*rtr_SSL_connect_t)(SSL *ssl);
 

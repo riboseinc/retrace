@@ -55,62 +55,70 @@ print_ssl_keys(SSL *ssl)
 
 int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
 {
-	rtr_SSL_write_t real_SSL_write = RETRACE_GET_REAL(SSL_write);
+	rtr_SSL_write_t real_SSL_write;
 	int r;
 
-	r = real_SSL_write (ssl, buf, num);
+	real_SSL_write = RETRACE_GET_REAL(SSL_write);
+
+	r = real_SSL_write(ssl, buf, num);
 
 	trace_printf(1, "SSL_write(%p, %p, %d); [return: %d]\n", ssl, buf, num, r);
 	trace_dump_data(buf, num);
 
-	return r;
+	return (r);
 }
 
 RETRACE_REPLACE(SSL_write)
 
 int RETRACE_IMPLEMENTATION(SSL_read)(SSL *ssl, void *buf, int num)
 {
-	rtr_SSL_read_t real_SSL_read = RETRACE_GET_REAL(SSL_read);
+	rtr_SSL_read_t real_SSL_read;
 	int r;
 
-	r = real_SSL_read (ssl, buf, num);
+	real_SSL_read = RETRACE_GET_REAL(SSL_read);
+
+	r = real_SSL_read(ssl, buf, num);
 
 	trace_printf(1, "SSL_read(%p, %p, %d); [return: %d]\n", ssl, buf, num, r);
 
 	if (r > 0)
 		trace_dump_data(buf, r);
 
-	return r;
+	return (r);
 }
 
 RETRACE_REPLACE(SSL_read)
 
 int RETRACE_IMPLEMENTATION(SSL_connect)(SSL *ssl)
 {
-	rtr_SSL_connect_t real_SSL_connect = RETRACE_GET_REAL(SSL_connect);
+	rtr_SSL_connect_t real_SSL_connect;
 	int r;
 
-	r = real_SSL_connect (ssl);
+	real_SSL_connect = RETRACE_GET_REAL(SSL_connect);
+
+	r = real_SSL_connect(ssl);
 
 	trace_printf(1, "SSL_connect(%p); [return: %d]\n", ssl, r);
 	print_ssl_keys (ssl);
 
-	return r;
+	return (r);
 }
 
 RETRACE_REPLACE(SSL_connect)
 
 int RETRACE_IMPLEMENTATION(SSL_accept)(SSL *ssl)
 {
-	rtr_SSL_accept_t real_SSL_accept = RETRACE_GET_REAL(SSL_accept);
+	rtr_SSL_accept_t real_SSL_accept;
 	int r;
 
-	r = real_SSL_accept (ssl);
+	real_SSL_accept = RETRACE_GET_REAL(SSL_accept);
+
+	r = real_SSL_accept(ssl);
 
 	trace_printf(1, "SSL_accept(%p); [return: %d]\n", ssl, r);
-	print_ssl_keys (ssl);
+	print_ssl_keys(ssl);
 
-	return r;
+	return (r);
 }
 
 RETRACE_REPLACE(SSL_accept)
