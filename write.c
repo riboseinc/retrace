@@ -29,14 +29,17 @@
 ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 {
 	ssize_t ret;
+	struct descriptor_info *di;
+	rtr_write_t real_write;
 
-	rtr_write_t real_write = RETRACE_GET_REAL(write);
+	real_write = RETRACE_GET_REAL(write);
+
 	ret = real_write(fd, buf, nbytes);
 
-	descriptor_info_t *di = file_descriptor_get(fd);
+	di = file_descriptor_get(fd);
 
 	if (di && di->location)
-		trace_printf(1, "write(%d, %p, %d); [to %s, return: %d] \n", fd, buf, nbytes, di->location, ret);
+		trace_printf(1, "write(%d, %p, %d); [to %s, return: %d]\n", fd, buf, nbytes, di->location, ret);
 	else
 		trace_printf(1, "write(%d, %p, %d); [return: %d]\n", fd, buf, nbytes, ret);
 
