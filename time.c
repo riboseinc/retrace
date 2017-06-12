@@ -28,7 +28,7 @@
 
 char *RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
 {
-	real_ctime_r = RETRACE_GET_REAL(ctime_r);
+	rtr_ctime_r_t real_ctime_r = RETRACE_GET_REAL(ctime_r);
 
 	char *r = real_ctime_r (timep, buf);
 
@@ -40,7 +40,7 @@ RETRACE_REPLACE(ctime_r)
 
 char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 {
-	real_ctime = RETRACE_GET_REAL(ctime);
+	rtr_ctime_t real_ctime = RETRACE_GET_REAL(ctime);
 
 	char *r = real_ctime(timep);
 
@@ -57,7 +57,7 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *restrict tv, void *rest
 int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz)
 #endif
 {
-        real_gettimeofday = RETRACE_GET_REAL(gettimeofday);
+        rtr_gettimeofday_t real_gettimeofday = RETRACE_GET_REAL(gettimeofday);
 
 #ifdef __APPLE__
         struct timezone *tz = (struct timezone *) tzp;

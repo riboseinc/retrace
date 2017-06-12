@@ -12,8 +12,8 @@ typedef int (*rtr_gettimeofday_t)(struct timeval *restrict tv, void *restrict tz
 typedef int (*rtr_gettimeofday_t)(struct timeval *tv, struct timezone *tz);
 #endif        
 
-rtr_ctime_t   real_ctime;
-rtr_ctime_r_t real_ctime_r;
-rtr_gettimeofday_t real_gettimeofday;
+RETRACE_DECL(ctime);
+RETRACE_DECL(ctime_r);
+RETRACE_DECL(gettimeofday);
 
 #endif /* __RETRACE_TIME_H__ */

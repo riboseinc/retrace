@@ -5,6 +5,6 @@
 
 typedef pid_t (*rtr_fork_t)(void);
 
-rtr_fork_t real_fork;
+RETRACE_DECL(fork);
 
 #endif

@@ -31,8 +31,8 @@
 
 int RETRACE_IMPLEMENTATION(putc)(int c, FILE *stream)
 {
-	real_putc = RETRACE_GET_REAL(putc);
-	real_fileno = RETRACE_GET_REAL(fileno);
+	rtr_putc_t real_putc = RETRACE_GET_REAL(putc);
+	rtr_fileno_t real_fileno = RETRACE_GET_REAL(fileno);
 	int fd = real_fileno(stream);
 
 	trace_printf(1, "putc(");
@@ -56,7 +56,7 @@ RETRACE_REPLACE(putc)
 
 int RETRACE_IMPLEMENTATION(toupper)(int c)
 {
-	real_toupper = RETRACE_GET_REAL(toupper);
+	rtr_toupper_t real_toupper = RETRACE_GET_REAL(toupper);
 	trace_printf(1, "toupper(\"%s\");\n", &c);
 	return real_toupper(c);
 }
@@ -65,7 +65,7 @@ RETRACE_REPLACE(toupper)
 
 int RETRACE_IMPLEMENTATION(tolower)(int c)
 {
-	real_tolower = RETRACE_GET_REAL(tolower);
+	rtr_tolower_t real_tolower = RETRACE_GET_REAL(tolower);
 	trace_printf(1, "tolower(\"%c\");\n", &c);
 	return real_tolower(c);
 }

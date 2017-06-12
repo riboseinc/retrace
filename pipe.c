@@ -32,7 +32,7 @@ int RETRACE_IMPLEMENTATION(pipe)(int pipefd[2])
 {
 	int ret;
 
-	real_pipe = RETRACE_GET_REAL(pipe);
+	rtr_pipe_t real_pipe = RETRACE_GET_REAL(pipe);
 	ret = real_pipe(pipefd);
 	trace_printf(1, "pipe(%p); [%d]\n", (void *) pipefd, ret);
 
@@ -47,7 +47,7 @@ int RETRACE_IMPLEMENTATION(pipe2)(int pipefd[2], int flags)
 {
 	int ret;
 
-	real_pipe2 = RETRACE_GET_REAL(pipe2);
+	rtr_pipe2_t real_pipe2 = RETRACE_GET_REAL(pipe2);
 	ret = real_pipe2(pipefd, flags);
 	trace_printf(1, "pipe2(%p, %d); [%d]\n", (void *) pipefd, flags, ret);
 
