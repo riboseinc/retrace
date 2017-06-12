@@ -49,6 +49,7 @@ SRCS		+= dir.c
 SRCS		+= printf.c
 SRCS		+= select.c
 SRCS    += trace.c
+SRCS		+= scanf.c
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test
