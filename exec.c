@@ -336,6 +336,7 @@ RETRACE_REPLACE(execveat)
 int RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp[])
 {
 	int i;
+	rtr_fexecve_t real_fexecve = RETRACE_GET_REAL(fexecve);
 
 	trace_printf(1, "fexecve(%d", fd);
 
@@ -363,7 +364,7 @@ int RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp
 
 	set_tracing_enabled(0);
 
-	return fexecve(fd, argv, envp);
+	return real_fexecve(fd, argv, envp);
 }
 
 RETRACE_REPLACE(fexecve)

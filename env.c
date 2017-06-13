@@ -23,6 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if defined(__FreeBSD__)
+#define _KERNEL
+#endif
+
 #include "common.h"
 #include "env.h"
 

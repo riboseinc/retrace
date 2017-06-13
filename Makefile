@@ -5,6 +5,8 @@ RM		= rm -f
 
 ifeq ($(OS),Darwin)
 	RETRACE_CFLAGS = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
+else ifeq ($(OS),FreeBSD)
+	RETRACE_CFLAGS  = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
 else
 	RETRACE_CFLAGS  = $(CFLAGS) -fPIC -D_GNU_SOURCE -rdynamic -Wall
 endif
@@ -15,12 +17,15 @@ ifeq ($(OS),Darwin)
 endif
 
 ifeq ($(OS),Darwin)
-	RETRACE_LDFLAGS = $(LDFLAGS) -dylib
+	RETRACE_LDFLAGS = $(LDFLAGS) -dylib -ldl
+        RETRACE_LIBS = -ldl
+else ifeq ($(OS),FreeBSD) 
+	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
+        RETRACE_LIBS =
 else
 	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
+        RETRACE_LIBS = -ldl
 endif
-
-RETRACE_LIBS	= -ldl -lncurses
 
 ifeq ($(OS),Darwin)
 	RETRACE_SO	= retrace.dylib

@@ -29,8 +29,10 @@
 #include <sys/types.h>
 #include <sys/ptrace.h>
 
-#ifdef __APPLE__
+#if defined(__APPLE__)
 long int RETRACE_IMPLEMENTATION(ptrace)(int request, ...)
+#elif __FreeBSD__
+int ptrace(int request, pid_t pid, caddr_t addr, int data)
 #else
 long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 #endif
@@ -38,6 +40,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
         rtr_ptrace_t real_ptrace = RETRACE_GET_REAL(ptrace);
         char *request_str = "UNKNOW";
         int r;
+#if defined(__APPLE__) || defined(__linux__)
         pid_t pid;
         caddr_t addr;
         int data;
@@ -50,6 +53,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
         data = va_arg(arglist, int);
 
         va_end(arglist);
+#endif
 
         switch (request) {
                 case PT_TRACE_ME:
@@ -61,7 +65,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 		case PT_READ_D:
                         request_str = "PT_READ_D";
                         break;
-		case PT_READ_U:
+		case 3: /* PT_READ_U: */
                         request_str = "PT_READ_U";
                         break;
 		case PT_WRITE_I:
@@ -70,7 +74,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 		case PT_WRITE_D:
                         request_str = "PT_WRITE_D";
                         break;
-		case PT_WRITE_U:
+		case 6: /* PT_WRITE_U: */
                         request_str = "PT_WRITE_U";
                         break;
 		case PT_CONTINUE:
@@ -85,7 +89,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 		case PT_DETACH:
                         request_str = "PT_DETACH";
                         break;
-#if __APPLE__
+#if defined(__APPLE__)
 		case PT_SIGEXC:
                         request_str = "PT_SIGEXC";
                         break;
@@ -104,7 +108,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 		case PT_FIRSTMACH:
                         request_str = "PT_FIRSTMACH";
                         break;
-#else
+#elif defined(__linux__)
                 case PT_ATTACH:
                         request_str = "PT_ATTACH";
                         break;

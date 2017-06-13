@@ -27,7 +27,15 @@
 #include "file.h"
 #include "char.h"
 
+#if defined(__FreeBSD__)
+#define _DONT_USE_CTYPE_INLINE_
+#include <runetype.h>
+#endif 
 #include <ctype.h>
+
+#if defined(__FreeBSD__)
+#undef putc
+#endif
 
 int RETRACE_IMPLEMENTATION(putc)(int c, FILE *stream)
 {
