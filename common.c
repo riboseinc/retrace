@@ -26,6 +26,7 @@
 #include <sys/types.h>
 
 #include <pwd.h>
+#define _WITH_GETLINE
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -33,6 +34,9 @@
 #include <pthread.h>
 #ifdef __linux__
 #include <syscall.h>
+#endif
+#ifdef __FreeBSD__
+#include <pthread_np.h>
 #endif
 #include <stdarg.h>
 
