@@ -26,48 +26,64 @@
 #include "common.h"
 #include "file.h"
 #include "char.h"
+#include "str.h"
 
 #include <ctype.h>
 
-int RETRACE_IMPLEMENTATION(putc)(int c, FILE *stream)
+static void
+trace_putc(const char *name, int c, FILE* stream)
 {
-	rtr_putc_t real_putc = RETRACE_GET_REAL(putc);
-	rtr_fileno_t real_fileno = RETRACE_GET_REAL(fileno);
-	int fd = real_fileno(stream);
+	static char specials[] = "\nn\rr\tt";
+	rtr_fileno_t real_fileno;
+	rtr_strchr_t real_strchr;
+	char *p;
 
-	trace_printf(1, "putc(");
-	if (c == '\n')
-		trace_printf(0, "%s\\n%s", VAR, RST);
-	else if (c == '\t')
-		trace_printf(0, "%s\\t%s", VAR, RST);
-	else if (c == '\r')
-		trace_printf(0, "%s\\r%s", VAR, RST);
-	else if (c == '\0')
-		trace_printf(0, "%s(nullterm)%s", VAR, RST);
-	else
-		trace_printf(0, "%c", c);
+	real_fileno = RETRACE_GET_REAL(fileno);
+	real_strchr = RETRACE_GET_REAL(strchr);
 
-	trace_printf(0, ", %d);\n", fd);
+	p = c == '\0' ? " 0" : real_strchr(specials, c);
 
-	return real_putc(c, stream);
+	trace_printf(0,
+	    p == NULL ? "%s('%c', %d)\n" : "%s(" VAR "'\\%c'" RST ", %d)\n",
+	    name, p == NULL ? c : *(p + 1), real_fileno(stream));
+}
+
+int
+RETRACE_IMPLEMENTATION(putc)(int c, FILE *stream)
+{
+	trace_putc(__func__, c, stream);
+
+	return (RETRACE_GET_REAL(putc)(c, stream));
 }
 
 RETRACE_REPLACE(putc)
 
-int RETRACE_IMPLEMENTATION(toupper)(int c)
+int
+RETRACE_IMPLEMENTATION(_IO_putc)(int c, FILE *stream)
+{
+	trace_putc(__func__, c, stream);
+
+	return (RETRACE_GET_REAL(_IO_putc)(c, stream));
+}
+
+RETRACE_REPLACE(_IO_putc)
+
+int
+RETRACE_IMPLEMENTATION(toupper)(int c)
 {
 	rtr_toupper_t real_toupper = RETRACE_GET_REAL(toupper);
-	trace_printf(1, "toupper(\"%s\");\n", &c);
-	return real_toupper(c);
+	trace_printf(1, "toupper('%c');\n", c);
+	return (real_toupper(c));
 }
 
 RETRACE_REPLACE(toupper)
 
-int RETRACE_IMPLEMENTATION(tolower)(int c)
+int
+RETRACE_IMPLEMENTATION(tolower)(int c)
 {
 	rtr_tolower_t real_tolower = RETRACE_GET_REAL(tolower);
-	trace_printf(1, "tolower(\"%c\");\n", &c);
-	return real_tolower(c);
+	trace_printf(1, "tolower('%c');\n", c);
+	return (real_tolower(c));
 }
 
 RETRACE_REPLACE(tolower)

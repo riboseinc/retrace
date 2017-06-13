@@ -4,9 +4,11 @@
 typedef int (*rtr_tolower_t)(int c);
 typedef int (*rtr_toupper_t)(int c);
 typedef int (*rtr_putc_t)(int c, FILE *stream);
+typedef int (*rtr__IO_putc_t)(int c, FILE *stream);
 
 RETRACE_DECL(tolower);
 RETRACE_DECL(toupper);
 RETRACE_DECL(putc);
+RETRACE_DECL(_IO_putc);
 
 #endif /* __RETRACE_CHAR_H__ */
