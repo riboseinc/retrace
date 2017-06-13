@@ -1,6 +1,10 @@
 #!/bin/bash
 set -eEu
 
+# Temporarily disabled, while better style rules for clang-format
+# are being developed.
+exit 0
+
 # Path to clang-format. If it's in your PATH, "clang-format" is fine.
 # If you do not have it (or the version is too old), see USE_DOCKER.
 CLANG_FORMAT="/usr/bin/clang-format"

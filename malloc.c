@@ -28,8 +28,12 @@
 
 void RETRACE_IMPLEMENTATION(free)(void *mem)
 {
-	rtr_free_t real_free = RETRACE_GET_REAL(free);
+	rtr_free_t real_free;
+
+	real_free = RETRACE_GET_REAL(free);
+
 	trace_printf(1, "free(%p);\n", mem);
+
 	real_free(mem);
 }
 
@@ -38,9 +42,12 @@ RETRACE_REPLACE(free)
 void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 {
 	void *p;
+	rtr_malloc_t real_malloc;
 
-	rtr_malloc_t real_malloc = RETRACE_GET_REAL(malloc);
+	real_malloc = RETRACE_GET_REAL(malloc);
+
 	p = real_malloc(bytes);
+
 	trace_printf(1, "malloc(%d); [%p]\n", bytes, p);
 
 	return p;

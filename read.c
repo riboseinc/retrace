@@ -29,11 +29,14 @@
 ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 {
 	ssize_t ret;
+	struct descriptor_info *di;
+	rtr_read_t real_read;
 
-	rtr_read_t real_read = RETRACE_GET_REAL(read);
+	real_read = RETRACE_GET_REAL(read);
+
 	ret = real_read(fd, buf, nbytes);
 
-	descriptor_info_t *di = file_descriptor_get(fd);
+	di = file_descriptor_get(fd);
 
 	if (di && di->location)
 		trace_printf(1, "read(%d, %p, %d); [to \"%s\", return: %d]\n", fd, buf, nbytes, di->location, ret);
