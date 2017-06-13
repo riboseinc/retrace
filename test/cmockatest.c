@@ -37,8 +37,8 @@
 
 #include <cmocka.h>
 
-#include "char.h"
 #include "common.h"
+#include "char.h"
 #include "env.h"
 #include "exec.h"
 #include "exit.h"
@@ -69,15 +69,66 @@ void *handle;
 #define RTR_TEST_END }
 
 RTR_TEST_START(tolower)
+	static char s[] = "abcDEF123";
+	static char ls[] = "abcdef123";
+	int i;
+	char buf[] = "ABCDEF123";
+
+	for (i = 0; i < sizeof(s) - 1; i++)
+		buf[i] = rtr_tolower(s[i]);
+
+	assert_string_equal(buf, ls);
 RTR_TEST_END
 
 RTR_TEST_START(toupper)
+	static char s[] = "abcDEF123";
+	static char us[] = "ABCDEF123";
+	int i;
+	char buf[] = "abcdef123";
+
+	for (i = 0; i < sizeof(s) - 1; i++)
+		buf[i] = rtr_toupper(s[i]);
+
+	assert_string_equal(buf, us);
 RTR_TEST_END
 
-/*
 RTR_TEST_START(putc)
+	int fd[2];
+	FILE *f;
+	int i;
+	char buf[5];
+
+	pipe(fd);
+	f = fdopen(fd[1], "w");
+	for (i = 0; i < 4; i++)
+		rtr_putc('0'+i, f);
+	fclose(f);
+	read(fd[0], buf, 4);
+	close(fd[0]);
+
+	buf[4] = '\0';
+
+	assert_string_equal(buf, "0123");
 RTR_TEST_END
-*/
+
+RTR_TEST_START(_IO_putc)
+	int fd[2];
+	FILE *f;
+	int i;
+	char buf[5];
+
+	pipe(fd);
+	f = fdopen(fd[1], "w");
+	for (i = 0; i < 4; i++)
+		rtr__IO_putc('0'+i, f);
+	fclose(f);
+	read(fd[0], buf, 4);
+	close(fd[0]);
+
+	buf[4] = '\0';
+
+	assert_string_equal(buf, "0123");
+RTR_TEST_END
 
 RTR_TEST_START(getenv)
 RTR_TEST_END
@@ -640,7 +691,8 @@ main(void)
     int                     ret;
     const struct CMUnitTest tests[] = {
       cmocka_unit_test(test_rtr_perror),   cmocka_unit_test(test_rtr_tolower),
-      cmocka_unit_test(test_rtr_toupper),  /* cmocka_unit_test(test_rtr_putc), */
+      cmocka_unit_test(test_rtr_toupper),  cmocka_unit_test(test_rtr_putc),
+      cmocka_unit_test(test_rtr__IO_putc),
       cmocka_unit_test(test_rtr_getenv),   cmocka_unit_test(test_rtr_putenv),
       cmocka_unit_test(test_rtr_unsetenv), cmocka_unit_test(test_rtr_execl),
       cmocka_unit_test(test_rtr_execv),    cmocka_unit_test(test_rtr_execle),
