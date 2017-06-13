@@ -9,7 +9,7 @@ BINARIES	= id env time fork exit malloc str pipe sock file trace
 
 ifneq ($(OS),Darwin)
 	BINARIES += $(CMOCKA-TEST-BIN)
-	LDFLAGS += -lcmocka -z text -export-dynamic
+	LDFLAGS += -lcmocka -z text -export-dynamic -fno-builtin
 endif
 
 

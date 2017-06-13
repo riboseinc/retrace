@@ -30,6 +30,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <pthread.h>
+#ifndef __APPLE__
+#include <syscall.h>
+#endif
 
 #include "common.h"
 #include "str.h"
@@ -37,6 +41,7 @@
 #include "file.h"
 #include "malloc.h"
 #include "printf.h"
+#include "env.h"
 
 /*************************************************
  *  Global setting, we set this to disable all our
@@ -52,8 +57,22 @@
  * calls into your tapped version of getuid and we
  * get into an infinite loop.
  *
+ * g_enable_tracing is used only for the main thread,
+ * if we see ourselves being called from a different thread
+ * we will initialized the key g_enable_tracing_key
+ * and will use that to store a per-thread tracing
+ * enabled/disabled setting. I used to declare
+ * g_enable_tracing with the __thread modifier, but in
+ * macOS that will eventually call malloc which would
+ * get us into a loop.
+ *
+ * g_enable_tracing_key logic is backwards, 0 (NULL)
+ * means tracing is enabled. 1 means tracing is disabled.
+ *
  **************************************************/
-int g_enable_tracing = 1;
+static int g_enable_tracing = 1;
+static pthread_key_t g_enable_tracing_key = -1;
+static pthread_once_t tracing_key_once = PTHREAD_ONCE_INIT;
 
 /*************************************************
  * Global list of file descriptors so we can track
@@ -177,18 +196,52 @@ trace_dump_data(const void *buf, size_t nbytes)
 	}
 }
 
+static void
+initialize_tracing_key(void)
+{
+	pthread_key_create(&g_enable_tracing_key, NULL);
+}
+
+static int
+is_main_thread(void)
+{
+#ifdef __APPLE__
+	return pthread_main_np();
+#else
+	rtr_getpid_t real_getpid = RETRACE_GET_REAL(getpid);
+
+	return syscall(SYS_gettid) == real_getpid();
+#endif
+}
+
 int
 get_tracing_enabled()
 {
+	if (!is_main_thread()) {
+		pthread_once(&tracing_key_once, initialize_tracing_key);
+
+		return !pthread_getspecific(g_enable_tracing_key);
+	}
+
 	return g_enable_tracing;
 }
 
 int
 set_tracing_enabled(int enabled)
 {
-	int oldvalue = g_enable_tracing;
+	int oldvalue;
 
-	g_enable_tracing = enabled;
+	if (is_main_thread()) {
+		oldvalue = g_enable_tracing;
+
+		g_enable_tracing = enabled;
+	} else {
+		pthread_once(&tracing_key_once, initialize_tracing_key);
+
+		oldvalue = !pthread_getspecific(g_enable_tracing_key);
+
+		pthread_setspecific(g_enable_tracing_key , (void *) (size_t) !enabled);
+	}
 
 	return oldvalue;
 }
@@ -206,10 +259,11 @@ get_config_file ()
 	rtr_fopen_t real_fopen = RETRACE_GET_REAL(fopen);
 	rtr_malloc_t real_malloc =  RETRACE_GET_REAL(malloc);
 	rtr_free_t real_free = RETRACE_GET_REAL(free);
+	rtr_getenv_t real_getenv = RETRACE_GET_REAL(getenv);
 
   	// If we have a RETRACE_CONFIG env var, try to open the config file
 	// from there
-	char *file_path = getenv("RETRACE_CONFIG");
+	char *file_path = real_getenv("RETRACE_CONFIG");
 
 	if (file_path)
 		config_file = real_fopen(file_path, "r");
@@ -217,7 +271,7 @@ get_config_file ()
 	// If we couldn't open the file from the env var try to home it from ~/.retrace.conf
 	if (!config_file) {
 		
-		file_path = getenv("HOME");
+		file_path = real_getenv("HOME");
 
 		if (file_path) {
 			char *file_name_user = ".retrace.conf";
@@ -516,8 +570,10 @@ file_descriptor_update(int fd, unsigned int type, const char *location, int port
 	/* If found, update */
 	if (di) {
 		di->type = type;
-		if (di->location)
+		if (di->location) {
 			free(di->location);
+		}
+		di->location = strdup (location);
 
 		di->port = port;
 	} else {
