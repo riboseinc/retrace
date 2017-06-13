@@ -48,8 +48,11 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 {
 	rtr_getenv_t real_getenv = RETRACE_GET_REAL(getenv);
 	char *env = real_getenv(envname);
-	trace_printf(1, "getenv(\"%s\"); [%s]\n", envname, env);
-	return real_getenv(envname);
+	if (env != NULL)
+	    trace_printf(1, "getenv(\"%s\"); [\"%s\"]\n", envname, env);
+	else
+	    trace_printf(1, "getenv(\"%s\"); [NULL]\n", envname, env);
+	return (env);
 }
 
 RETRACE_REPLACE(getenv)
