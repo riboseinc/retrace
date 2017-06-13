@@ -28,7 +28,11 @@
 #include <arpa/inet.h>
 
 #define RETRACE_MAX_IP_ADDR_LEN 15
+#ifdef __APPLE__
+int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_t len)
+#else
 int RETRACE_IMPLEMENTATION(connect)(int fd, __CONST_SOCKADDR_ARG _address, socklen_t len)
+#endif
 {
 	unsigned short port;
 	int match_port;
@@ -37,7 +41,9 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, __CONST_SOCKADDR_ARG _address, sockl
 	char *redirect_ip = NULL;
 	rtr_connect_t real_connect;
 	char ip_address[RETRACE_MAX_IP_ADDR_LEN + 1];
+#ifndef __APPLE__
 	const struct sockaddr *address = _address.__sockaddr__;
+#endif
 
 	port = ntohs(*(unsigned short *)&address->sa_data[0]);
 
@@ -149,10 +155,16 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, __CONST_SOCKADDR_ARG _address, sockl
 
 RETRACE_REPLACE(connect)
 
+#ifdef __APPLE__
+int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen_t len)
+#else
 int RETRACE_IMPLEMENTATION(bind)(int fd, __CONST_SOCKADDR_ARG _address, socklen_t len)
+#endif
 {
 	rtr_bind_t real_bind;
+#ifndef __APPLE__
 	const struct sockaddr *address = _address.__sockaddr__;
+#endif
 
 	real_bind = RETRACE_GET_REAL(bind);
 
@@ -171,10 +183,16 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, __CONST_SOCKADDR_ARG _address, socklen_
 
 RETRACE_REPLACE(bind)
 
+#ifdef __APPLE__
+int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *len)
+#else
 int RETRACE_IMPLEMENTATION(accept)(int fd, __SOCKADDR_ARG _address, socklen_t *len)
+#endif
 {
 	rtr_accept_t real_accept;
+#ifndef __APPLE__
 	struct sockaddr *address = _address.__sockaddr__;
+#endif
 
 	real_accept = RETRACE_GET_REAL(accept);
 
