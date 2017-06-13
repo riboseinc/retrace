@@ -213,6 +213,24 @@ RTR_TEST_END
 RTR_TEST_START(strstr)
 RTR_TEST_END
 
+RTR_TEST_START(strchr)
+	char *p;
+	static char s1[] = "0123456789";
+	static char s2[] = "\t\r\n";
+
+	p = rtr_strchr(s1, '4');
+	assert_int_equal(p, s1+4);
+
+	p = rtr_strchr(s1, 'a');
+	assert_ptr_equal(p, NULL);
+
+	p = rtr_strchr(s2, '\r');
+	assert_int_equal(p, s2+1);
+
+	p = rtr_strchr(s2, 'a');
+	assert_ptr_equal(p, NULL);
+RTR_TEST_END
+
 RTR_TEST_START(strlen)
 RTR_TEST_END
 
@@ -645,6 +663,7 @@ main(void)
       cmocka_unit_test(test_rtr_strncpy),  cmocka_unit_test(test_rtr_strcat),
       cmocka_unit_test(test_rtr_strncat),  cmocka_unit_test(test_rtr_strcmp),
       cmocka_unit_test(test_rtr_strncmp),  cmocka_unit_test(test_rtr_strstr),
+      cmocka_unit_test(test_rtr_strchr),
       cmocka_unit_test(test_rtr_strlen),   cmocka_unit_test(test_rtr_ctime),
       cmocka_unit_test(test_rtr_ctime_r),  cmocka_unit_test(test_rtr_read),
       cmocka_unit_test(test_rtr_write),    cmocka_unit_test(test_rtr_malloc),
