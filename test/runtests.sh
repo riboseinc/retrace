@@ -23,3 +23,4 @@
 ../retrace ./trace
 ../retrace ./log
 ../retrace -f ../retrace.conf.example ./config
+../retrace ./exec

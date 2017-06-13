@@ -53,7 +53,7 @@ RETRACE_IMPLEMENTATION(printf)(const char *fmt, ...)
 	va_end(ap);
 
 	va_start(ap, fmt);
-	result = real_vprintf(fmt, ap);
+	result = real_vfprintf(stdout, fmt, ap);
 	va_end(ap);
 
 	if (result < 0)
@@ -243,7 +243,7 @@ RETRACE_IMPLEMENTATION(vprintf)(const char *fmt, va_list ap)
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
-	result = real_vprintf(fmt, ap);
+	result = real_vprintf(fmt, ap1);
 	va_end(ap1);
 
 	if (result < 0)
@@ -281,7 +281,7 @@ RETRACE_IMPLEMENTATION(vfprintf)(FILE *stream, const char *fmt, va_list ap)
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
-	result = real_vfprintf(stream, fmt, ap);
+	result = real_vfprintf(stream, fmt, ap1);
 	va_end(ap1);
 
 	if (result < 0)
@@ -319,7 +319,7 @@ RETRACE_IMPLEMENTATION(vdprintf)(int fd, const char *fmt, va_list ap)
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
-	result = real_vdprintf(fd, fmt, ap);
+	result = real_vdprintf(fd, fmt, ap1);
 	va_end(ap1);
 
 	if (result < 0)

@@ -174,7 +174,7 @@ RETRACE_IMPLEMENTATION(vscanf)(const char *format, va_list ap)
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
-	result = real_vscanf(format, ap);
+	result = real_vscanf(format, ap1);
 	va_end(ap1);
 
 	if (errno)
@@ -212,7 +212,7 @@ RETRACE_IMPLEMENTATION(vsscanf)(const char *str, const char *format, va_list ap)
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
-	result = real_vsscanf(str, format, ap);
+	result = real_vsscanf(str, format, ap1);
 	va_end(ap1);
 
 	if (errno)
@@ -252,7 +252,7 @@ RETRACE_IMPLEMENTATION(vfscanf)(FILE *stream, const char *format, va_list ap)
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
-	result = real_vfscanf(stream, format, ap);
+	result = real_vfscanf(stream, format, ap1);
 	va_end(ap1);
 
 	if (errno)

@@ -160,7 +160,7 @@ DYLD_INTERPOSE(retrace_impl_##func, func)
 
 #define RETRACE_IMPLEMENTATION(func) (func)
 
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__NetBSD__)
 
 #define RETRACE_FIXUP(func) real_##func = dlsym(RTLD_NEXT, #func)
 
