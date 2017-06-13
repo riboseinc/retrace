@@ -23,7 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #define _KERNEL
 #endif
 

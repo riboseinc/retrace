@@ -28,15 +28,12 @@
 #include "char.h"
 #include "str.h"
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #define _DONT_USE_CTYPE_INLINE_
 #include <runetype.h>
+#undef putc
 #endif 
 #include <ctype.h>
-
-#ifdef __FreeBSD__
-#undef putc
-#endif
 
 #include <string.h>
 

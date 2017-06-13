@@ -29,7 +29,7 @@
 #include <sys/types.h>
 #include <sys/ptrace.h>
 
-#if defined(__APPLE__)
+#ifdef __APPLE__
 long int RETRACE_IMPLEMENTATION(ptrace)(int request, ...)
 #elif __FreeBSD__
 int ptrace(int request, pid_t pid, caddr_t addr, int data)
