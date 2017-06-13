@@ -41,7 +41,7 @@ __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long
 #define RETRACE_GET_REAL(func) func
 #else
 #define RETRACE_DECL(func) rtr_##func##_t rtr_get_real_##func()
-#define RETRACE_IMPLEMENTATION(func) func
+#define RETRACE_IMPLEMENTATION(func) (func)
 #define RETRACE_REPLACE(func)                                              \
 rtr_##func##_t rtr_get_real_##func() {                                     \
 	static rtr_##func##_t ptr;                                             \

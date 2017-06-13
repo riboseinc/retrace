@@ -165,3 +165,27 @@ char *RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
 }
 
 RETRACE_REPLACE(strcpy)
+
+char *RETRACE_IMPLEMENTATION(strchr)(const char *s, int c)
+{
+	static char specials[] = "\nn\rr\tt";
+	rtr_strchr_t real_strchr;
+	char *p, *result;
+
+	real_strchr = RETRACE_GET_REAL(strchr);
+
+	result = real_strchr(s, c);
+
+	p = real_strchr(specials, c);
+
+	trace_printf(1, "strchr(\"");
+	trace_printf_str(s);
+	if (p == NULL)
+	    trace_printf(0, "\", '%c')[%p]\n", c, result);
+	else
+	    trace_printf(0, "\", '" VAR "\\%c" RST "')[%p]\n", *(p+1), result);
+
+	return (result);
+}
+
+RETRACE_REPLACE(strchr)
