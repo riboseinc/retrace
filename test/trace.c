@@ -3,8 +3,7 @@
 
 int main (void)
 {
-	ptrace(PT_TRACE_ME, 42, 0xdeadbeef, 42);
+	ptrace(PT_TRACE_ME, 42, (caddr_t) 0xdeadbeef, 42);
 
 	return 0;
 }
-
