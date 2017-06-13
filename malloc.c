@@ -381,7 +381,12 @@ int RETRACE_IMPLEMENTATION(munmap)(void *addr, size_t length)
 RETRACE_REPLACE(munmap, int, (void *addr, size_t length), (addr, length))
 
 #ifndef __APPLE__
+
+#ifdef __FreeBSD__
 int RETRACE_IMPLEMENTATION(brk)(const void *addr)
+#else
+int RETRACE_IMPLEMENTATION(brk)(void *addr)
+#endif
 {
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
