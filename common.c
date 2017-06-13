@@ -99,7 +99,11 @@
 #define RTR_TRACE_ENABLED 1
 #define RTR_TRACE_DISABLED 2
 
+#ifdef __FreeBSD__
+static __thread int g_enable_tracing = RTR_TRACE_ENABLED;
+#else
 static int g_enable_tracing = RTR_TRACE_ENABLED;
+#endif
 
 #ifdef __OpenBSD__
 /* This is only used in OpenBSD for now */
@@ -1239,12 +1243,13 @@ set_tracing_state_thread(int state)
 int
 get_tracing_state()
 {
+#ifndef __FreeBSD__
 	if (!is_main_thread()) {
 		retrace_init_tracing_key();
 
 		return get_tracing_state_thread();
 	}
-
+#endif
 	return g_enable_tracing;
 }
 
@@ -1257,11 +1262,15 @@ get_tracing_enabled()
 void
 trace_restore(int old_state)
 {
+#ifdef __FreeBSD__
+	g_enable_tracing = old_state;
+#else
 	if (is_main_thread()) {
 		g_enable_tracing = old_state;
         } else {
 		set_tracing_state_thread(old_state);
         }
+#endif
 }
 
 int
