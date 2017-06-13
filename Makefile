@@ -4,6 +4,7 @@ GCC		= gcc
 RM		= rm -f
 RETRACE_CFLAGS = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
 
+
 ifeq ($(OS),Darwin)
 	RETRACE_LDFLAGS = $(LDFLAGS) -dylib -ldl
 	RETRACE_LIBS = -ldl
@@ -14,11 +15,12 @@ else ifeq ($(OS),FreeBSD)
         RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
         RETRACE_LIBS =
 	RETRACE_SO     = retrace.so
+	RETRACE_CFLAGS = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall -I/usr/local/opt/openssl/include
 else
-	RETRACE_CFLAGS  += -rdynamic -Werror -pedantic -Wextra -ansi
 	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
-	RETRACE_LIBS = -ldl
+	RETRACE_LIBS = -dl
 	RETRACE_SO     = retrace.so
+	RETRACE_CFLAGS  = $(CFLAGS) -fPIC -D_GNU_SOURCE -rdynamic -Wall -Werror -pedantic -Wextra -ansi
 endif
 
 SRCS		+= exit.c
@@ -41,6 +43,7 @@ SRCS		+= pipe.c
 SRCS		+= dir.c
 SRCS		+= printf.c
 SRCS		+= select.c
+SRCS            += ssl.c
 SRCS		+= trace.c
 OBJS		= $(SRCS:.c=.o)
 

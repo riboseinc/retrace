@@ -48,6 +48,8 @@ int RETRACE_IMPLEMENTATION(execl)(const char *path, const char *arg0, ... /*, (c
 	char *p = NULL;
 	rtr_execv_t real_execv;
 	va_list arglist;
+	int r;
+	int old_trace_state;
 
 	real_execv = RETRACE_GET_REAL(execv);
 
@@ -74,9 +76,13 @@ int RETRACE_IMPLEMENTATION(execl)(const char *path, const char *arg0, ... /*, (c
 
 	va_end(arglist);
 
-	set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
-	return real_execv(path, (char *const *)argv);
+	r = real_execv(path, (char *const *)argv);
+
+	trace_restore(old_trace_state);
+
+	return (r);
 }
 
 RETRACE_REPLACE(execl)
@@ -85,6 +91,8 @@ int RETRACE_IMPLEMENTATION(execv)(const char *path, char *const argv[])
 {
 	int i;
 	rtr_execv_t real_execv;
+	int r;
+	int old_trace_state;
 
 	real_execv = RETRACE_GET_REAL(execv);
 
@@ -99,9 +107,13 @@ int RETRACE_IMPLEMENTATION(execv)(const char *path, char *const argv[])
 
 	trace_printf(0, ", NULL);\n");
 
-	set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
-	return real_execv(path, argv);
+	r = real_execv(path, argv);
+
+	trace_restore(old_trace_state);
+
+	return (r);
 }
 
 RETRACE_REPLACE(execv)
@@ -117,6 +129,8 @@ int RETRACE_IMPLEMENTATION(execle)(const char *path,
 	char *p = NULL;
 	rtr_execve_t real_execve;
 	va_list arglist;
+	int r;
+	int old_trace_state;
 
 	real_execve = RETRACE_GET_REAL(execve);
 
@@ -158,9 +172,13 @@ int RETRACE_IMPLEMENTATION(execle)(const char *path,
 
 	va_end(arglist);
 
-	set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
-	return real_execve(path, (char *const *)argv, envp);
+	r = real_execve(path, (char *const *)argv, envp);
+
+	trace_restore(old_trace_state);
+
+	return (r);
 }
 
 RETRACE_REPLACE(execle)
@@ -169,6 +187,9 @@ int RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *c
 {
 	int i;
 	rtr_execve_t real_execve;
+	int r;
+	int old_trace_state;
+
 
 	real_execve = RETRACE_GET_REAL(execve);
 
@@ -196,9 +217,13 @@ int RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *c
 	trace_printf(1, "\tNULL\n");
 	trace_printf(1, "}\n");
 
-	set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
-	return real_execve(path, argv, envp);
+	r = real_execve(path, argv, envp);
+
+	trace_restore(old_trace_state);
+
+	return (r);
 }
 
 RETRACE_REPLACE(execve)
@@ -207,11 +232,13 @@ int RETRACE_IMPLEMENTATION(execlp)(const char *file, const char *arg0, ... /*, (
 {
 	int argsize = 1;
 	int i = 0;
-	int ret;
+	int r;
 	const char **argv;
 	char *p = NULL;
 	rtr_execvp_t real_execvp;
 	va_list arglist;
+	int old_trace_state;
+
 
 	real_execvp = RETRACE_GET_REAL(execvp);
 
@@ -238,11 +265,13 @@ int RETRACE_IMPLEMENTATION(execlp)(const char *file, const char *arg0, ... /*, (
 
 	va_end(arglist);
 
-	set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
-	ret = real_execvp(file, (char *const *)argv);
+	r = real_execvp(file, (char *const *)argv);
 
-	return ret;
+	trace_restore(old_trace_state);
+
+	return (r);
 }
 
 RETRACE_REPLACE(execlp)
@@ -251,6 +280,9 @@ int RETRACE_IMPLEMENTATION(execvp)(const char *file, char *const argv[])
 {
 	int i;
 	rtr_execvp_t real_execvp;
+	int r;
+	int old_trace_state;
+
 
 	real_execvp = RETRACE_GET_REAL(execvp);
 
@@ -265,9 +297,13 @@ int RETRACE_IMPLEMENTATION(execvp)(const char *file, char *const argv[])
 
 	trace_printf(0, ", NULL);\n");
 
-	set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
-	return real_execvp(file, argv);
+	r = real_execvp(file, argv);
+
+	trace_restore(old_trace_state);
+
+	return (r);
 }
 
 RETRACE_REPLACE(execvp)
@@ -277,6 +313,9 @@ int RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *
 {
 	int i;
 	rtr_execvpe_t real_execvpe;
+	int r;
+	int old_trace_state;
+
 
 	real_execvpe = RETRACE_GET_REAL(execvpe);
 
@@ -304,9 +343,13 @@ int RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *
 	trace_printf(1, "\tNULL\n");
 	trace_printf(1, "}\n");
 
-	set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
-	return real_execvpe(file, argv, envp);
+	r = real_execvpe(file, argv, envp);
+
+	trace_restore(old_trace_state);
+
+	return (r);
 }
 
 RETRACE_REPLACE(execvpe)
@@ -316,6 +359,8 @@ int RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname,
 {
 	int i;
 	rtr_execveat_t real_execveat;
+	int r;
+	int old_trace_state;
 
 	real_execveat = RETRACE_GET_REAL(execveat);
 
@@ -343,9 +388,13 @@ int RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname,
 	trace_printf(1, "\tNULL\n");
 	trace_printf(1, "}\n");
 
-	set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
-	return real_execveat(dirfd, pathname, argv, envp, flags);
+	r = real_execveat(dirfd, pathname, argv, envp, flags);
+
+	trace_restore(old_trace_state);
+
+	return (r);
 }
 
 RETRACE_REPLACE(execveat)
@@ -354,6 +403,8 @@ int RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp
 {
 	int i;
 	rtr_fexecve_t real_fexecve;
+	int r;
+	int old_trace_state;
 
 	real_fexecve = RETRACE_GET_REAL(fexecve);
 
@@ -381,9 +432,13 @@ int RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp
 	trace_printf(1, "\tNULL\n");
 	trace_printf(1, "}\n");
 
-	set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
-	return real_fexecve(fd, argv, envp);
+	r = real_fexecve(fd, argv, envp);
+
+	trace_restore(old_trace_state);
+
+	return r;
 }
 
 RETRACE_REPLACE(fexecve)

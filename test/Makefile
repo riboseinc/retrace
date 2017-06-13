@@ -1,4 +1,4 @@
-CFLAGS	+= -I ../ -fPIC -D_GNU_SOURCE -rdynamic -Wall -g 
+CFLAGS	+= -I ../ -fPIC -D_GNU_SOURCE -rdynamic -Wall -g -fno-builtin
 
 OS              = $(shell uname)
 AUTOMATED-TEST  = runtests.sh
@@ -8,7 +8,7 @@ BINARIES	= id env time fork exit malloc str pipe sock file trace
 
 ifeq ($(OS),Linux)
 	BINARIES += $(CMOCKA-TEST-BIN)
-	LDFLAGS += -lcmocka -z text -export-dynamic -ldl 
+	LDFLAGS += -lcmocka -z text -export-dynamic -ldl
 endif
 
 
