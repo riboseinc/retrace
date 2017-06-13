@@ -113,7 +113,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	case PT_FIRSTMACH:
 		request_str = "PT_FIRSTMACH";
 		break;
-#else
+#elif defined(__linux__)
 	case PT_ATTACH:
 		request_str = "PT_ATTACH";
 		break;
