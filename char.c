@@ -58,6 +58,7 @@ RETRACE_IMPLEMENTATION(putc)(int c, FILE *stream)
 
 RETRACE_REPLACE(putc)
 
+#ifndef __APPLE__
 int
 RETRACE_IMPLEMENTATION(_IO_putc)(int c, FILE *stream)
 {
@@ -67,6 +68,7 @@ RETRACE_IMPLEMENTATION(_IO_putc)(int c, FILE *stream)
 }
 
 RETRACE_REPLACE(_IO_putc)
+#endif
 
 int
 RETRACE_IMPLEMENTATION(toupper)(int c)

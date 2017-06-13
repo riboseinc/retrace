@@ -111,6 +111,7 @@ RTR_TEST_START(putc)
 	assert_string_equal(buf, "0123");
 RTR_TEST_END
 
+#ifndef __APPLE__
 RTR_TEST_START(_IO_putc)
 	int fd[2];
 	FILE *f;
@@ -129,6 +130,7 @@ RTR_TEST_START(_IO_putc)
 
 	assert_string_equal(buf, "0123");
 RTR_TEST_END
+#endif
 
 RTR_TEST_START(getenv)
 RTR_TEST_END
@@ -692,7 +694,9 @@ main(void)
     const struct CMUnitTest tests[] = {
       cmocka_unit_test(test_rtr_perror),   cmocka_unit_test(test_rtr_tolower),
       cmocka_unit_test(test_rtr_toupper),  cmocka_unit_test(test_rtr_putc),
+#ifndef __APPLE__
       cmocka_unit_test(test_rtr__IO_putc),
+#endif
       cmocka_unit_test(test_rtr_getenv),   cmocka_unit_test(test_rtr_putenv),
       cmocka_unit_test(test_rtr_unsetenv), cmocka_unit_test(test_rtr_execl),
       cmocka_unit_test(test_rtr_execv),    cmocka_unit_test(test_rtr_execle),
