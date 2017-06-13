@@ -30,6 +30,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include "common.h"
 #include "str.h"
@@ -53,8 +54,22 @@
  * calls into your tapped version of getuid and we
  * get into an infinite loop.
  *
+ * g_enable_tracing is used only for the main thread,
+ * if we see ourselves being called from a different thread
+ * we will initialized the key g_enable_tracing_key
+ * and will use that to store a per-thread tracing
+ * enabled/disabled setting. I used to declare
+ * g_enable_tracing with the __thread modifier, but in
+ * macOS that will eventually call malloc which would
+ * get us into a loop.
+ *
+ * g_enable_tracing_key logic is backwards, 0 (NULL)
+ * means tracing is enabled. 1 means tracing is disabled.
+ *
  **************************************************/
-static __thread  int g_enable_tracing = 1;
+static int g_enable_tracing = 1;
+static pthread_key_t g_enable_tracing_key = -1;
+static pthread_once_t tracing_key_once = PTHREAD_ONCE_INIT;
 
 /*************************************************
  * Global list of file descriptors so we can track
@@ -178,18 +193,50 @@ trace_dump_data(const void *buf, size_t nbytes)
 	}
 }
 
+static void
+initialize_tracing_key(void)
+{
+	pthread_key_create(&g_enable_tracing_key, NULL);
+}
+
+static int
+is_main_thread(void)
+{
+#ifdef __APPLE__
+	return pthread_main_np();
+#else
+	return getpid() == gettpid();
+#endif
+}
+
 int
 get_tracing_enabled()
 {
+	if (!is_main_thread()) {
+		pthread_once(&tracing_key_once, initialize_tracing_key);
+
+		return !pthread_getspecific(g_enable_tracing_key);
+	}
+
 	return g_enable_tracing;
 }
 
 int
 set_tracing_enabled(int enabled)
 {
-	int oldvalue = g_enable_tracing;
+	int oldvalue;
 
-	g_enable_tracing = enabled;
+	if (is_main_thread()) {
+		oldvalue = g_enable_tracing;
+
+		g_enable_tracing = enabled;
+	} else {
+		pthread_once(&tracing_key_once, initialize_tracing_key);
+
+		oldvalue = !pthread_getspecific(g_enable_tracing_key);
+
+		pthread_setspecific(g_enable_tracing_key , (void *) (size_t) !enabled);
+	}
 
 	return oldvalue;
 }
