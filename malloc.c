@@ -381,7 +381,7 @@ int RETRACE_IMPLEMENTATION(munmap)(void *addr, size_t length)
 RETRACE_REPLACE(munmap, int, (void *addr, size_t length), (addr, length))
 
 #ifndef __APPLE__
-int RETRACE_IMPLEMENTATION(brk)(void *addr)
+int RETRACE_IMPLEMENTATION(brk)(const void *addr)
 {
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
@@ -412,7 +412,7 @@ int RETRACE_IMPLEMENTATION(brk)(void *addr)
 	}
 
 	if (!redirect)
-		ret = real_brk(addr);
+		ret = real_brk((void *) addr);
 
 	retrace_log_and_redirect_after(&event_info);
 
