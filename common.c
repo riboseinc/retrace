@@ -534,7 +534,7 @@ file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 			// clear the new spots we added
 			memset(g_descriptor_list + g_descriptor_list_size,
 			       0,
-			       new_size - g_descriptor_list_size);
+			       (new_size - g_descriptor_list_size) * sizeof(descriptor_info_t *));
 
 			// Insert at the end of old list
 			free_spot = g_descriptor_list_size;
