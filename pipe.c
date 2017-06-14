@@ -31,10 +31,13 @@
 int RETRACE_IMPLEMENTATION(pipe)(int pipefd[2])
 {
 	int ret;
+	rtr_pipe_t real_pipe;
 
-	rtr_pipe_t real_pipe = RETRACE_GET_REAL(pipe);
+	real_pipe = RETRACE_GET_REAL(pipe);
+
 	ret = real_pipe(pipefd);
-	trace_printf(1, "pipe(%p); [%d]\n", (void *) pipefd, ret);
+
+	trace_printf(1, "pipe(%p); [%d]\n", (void *)pipefd, ret);
 
 	return ret;
 }
@@ -46,10 +49,13 @@ RETRACE_REPLACE(pipe)
 int RETRACE_IMPLEMENTATION(pipe2)(int pipefd[2], int flags)
 {
 	int ret;
+	rtr_pipe2_t real_pipe2;
 
-	rtr_pipe2_t real_pipe2 = RETRACE_GET_REAL(pipe2);
+	real_pipe2 = RETRACE_GET_REAL(pipe2);
+
 	ret = real_pipe2(pipefd, flags);
-	trace_printf(1, "pipe2(%p, %d); [%d]\n", (void *) pipefd, flags, ret);
+
+	trace_printf(1, "pipe2(%p, %d); [%d]\n", (void *)pipefd, flags, ret);
 
 	return ret;
 }

@@ -28,8 +28,12 @@
 
 int RETRACE_IMPLEMENTATION(unsetenv)(const char *name)
 {
-	rtr_unsetenv_t real_unsetenv = RETRACE_GET_REAL(unsetenv);
+	rtr_unsetenv_t real_unsetenv;
+
+	real_unsetenv = RETRACE_GET_REAL(unsetenv);
+
 	trace_printf(1, "unsetenv(\"%s\");\n", name);
+
 	return real_unsetenv(name);
 }
 
@@ -37,8 +41,12 @@ RETRACE_REPLACE(unsetenv)
 
 int RETRACE_IMPLEMENTATION(putenv)(char *string)
 {
-	rtr_putenv_t real_putenv = RETRACE_GET_REAL(putenv);
+	rtr_putenv_t real_putenv;
+
+	real_putenv = RETRACE_GET_REAL(putenv);
+
 	trace_printf(1, "putenv(\"%s\");\n", string);
+
 	return real_putenv(string);
 }
 
@@ -59,12 +67,15 @@ RETRACE_REPLACE(getenv)
 
 int RETRACE_IMPLEMENTATION(uname)(struct utsname *buf)
 {
-	rtr_uname_t real_uname = RETRACE_GET_REAL(uname);
-	
-	int ret = real_uname(buf);
+	int ret;
+	rtr_uname_t real_uname;
+
+	real_uname = RETRACE_GET_REAL(uname);
+
+	ret = real_uname(buf);
 	if (ret == 0)
 		trace_printf(1, "uname(); [%s, %s, %s, %s, %s]\n", buf->sysname, buf->nodename,
-					buf->release, buf->version, buf->machine);
+				buf->release, buf->version, buf->machine);
 	else
 		trace_printf(1, "uname(); NULL");
 

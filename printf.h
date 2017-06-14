@@ -1,5 +1,5 @@
-#ifndef __RETRACE_PRINT_H__
-#define __RETRACE_PRINT_H__
+#ifndef __RETRACE_PRINTF_H__
+#define __RETRACE_PRINTF_H__
 typedef int (*rtr_printf_t)(const char *fmt, ...);
 typedef int (*rtr_fprintf_t)(FILE *stream, const char *fmt, ...);
 typedef int (*rtr_dprintf_t)(int fd, const char *fmt, ...);
@@ -22,4 +22,4 @@ RETRACE_DECL(vdprintf);
 RETRACE_DECL(vsprintf);
 RETRACE_DECL(vsnprintf);
 
-#endif
+#endif /* __RETRACE_PRINTF_H__ */
