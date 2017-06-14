@@ -124,16 +124,15 @@ trace_printf_str(const char *str)
 
 				/* allocate new buffer and add color strings */
 				tmp = real_malloc(size);
+
+				memset(tmp, 0, size);
 				real_strncpy(tmp, str_print, idx);
 				real_strcat(tmp, colors->color_str);
 				real_strcat(tmp, str_print + idx + 1);
-				tmp[size - 1] = '\0';
 
 				/* reset print string */
-				if (str_print) {
-					real_free(str_print);
-					str_print = tmp;
-				}
+				real_free(str_print);
+				str_print = tmp;
 
 				idx += real_strlen(colors->color_str);
 				p = str_print + idx;
