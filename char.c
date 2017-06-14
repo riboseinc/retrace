@@ -51,7 +51,7 @@ trace_putc(const char *name, int c, FILE* stream)
 int
 RETRACE_IMPLEMENTATION(putc)(int c, FILE *stream)
 {
-	trace_putc(__func__, c, stream);
+	trace_putc("putc", c, stream);
 
 	return (RETRACE_GET_REAL(putc)(c, stream));
 }
@@ -62,7 +62,7 @@ RETRACE_REPLACE(putc)
 int
 RETRACE_IMPLEMENTATION(_IO_putc)(int c, FILE *stream)
 {
-	trace_putc(__func__, c, stream);
+	trace_putc("__IO_putc", c, stream);
 
 	return (RETRACE_GET_REAL(_IO_putc)(c, stream));
 }

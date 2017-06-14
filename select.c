@@ -26,7 +26,8 @@
 #include "common.h"
 #include "select.h"
 
-static void copy_fd_set(fd_set *dest, const fd_set *src)
+static void
+copy_fd_set(fd_set *dest, const fd_set *src)
 {
 	if (src)
 		*dest = *src;
@@ -34,7 +35,8 @@ static void copy_fd_set(fd_set *dest, const fd_set *src)
 		FD_ZERO(dest);
 }
 
-static void print_fds(const char *set, int nfds, fd_set *in, fd_set *out)
+static void
+print_fds(const char *set, int nfds, fd_set *in, fd_set *out)
 {
 	int fd, comma = 0;
 
@@ -54,7 +56,8 @@ static void print_fds(const char *set, int nfds, fd_set *in, fd_set *out)
 	trace_printf(0, ")");
 }
 
-int RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
+int
+RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 			fd_set *exceptfds, struct timeval *timeout)
 {
 	rtr_select_t real_select;
@@ -69,10 +72,10 @@ int RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 	ret = real_select(nfds, readfds, writefds, exceptfds, timeout);
 
 	if (timeout != NULL)
-		trace_printf(1, "%s (timeout: %lds %ldus) [=%d]", __func__,
+		trace_printf(1, "select (timeout: %lds %ldus) [=%d]",
 		    timeout->tv_sec, timeout->tv_usec, ret);
 	else
-		trace_printf(1, "%s (no timeout)[=%d]", __func__, ret);
+		trace_printf(1, "select (no timeout)[=%d]", ret);
 
 	print_fds("read", nfds, &inr, readfds);
 	print_fds("write", nfds, &inr, writefds);
