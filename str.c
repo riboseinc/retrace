@@ -77,11 +77,9 @@ RETRACE_REPLACE(strncmp)
 int RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 {
 	rtr_strcmp_t real_strcmp;
+	int old_tracing_enabled;
 
 	real_strcmp = RETRACE_GET_REAL(strcmp);
-
-	if (get_tracing_enabled()) {
-		int old_tracing_enabled;
 
 	if(get_tracing_enabled()) {
 		old_tracing_enabled = set_tracing_enabled(0);

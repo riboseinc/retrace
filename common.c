@@ -90,6 +90,7 @@ trace_printf_str(const char *str)
 	rtr_strlen_t	real_strlen;
 	rtr_fprintf_t	real_fprintf;
 
+	struct str_colors *colors = g_str_colors;
 
 	/* get original function pointers */
 	real_malloc = RETRACE_GET_REAL(malloc);
@@ -104,7 +105,6 @@ trace_printf_str(const char *str)
 	strcpy(str_print, str);
 	str_print[strlen(str)] = '\0';
 
-	struct str_colors *colors = g_str_colors;
 	while (colors) {
 		char *p = str_print;
 		int idx = 0;
@@ -115,13 +115,15 @@ trace_printf_str(const char *str)
 
 		while (*p != '\0') {
 			if (*p == colors->ch) {
+				char *tmp;
 				size_t size = strlen(str_print) + strlen(colors->color_str) + 1;
 
 				/* check end line */
 				if (*p == '\n' && p == (str_print + strlen(str_print) - 1))
 					break;
 
-				char *tmp = real_malloc(size);
+				/* allocate new buffer and add color strings */
+				tmp = real_malloc(size);
 				real_strncpy(tmp, str_print, idx);
 				real_strcat(tmp, colors->color_str);
 				real_strcat(tmp, str_print + idx + 1);
@@ -159,20 +161,13 @@ void
 trace_printf(int hdr, const char *fmt, ...)
 {
 	int old_tracing_enabled;
+
 	rtr_vsnprintf_t real_vsnprintf;
 	rtr_fprintf_t real_fprintf;
 	rtr_getpid_t real_getpid;
+
 	va_list arglist;
 	char str[1024];
-
-	rtr_vsnprintf_t	real_vsnprintf;
-	rtr_fprintf_t	real_fprintf;
-	rtr_getpid_t	real_getpid;
-
-	va_list arglist;
-	va_start(arglist, fmt);
-
-	int old_tracing_enabled;
 
 	if (!get_tracing_enabled())
 		return;
@@ -184,7 +179,6 @@ trace_printf(int hdr, const char *fmt, ...)
 	real_getpid = RETRACE_GET_REAL(getpid);
 
 	va_start(arglist, fmt);
-
 	real_vsnprintf(str, sizeof(str), fmt, arglist);
 
 	if (hdr == 1)
