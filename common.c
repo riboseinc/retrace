@@ -85,6 +85,7 @@ trace_printf_str(const char *str)
 
 	rtr_malloc_t	real_malloc;
 	rtr_free_t	real_free;
+	rtr_strcpy_t 	real_strcpy;
 	rtr_strncpy_t	real_strncpy;
 	rtr_strcat_t	real_strcat;
 	rtr_strlen_t	real_strlen;
@@ -95,6 +96,7 @@ trace_printf_str(const char *str)
 	/* get original function pointers */
 	real_malloc = RETRACE_GET_REAL(malloc);
 	real_free = RETRACE_GET_REAL(free);
+	real_strcpy = RETRACE_GET_REAL(strcpy);
 	real_strncpy = RETRACE_GET_REAL(strncpy);
 	real_strcat = RETRACE_GET_REAL(strcat);
 	real_strlen = RETRACE_GET_REAL(strlen);
@@ -102,7 +104,7 @@ trace_printf_str(const char *str)
 
 	/* set new buffer */
 	str_print = (char *) real_malloc(strlen(str) + 1);
-	strcpy(str_print, str);
+	real_strcpy(str_print, str);
 	str_print[strlen(str)] = '\0';
 
 	while (colors) {
@@ -116,10 +118,10 @@ trace_printf_str(const char *str)
 		while (*p != '\0') {
 			if (*p == colors->ch) {
 				char *tmp;
-				size_t size = strlen(str_print) + strlen(colors->color_str) + 1;
+				size_t size = real_strlen(str_print) + real_strlen(colors->color_str) + 1;
 
 				/* check end line */
-				if (*p == '\n' && p == (str_print + strlen(str_print) - 1))
+				if (*p == '\n' && p == (str_print + real_strlen(str_print) - 1))
 					break;
 
 				/* allocate new buffer and add color strings */
