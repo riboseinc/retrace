@@ -68,38 +68,27 @@ unsigned int g_descriptor_list_size;
 void
 trace_printf(int hdr, const char *fmt, ...)
 {
-	int old_tracing_enabled;
-	rtr_vsnprintf_t real_vsnprintf;
-	rtr_fprintf_t real_fprintf;
-	rtr_getpid_t real_getpid;
+	static const size_t maxlen = 1024;
+	char *str;
 	va_list arglist;
-	char str[1024];
+
+	str = alloca(maxlen);
 
 	if (!get_tracing_enabled())
 		return;
 
-	old_tracing_enabled = set_tracing_enabled(0);
-
-	real_vsnprintf = RETRACE_GET_REAL(vsnprintf);
-	real_fprintf = RETRACE_GET_REAL(fprintf);
-	real_getpid = RETRACE_GET_REAL(getpid);
+	set_tracing_enabled(0);
 
 	va_start(arglist, fmt);
-
-	memset(str, 0, sizeof(str));
-
-	real_vsnprintf(str, sizeof(str), fmt, arglist);
-
-	str[sizeof(str) - 1] = '\0';
-
-	if (hdr == 1)
-		real_fprintf(stderr, "(%d) ", real_getpid());
-
-	real_fprintf(stderr, "%s", str);
-
+	vsnprintf(str, maxlen, fmt, arglist);
 	va_end(arglist);
 
-	set_tracing_enabled(old_tracing_enabled);
+	if (hdr == 1)
+		fprintf(stderr, "(%d) ", getpid());
+
+	fprintf(stderr, "%s", str);
+
+	set_tracing_enabled(1);
 }
 
 void
@@ -109,28 +98,24 @@ trace_printf_str(const char *string)
 	static const char LF[] = VAR "\\n" RST;
 	static const char TAB[] = VAR "\\t" RST;
 	static const char SNIP[] = "[SNIP]";
+	char buf[MAXLEN * (sizeof(CR)-1) + sizeof(SNIP)];
 	int i;
-	int old_tracing_enabled;
 	char *p;
-	rtr_strcpy_t strcpy_;
-	char buf[MAXLEN * (sizeof(CR) - 1) + sizeof(SNIP)];
 
 	if (!get_tracing_enabled() || *string == '\0')
 		return;
 
-	old_tracing_enabled = set_tracing_enabled(0);
-
-	strcpy_ = RETRACE_GET_REAL(strcpy);
+	set_tracing_enabled(0);
 
 	for (i = 0, p = buf; i < MAXLEN && string[i] != '\0'; i++) {
 		if (string[i] == '\n')
-			strcpy_(p, LF);
+			strcpy(p, LF);
 		else if (string[i] == '\r')
-			strcpy_(p, CR);
+			strcpy(p, CR);
 		else if (string[i] == '\t')
-			strcpy_(p, TAB);
+			strcpy(p, TAB);
 		else if (string[i] == '%')
-			strcpy_(p, "%%");
+			strcpy(p, "%%");
 		else {
 			*(p++) = string[i];
 			*p = '\0';
@@ -140,9 +125,9 @@ trace_printf_str(const char *string)
 	}
 
 	if (string[i] != '\0')
-		strcpy_(p, SNIP);
+		strcpy(p, SNIP);
 
-	set_tracing_enabled(old_tracing_enabled);
+	set_tracing_enabled(1);
 
 	trace_printf(0, buf);
 }
@@ -151,38 +136,34 @@ trace_printf_str(const char *string)
 void
 trace_dump_data(const unsigned char *buf, size_t nbytes)
 {
-	size_t  i;
-	int  print_newline = 0;
-	char current_string[DUMP_LINE_SIZE + 1];
+	static const char fmt[] = "\t%07u\t%s | %s\n";
+	static const size_t asc_len = DUMP_LINE_SIZE + 1;
+	static const size_t hex_len = DUMP_LINE_SIZE * 2 + DUMP_LINE_SIZE/2 + 2;
+	rtr_sprintf_t real_sprintf;
+	char *hex_str, *asc_str;
+	char *hexp, *ascp;
+	size_t i;
+
+	hex_str = alloca(hex_len);
+	asc_str = alloca(asc_len);
+	real_sprintf = RETRACE_GET_REAL(sprintf);
 
 	for (i = 0; i < nbytes; i++) {
-		unsigned char c;
-
 		if (i % DUMP_LINE_SIZE == 0) {
-			if (print_newline)
-				trace_printf(0, " | %s\n", current_string);
-
-			memset(current_string, '\0', DUMP_LINE_SIZE);
-			trace_printf(0, "\t%07u\t", i / 2);
+			if (i)
+				trace_printf(0, fmt, i - DUMP_LINE_SIZE, hex_str, asc_str);
+			hexp = hex_str;
+			memset(asc_str, 0, asc_len);
+			ascp = asc_str;
 		}
-
-		if (i % 2 == 0)
-			trace_printf(0, " ");
-
-		c = buf[i];
-
-		print_newline = 1;
-		trace_printf(0, "%02x", c);
-
-		/* Only print ASCII characters */
-		if (c > 31 && c < 128)
-			current_string[i % 20] = c;
-		else
-			current_string[i % 20] = '.';
+		*(ascp++) = buf[i] > 31 && buf[i] < 127 ? buf[i] : '.';
+		hexp += real_sprintf(hexp, i % 2 ? "%02x" : " %02x", buf[i]);
 	}
-
-	if (print_newline)
-		trace_printf(0, " | %s\n", current_string);
+	if (nbytes % DUMP_LINE_SIZE) {
+		int n = DUMP_LINE_SIZE - nbytes % DUMP_LINE_SIZE;
+		sprintf(hexp, "%*s", n * 2 + n/2, "");
+		trace_printf(0, fmt, i - DUMP_LINE_SIZE + n, hex_str, asc_str);
+	}
 }
 
 int
@@ -325,8 +306,8 @@ rtr_parse_config_file(FILE *config_file, const char *function, va_list arg_types
 
 		/* Now start filling the requests */
 		for (current_argument = va_arg(arg_types, int);
-		     current_argument != ARGUMENT_TYPE_END;
-		     current_argument = va_arg(arg_types, int)) {
+			 current_argument != ARGUMENT_TYPE_END;
+			 current_argument = va_arg(arg_types, int)) {
 			void *current_value = va_arg(arg_values, void *);
 			char *arg_end;
 
@@ -337,7 +318,7 @@ rtr_parse_config_file(FILE *config_file, const char *function, va_list arg_types
 			else {
 				/* skip the newline for the last string argument */
 				if (arg_start && strlen(arg_start) &&
-				    arg_start[strlen(arg_start) - 1] == '\n')
+					arg_start[strlen(arg_start) - 1] == '\n')
 					arg_start[strlen(arg_start) - 1] = '\0';
 			}
 
@@ -485,8 +466,8 @@ file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 		  DESCRIPTOR_LIST_INITIAL_SIZE * sizeof(struct descriptor_info *));
 
 		memset(g_descriptor_list,
-		       0,
-		       DESCRIPTOR_LIST_INITIAL_SIZE * sizeof(struct descriptor_info *));
+		   0,
+		   DESCRIPTOR_LIST_INITIAL_SIZE * sizeof(struct descriptor_info *));
 	}
 
 	for (i = 0; i < g_descriptor_list_size; i++) {
@@ -506,8 +487,8 @@ file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 		if (g_descriptor_list) {
 			/* clear the new spots we added */
 			memset(g_descriptor_list + g_descriptor_list_size,
-			       0,
-			       new_size - g_descriptor_list_size);
+				   0,
+				   new_size - g_descriptor_list_size);
 
 			/* Insert at the end of old list */
 			free_spot = g_descriptor_list_size;

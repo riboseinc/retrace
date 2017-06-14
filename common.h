@@ -48,13 +48,13 @@ static struct {										\
 #else /* !__APPLE__ */
 
 #define RETRACE_DECL(func) rtr_##func##_t rtr_get_real_##func()
-#define RETRACE_IMPLEMENTATION(func) func
-#define RETRACE_REPLACE(func)								\
-rtr_##func##_t rtr_get_real_##func() {							\
-	static rtr_##func##_t ptr;							\
-	if (__atomic_load_n(&ptr, __ATOMIC_RELAXED) == NULL)				\
-		__atomic_store_n(&ptr, dlsym(RTLD_NEXT, #func), __ATOMIC_RELAXED);	\
-	return ptr;									\
+#define RETRACE_IMPLEMENTATION(func) (func)
+#define RETRACE_REPLACE(func)                                                      \
+rtr_##func##_t rtr_get_real_##func() {                                             \
+	static rtr_##func##_t ptr;                                                 \
+	if (__atomic_load_n(&ptr, __ATOMIC_RELAXED) == NULL)                       \
+		__atomic_store_n(&ptr, dlsym(RTLD_NEXT, #func), __ATOMIC_RELAXED); \
+	return ptr;                                                                \
 }
 #define RETRACE_GET_REAL(func) rtr_get_real_##func()
 
