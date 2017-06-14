@@ -29,8 +29,12 @@
 
 int RETRACE_IMPLEMENTATION(system)(const char *command)
 {
-	rtr_system_t real_system = RETRACE_GET_REAL(system);
+	rtr_system_t real_system;
+
+	real_system = RETRACE_GET_REAL(system);
+
 	trace_printf(1, "system(\"%s\");\n", command);
+
 	return real_system(command);
 }
 
@@ -38,19 +42,21 @@ RETRACE_REPLACE(system)
 
 int RETRACE_IMPLEMENTATION(execl)(const char *path, const char *arg0, ... /*, (char *)0 */)
 {
-	rtr_execv_t real_execv = RETRACE_GET_REAL(execv);
-
-	va_list arglist;
-	va_start(arglist, arg0);
-
-	char *p = NULL;
 	int i = 0;
 	int argsize = 1;
+	const char **argv;
+	char *p = NULL;
+	rtr_execv_t real_execv;
+	va_list arglist;
+
+	real_execv = RETRACE_GET_REAL(execv);
+
+	va_start(arglist, arg0);
 
 	while ((p = va_arg(arglist, char *)) != NULL)
 		argsize++;
 
-	const char **argv = malloc(argsize * sizeof(char *));
+	argv = malloc(argsize * sizeof(char *));
 
 	va_start(arglist, arg0);
 
@@ -70,16 +76,17 @@ int RETRACE_IMPLEMENTATION(execl)(const char *path, const char *arg0, ... /*, (c
 
 	set_tracing_enabled(0);
 
-	return real_execv(path, (char *const *) argv);
+	return real_execv(path, (char *const *)argv);
 }
 
 RETRACE_REPLACE(execl)
 
 int RETRACE_IMPLEMENTATION(execv)(const char *path, char *const argv[])
 {
-	rtr_execv_t real_execv = RETRACE_GET_REAL(execv);
-
 	int i;
+	rtr_execv_t real_execv;
+
+	real_execv = RETRACE_GET_REAL(execv);
 
 	trace_printf(1, "execv(\"%s\"", path);
 
@@ -100,22 +107,25 @@ int RETRACE_IMPLEMENTATION(execv)(const char *path, char *const argv[])
 RETRACE_REPLACE(execv)
 
 int RETRACE_IMPLEMENTATION(execle)(const char *path,
-				   const char *arg0,
-				   ... /*, (char *)0, char *const envp[]*/)
+		const char *arg0,
+		... /*, (char *)0, char *const envp[]*/)
 {
-	rtr_execve_t real_execve = RETRACE_GET_REAL(execve);
-
-	va_list arglist;
-	va_start(arglist, arg0);
-
-	char *p = NULL;
-	int i = 0;
 	int argsize = 1;
+	int i = 0;
+	const char **argv;
+	char *const *envp;
+	char *p = NULL;
+	rtr_execve_t real_execve;
+	va_list arglist;
+
+	real_execve = RETRACE_GET_REAL(execve);
+
+	va_start(arglist, arg0);
 
 	while ((p = va_arg(arglist, char *)) != NULL)
 		argsize++;
 
-	const char **argv = malloc(argsize * sizeof(char *));
+	argv = malloc(argsize * sizeof(char *));
 
 	va_start(arglist, arg0);
 
@@ -131,7 +141,7 @@ int RETRACE_IMPLEMENTATION(execle)(const char *path,
 
 	trace_printf(0, ", envp);\n");
 
-	char *const *envp = va_arg(arglist, char **);
+	envp = va_arg(arglist, char **);
 
 	trace_printf(1, "char *envp[]=\n");
 	trace_printf(1, "{\n");
@@ -150,16 +160,17 @@ int RETRACE_IMPLEMENTATION(execle)(const char *path,
 
 	set_tracing_enabled(0);
 
-	return real_execve(path, (char *const *) argv, envp);
+	return real_execve(path, (char *const *)argv, envp);
 }
 
 RETRACE_REPLACE(execle)
 
 int RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *const envp[])
 {
-	rtr_execve_t real_execve = RETRACE_GET_REAL(execve);
-
 	int i;
+	rtr_execve_t real_execve;
+
+	real_execve = RETRACE_GET_REAL(execve);
 
 	trace_printf(1, "execve(\"%s\"", path);
 
@@ -194,19 +205,22 @@ RETRACE_REPLACE(execve)
 
 int RETRACE_IMPLEMENTATION(execlp)(const char *file, const char *arg0, ... /*, (char *)0 */)
 {
-	rtr_execvp_t real_execvp = RETRACE_GET_REAL(execvp);
-
-	va_list arglist;
-	va_start(arglist, arg0);
-
-	char *p = NULL;
-	int i = 0;
 	int argsize = 1;
+	int i = 0;
+	int ret;
+	const char **argv;
+	char *p = NULL;
+	rtr_execvp_t real_execvp;
+	va_list arglist;
+
+	real_execvp = RETRACE_GET_REAL(execvp);
+
+	va_start(arglist, arg0);
 
 	while ((p = va_arg(arglist, char *)) != NULL)
 		argsize++;
 
-	const char **argv = malloc(argsize * sizeof(char *));
+	argv = malloc(argsize * sizeof(char *));
 
 	va_start(arglist, arg0);
 
@@ -226,18 +240,19 @@ int RETRACE_IMPLEMENTATION(execlp)(const char *file, const char *arg0, ... /*, (
 
 	set_tracing_enabled(0);
 
-	int ret = real_execvp(file, (char *const *) argv);
+	ret = real_execvp(file, (char *const *)argv);
 
-	return(ret);
+	return ret;
 }
 
 RETRACE_REPLACE(execlp)
 
 int RETRACE_IMPLEMENTATION(execvp)(const char *file, char *const argv[])
 {
-	rtr_execvp_t real_execvp = RETRACE_GET_REAL(execvp);
-
 	int i;
+	rtr_execvp_t real_execvp;
+
+	real_execvp = RETRACE_GET_REAL(execvp);
 
 	trace_printf(1, "execvp(\"%s\"", file);
 
@@ -260,9 +275,10 @@ RETRACE_REPLACE(execvp)
 #ifndef __APPLE__
 int RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *const envp[])
 {
-	rtr_execvpe_t real_execvpe = RETRACE_GET_REAL(execvpe);
-
 	int i;
+	rtr_execvpe_t real_execvpe;
+
+	real_execvpe = RETRACE_GET_REAL(execvpe);
 
 	trace_printf(1, "execvpe(\"%s\"", file);
 
@@ -295,12 +311,13 @@ int RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *
 
 RETRACE_REPLACE(execvpe)
 
-int RETRACE_IMPLEMENTATION(execveat)(
-  int dirfd, const char *pathname, char *const argv[], char *const envp[], int flags)
+int RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname,
+		char *const argv[], char *const envp[], int flags)
 {
-	rtr_execveat_t real_execveat = RETRACE_GET_REAL(execveat);
-
 	int i;
+	rtr_execveat_t real_execveat;
+
+	real_execveat = RETRACE_GET_REAL(execveat);
 
 	trace_printf(1, "execveat(%d, \"%s\"", dirfd, pathname);
 
@@ -368,4 +385,4 @@ int RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp
 
 RETRACE_REPLACE(fexecve)
 
-#endif
+#endif /* !__APPLE__ */
