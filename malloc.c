@@ -54,3 +54,16 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 }
 
 RETRACE_REPLACE(malloc)
+
+void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
+{
+        void *p;
+
+        rtr_realloc_t real_realloc = RETRACE_GET_REAL(realloc);
+        p = real_realloc(ptr, size);
+        trace_printf(1, "realloc(%p, %d); [%p]\n", ptr, size, p);
+
+        return p;
+}
+
+RETRACE_REPLACE(realloc)

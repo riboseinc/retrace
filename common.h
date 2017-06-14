@@ -13,12 +13,10 @@
 #include <time.h>
 
 #define SOMAXCONN	128
-#define MAXLEN		40
 
-#define VAR "\033[33m"  /* ANSI yellow for variable values */
-#define INF "\033[31m"  /* ANSI red for information notices */
-#define RST "\033[0m"   /* ANSI white */
-#define BEG "\033[100D" /* ANSI goto 1st char */
+#define VAR "\x1b[33m"  /* ANSI yellow for variable values */
+#define INF "\x1b[31m"  /* ANSI red for information notices */
+#define RST "\x1b[0m"   /* ANSI white */
 
 #define ARGUMENT_TYPE_END	0
 #define ARGUMENT_TYPE_INT	1
@@ -68,7 +66,6 @@ struct descriptor_info {
 };
 
 void trace_printf(int hdr, const char *fmt, ...);
-void trace_printf_str(const char *string);
 void trace_dump_data(const unsigned char *buf, size_t nbytes);
 void trace_mode(mode_t mode, char *p);
 

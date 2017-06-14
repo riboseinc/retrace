@@ -27,11 +27,11 @@
 
 int main (void)
 {
-	char *s = "This is a testing string. All work and no play makes Jack a dull boy. Lorem ipsum dolor sit amet, consectetur adipiscing elit";
+	char *s = "This is a testing string. All work and no\r\nplay makes Jack a dull boy. Lorem ipsum dolor sit amet, consectetur adipiscing elit\n";
 	char buf[1024];
 	int a = 2;
 
-	char *p = strstr (s, "dull");
+	char *p = strstr(s, "dull");
 	if (p)
 		a = 3;
 
@@ -50,4 +50,3 @@ int main (void)
 
         return 0;
 }
-

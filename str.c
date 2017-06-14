@@ -34,12 +34,7 @@ char *RETRACE_IMPLEMENTATION(strstr)(const char *s1, const char *s2)
 
 	real_strstr = RETRACE_GET_REAL(strstr);
 
-	trace_printf(1, "strstr(\"");
-	trace_printf_str(s1);
-	trace_printf(0, "\", \"");
-	trace_printf_str(s2);
-	trace_printf(0, "\");\n");
-
+	trace_printf(1, "strstr(\"%s\", \"%s\")\n", s1, s2);
 	return real_strstr(s1, s2);
 }
 
@@ -58,11 +53,7 @@ size_t RETRACE_IMPLEMENTATION(strlen)(const char *s)
 		int old_tracing_enabled;
 
 		old_tracing_enabled = set_tracing_enabled(0);
-
-		trace_printf(1, "strlen(\"%p", s);
-		trace_printf_str(s);
-		trace_printf(0, "\"); [len: %zu]\n", len);
-
+		trace_printf(1, "strlen(\"%s\"); [len: %zu]\n", len);
 		set_tracing_enabled(old_tracing_enabled);
 	}
 
@@ -77,12 +68,7 @@ int RETRACE_IMPLEMENTATION(strncmp)(const char *s1, const char *s2, size_t n)
 
 	real_strncmp = RETRACE_GET_REAL(strncmp);
 
-	trace_printf(1, "strncmp(\"");
-	trace_printf_str(s1);
-	trace_printf(0, "\", \"");
-	trace_printf_str(s2);
-	trace_printf(0, "\", %zu);\n", n);
-
+	trace_printf(1, "strncmp(\"%s\", \"%s\", %zu)\n", s1, s2, n);
 	return real_strncmp(s1, s2, n);
 }
 
@@ -91,20 +77,13 @@ RETRACE_REPLACE(strncmp)
 int RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 {
 	rtr_strcmp_t real_strcmp;
+	int old_tracing_enabled;
 
 	real_strcmp = RETRACE_GET_REAL(strcmp);
 
-	if (get_tracing_enabled()) {
-		int old_tracing_enabled;
-
+	if(get_tracing_enabled()) {
 		old_tracing_enabled = set_tracing_enabled(0);
-
-		trace_printf(1, "strcmp(\"");
-		trace_printf_str(s1);
-		trace_printf(0, "\", \"");
-		trace_printf_str(s2);
-		trace_printf(0, "\");\n");
-
+		trace_printf(1, "strcmp(\"%s\", \"%s\")\n", s1, s2);
 		set_tracing_enabled(old_tracing_enabled);
 	}
 
@@ -124,10 +103,7 @@ char *RETRACE_IMPLEMENTATION(strncpy)(char *s1, const char *s2, size_t n)
 
 	len = real_strlen(s2);
 
-	trace_printf(1, "strncpy(%p, \"", s2);
-	trace_printf_str(s2);
-	trace_printf(0, "\", %zu); [len: %d]\n", n, len);
-
+	trace_printf(1, "strncpy(%p, \"%s\", %zu); [len: %d]\n", s1, s2, len, n);
 	return real_strncpy(s1, s2, n);
 }
 
@@ -144,10 +120,7 @@ char *RETRACE_IMPLEMENTATION(strcat)(char *s1, const char *s2)
 
 	len = real_strlen(s2);
 
-	trace_printf(1, "strcat(%p, \"", s1);
-	trace_printf_str(s2);
-	trace_printf(0, "\"); [len %zu]\n", len);
-
+	trace_printf(1, "strcat(%p, \"%s\"); [len %zu]\n", s1, s2, len);
 	return real_strcat(s1, s2);
 }
 
@@ -164,10 +137,7 @@ char *RETRACE_IMPLEMENTATION(strncat)(char *s1, const char *s2, size_t n)
 
 	len = real_strlen(s2) + 1;
 
-	trace_printf(1, "strncat(%p, \"", s1);
-	trace_printf_str(s2);
-	trace_printf(0, "\", %zu); [len: %zu]\n", n, len);
-
+	trace_printf(1, "strncat(%p, \"%s\", %zu); [len: %zu]\n", s1, s2, n, len);
 	return real_strncat(s1, s2, n);
 }
 
@@ -184,10 +154,7 @@ char *RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
 
 	len = real_strlen(s2);
 
-	trace_printf(1, "strcpy(%p, \"", s1);
-	trace_printf_str(s2);
-	trace_printf(0, "\"); [len: %zu]\n", len);
-
+	trace_printf(1, "strcpy(%p, \"%s\"); [len: %zu]\n", s1, s2, len);
 	return real_strcpy(s1, s2);
 }
 
@@ -195,22 +162,14 @@ RETRACE_REPLACE(strcpy)
 
 char *RETRACE_IMPLEMENTATION(strchr)(const char *s, int c)
 {
-	static char specials[] = "\nn\rr\tt";
 	rtr_strchr_t real_strchr;
-	char *p, *result;
+	char *result;
 
 	real_strchr = RETRACE_GET_REAL(strchr);
 
 	result = real_strchr(s, c);
 
-	p = real_strchr(specials, c);
-
-	trace_printf(1, "strchr(\"");
-	trace_printf_str(s);
-	if (p == NULL)
-	    trace_printf(0, "\", '%c')[%p]\n", c, result);
-	else
-	    trace_printf(0, "\", '" VAR "\\%c" RST "')[%p]\n", *(p+1), result);
+	trace_printf(1, "strchr(\"%s\", '%c') [%p]\n", s, c, result);
 
 	return (result);
 }

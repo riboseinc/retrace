@@ -47,10 +47,7 @@ trace(const char *func, bool showfd, int fd, int result,
 		str = buf;
 	}
 
-	trace_printf(1, "%s(\"", func);
-	trace_printf_str(fmt);
-	trace_printf(0, "\" > \"");
-	trace_printf_str(str);
+	trace_printf(1, "%s(\"%s\" > \"%s\"", func, fmt, str);
 	if (showfd)
 		trace_printf(0, "\")[fd=%d][%d]\n", fd, result);
 	else
