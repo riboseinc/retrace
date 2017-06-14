@@ -28,81 +28,69 @@
 
 static void print_fds(int max_fd, fd_set *fds)
 {
-        int fd;
-        for (fd = 0; fd < max_fd; fd++)
-        {
-                if (FD_ISSET(fd, fds))
-                        trace_printf(1, "%d,", fd);
-        }
+	int fd;
 
-        return;
+	for (fd = 0; fd < max_fd; fd++) {
+		if (FD_ISSET(fd, fds))
+			trace_printf(1, "%d,", fd);
+	}
 }
 
 int RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
-                        fd_set *exceptfds, struct timeval *timeout)
+		fd_set *exceptfds, struct timeval *timeout)
 {
-        rtr_select_t real_select = RETRACE_GET_REAL(select);
-        int ret;
+	int ret;
+	rtr_select_t real_select;
 
-        // print original fdsets
-        if (readfds)
-        {
-                trace_printf(1, "select(): input readfds: ");
-                print_fds(nfds, readfds);
-                trace_printf(1, "\n");
-        }
+	real_select = RETRACE_GET_REAL(select);
 
-        if (writefds)
-        {
-                trace_printf(1, "select(): input writefds: ");
-                print_fds(nfds, writefds);
-                trace_printf(1, "\n");
-        }
+	/* print original fdsets */
+	if (readfds) {
+		trace_printf(1, "select(): input readfds: ");
+		print_fds(nfds, readfds);
+		trace_printf(1, "\n");
+	}
 
-        if (exceptfds)
-        {
-                trace_printf(1, "select(): input exceptfds: ");
-                print_fds(nfds, writefds);
-                trace_printf(1, "\n");
-        }
+	if (writefds) {
+		trace_printf(1, "select(): input writefds: ");
+		print_fds(nfds, writefds);
+		trace_printf(1, "\n");
+	}
 
-        trace_printf(1, "select(): timeout:[%ld, %ld]\n", timeout->tv_sec, timeout->tv_usec);
+	if (exceptfds) {
+		trace_printf(1, "select(): input exceptfds: ");
+		print_fds(nfds, writefds);
+		trace_printf(1, "\n");
+	}
 
-        // call select function
-        ret = real_select(nfds, readfds, writefds, exceptfds, timeout);
-        if (ret == 0)
-        {
-                trace_printf(1, "select() timeout expired.\n");
-        }
-        else if (ret > 0)
-        {
-                if (readfds)
-                {
-                        trace_printf(1, "select(): output readfds: ");
-                        print_fds(nfds, readfds);
-                        trace_printf(1, "\n");
-                }
+	trace_printf(1, "select(): timeout:[%ld, %ld]\n", timeout->tv_sec, timeout->tv_usec);
 
-                if (writefds)
-                {
-                        trace_printf(1, "select(): output writefds: ");
-                        print_fds(nfds, writefds);
-                        trace_printf(1, "\n");
-                }
+	/* call select function */
+	ret = real_select(nfds, readfds, writefds, exceptfds, timeout);
+	if (ret == 0)
+		trace_printf(1, "select() timeout expired.\n");
+	else if (ret > 0) {
+		if (readfds) {
+			trace_printf(1, "select(): output readfds: ");
+			print_fds(nfds, readfds);
+			trace_printf(1, "\n");
+		}
 
-                if (exceptfds)
-                {
-                        trace_printf(1, "select(): output exceptfds: ");
-                        print_fds(nfds, writefds);
-                        trace_printf(1, "\n");
-                }
-        }
-        else
-        {
-                trace_printf(1, "select(): failed.");
-        }
+		if (writefds) {
+			trace_printf(1, "select(): output writefds: ");
+			print_fds(nfds, writefds);
+			trace_printf(1, "\n");
+		}
 
-        return ret;
+		if (exceptfds) {
+			trace_printf(1, "select(): output exceptfds: ");
+			print_fds(nfds, writefds);
+			trace_printf(1, "\n");
+		}
+	} else
+		trace_printf(1, "select(): failed.");
+
+	return ret;
 }
 
 RETRACE_REPLACE(select)

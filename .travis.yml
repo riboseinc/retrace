@@ -9,6 +9,7 @@ branches:
 env:
   global:
     - CMOCKA_INSTALL="$HOME/builds/cmocka-install"
+    - CHECKPATCH_INSTALL="$HOME/builds/checkpatch-install"
     - LOGNAME="Travis"
 
 cache:

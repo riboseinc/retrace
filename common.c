@@ -30,6 +30,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdarg.h>
 
 #include "common.h"
 #include "str.h"
@@ -38,12 +39,12 @@
 #include "malloc.h"
 #include "printf.h"
 
-/*************************************************
- *  Global setting, we set this to disable all our
- *  internal tracing when we are doing some internal
- *  operations like reading config files, so we don't
- *  confuse the program with calls that we ourselves
- *  introduced. Default to enable
+/*
+ * Global setting, we set this to disable all our
+ * internal tracing when we are doing some internal
+ * operations like reading config files, so we don't
+ * confuse the program with calls that we ourselves
+ * introduced. Default to enable
  *
  * This also fixes some looping issues. Image we are
  * faking a call to getuid, this calls get_redirect to
@@ -52,17 +53,17 @@
  * calls into your tapped version of getuid and we
  * get into an infinite loop.
  *
- **************************************************/
+ */
 int g_enable_tracing = 1;
 
-/*************************************************
+/*
  * Global list of file descriptors so we can track
  * their usage across different functions
  *
- **************************************************/
+ */
 #define DESCRIPTOR_LIST_INITIAL_SIZE 8
-descriptor_info_t **g_descriptor_list = NULL;
-unsigned int	g_descriptor_list_size = 0;
+struct descriptor_info **g_descriptor_list;
+unsigned int g_descriptor_list_size;
 
 /* special strings to be displayed with ANSI colors */
 struct str_colors {
@@ -157,6 +158,11 @@ trace_printf_str(const char *str)
 void
 trace_printf(int hdr, const char *fmt, ...)
 {
+	int old_tracing_enabled;
+	rtr_vsnprintf_t real_vsnprintf;
+	rtr_fprintf_t real_fprintf;
+	rtr_getpid_t real_getpid;
+	va_list arglist;
 	char str[1024];
 
 	rtr_vsnprintf_t	real_vsnprintf;
@@ -177,6 +183,8 @@ trace_printf(int hdr, const char *fmt, ...)
 	real_fprintf = RETRACE_GET_REAL(fprintf);
 	real_getpid = RETRACE_GET_REAL(getpid);
 
+	va_start(arglist, fmt);
+
 	real_vsnprintf(str, sizeof(str), fmt, arglist);
 
 	if (hdr == 1)
@@ -190,43 +198,42 @@ trace_printf(int hdr, const char *fmt, ...)
 	return;
 }
 
-void
-trace_dump_data(const void *buf, size_t nbytes)
-{
 #define DUMP_LINE_SIZE 20
-	int  i;
+void
+trace_dump_data(const unsigned char *buf, size_t nbytes)
+{
+	size_t  i;
 	int  print_newline = 0;
 	char current_string[DUMP_LINE_SIZE + 1];
 
 	for (i = 0; i < nbytes; i++) {
+		unsigned char c;
+
 		if (i % DUMP_LINE_SIZE == 0) {
-			if (print_newline) {
+			if (print_newline)
 				trace_printf(0, " | %s\n", current_string);
-			}
 
 			memset(current_string, '\0', DUMP_LINE_SIZE);
 			trace_printf(0, "\t%07u\t", i / 2);
 		}
 
-		if (i % 2 == 0) {
+		if (i % 2 == 0)
 			trace_printf(0, " ");
-		}
 
-		unsigned char c = ((unsigned char *) buf)[i];
+		c = buf[i];
 
 		print_newline = 1;
 		trace_printf(0, "%02x", c);
 
-		// Only print ASCII characters
+		/* Only print ASCII characters */
 		if (c > 31 && c < 128)
 			current_string[i % 20] = c;
 		else
 			current_string[i % 20] = '.';
 	}
 
-	if (print_newline) {
+	if (print_newline)
 		trace_printf(0, " | %s\n", current_string);
-	}
 }
 
 int
@@ -246,35 +253,39 @@ set_tracing_enabled(int enabled)
 }
 
 static FILE *
-get_config_file ()
+get_config_file()
 {
+	int old_tracing_enabled;
 	FILE *config_file = NULL;
+	char *file_path;
+	rtr_fopen_t real_fopen;
+	rtr_malloc_t real_malloc;
+	rtr_free_t real_free;
 
 	if (!get_tracing_enabled())
-        	return NULL;
+		return NULL;
 
-	int old_tracing_enabled = set_tracing_enabled(0);
+	old_tracing_enabled = set_tracing_enabled(0);
 
-	rtr_fopen_t real_fopen = RETRACE_GET_REAL(fopen);
-	rtr_malloc_t real_malloc =  RETRACE_GET_REAL(malloc);
-	rtr_free_t real_free = RETRACE_GET_REAL(free);
+	real_fopen	= RETRACE_GET_REAL(fopen);
+	real_malloc	= RETRACE_GET_REAL(malloc);
+	real_free	= RETRACE_GET_REAL(free);
 
-  	// If we have a RETRACE_CONFIG env var, try to open the config file
-	// from there
-	char *file_path = getenv("RETRACE_CONFIG");
+	/* If we have a RETRACE_CONFIG env var, try to open the config file from there. */
+	file_path = getenv("RETRACE_CONFIG");
 
 	if (file_path)
 		config_file = real_fopen(file_path, "r");
 
-	// If we couldn't open the file from the env var try to home it from ~/.retrace.conf
+	/* If we couldn't open the file from the env var try to home it from ~/.retrace.conf */
 	if (!config_file) {
-		
 		file_path = getenv("HOME");
 
 		if (file_path) {
+			char *file_path_user;
 			char *file_name_user = ".retrace.conf";
-			char *file_path_user =
-			  (char *) real_malloc(strlen(file_path) + strlen(file_name_user) + 2);
+
+			file_path_user = (char *)real_malloc(strlen(file_path) + strlen(file_name_user) + 2);
 
 			if (file_path_user) {
 				strcpy(file_path_user, file_path);
@@ -288,10 +299,9 @@ get_config_file ()
 		}
 	}
 
-	// Finally if the above failed try to open /etc/retrace.conf
-	if (!config_file) {
+	/* Finally if the above failed try to open /etc/retrace.conf */
+	if (!config_file)
 		config_file = real_fopen("/etc/retrace.conf", "r");
-	}
 
 	set_tracing_enabled(old_tracing_enabled);
 
@@ -299,31 +309,36 @@ get_config_file ()
 }
 
 static int
-rtr_parse_config_file(rtr_config config_file, const char *function, va_list arg_types)
+rtr_parse_config_file(FILE *config_file, const char *function, va_list arg_types)
 {
-	size_t line_size = 0;
-	char * config_line = NULL;
-	char * current_function = NULL;
-	char * arg_start = NULL;
+	int retval = 0;
+	int old_tracing_enabled;
 	size_t len;
-	int    retval = 0;
+	size_t line_size = 0;
+	char *config_line = NULL;
+	char *current_function = NULL;
+	char *arg_start = NULL;
+	rtr_strncmp_t real_strncmp;
+	rtr_free_t real_free;
 
-	// If we disabled tracing because we are
-	// executing some internal code, don't honor
-	// any redirections
+	/*
+	 * If we disabled tracing because we are executing some internal code,
+	 * don't honor any redirections.
+	 */
 	if (!get_tracing_enabled())
 		return 0;
 
-	// Disable tracing so we don't get in loops
-	// when the functions we called here, call
-	// Other functions that we have replaced
-	int old_tracing_enabled = set_tracing_enabled(0);
+	/*
+	 * Disable tracing so we don't get in loops when the functions we
+	 * called here, call other functions that we have replaced.
+	 */
+	old_tracing_enabled = set_tracing_enabled(0);
 
-	rtr_strncmp_t real_strncmp = RETRACE_GET_REAL(strncmp);
-	rtr_free_t real_free = RETRACE_GET_REAL(free);
+	real_strncmp = RETRACE_GET_REAL(strncmp);
+	real_free = RETRACE_GET_REAL(free);
 
 	if (!config_file)
-		goto Cleanup;
+		goto cleanup;
 
 	len = strlen(function);
 
@@ -348,18 +363,18 @@ rtr_parse_config_file(rtr_config config_file, const char *function, va_list arg_
 		real_free(current_function);
 
 	if (arg_start) {
-		// Count how many arguments we have
+		/* Count how many arguments we have */
 		va_list arg_values;
 		int     current_argument;
 
-		va_copy (arg_values, arg_types);
+		__va_copy(arg_values, arg_types);
 
-		// Advance past the types until we find the values
+		/* Advance past the types until we find the values */
 		do {
 			current_argument = va_arg(arg_values, int);
 		} while (current_argument != ARGUMENT_TYPE_END);
 
-		// Now start filling the requests
+		/* Now start filling the requests */
 		for (current_argument = va_arg(arg_types, int);
 		     current_argument != ARGUMENT_TYPE_END;
 		     current_argument = va_arg(arg_types, int)) {
@@ -371,7 +386,7 @@ rtr_parse_config_file(rtr_config config_file, const char *function, va_list arg_
 			if (arg_end)
 				*arg_end = '\0';
 			else {
-				// skip the newline for the last string argument
+				/* skip the newline for the last string argument */
 				if (arg_start && strlen(arg_start) &&
 				    arg_start[strlen(arg_start) - 1] == '\n')
 					arg_start[strlen(arg_start) - 1] = '\0';
@@ -379,10 +394,10 @@ rtr_parse_config_file(rtr_config config_file, const char *function, va_list arg_
 
 			switch (current_argument) {
 			case ARGUMENT_TYPE_INT:
-				*((int *) current_value) = atoi(arg_start);
+				*((int *)current_value) = atoi(arg_start);
 				break;
 			case ARGUMENT_TYPE_STRING:
-				*((char **) current_value) = strdup(arg_start);
+				*((char **)current_value) = strdup(arg_start);
 				break;
 			}
 
@@ -396,68 +411,75 @@ rtr_parse_config_file(rtr_config config_file, const char *function, va_list arg_
 		va_end(arg_values);
 	}
 
-Cleanup:
+cleanup:
 	if (config_line)
 		real_free(config_line);
 
-	// Restore tracing
+	/* Restore tracing */
 	set_tracing_enabled(old_tracing_enabled);
 
 	return retval;
 }
 
 void
-rtr_confing_close (rtr_config config)
+rtr_confing_close(FILE *config)
 {
-	fclose ((FILE *) config); 
+	fclose(config);
 }
 
-int rtr_get_config_multiple(rtr_config *config, const char *function, ...)
+int rtr_get_config_multiple(FILE **config, const char *function, ...)
 {
 	int ret = 0;
 
 	if (*config == NULL)
-		*config = get_config_file ();
+		*config = get_config_file();
 
 	if (*config) {
 		va_list args;
-		va_start (args, function);
-		ret = rtr_parse_config_file (*config, function, args);
+
+		va_start(args, function);
+
+		ret = rtr_parse_config_file(*config, function, args);
 
 		if (!ret) {
-			rtr_confing_close (*config);
+			rtr_confing_close(*config);
 			*config = NULL;
 		}
-        }
+	}
 
 	return ret;
 }
 
 int rtr_get_config_single(const char *function, ...)
 {
-	rtr_config config_file = get_config_file ();
 	int ret = 0;
+	FILE *config_file;
+
+	config_file = get_config_file();
 
 	if (config_file) {
 		va_list args;
-                va_start (args, function);
-		ret = rtr_parse_config_file (config_file, function, args);
 
-		rtr_confing_close (config_file);
+		va_start(args, function);
+
+		ret = rtr_parse_config_file(config_file, function, args);
+
+		rtr_confing_close(config_file);
 	}
 
 	return ret;
 }
 
 
-descriptor_info_t *
+struct descriptor_info *
 descriptor_info_new(int fd, unsigned int type, const char *location, int port)
 {
-	descriptor_info_t *di;
+	int old_tracing_enabled;
+	struct descriptor_info *di;
 
-	int old_tracing_enabled = set_tracing_enabled(0);
+	old_tracing_enabled = set_tracing_enabled(0);
 
-	di = (descriptor_info_t *) malloc(sizeof(descriptor_info_t));
+	di = (struct descriptor_info *) malloc(sizeof(struct descriptor_info));
 
 	if (di) {
 		di->fd = fd;
@@ -477,9 +499,11 @@ descriptor_info_new(int fd, unsigned int type, const char *location, int port)
 }
 
 void
-descriptor_info_free(descriptor_info_t *di)
+descriptor_info_free(struct descriptor_info *di)
 {
-	int old_tracing_enabled = set_tracing_enabled(0);
+	int old_tracing_enabled;
+
+	old_tracing_enabled = set_tracing_enabled(0);
 
 	if (di->location)
 		free(di->location);
@@ -493,11 +517,13 @@ void
 file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 {
 	int free_spot = -1;
-	int i = 0;
+	unsigned int i = 0;
+	int old_tracing_enabled;
+	struct descriptor_info *di;
 
-	int old_tracing_enabled = set_tracing_enabled(0);
+	old_tracing_enabled = set_tracing_enabled(0);
 
-	descriptor_info_t *di = descriptor_info_new(fd, type, location, port);
+	di = descriptor_info_new(fd, type, location, port);
 
 	if (!di) {
 		return;
@@ -506,12 +532,12 @@ file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 
 	if (g_descriptor_list == NULL) {
 		g_descriptor_list_size = DESCRIPTOR_LIST_INITIAL_SIZE;
-		g_descriptor_list = (descriptor_info_t **) malloc(
-		  DESCRIPTOR_LIST_INITIAL_SIZE * sizeof(descriptor_info_t *));
+		g_descriptor_list = (struct descriptor_info **)malloc(
+		  DESCRIPTOR_LIST_INITIAL_SIZE * sizeof(struct descriptor_info *));
 
 		memset(g_descriptor_list,
 		       0,
-		       DESCRIPTOR_LIST_INITIAL_SIZE * sizeof(descriptor_info_t *));
+		       DESCRIPTOR_LIST_INITIAL_SIZE * sizeof(struct descriptor_info *));
 	}
 
 	for (i = 0; i < g_descriptor_list_size; i++) {
@@ -522,36 +548,36 @@ file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 	}
 
 	if (free_spot == -1) {
-		// If we don't have any free spots double the list size
+		/* If we don't have any free spots double the list size */
 		int new_size = g_descriptor_list_size * 2;
 
-		g_descriptor_list = (descriptor_info_t **) realloc(
-		  g_descriptor_list, new_size * sizeof(descriptor_info_t *));
+		g_descriptor_list = (struct descriptor_info **)realloc(
+		  g_descriptor_list, new_size * sizeof(struct descriptor_info *));
 
 		if (g_descriptor_list) {
-			// clear the new spots we added
+			/* clear the new spots we added */
 			memset(g_descriptor_list + g_descriptor_list_size,
 			       0,
 			       new_size - g_descriptor_list_size);
 
-			// Insert at the end of old list
+			/* Insert at the end of old list */
 			free_spot = g_descriptor_list_size;
 
 			g_descriptor_list_size = new_size;
 		}
 	}
 
-	if (free_spot != -1) {
+	if (free_spot != -1)
 		g_descriptor_list[free_spot] = di;
-	}
 
 	set_tracing_enabled(old_tracing_enabled);
 }
 
-descriptor_info_t *
+struct descriptor_info *
 file_descriptor_get(int fd)
 {
-	int i;
+	unsigned int i;
+
 	for (i = 0; i < g_descriptor_list_size; i++) {
 		if (g_descriptor_list[i] && g_descriptor_list[i]->fd == fd)
 			return g_descriptor_list[i];
@@ -563,7 +589,9 @@ file_descriptor_get(int fd)
 void
 file_descriptor_update(int fd, unsigned int type, const char *location, int port)
 {
-	descriptor_info_t *di = file_descriptor_get(fd);
+	struct descriptor_info *di;
+
+	di = file_descriptor_get(fd);
 
 	/* If found, update */
 	if (di) {
@@ -581,7 +609,7 @@ file_descriptor_update(int fd, unsigned int type, const char *location, int port
 void
 file_descriptor_remove(int fd)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < g_descriptor_list_size; i++) {
 		if (g_descriptor_list[i] && g_descriptor_list[i]->fd == fd) {
@@ -591,8 +619,7 @@ file_descriptor_remove(int fd)
 	}
 }
 
-/* lightweight copy of strmode() from FreeBSD for displaying mode_t in chmod
- */
+/* lightweight copy of strmode() from FreeBSD for displaying mode_t in chmod */
 void
 trace_mode(mode_t mode, char *p)
 {
@@ -605,6 +632,7 @@ trace_mode(mode_t mode, char *p)
 		*p++ = 'w';
 	else
 		*p++ = '-';
+
 	switch (mode & (S_IXUSR | S_ISUID)) {
 	case 0:
 		*p++ = '-';
@@ -619,6 +647,7 @@ trace_mode(mode_t mode, char *p)
 		*p++ = 's';
 		break;
 	}
+
 	/* group */
 	if (mode & S_IRGRP)
 		*p++ = 'r';
@@ -628,6 +657,7 @@ trace_mode(mode_t mode, char *p)
 		*p++ = 'w';
 	else
 		*p++ = '-';
+
 	switch (mode & (S_IXGRP | S_ISGID)) {
 	case 0:
 		*p++ = '-';
@@ -642,6 +672,7 @@ trace_mode(mode_t mode, char *p)
 		*p++ = 's';
 		break;
 	}
+
 	/* other */
 	if (mode & S_IROTH)
 		*p++ = 'r';
@@ -651,6 +682,7 @@ trace_mode(mode_t mode, char *p)
 		*p++ = 'w';
 	else
 		*p++ = '-';
+
 	switch (mode & (S_IXOTH | S_ISVTX)) {
 	case 0:
 		*p++ = '-';
@@ -665,5 +697,6 @@ trace_mode(mode_t mode, char *p)
 		*p++ = 't';
 		break;
 	}
+
 	*p = '\0';
 }
