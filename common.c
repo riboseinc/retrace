@@ -161,20 +161,20 @@ trace_printf_str(const char *str)
 void
 trace_printf(int hdr, const char *fmt, ...)
 {
-	int old_tracing_enabled;
-
 	rtr_vsnprintf_t real_vsnprintf;
 	rtr_fprintf_t real_fprintf;
 	rtr_getpid_t real_getpid;
 
 	va_list arglist;
 
-	str = alloca(maxlen);
+	char str[1024];
 
 	if (!get_tracing_enabled())
 		return;
 
-	set_tracing_enabled(0);
+	real_vsnprintf = RETRACE_GET_REAL(vsnprintf);
+	real_fprintf = RETRACE_GET_REAL(fprintf);
+	real_getpid = RETRACE_GET_REAL(getpid);
 
 	va_start(arglist, fmt);
 	real_vsnprintf(str, sizeof(str), fmt, arglist);
@@ -184,8 +184,6 @@ trace_printf(int hdr, const char *fmt, ...)
 
 	trace_printf_str(str);
 	va_end(arglist);
-
-	set_tracing_enabled(old_tracing_enabled);
 
 	return;
 }
