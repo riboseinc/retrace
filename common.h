@@ -15,72 +15,73 @@
 #define SOMAXCONN	128
 #define MAXLEN		40
 
-#define VAR "\e[33m"  /* ANSI yellow for variable values */
-#define INF "\e[31m"  /* ANSI red for information notices */
-#define RST "\e[0m"   /* ANSI white */
-#define BEG "\e[100D" /* ANSI goto 1st char */
+#define VAR "\033[33m"  /* ANSI yellow for variable values */
+#define INF "\033[31m"  /* ANSI red for information notices */
+#define RST "\033[0m"   /* ANSI white */
+#define BEG "\033[100D" /* ANSI goto 1st char */
 
-#define ARGUMENT_TYPE_END (int) 0
-#define ARGUMENT_TYPE_INT (int) 1
-#define ARGUMENT_TYPE_STRING (int) 2
+#define ARGUMENT_TYPE_END	0
+#define ARGUMENT_TYPE_INT	1
+#define ARGUMENT_TYPE_STRING	2
 
-#define FILE_DESCRIPTOR_TYPE_UNKNOW		0
-#define FILE_DESCRIPTOR_TYPE_FILE		1 // from open()
-#define FILE_DESCRIPTOR_TYPE_IPV4_CONNECT	2 // from connect()
-#define FILE_DESCRIPTOR_TYPE_IPV4_BIND		3 // from bind()
-#define FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT	4 // from accept()
+#define FILE_DESCRIPTOR_TYPE_UNKNOWN		0
+#define FILE_DESCRIPTOR_TYPE_FILE		1 /* from open() */
+#define FILE_DESCRIPTOR_TYPE_IPV4_CONNECT	2 /* from connect() */
+#define FILE_DESCRIPTOR_TYPE_IPV4_BIND		3 /* from bind() */
+#define FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT	4 /* from accept() */
 
 #ifdef __APPLE__
 
-#define DYLD_INTERPOSE(_replacment,_replacee) \
-__attribute__((used)) static struct{ const void* replacment; const void* replacee; } _interpose_##_replacee \
-__attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long)&_replacment, (const void*)(unsigned long)&_replacee };
+#define DYLD_INTERPOSE(_replacment, _replacee)						\
+static struct {										\
+	const void *replacment;								\
+	const void *replacee;								\
+} _interpose_##_replacee __attribute__((used, section("__DATA,__interpose"))) = {	\
+	(const void *)(unsigned long)&_replacment,					\
+	(const void *)(unsigned long)&_replacee						\
+};
 #define RETRACE_DECL(func)
 #define RETRACE_IMPLEMENTATION(func) retrace_impl_##func
 #define RETRACE_REPLACE(func) DYLD_INTERPOSE(retrace_impl_##func, func)
 #define RETRACE_GET_REAL(func) func
-#else
+
+#else /* !__APPLE__ */
+
 #define RETRACE_DECL(func) rtr_##func##_t rtr_get_real_##func()
 #define RETRACE_IMPLEMENTATION(func) (func)
-#define RETRACE_REPLACE(func)                                              \
-rtr_##func##_t rtr_get_real_##func() {                                     \
-	static rtr_##func##_t ptr;                                             \
-	if (__atomic_load_n(&ptr, __ATOMIC_RELAXED) == NULL)                   \
+#define RETRACE_REPLACE(func)                                                      \
+rtr_##func##_t rtr_get_real_##func() {                                             \
+	static rtr_##func##_t ptr;                                                 \
+	if (__atomic_load_n(&ptr, __ATOMIC_RELAXED) == NULL)                       \
 		__atomic_store_n(&ptr, dlsym(RTLD_NEXT, #func), __ATOMIC_RELAXED); \
-	return ptr;                                                            \
+	return ptr;                                                                \
 }
 #define RETRACE_GET_REAL(func) rtr_get_real_##func()
-#endif
 
-typedef struct {
+#endif /* !__APPLE__ */
+
+struct descriptor_info {
 	int fd;
 	unsigned int type;
-	char *location; // File name or address
+	char *location; /* File name or address */
 	int port;
-} descriptor_info_t;
-
-// This is just a FILE*
-typedef void* rtr_config;
-
+};
 
 void trace_printf(int hdr, const char *fmt, ...);
 void trace_printf_str(const char *string);
 void trace_dump_data(const unsigned char *buf, size_t nbytes);
 void trace_mode(mode_t mode, char *p);
 
-int rtr_get_config_multiple(rtr_config *config, const char *function, ...);
+int rtr_get_config_multiple(FILE **config, const char *function, ...);
 int rtr_get_config_single(const char *function, ...);
-void rtr_confing_close (rtr_config config);
+void rtr_confing_close(FILE *config);
 
-
-int get_tracing_enabled();
+int get_tracing_enabled(void);
 int set_tracing_enabled(int enabled);
-
 
 /* Descriptor tracking */
 void file_descriptor_update(int fd, unsigned int type, const char *location, int port);
-descriptor_info_t *file_descriptor_get (int fd);
-void file_descriptor_remove (int fd);
-
+struct descriptor_info *file_descriptor_get(int fd);
+void file_descriptor_remove(int fd);
 
 #endif /* __RETRACE_COMMON_H__ */

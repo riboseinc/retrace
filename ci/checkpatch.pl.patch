@@ -1,0 +1,11 @@
+--- checkpatch.pl.orig	2017-06-13 19:11:59.932004444 +0300
++++ checkpatch.pl	2017-06-13 19:11:42.317051086 +0300
+@@ -466,6 +466,8 @@ our @typeListMisordered = (
+ );
+ 
+ our @typeList = (
++	qr{FILE},
++	qr{DIR},
+ 	qr{void},
+ 	qr{(?:(?:un)?signed\s+)?char},
+ 	qr{(?:(?:un)?signed\s+)?short\s+int},

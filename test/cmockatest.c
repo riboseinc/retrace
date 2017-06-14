@@ -133,12 +133,21 @@ RTR_TEST_END
 #endif
 
 RTR_TEST_START(getenv)
+	putenv("TESTVAR=BIJOU");
+	assert_string_equal(rtr_getenv("TESTVAR"), "BIJOU");
+	assert_ptr_equal(rtr_getenv("NOTESTVAR"), NULL);
 RTR_TEST_END
 
 RTR_TEST_START(putenv)
+	rtr_putenv("TESTVAR=BIJOU");
+	assert_string_equal(getenv("TESTVAR"), "BIJOU");
 RTR_TEST_END
 
 RTR_TEST_START(unsetenv)
+	putenv("TESTVAR=BIJOU");
+	rtr_unsetenv("TESTVAR");
+	rtr_unsetenv("NOTESTVAR");
+	assert_ptr_equal(getenv("TESTVAR"), NULL);
 RTR_TEST_END
 
 RTR_TEST_START(execl)

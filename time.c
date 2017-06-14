@@ -28,11 +28,15 @@
 
 char *RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
 {
-	rtr_ctime_r_t real_ctime_r = RETRACE_GET_REAL(ctime_r);
+	char *r;
+	rtr_ctime_r_t real_ctime_r;
 
-	char *r = real_ctime_r (timep, buf);
+	real_ctime_r = RETRACE_GET_REAL(ctime_r);
+
+	r = real_ctime_r(timep, buf);
 
 	trace_printf(1, "ctime_r(\"%u\", \"%s\");\n", timep ? timep : 0, buf);
+
 	return r;
 }
 
@@ -40,9 +44,12 @@ RETRACE_REPLACE(ctime_r)
 
 char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 {
-	rtr_ctime_t real_ctime = RETRACE_GET_REAL(ctime);
+	char *r;
+	rtr_ctime_t real_ctime;
 
-	char *r = real_ctime(timep);
+	real_ctime = RETRACE_GET_REAL(ctime);
+
+	r = real_ctime(timep);
 
 	trace_printf(1, "ctime(\"%u\") [return: %s];\n", timep ? timep : 0, r);
 
@@ -57,27 +64,37 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *restrict tv, void *rest
 int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz)
 #endif
 {
-        rtr_gettimeofday_t real_gettimeofday = RETRACE_GET_REAL(gettimeofday);
-
+	int ret;
+	rtr_gettimeofday_t real_gettimeofday;
 #ifdef __APPLE__
-        struct timezone *tz = (struct timezone *) tzp;
+	struct timezone *tz;
+
+	tz = (struct timezone *)tzp;
 #endif
 
-        int ret = real_gettimeofday(tv, tz);
-        if (ret == 0)
-        {
-                time_t tv_sec = tv ? tv->tv_sec : 0;
-                suseconds_t tv_usec = tv ? tv->tv_usec : 0;
-                int tz_minuteswest = tz ? tz->tz_minuteswest : 0;
-                int tz_dsttime = tz ? tz->tz_dsttime : 0;
+	real_gettimeofday = RETRACE_GET_REAL(gettimeofday);
 
-                trace_printf(1, "gettimeofday(timeval:[%ld, %ld], timezone:[%d, %d]);\n",
-                                tv_sec, tv_usec, tz_minuteswest, tz_dsttime);
-        }
-        else
-                trace_printf(1, "gettimeofday(); -1\n");
+	ret = real_gettimeofday(tv, tz);
+	if (ret == 0) {
+		int tz_minuteswest = 0;
+		int tz_dsttime = 0;
+		time_t tv_sec;
+		suseconds_t tv_usec;
 
-        return ret;
+		tv_sec	= tv->tv_sec;
+		tv_usec	= tv->tv_usec;
+
+		if (tz != NULL) {
+			tz_minuteswest	= tz->tz_minuteswest;
+			tz_dsttime	= tz->tz_dsttime;
+		}
+
+		trace_printf(1, "gettimeofday(timeval:[%ld, %ld], timezone:[%d, %d]);\n",
+				tv_sec, tv_usec, tz_minuteswest, tz_dsttime);
+	} else
+		trace_printf(1, "gettimeofday(); -1\n");
+
+	return ret;
 }
 
 RETRACE_REPLACE(gettimeofday)

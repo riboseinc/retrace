@@ -6,7 +6,7 @@ RM		= rm -f
 ifeq ($(OS),Darwin)
 	RETRACE_CFLAGS = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
 else
-	RETRACE_CFLAGS  = $(CFLAGS) -fPIC -D_GNU_SOURCE -rdynamic -Wall
+	RETRACE_CFLAGS  = $(CFLAGS) -fPIC -D_GNU_SOURCE -rdynamic -Wall -Werror -pedantic -Wextra -ansi
 endif
 
 # assume Sierra for now to silence ld warnings
