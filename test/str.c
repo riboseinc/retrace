@@ -32,7 +32,7 @@ int main (void)
 	char buf[1024];
 	int a = 2;
 
-	char *p = strstr (s, "[test\n]");
+	char *p = strstr(s, "[test\n]");
 #if 0
 	if (p)
 		a = 3;
