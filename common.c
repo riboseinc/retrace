@@ -64,7 +64,7 @@ int g_enable_tracing = 1;
 descriptor_info_t **g_descriptor_list = NULL;
 unsigned int	g_descriptor_list_size = 0;
 
-// special strings to be displayed with ANSI colors
+/* special strings to be displayed with ANSI colors */
 struct str_colors {
 	char ch;
 	const char *color_str;
@@ -82,15 +82,23 @@ trace_printf_str(const char *str)
 {
 	char *str_print;
 
-	// get original function pointers
-	rtr_malloc_t real_malloc = RETRACE_GET_REAL(malloc);
-	rtr_free_t real_free = RETRACE_GET_REAL(free);
-	rtr_strncpy_t real_strncpy = RETRACE_GET_REAL(strncpy);
-	rtr_strcat_t real_strcat = RETRACE_GET_REAL(strcat);
-	rtr_strlen_t real_strlen = RETRACE_GET_REAL(strlen);
-	rtr_fprintf_t real_fprintf = RETRACE_GET_REAL(fprintf);
+	rtr_malloc_t	real_malloc;
+	rtr_free_t	real_free;
+	rtr_strncpy_t	real_strncpy;
+	rtr_strcat_t	real_strcat;
+	rtr_strlen_t	real_strlen;
+	rtr_fprintf_t	real_fprintf;
 
-	// set new buffer
+
+	/* get original function pointers */
+	real_malloc = RETRACE_GET_REAL(malloc);
+	real_free = RETRACE_GET_REAL(free);
+	real_strncpy = RETRACE_GET_REAL(strncpy);
+	real_strcat = RETRACE_GET_REAL(strcat);
+	real_strlen = RETRACE_GET_REAL(strlen);
+	real_fprintf = RETRACE_GET_REAL(fprintf);
+
+	/* set new buffer */
 	str_print = (char *) real_malloc(strlen(str) + 1);
 	strcpy(str_print, str);
 	str_print[strlen(str)] = '\0';
@@ -100,7 +108,7 @@ trace_printf_str(const char *str)
 		char *p = str_print;
 		int idx = 0;
 
-		// check NULL
+		/* check NULL */
 		if (!colors->color_str)
 			break;
 
@@ -108,7 +116,7 @@ trace_printf_str(const char *str)
 			if (*p == colors->ch) {
 				size_t size = strlen(str_print) + strlen(colors->color_str) + 1;
 
-				// check end line
+				/* check end line */
 				if (*p == '\n' && p == (str_print + strlen(str_print) - 1))
 					break;
 
@@ -118,7 +126,7 @@ trace_printf_str(const char *str)
 				real_strcat(tmp, str_print + idx + 1);
 				tmp[size - 1] = '\0';
 
-				// reset print string
+				/* reset print string */
 				if (str_print) {
 					real_free(str_print);
 					str_print = tmp;
@@ -137,10 +145,10 @@ trace_printf_str(const char *str)
 		colors++;
 	}
 
-	// print string
+	/* print string */
 	real_fprintf(stderr, "%s", str_print);
 
-	// free print string
+	/* free print string */
 	real_free(str_print);
 
 	return;
@@ -151,17 +159,23 @@ trace_printf(int hdr, const char *fmt, ...)
 {
 	char str[1024];
 
-	if (!get_tracing_enabled())
-		return;
-
-	int old_tracing_enabled = set_tracing_enabled(0);
-
-	rtr_vsnprintf_t real_vsnprintf = RETRACE_GET_REAL(vsnprintf);
-	rtr_fprintf_t real_fprintf = RETRACE_GET_REAL(fprintf);
-	rtr_getpid_t real_getpid = RETRACE_GET_REAL(getpid);
+	rtr_vsnprintf_t	real_vsnprintf;
+	rtr_fprintf_t	real_fprintf;
+	rtr_getpid_t	real_getpid;
 
 	va_list arglist;
 	va_start(arglist, fmt);
+
+	int old_tracing_enabled;
+
+	if (!get_tracing_enabled())
+		return;
+
+	old_tracing_enabled = set_tracing_enabled(0);
+
+	real_vsnprintf = RETRACE_GET_REAL(vsnprintf);
+	real_fprintf = RETRACE_GET_REAL(fprintf);
+	real_getpid = RETRACE_GET_REAL(getpid);
 
 	real_vsnprintf(str, sizeof(str), fmt, arglist);
 
@@ -172,6 +186,8 @@ trace_printf(int hdr, const char *fmt, ...)
 	va_end(arglist);
 
 	set_tracing_enabled(old_tracing_enabled);
+
+	return;
 }
 
 void
