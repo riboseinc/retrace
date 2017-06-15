@@ -39,12 +39,15 @@ int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 {
 	rtr_stat_t real_stat;
 	char perm[10];
+	int r;
 
 	real_stat = RETRACE_GET_REAL(stat);
 
 	trace_printf(1, "stat(\"%s\", buf);\n", path);
 
-	if (real_stat(path, buf) == 0) {
+	r = real_stat(path, buf);
+
+	if (r == 0) {
 		trace_printf(1, "struct stat {\n");
 		trace_printf(1, "\tst_dev = %lu\n", buf->st_dev);
 		trace_printf(1, "\tst_ino = %i\n", buf->st_ino);
@@ -67,7 +70,7 @@ int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 		trace_printf(1, "}\n");
 	}
 
-	return real_stat(path, buf);
+	return r;
 }
 
 RETRACE_REPLACE(stat)
