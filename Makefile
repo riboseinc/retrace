@@ -19,7 +19,7 @@ else
 	RETRACE_LDFLAGS	= $(LDFLAGS) -shared
 	RETRACE_LIBS	= -dl -lncurses -lpthread
 	RETRACE_SO	= retrace.so
-	RETRACE_CFLAGS	+= -rdynamic 
+	RETRACE_CFLAGS	+= -rdynamic
 endif
 
 SRCS		+= exit.c
@@ -44,6 +44,7 @@ SRCS		+= printf.c
 SRCS		+= select.c
 SRCS            += ssl.c
 SRCS		+= trace.c
+SRCS		+= pledge.c
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test
