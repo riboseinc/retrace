@@ -267,7 +267,7 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		if (dirp)
 			fd = real_dirfd(dirp);
 
-		trace_printf(0, "%p", dirfd);
+		trace_printf(0, "%p", dirp);
 		trace_set_color(INF);
 		trace_printf(0, " [fd %d]", fd);
 		trace_set_color(VAR);
