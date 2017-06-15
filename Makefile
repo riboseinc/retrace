@@ -2,34 +2,23 @@ OS 		= $(shell uname)
 LD		= ld
 GCC		= gcc
 RM		= rm -f
-
-ifeq ($(OS),Darwin)
-	RETRACE_CFLAGS = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
-else ifeq ($(OS),FreeBSD)
-	RETRACE_CFLAGS  = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
-else
-	RETRACE_CFLAGS  = $(CFLAGS) -fPIC -D_GNU_SOURCE -rdynamic -Wall
-endif
-
-# assume Sierra for now to silence ld warnings
-ifeq ($(OS),Darwin)
-	export MACOSX_DEPLOYMENT_TARGET = 10.12
-endif
+RETRACE_CFLAGS = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
 
 ifeq ($(OS),Darwin)
 	RETRACE_LDFLAGS = $(LDFLAGS) -dylib -ldl
-        RETRACE_LIBS = -ldl
-else ifeq ($(OS),FreeBSD) 
-	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
-        RETRACE_LIBS =
-else
-	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
-        RETRACE_LIBS = -ldl
-endif
+	RETRACE_LIBS = -ldl
 
-ifeq ($(OS),Darwin)
-	RETRACE_SO	= retrace.dylib
+	# assume Sierra for now to silence ld warnings
+	export MACOSX_DEPLOYMENT_TARGET = 10.12
+	RETRACE_SO      = retrace.dylib
+else ifeq ($(OS),FreeBSD)
+        RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
+        RETRACE_LIBS =
+	RETRACE_SO     = retrace.so
 else
+	RETRACE_CFLAGS  += -rdynamic
+	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
+	RETRACE_LIBS = -ldl
 	RETRACE_SO     = retrace.so
 endif
 
@@ -53,7 +42,7 @@ SRCS		+= pipe.c
 SRCS		+= dir.c
 SRCS		+= printf.c
 SRCS		+= select.c
-SRCS    += trace.c
+SRCS		+= trace.c
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test

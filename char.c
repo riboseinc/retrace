@@ -33,7 +33,7 @@
 #endif 
 #include <ctype.h>
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #undef putc
 #endif
 
