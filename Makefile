@@ -7,7 +7,6 @@ RETRACE_CFLAGS = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
 ifeq ($(OS),Darwin)
 	RETRACE_LDFLAGS = $(LDFLAGS) -dylib -ldl
 	RETRACE_LIBS = -ldl
-
 	# assume Sierra for now to silence ld warnings
 	export MACOSX_DEPLOYMENT_TARGET = 10.12
 	RETRACE_SO      = retrace.dylib
@@ -16,7 +15,7 @@ else ifeq ($(OS),FreeBSD)
         RETRACE_LIBS =
 	RETRACE_SO     = retrace.so
 else
-	RETRACE_CFLAGS  += -rdynamic
+	RETRACE_CFLAGS  += -rdynamic -Werror -pedantic -Wextra -ansi
 	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
 	RETRACE_LIBS = -ldl
 	RETRACE_SO     = retrace.so

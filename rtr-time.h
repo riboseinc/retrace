@@ -10,7 +10,7 @@ typedef char *(*rtr_ctime_r_t)(const time_t *timep, char *buf);
 typedef int (*rtr_gettimeofday_t)(struct timeval *restrict tv, void *restrict tzp);
 #else
 typedef int (*rtr_gettimeofday_t)(struct timeval *tv, struct timezone *tz);
-#endif        
+#endif
 
 RETRACE_DECL(ctime);
 RETRACE_DECL(ctime_r);
