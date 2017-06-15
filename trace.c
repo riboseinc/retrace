@@ -35,138 +35,142 @@ long int RETRACE_IMPLEMENTATION(ptrace)(int request, ...)
 long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 #endif
 {
-        rtr_ptrace_t real_ptrace = RETRACE_GET_REAL(ptrace);
-        char *request_str = "UNKNOW";
-        int r;
-        pid_t pid;
-        caddr_t addr;
-        int data;
+	int data;
+	int r;
+	pid_t pid;
+	caddr_t addr;
+	rtr_ptrace_t real_ptrace;
+	char *request_str;
+	va_list arglist;
 
-        va_list arglist;
-        va_start(arglist, request);
+	real_ptrace = RETRACE_GET_REAL(ptrace);
 
-        pid = va_arg(arglist, int);
-        addr = va_arg(arglist, void *);
-        data = va_arg(arglist, int);
+	va_start(arglist, request);
 
-        va_end(arglist);
+	pid = va_arg(arglist, int);
+	addr = va_arg(arglist, void *);
+	data = va_arg(arglist, int);
 
-        switch (request) {
-                case PT_TRACE_ME:
-                        request_str = "PT_TRACE_ME";
-                        break;
-		case PT_READ_I:
-			request_str = "PT_READ_I";
-			break;
-		case PT_READ_D:
-                        request_str = "PT_READ_D";
-                        break;
-		case PT_READ_U:
-                        request_str = "PT_READ_U";
-                        break;
-		case PT_WRITE_I:
-                        request_str = "PT_WRITE_I";
-                        break;
-		case PT_WRITE_D:
-                        request_str = "PT_WRITE_D";
-                        break;
-		case PT_WRITE_U:
-                        request_str = "PT_WRITE_U";
-                        break;
-		case PT_CONTINUE:
-                        request_str = "PT_CONTINUE";
-                        break;
-		case PT_KILL:
-                        request_str = "PT_KILL";
-                        break;
-		case PT_STEP:
-                        request_str = "PT_STEP";
-                        break;
-		case PT_DETACH:
-                        request_str = "PT_DETACH";
-                        break;
+	va_end(arglist);
+
+	switch (request) {
+	case PT_TRACE_ME:
+		request_str = "PT_TRACE_ME";
+		break;
+	case PT_READ_I:
+		request_str = "PT_READ_I";
+		break;
+	case PT_READ_D:
+		request_str = "PT_READ_D";
+		break;
+	case PT_READ_U:
+		request_str = "PT_READ_U";
+		break;
+	case PT_WRITE_I:
+		request_str = "PT_WRITE_I";
+		break;
+	case PT_WRITE_D:
+		request_str = "PT_WRITE_D";
+		break;
+	case PT_WRITE_U:
+		request_str = "PT_WRITE_U";
+		break;
+	case PT_CONTINUE:
+		request_str = "PT_CONTINUE";
+		break;
+	case PT_KILL:
+		request_str = "PT_KILL";
+		break;
+	case PT_STEP:
+		request_str = "PT_STEP";
+		break;
+	case PT_DETACH:
+		request_str = "PT_DETACH";
+		break;
 #if __APPLE__
-		case PT_SIGEXC:
-                        request_str = "PT_SIGEXC";
-                        break;
-		case PT_THUPDATE:
-                        request_str = "PT_THUPDATE";
-                        break;
-		case PT_ATTACHEXC:
-                        request_str = "PT_ATTACHEXC";
-                        break;
-		case PT_FORCEQUOTA:
-                        request_str = "PT_FORCEQUOTA";
-                        break;
-		case PT_DENY_ATTACH:
-                        request_str = "PT_DENY_ATTACH";
-                        break;
-		case PT_FIRSTMACH:
-                        request_str = "PT_FIRSTMACH";
-                        break;
+	case PT_SIGEXC:
+		request_str = "PT_SIGEXC";
+		break;
+	case PT_THUPDATE:
+		request_str = "PT_THUPDATE";
+		break;
+	case PT_ATTACHEXC:
+		request_str = "PT_ATTACHEXC";
+		break;
+	case PT_FORCEQUOTA:
+		request_str = "PT_FORCEQUOTA";
+		break;
+	case PT_DENY_ATTACH:
+		request_str = "PT_DENY_ATTACH";
+		break;
+	case PT_FIRSTMACH:
+		request_str = "PT_FIRSTMACH";
+		break;
 #else
-                case PT_ATTACH:
-                        request_str = "PT_ATTACH";
-                        break;
-                case PTRACE_GETREGS:
-                        request_str = "PTRACE_GETREGS";
-                        break;
-		case PTRACE_SETREGS:
-			request_str = "PTRACE_SETREGS";
-			break;
-		case PTRACE_GETFPREGS:
-                        request_str = "PTRACE_GETFPREGS";
-                        break;
-		case PTRACE_SETFPREGS:
-                        request_str = "PTRACE_SETFPREGS";
-                        break;	
-		case PTRACE_GETFPXREGS:
-                        request_str = "PTRACE_GETFPXREGS";
-                        break;
-		case PTRACE_SETFPXREGS:
-                        request_str = "PTRACE_SETFPXREGS";
-                        break;
-		case PTRACE_SYSCALL:
-                        request_str = "PTRACE_SYSCALL";
-                        break;
-		case PTRACE_SETOPTIONS:
-                        request_str = "PTRACE_SETOPTIONS";
-                        break;
-		case PTRACE_GETEVENTMSG:
-                        request_str = "PTRACE_GETEVENTMSG";
-                        break;
-		case PTRACE_GETSIGINFO:
-                        request_str = "PTRACE_GETSIGINFO";
-                        break;
-		case PTRACE_SETSIGINFO:
-                        request_str = "PTRACE_SETSIGINFO";
-                        break;
-		case PTRACE_GETREGSET:
-                        request_str = "PTRACE_GETREGSET";
-                        break;
-		case PTRACE_SETREGSET:
-                        request_str = "PTRACE_SETREGSET";
-                        break;
-		case PTRACE_SEIZE:
-                        request_str = "PTRACE_SEIZE";
-                        break;
-		case PTRACE_INTERRUPT:
-                        request_str = "PTRACE_INTERRUPT";
-                        break;
-		case PTRACE_LISTEN:
-                        request_str = "PTRACE_LISTEN";
-                        break;
-		case PTRACE_PEEKSIGINFO:
-                        request_str = "PTRACE_PEEKSIGINFO";
-                        break;
+	case PT_ATTACH:
+		request_str = "PT_ATTACH";
+		break;
+	case PTRACE_GETREGS:
+		request_str = "PTRACE_GETREGS";
+		break;
+	case PTRACE_SETREGS:
+		request_str = "PTRACE_SETREGS";
+		break;
+	case PTRACE_GETFPREGS:
+		request_str = "PTRACE_GETFPREGS";
+		break;
+	case PTRACE_SETFPREGS:
+		request_str = "PTRACE_SETFPREGS";
+		break;
+	case PTRACE_GETFPXREGS:
+		request_str = "PTRACE_GETFPXREGS";
+		break;
+	case PTRACE_SETFPXREGS:
+		request_str = "PTRACE_SETFPXREGS";
+		break;
+	case PTRACE_SYSCALL:
+		request_str = "PTRACE_SYSCALL";
+		break;
+	case PTRACE_SETOPTIONS:
+		request_str = "PTRACE_SETOPTIONS";
+		break;
+	case PTRACE_GETEVENTMSG:
+		request_str = "PTRACE_GETEVENTMSG";
+		break;
+	case PTRACE_GETSIGINFO:
+		request_str = "PTRACE_GETSIGINFO";
+		break;
+	case PTRACE_SETSIGINFO:
+		request_str = "PTRACE_SETSIGINFO";
+		break;
+	case PTRACE_GETREGSET:
+		request_str = "PTRACE_GETREGSET";
+		break;
+	case PTRACE_SETREGSET:
+		request_str = "PTRACE_SETREGSET";
+		break;
+	case PTRACE_SEIZE:
+		request_str = "PTRACE_SEIZE";
+		break;
+	case PTRACE_INTERRUPT:
+		request_str = "PTRACE_INTERRUPT";
+		break;
+	case PTRACE_LISTEN:
+		request_str = "PTRACE_LISTEN";
+		break;
+	case PTRACE_PEEKSIGINFO:
+		request_str = "PTRACE_PEEKSIGINFO";
+		break;
 #endif
-        }
+	default:
+		request_str = "UNKNOWN";
+	}
 
-        r = real_ptrace(request, pid, addr, data);
+	r = real_ptrace(request, pid, addr, data);
 
-        trace_printf(1, "ptrace(\"%s\"(%d), %u, %p, %p) [return: %d];\n", request_str, request, pid, addr, data, r);
+	trace_printf(1, "ptrace(\"%s\"(%d), %u, %p, %p) [return: %d];\n", request_str, request, pid, addr, data, r);
 
-        return r;
+	return r;
 }
 
 RETRACE_REPLACE(ptrace)

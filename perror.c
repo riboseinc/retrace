@@ -28,9 +28,13 @@
 
 void RETRACE_IMPLEMENTATION(perror)(const char *s)
 {
-	rtr_perror_t real_perror = RETRACE_GET_REAL(perror);
+	rtr_perror_t real_perror;
+
+	real_perror = RETRACE_GET_REAL(perror);
+
 	trace_printf(1, "perror(\"%s\");\n", s);
-	return real_perror(s);
+
+	real_perror(s);
 }
 
 RETRACE_REPLACE(perror)
