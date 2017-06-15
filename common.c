@@ -26,13 +26,17 @@
 #include <sys/types.h>
 
 #include <pwd.h>
+#define _WITH_GETLINE
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
-#ifndef __APPLE__
+#ifdef __linux__
 #include <syscall.h>
+#endif
+#ifdef __FreeBSD__
+#include <pthread_np.h>
 #endif
 #include <stdarg.h>
 
@@ -197,7 +201,7 @@ initialize_tracing_key(void)
 static int
 is_main_thread(void)
 {
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__FreeBSD__)
 	return pthread_main_np();
 #else
 	rtr_getpid_t real_getpid;

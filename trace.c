@@ -31,27 +31,30 @@
 
 #ifdef __APPLE__
 long int RETRACE_IMPLEMENTATION(ptrace)(int request, ...)
+#elif __FreeBSD__
+int ptrace(int request, pid_t pid, caddr_t addr, int data)
 #else
 long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 #endif
 {
+        rtr_ptrace_t real_ptrace;
+        char *request_str;
+        int r;
+#if defined(__APPLE__) || defined(__linux__)
 	int data;
-	int r;
 	pid_t pid;
 	caddr_t addr;
-	rtr_ptrace_t real_ptrace;
-	char *request_str;
 	va_list arglist;
-
-	real_ptrace = RETRACE_GET_REAL(ptrace);
-
 	va_start(arglist, request);
 
-	pid = va_arg(arglist, int);
-	addr = va_arg(arglist, void *);
-	data = va_arg(arglist, int);
+        pid = va_arg(arglist, int);
+        addr = va_arg(arglist, void *);
+        data = va_arg(arglist, int);
 
-	va_end(arglist);
+        va_end(arglist);
+#endif
+
+	real_ptrace = RETRACE_GET_REAL(ptrace);
 
 	switch (request) {
 	case PT_TRACE_ME:
@@ -63,18 +66,22 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	case PT_READ_D:
 		request_str = "PT_READ_D";
 		break;
+#ifndef __FreeBSD__
 	case PT_READ_U:
 		request_str = "PT_READ_U";
 		break;
+#endif
 	case PT_WRITE_I:
 		request_str = "PT_WRITE_I";
 		break;
 	case PT_WRITE_D:
 		request_str = "PT_WRITE_D";
 		break;
+#ifndef __FreeBSD__
 	case PT_WRITE_U:
 		request_str = "PT_WRITE_U";
 		break;
+#endif
 	case PT_CONTINUE:
 		request_str = "PT_CONTINUE";
 		break;
@@ -106,7 +113,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	case PT_FIRSTMACH:
 		request_str = "PT_FIRSTMACH";
 		break;
-#else
+#elif defined(__linux__)
 	case PT_ATTACH:
 		request_str = "PT_ATTACH";
 		break;

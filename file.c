@@ -31,6 +31,10 @@
 #include "file.h"
 #include "str.h"
 
+#ifdef __FreeBSD__
+#undef fileno
+#endif
+
 int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 {
 	rtr_stat_t real_stat;
