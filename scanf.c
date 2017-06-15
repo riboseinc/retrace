@@ -31,14 +31,16 @@
 #include "printf.h"
 #include "file.h"
 
+#define __func__ __extension__ __FUNCTION__
+
 static void
-trace(const char *func, bool showfd, int fd, int result,
-	  const char *str, const char *fmt, va_list ap)
+trace(const char *func, bool showfd, int fd, int result, const char *str, const char *fmt, va_list ap)
 {
 	char buf[1024];
 
 	if (str == NULL) {
-		rtr_vsnprintf_t vsnprintf_ = RETRACE_GET_REAL(vsnprintf);
+		rtr_vsnprintf_t vsnprintf_;
+		vsnprintf_ = RETRACE_GET_REAL(vsnprintf);
 		vsnprintf_(buf, 1024, fmt, ap);
 		str = buf;
 	}
@@ -56,11 +58,14 @@ trace(const char *func, bool showfd, int fd, int result,
 int
 RETRACE_IMPLEMENTATION(scanf)(const char *format, ...)
 {
-	rtr_vscanf_t real_vscanf = RETRACE_GET_REAL(vscanf);
+	rtr_vscanf_t real_vscanf;
 	va_list ap;
+	int result;
+
+	real_vscanf = RETRACE_GET_REAL(vscanf);
 
 	va_start(ap, format);
-	int result = real_vscanf(format, ap);
+	result = real_vscanf(format, ap);
 	va_end(ap);
 
 	va_start(ap, format);
@@ -75,12 +80,16 @@ RETRACE_REPLACE(scanf)
 int
 RETRACE_IMPLEMENTATION(fscanf)(FILE *stream, const char *format, ...)
 {
-	rtr_vfscanf_t real_vfscanf = RETRACE_GET_REAL(vfscanf);
-	rtr_fileno_t fileno_ = RETRACE_GET_REAL(fileno);
+	rtr_vfscanf_t real_vfscanf;
+	rtr_fileno_t fileno_;
 	va_list ap;
+	int result;
+
+	real_vfscanf = RETRACE_GET_REAL(vfscanf);
+	fileno_ = RETRACE_GET_REAL(fileno);
 
 	va_start(ap, format);
-	int result = real_vfscanf(stream, format, ap);
+	result = real_vfscanf(stream, format, ap);
 	va_end(ap);
 
 	va_start(ap, format);
@@ -95,11 +104,14 @@ RETRACE_REPLACE(fscanf)
 int
 RETRACE_IMPLEMENTATION(sscanf)(const char *str, const char *format, ...)
 {
-	rtr_vsscanf_t real_vsscanf = RETRACE_GET_REAL(vsscanf);
+	rtr_vsscanf_t real_vsscanf;
 	va_list ap;
+	int result;
+
+	real_vsscanf = RETRACE_GET_REAL(vsscanf);
 
 	va_start(ap, format);
-	int result = real_vsscanf(str, format, ap);
+	result = real_vsscanf(str, format, ap);
 	va_end(ap);
 
 	va_start(ap, format);
@@ -114,11 +126,14 @@ RETRACE_REPLACE(sscanf)
 int
 RETRACE_IMPLEMENTATION(vscanf)(const char *format, va_list ap)
 {
-	rtr_vscanf_t real_vscanf = RETRACE_GET_REAL(vscanf);
+	rtr_vscanf_t real_vscanf;
 	va_list ap1;
+	int result;
 
-	va_copy(ap1, ap);
-	int result = real_vscanf(format, ap);
+	real_vscanf = RETRACE_GET_REAL(vscanf);
+
+	__va_copy(ap1, ap);
+	result = real_vscanf(format, ap);
 	trace(__func__, false, 0, result, NULL, format, ap1);
 	va_end(ap1);
 
@@ -130,11 +145,14 @@ RETRACE_REPLACE(vscanf)
 int
 RETRACE_IMPLEMENTATION(vsscanf)(const char *str, const char *format, va_list ap)
 {
-	rtr_vsscanf_t real_vsscanf = RETRACE_GET_REAL(vsscanf);
+	rtr_vsscanf_t real_vsscanf;
 	va_list ap1;
+	int result;
 
-	va_copy(ap1, ap);
-	int result = real_vsscanf(str, format, ap);
+	real_vsscanf = RETRACE_GET_REAL(vsscanf);
+
+	__va_copy(ap1, ap);
+	result = real_vsscanf(str, format, ap);
 	trace(__func__, false, 0, result, str, format, ap1);
 	va_end(ap1);
 
@@ -146,12 +164,16 @@ RETRACE_REPLACE(vsscanf)
 int
 RETRACE_IMPLEMENTATION(vfscanf)(FILE *stream, const char *format, va_list ap)
 {
-	rtr_vfscanf_t real_vfscanf = RETRACE_GET_REAL(vfscanf);
-	rtr_fileno_t fileno_ = RETRACE_GET_REAL(fileno);
+	rtr_vfscanf_t real_vfscanf;
+	rtr_fileno_t fileno_;
 	va_list ap1;
+	int result;
 
-	va_copy(ap1, ap);
-	int result = real_vfscanf(stream, format, ap);
+	real_vfscanf = RETRACE_GET_REAL(vfscanf);
+	fileno_ = RETRACE_GET_REAL(fileno);
+
+	__va_copy(ap1, ap);
+	result = real_vfscanf(stream, format, ap);
 	trace(__func__, true, fileno_(stream), result, NULL, format, ap1);
 	va_end(ap1);
 
