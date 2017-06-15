@@ -4,7 +4,7 @@ GCC		= gcc
 RM		= rm -f
 
 ifeq ($(OS),Darwin)
-	RETRACE_CFLAGS = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
+	RETRACE_CFLAGS = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall -I/usr/local/opt/openssl/include
 else
 	RETRACE_CFLAGS  = $(CFLAGS) -fPIC -D_GNU_SOURCE -rdynamic -Wall -Werror -pedantic -Wextra -ansi
 endif
@@ -15,7 +15,7 @@ ifeq ($(OS),Darwin)
 endif
 
 ifeq ($(OS),Darwin)
-	RETRACE_LDFLAGS = $(LDFLAGS) -dylib
+	RETRACE_LDFLAGS = $(LDFLAGS) -dylib -L/usr/local/opt/openssl/lib -lssl
 else
 	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
 endif
@@ -48,6 +48,7 @@ SRCS		+= pipe.c
 SRCS		+= dir.c
 SRCS		+= printf.c
 SRCS		+= select.c
+SRCS            += ssl.c
 SRCS    += trace.c
 OBJS		= $(SRCS:.c=.o)
 

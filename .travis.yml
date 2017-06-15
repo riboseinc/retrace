@@ -12,6 +12,10 @@ env:
     - CHECKPATCH_INSTALL="$HOME/builds/checkpatch-install"
     - LOGNAME="Travis"
 
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install openssl; fi
+
 cache:
   directories:
     - "$CMOCKA_INSTALL"
