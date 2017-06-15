@@ -5,12 +5,12 @@ RM		= rm -f
 RETRACE_CFLAGS	= $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
 
 ifeq ($(OS),Darwin)
-	RETRACE_LDFLAGS = $(LDFLAGS) -dylib 
+	RETRACE_LDFLAGS = $(LDFLAGS) -dylib -L/usr/local/opt/openssl/lib
 	RETRACE_LIBS	= -ldl -lssl
 	# assume Sierra for now to silence ld warnings
 	export MACOSX_DEPLOYMENT_TARGET = 10.12
 	RETRACE_SO      = retrace.dylib
-	RETRACE_CFLAGS	+= -L/usr/local/opt/openssl/lib
+	RETRACE_CFLAGS	+= -I/usr/local/opt/openssl/include
 else ifeq ($(OS),FreeBSD)
 	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
 	RETRACE_LIBS	=

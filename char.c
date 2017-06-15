@@ -38,6 +38,8 @@
 #undef putc
 #endif
 
+#include <string.h>
+
 static void
 trace_putc(const char *name, int c, FILE* stream)
 {
