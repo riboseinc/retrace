@@ -55,15 +55,15 @@ size_t RETRACE_IMPLEMENTATION(strlen)(const char *s)
 	len = real_strlen(s);
 
 	if (get_tracing_enabled()) {
-		int old_tracing_enabled;
+		int old_trace_state;
 
-		old_tracing_enabled = set_tracing_enabled(0);
+		old_trace_state = trace_disable();
 
 		trace_printf(1, "strlen(\"%p", s);
 		trace_printf_str(s);
 		trace_printf(0, "\"); [len: %zu]\n", len);
 
-		set_tracing_enabled(old_tracing_enabled);
+		trace_restore(old_trace_state);
 	}
 
 	return len;
@@ -95,9 +95,9 @@ int RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 	real_strcmp = RETRACE_GET_REAL(strcmp);
 
 	if (get_tracing_enabled()) {
-		int old_tracing_enabled;
+		int old_trace_state;
 
-		old_tracing_enabled = set_tracing_enabled(0);
+		old_trace_state = trace_disable();
 
 		trace_printf(1, "strcmp(\"");
 		trace_printf_str(s1);
@@ -105,7 +105,7 @@ int RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 		trace_printf_str(s2);
 		trace_printf(0, "\");\n");
 
-		set_tracing_enabled(old_tracing_enabled);
+		trace_restore(old_trace_state);
 	}
 
 	return real_strcmp(s1, s2);

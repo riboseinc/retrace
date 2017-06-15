@@ -77,7 +77,8 @@ int rtr_get_config_single(const char *function, ...);
 void rtr_confing_close(FILE *config);
 
 int get_tracing_enabled(void);
-int set_tracing_enabled(int enabled);
+int trace_disable();
+void trace_restore(int oldstate);
 
 /* Descriptor tracking */
 void file_descriptor_update(int fd, unsigned int type, const char *location, int port);
