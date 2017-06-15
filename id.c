@@ -30,8 +30,12 @@
 
 int RETRACE_IMPLEMENTATION(setuid)(uid_t uid)
 {
-	rtr_setuid_t real_setuid = RETRACE_GET_REAL(setuid);
+	rtr_setuid_t real_setuid;
+
+	real_setuid = RETRACE_GET_REAL(setuid);
+
 	trace_printf(1, "setuid(%d);\n", uid);
+
 	return real_setuid(uid);
 }
 
@@ -39,8 +43,12 @@ RETRACE_REPLACE(setuid)
 
 int RETRACE_IMPLEMENTATION(seteuid)(uid_t uid)
 {
-	rtr_seteuid_t real_seteuid = RETRACE_GET_REAL(seteuid);
+	rtr_seteuid_t real_seteuid;
+
+	real_seteuid = RETRACE_GET_REAL(seteuid);
+
 	trace_printf(1, "seteuid(%d);\n", uid);
+
 	return real_seteuid(uid);
 }
 
@@ -48,8 +56,12 @@ RETRACE_REPLACE(seteuid)
 
 int RETRACE_IMPLEMENTATION(setgid)(gid_t gid)
 {
-	rtr_setgid_t real_setgid = RETRACE_GET_REAL(setgid);
+	rtr_setgid_t real_setgid;
+
+	real_setgid = RETRACE_GET_REAL(setgid);
+
 	trace_printf(1, "setgid(%d);\n", gid);
+
 	return real_setgid(gid);
 }
 
@@ -57,20 +69,32 @@ RETRACE_REPLACE(setgid)
 
 gid_t RETRACE_IMPLEMENTATION(getgid)()
 {
-	rtr_getgid_t real_getgid = RETRACE_GET_REAL(getgid);
-	int gid = real_getgid();
+	int gid;
+	rtr_getgid_t real_getgid;
+
+	real_getgid = RETRACE_GET_REAL(getgid);
+
+	gid = real_getgid();
+
 	trace_printf(1, "getgid(); [%d]\n", gid);
-	return(gid);
+
+	return gid;
 }
 
 RETRACE_REPLACE(getgid)
 
 gid_t RETRACE_IMPLEMENTATION(getegid)()
 {
-	rtr_getegid_t real_getegid = RETRACE_GET_REAL(getegid);
-	int egid = real_getegid();
+	int egid;
+	rtr_getegid_t real_getegid;
+
+	real_getegid = RETRACE_GET_REAL(getegid);
+
+	egid = real_getegid();
+
 	trace_printf(1, "getegid(); [%d]\n", egid);
-	return(egid);
+
+	return egid;
 }
 
 RETRACE_REPLACE(getegid)
@@ -78,55 +102,77 @@ RETRACE_REPLACE(getegid)
 uid_t RETRACE_IMPLEMENTATION(getuid)()
 {
 	int redirect_id;
+	int uid;
+	rtr_getuid_t real_getuid;
+
 	if (rtr_get_config_single("getuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 		trace_printf(1, "getuid(); [redirection in effect: '%i']\n", redirect_id);
 
 		return redirect_id;
 	}
 
-	rtr_getuid_t real_getuid = RETRACE_GET_REAL(getuid);
+	real_getuid = RETRACE_GET_REAL(getuid);
 
-	int uid = real_getuid();
+	uid = real_getuid();
+
 	trace_printf(1, "getuid(); [%d]\n", uid);
-	return(uid);
+
+	return uid;
 }
 
 RETRACE_REPLACE(getuid)
 
 uid_t RETRACE_IMPLEMENTATION(geteuid)()
 {
+	int euid;
 	int redirect_id;
+	rtr_geteuid_t real_geteuid;
+
 	if (rtr_get_config_single("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 		trace_printf(1, "geteuid(); [redirection in effect: '%i']\n", redirect_id);
 
 		return redirect_id;
 	}
 
-	rtr_geteuid_t real_geteuid = RETRACE_GET_REAL(geteuid);
+	real_geteuid = RETRACE_GET_REAL(geteuid);
 
-	int euid = real_geteuid();
+	euid = real_geteuid();
+
 	trace_printf(1, "geteuid(); [%d]\n", euid);
-	return(euid);
+
+	return euid;
 }
 
 RETRACE_REPLACE(geteuid)
 
 pid_t RETRACE_IMPLEMENTATION(getpid)(void)
 {
-	rtr_getpid_t real_getpid = RETRACE_GET_REAL(getpid);
-	int pid = real_getpid();
+	int pid;
+	rtr_getpid_t real_getpid;
+
+	real_getpid = RETRACE_GET_REAL(getpid);
+
+	pid = real_getpid();
+
 	trace_printf(1, "getpid(); [%d]\n", pid);
-	return(pid);
+
+	return pid;
 }
 
 RETRACE_REPLACE(getpid)
 
 pid_t RETRACE_IMPLEMENTATION(getppid)(void)
 {
-	rtr_getppid_t real_getppid = RETRACE_GET_REAL(getppid);
-	int ppid = real_getppid();
+	int ppid;
+	rtr_getppid_t real_getppid;
+
+	real_getppid = RETRACE_GET_REAL(getppid);
+
+	ppid = real_getppid();
+
 	trace_printf(1, "getppid(); [%d]\n", ppid);
-	return(ppid);
+
+	return ppid;
 }
 
 RETRACE_REPLACE(getppid)
