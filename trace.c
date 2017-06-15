@@ -66,18 +66,22 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	case PT_READ_D:
 		request_str = "PT_READ_D";
 		break;
+#ifndef __FreeBSD__
 	case PT_READ_U:
 		request_str = "PT_READ_U";
 		break;
+#endif
 	case PT_WRITE_I:
 		request_str = "PT_WRITE_I";
 		break;
 	case PT_WRITE_D:
 		request_str = "PT_WRITE_D";
 		break;
+#ifndef __FreeBSD__
 	case PT_WRITE_U:
 		request_str = "PT_WRITE_U";
 		break;
+#endif
 	case PT_CONTINUE:
 		request_str = "PT_CONTINUE";
 		break;
