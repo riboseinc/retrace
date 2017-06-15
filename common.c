@@ -71,7 +71,11 @@
  * means tracing is enabled. 1 means tracing is disabled.
  *
  **************************************************/
-static int g_enable_tracing = 1;
+#define RTR_TRACE_UNKNOW 0
+#define RTR_TRACE_ENABLED 1
+#define RTR_TRACE_DISABLED 2
+
+static int g_enable_tracing = RTR_TRACE_ENABLED;
 static pthread_key_t g_enable_tracing_key = -1;
 static pthread_once_t tracing_key_once = PTHREAD_ONCE_INIT;
 
@@ -90,13 +94,14 @@ trace_printf(int hdr, const char *fmt, ...)
 	static const size_t maxlen = 1024;
 	char *str;
 	va_list arglist;
+	int old_trace_state;
 
 	str = alloca(maxlen);
 
 	if (!get_tracing_enabled())
 		return;
 
-	set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
 	va_start(arglist, fmt);
 	vsnprintf(str, maxlen, fmt, arglist);
@@ -107,7 +112,7 @@ trace_printf(int hdr, const char *fmt, ...)
 
 	fprintf(stderr, "%s", str);
 
-	set_tracing_enabled(1);
+	trace_restore(old_trace_state);
 }
 
 void
@@ -120,11 +125,12 @@ trace_printf_str(const char *string)
 	char buf[MAXLEN * (sizeof(CR)-1) + sizeof(SNIP)];
 	int i;
 	char *p;
+	int old_trace_state;
 
 	if (!get_tracing_enabled() || *string == '\0')
 		return;
 
-	set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
 	for (i = 0, p = buf; i < MAXLEN && string[i] != '\0'; i++) {
 		if (string[i] == '\n')
@@ -146,7 +152,7 @@ trace_printf_str(const char *string)
 	if (string[i] != '\0')
 		strcpy(p, SNIP);
 
-	set_tracing_enabled(1);
+	trace_restore(old_trace_state);
 
 	trace_printf(0, buf);
 }
@@ -197,48 +203,62 @@ is_main_thread(void)
 #ifdef __APPLE__
 	return pthread_main_np();
 #else
-	rtr_getpid_t real_getpid = RETRACE_GET_REAL(getpid);
+	rtr_getpid_t real_getpid;
 
-	return syscall(SYS_gettid) == real_getpid();
+	real_getpid = RETRACE_GET_REAL(getpid);
+
+	return (syscall(SYS_gettid) == real_getpid());
 #endif
 }
 
 int
-get_tracing_enabled()
+get_tracing_state()
 {
 	if (!is_main_thread()) {
 		pthread_once(&tracing_key_once, initialize_tracing_key);
 
-		return !pthread_getspecific(g_enable_tracing_key);
+		if (pthread_getspecific(g_enable_tracing_key) == NULL) {
+			pthread_setspecific(g_enable_tracing_key , (void *) (size_t) RTR_TRACE_ENABLED);
+		}
+
+		return (int)(size_t) pthread_getspecific(g_enable_tracing_key);
 	}
 
 	return g_enable_tracing;
 }
 
 int
-set_tracing_enabled(int enabled)
+get_tracing_enabled()
 {
-	int oldvalue;
+	return (get_tracing_state() == RTR_TRACE_ENABLED);
+}
 
+void
+trace_restore(int old_state)
+{
 	if (is_main_thread()) {
-		oldvalue = g_enable_tracing;
+		g_enable_tracing = old_state;
+        } else {
+                pthread_setspecific(g_enable_tracing_key , (void *) (size_t) old_state);
+        }
+}
 
-		g_enable_tracing = enabled;
-	} else {
-		pthread_once(&tracing_key_once, initialize_tracing_key);
+int
+trace_disable()
+{
+	int oldstate;
 
-		oldvalue = !pthread_getspecific(g_enable_tracing_key);
+	oldstate = get_tracing_state();
 
-		pthread_setspecific(g_enable_tracing_key , (void *) (size_t) !enabled);
-	}
+	trace_restore(RTR_TRACE_DISABLED);
 
-	return oldvalue;
+	return oldstate;
 }
 
 static FILE *
 get_config_file()
 {
-	int old_tracing_enabled;
+	int old_trace_state;
 	FILE *config_file = NULL;
 	char *file_path;
 	rtr_fopen_t real_fopen;
@@ -249,7 +269,7 @@ get_config_file()
 	if (!get_tracing_enabled())
 		return NULL;
 
-	old_tracing_enabled = set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
 	real_fopen	= RETRACE_GET_REAL(fopen);
 	real_malloc	= RETRACE_GET_REAL(malloc);
@@ -289,7 +309,7 @@ get_config_file()
 	if (!config_file)
 		config_file = real_fopen("/etc/retrace.conf", "r");
 
-	set_tracing_enabled(old_tracing_enabled);
+	trace_restore(old_trace_state);
 
 	return config_file;
 }
@@ -298,7 +318,7 @@ static int
 rtr_parse_config_file(FILE *config_file, const char *function, va_list arg_types)
 {
 	int retval = 0;
-	int old_tracing_enabled;
+	int old_trace_state;
 	size_t len;
 	size_t line_size = 0;
 	char *config_line = NULL;
@@ -318,7 +338,7 @@ rtr_parse_config_file(FILE *config_file, const char *function, va_list arg_types
 	 * Disable tracing so we don't get in loops when the functions we
 	 * called here, call other functions that we have replaced.
 	 */
-	old_tracing_enabled = set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
 	real_strncmp = RETRACE_GET_REAL(strncmp);
 	real_free = RETRACE_GET_REAL(free);
@@ -402,7 +422,7 @@ cleanup:
 		real_free(config_line);
 
 	/* Restore tracing */
-	set_tracing_enabled(old_tracing_enabled);
+	trace_restore(old_trace_state);
 
 	return retval;
 }
@@ -460,10 +480,10 @@ int rtr_get_config_single(const char *function, ...)
 struct descriptor_info *
 descriptor_info_new(int fd, unsigned int type, const char *location, int port)
 {
-	int old_tracing_enabled;
+	int old_trace_state;
 	struct descriptor_info *di;
 
-	old_tracing_enabled = set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
 	di = (struct descriptor_info *) malloc(sizeof(struct descriptor_info));
 
@@ -479,7 +499,7 @@ descriptor_info_new(int fd, unsigned int type, const char *location, int port)
 		di->port = port;
 	}
 
-	set_tracing_enabled(old_tracing_enabled);
+	trace_restore(old_trace_state);
 
 	return di;
 }
@@ -487,16 +507,16 @@ descriptor_info_new(int fd, unsigned int type, const char *location, int port)
 void
 descriptor_info_free(struct descriptor_info *di)
 {
-	int old_tracing_enabled;
+	int old_trace_state;
 
-	old_tracing_enabled = set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
 	if (di->location)
 		free(di->location);
 
 	free(di);
 
-	set_tracing_enabled(old_tracing_enabled);
+	trace_restore(old_trace_state);
 }
 
 void
@@ -504,16 +524,16 @@ file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 {
 	int free_spot = -1;
 	unsigned int i = 0;
-	int old_tracing_enabled;
+	int old_trace_state;
 	struct descriptor_info *di;
 
-	old_tracing_enabled = set_tracing_enabled(0);
+	old_trace_state = trace_disable();
 
 	di = descriptor_info_new(fd, type, location, port);
 
 	if (!di) {
+		trace_restore(old_trace_state);
 		return;
-		set_tracing_enabled(old_tracing_enabled);
 	}
 
 	if (g_descriptor_list == NULL) {
@@ -556,7 +576,7 @@ file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 	if (free_spot != -1)
 		g_descriptor_list[free_spot] = di;
 
-	set_tracing_enabled(old_tracing_enabled);
+	trace_restore(old_trace_state);
 }
 
 struct descriptor_info *

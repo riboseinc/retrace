@@ -354,9 +354,9 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 	r = real_fwrite(ptr, size, nmemb, stream);
 
 	if (get_tracing_enabled()) {
-		int old_tracing_enabled;
+		int old_trace_state;
 
-		old_tracing_enabled = set_tracing_enabled(0);
+		old_trace_state = trace_disable();
 
 		fd = real_fileno(stream);
 		di = file_descriptor_get(fd);
@@ -369,7 +369,7 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 		for (i = 0; i < nmemb; i++)
 			trace_dump_data((unsigned char *)ptr + i, size);
 
-		set_tracing_enabled(old_tracing_enabled);
+		trace_restore(old_trace_state);
 	}
 
 	return r;
@@ -390,9 +390,9 @@ size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE 
 	r = real_fread(ptr, size, nmemb, stream);
 
 	if (get_tracing_enabled()) {
-		int old_tracing_enabled;
+		int old_trace_state;
 
-		old_tracing_enabled = set_tracing_enabled(0);
+		old_trace_state = trace_disable();
 
 		if (stream) {
 			fd = real_fileno(stream);
@@ -407,7 +407,7 @@ size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE 
 		for (i = 0; i < r; i++)
 			trace_dump_data((unsigned char *)ptr + i, size);
 
-		set_tracing_enabled(old_tracing_enabled);
+		trace_restore(old_trace_state);
 	}
 
 	return r;
@@ -429,9 +429,9 @@ int RETRACE_IMPLEMENTATION(fputc)(int c, FILE *stream)
 	r = real_fputc(c, stream);
 
 	if (get_tracing_enabled()) {
-		int old_tracing_enabled;
+		int old_trace_state;
 
-		old_tracing_enabled = set_tracing_enabled(0);
+		old_trace_state = trace_disable();
 
 		fd = real_fileno(stream);
 		di = file_descriptor_get(fd);
@@ -441,7 +441,7 @@ int RETRACE_IMPLEMENTATION(fputc)(int c, FILE *stream)
 		else
 			trace_printf(1, "fputc('%c'(%d), %p) [return: %d]\n", c, c, stream, r);
 
-		set_tracing_enabled(old_tracing_enabled);
+		trace_restore(old_trace_state);
 	}
 
 	return r;
@@ -462,9 +462,9 @@ int RETRACE_IMPLEMENTATION(fputs)(const char *s, FILE *stream)
 	r = real_fputs(s, stream);
 
 	if (get_tracing_enabled()) {
-		int old_tracing_enabled;
+		int old_trace_state;
 
-		old_tracing_enabled = set_tracing_enabled(0);
+		old_trace_state = trace_disable();
 
 		fd = real_fileno(stream);
 		di = file_descriptor_get(fd);
@@ -474,7 +474,7 @@ int RETRACE_IMPLEMENTATION(fputs)(const char *s, FILE *stream)
 		else
 			trace_printf(1, "fputs(\"%s\", %p) [return: %d]\n", s, stream, r);
 
-		set_tracing_enabled(old_tracing_enabled);
+		trace_restore(old_trace_state);
 	}
 
 	return r;
@@ -496,9 +496,9 @@ int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 	r = real_fgetc(stream);
 
 	if (get_tracing_enabled()) {
-		int old_tracing_enabled;
+		int old_trace_state;
 
-		old_tracing_enabled = set_tracing_enabled(0);
+		old_trace_state = trace_disable();
 
 		if (stream) {
 			fd = real_fileno(stream);
@@ -510,7 +510,7 @@ int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 		else
 			trace_printf(1, "fgetc(%p) [return: '%c'(%d)])\n", stream, r, r);
 
-		set_tracing_enabled(old_tracing_enabled);
+		trace_restore(old_trace_state);
 	}
 
 	return r;
