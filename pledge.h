@@ -3,7 +3,7 @@
 
 #ifdef __OpenBSD__
 
-typedef int (*rtr_pledge_t)(const char *promises, const char *paths[]); 
+typedef int (*rtr_pledge_t)(const char *promises, const char *paths[]);
 
 RETRACE_DECL(pledge);
 
