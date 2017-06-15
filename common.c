@@ -67,9 +67,6 @@
  * macOS that will eventually call malloc which would
  * get us into a loop.
  *
- * g_enable_tracing_key logic is backwards, 0 (NULL)
- * means tracing is enabled. 1 means tracing is disabled.
- *
  **************************************************/
 #define RTR_TRACE_UNKNOW 0
 #define RTR_TRACE_ENABLED 1
