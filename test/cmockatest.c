@@ -376,7 +376,7 @@ RTR_TEST_END
 RTR_TEST_START(realloc)
 void *p;
 
-p = rtr_malloc(RTR_MALLOC_SIZE);
+p = malloc(RTR_MALLOC_SIZE);
 assert_non_null(p);
 
 p = rtr_realloc(p, RTR_MALLOC_SIZE + 64);
