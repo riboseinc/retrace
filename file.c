@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <string.h>
 
 #include "common.h"
 #include "file.h"
@@ -521,3 +522,16 @@ int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 }
 
 RETRACE_REPLACE(fgetc)
+
+void RETRACE_IMPLEMENTATION(strmode)(int mode, char *bp)
+{
+	rtr_strmode_t real_strmode;
+
+	real_strmode = RETRACE_GET_REAL(strmode);
+
+	real_strmode(mode, bp);
+
+	trace_printf(1, "strmode(%d, \"%s\");\n", mode, bp);
+}
+
+RETRACE_REPLACE(strmode)
