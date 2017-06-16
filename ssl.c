@@ -123,3 +123,29 @@ int RETRACE_IMPLEMENTATION(SSL_accept)(SSL *ssl)
 
 RETRACE_REPLACE(SSL_accept)
 
+long
+RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
+{
+	rtr_SSL_get_verify_result_t real_SSL_get_verify_result;
+	int r;
+	int redirect_id = 0;
+
+	real_SSL_get_verify_result = RETRACE_GET_REAL(SSL_get_verify_result);
+
+	if (rtr_get_config_single("SSL_get_verify_result", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
+
+		r = real_SSL_get_verify_result(ssl);
+
+		trace_printf(1, "SSL_get_verify_result(%p); [redirection in effect: '%i']\n", ssl, redirect_id);
+
+		return redirect_id;
+	}
+
+	r = real_SSL_get_verify_result(ssl);
+
+	trace_printf(1, "SSL_get_verify_result(%p); [return: %d]\n", ssl, r);
+
+	return r;
+}
+
+RETRACE_REPLACE(SSL_get_verify_result)
