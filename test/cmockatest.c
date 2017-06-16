@@ -382,8 +382,6 @@ assert_non_null(p);
 p = rtr_realloc(p, RTR_MALLOC_SIZE + 64);
 assert_non_null(p);
 
-rtr_free(p);
-
 RTR_TEST_END
 
 RTR_TEST_START(calloc)
@@ -391,8 +389,6 @@ void *p;
 
 p = rtr_calloc(1, RTR_MALLOC_SIZE);
 assert_non_null(p);
-
-rtr_free(p);
 
 RTR_TEST_END
 
