@@ -31,6 +31,7 @@ int scanf_test(void)
 {
 	char ch;
 	char str[100];
+	
 	printf("Enter any character \n");
 	scanf("%c", &ch);
 	printf("Entered character is %c \n", ch);
