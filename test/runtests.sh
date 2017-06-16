@@ -22,5 +22,6 @@ else
         LD_PRELOAD=../retrace.so ./sock
         LD_PRELOAD=../retrace.so ./str
         LD_PRELOAD=../retrace.so ./time
+        LD_PRELOAD=../retrace.so ./pledge
 fi
 

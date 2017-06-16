@@ -31,8 +31,10 @@
 
 #ifdef __APPLE__
 long int RETRACE_IMPLEMENTATION(ptrace)(int request, ...)
-#elif __FreeBSD__
-int ptrace(int request, pid_t pid, caddr_t addr, int data)
+#elif defined(__FreeBSD__) || defined(__OpenBSD__)
+int RETRACE_IMPLEMENTATION(ptrace)(int request, pid_t pid, caddr_t addr, int data)
+#elif defined(__NetBSD__)
+int RETRACE_IMPLEMENTATION(ptrace)(int request, pid_t pid, void *addr, int data)
 #else
 long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 #endif
@@ -66,7 +68,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	case PT_READ_D:
 		request_str = "PT_READ_D";
 		break;
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
 	case PT_READ_U:
 		request_str = "PT_READ_U";
 		break;
@@ -77,7 +79,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	case PT_WRITE_D:
 		request_str = "PT_WRITE_D";
 		break;
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
 	case PT_WRITE_U:
 		request_str = "PT_WRITE_U";
 		break;

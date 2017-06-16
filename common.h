@@ -49,6 +49,15 @@ static struct {										\
 
 #define RETRACE_DECL(func) rtr_##func##_t rtr_get_real_##func()
 #define RETRACE_IMPLEMENTATION(func) (func)
+#ifdef __OpenBSD__
+#define RETRACE_REPLACE(func)                                              \
+rtr_##func##_t rtr_get_real_##func() {                                     \
+	static rtr_##func##_t ptr = (rtr_##func##_t) NULL;                 \
+	if (ptr == NULL)                                                   \
+		*(void **) (&ptr) = dlsym(RTLD_NEXT, #func);               \
+	return ptr;                                                        \
+}
+#else
 #define RETRACE_REPLACE(func)                                                      \
 rtr_##func##_t rtr_get_real_##func() {                                             \
 	static rtr_##func##_t ptr;                                                 \
@@ -56,6 +65,7 @@ rtr_##func##_t rtr_get_real_##func() {                                          
 		__atomic_store_n(&ptr, dlsym(RTLD_NEXT, #func), __ATOMIC_RELAXED); \
 	return ptr;                                                                \
 }
+#endif
 #define RETRACE_GET_REAL(func) rtr_get_real_##func()
 
 #endif /* !__APPLE__ */
