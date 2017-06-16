@@ -17,7 +17,7 @@ else ifeq ($(OS),FreeBSD)
 	RETRACE_CFLAGS	+= 
 else
 	RETRACE_LDFLAGS	= $(LDFLAGS) -shared
-	RETRACE_LIBS	= -dl -lncurses -lpthread
+	RETRACE_LIBS	= -dl -lncurses
 	RETRACE_SO	= retrace.so
 	RETRACE_CFLAGS	+= -rdynamic
 endif
