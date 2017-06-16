@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 if $(uname | grep -q ^Darwin); then
         DYLD_INSERT_LIBRARIES=../retrace.dylib ./env

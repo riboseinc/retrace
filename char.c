@@ -28,7 +28,14 @@
 #include "char.h"
 #include "str.h"
 
+#ifdef __FreeBSD__
+#define _DONT_USE_CTYPE_INLINE_
+#include <runetype.h>
+#undef putc
+#endif 
 #include <ctype.h>
+
+#include <string.h>
 
 static void
 trace_putc(const char *name, int c, FILE* stream)
