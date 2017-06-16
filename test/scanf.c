@@ -25,8 +25,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 
-int main()
+int scanf_test()
 {
 	char ch;
 	char str[100];
@@ -34,8 +35,126 @@ int main()
 	scanf("%c", &ch);
 	printf("Entered character is %c \n", ch);
 	printf("Enter any string ( upto 100 character ) \n");
-	scanf("%s", &str);
+	scanf("%s", (char *)&str);
 	printf("Entered string is %s \n", str);
+
+	return 0;
+}
+
+int fscanf_test()
+{
+	char str1[10], str2[10], str3[10];
+	int year;
+	FILE * fp;
+
+	fp = fopen ("scanf_test.txt", "w+");
+	fputs("We are in 2012", fp);
+
+	rewind(fp);
+	fscanf(fp, "%s %s %s %d", str1, str2, str3, &year);
+
+	printf("Read String1 |%s|\n", str1 );
+	printf("Read String2 |%s|\n", str2 );
+	printf("Read String3 |%s|\n", str3 );
+	printf("Read Integer |%d|\n", year );
+
+	fclose(fp);
+
+	return(0);
+}
+
+int sscanf_test()
+{
+	int day, year;
+	char weekday[20], month[20], dtm[100];
+
+	strcpy( dtm, "Saturday March 25 1989" );
+	sscanf( dtm, "%s %s %d  %d", weekday, month, &day, &year );
+
+	printf("%s %d, %d = %s\n", month, day, year, weekday );
+
+	return(0);
+}
+
+void GetMatchesVscanf ( const char * format, ... )
+{
+	va_list args;
+	va_start (args, format);
+	vscanf (format, args);
+	va_end (args);
+}
+
+int vscanf_test ()
+{
+	int val;
+	char str[100];
+
+	printf ("Please enter a number and a word: ");
+	fflush (stdout);
+	GetMatchesVscanf (" %d %99s ", &val, str);
+	printf ("Number read: %d\nWord read: %s\n", val, str);
+
+	return 0;
+}
+
+void ReadStuff (FILE * stream, const char * format, ...)
+{
+	va_list args;
+	va_start (args, format);
+	vfscanf (stream, format, args);
+	va_end (args);
+}
+
+int vfscanf_test ()
+{
+	FILE * pFile;
+	int val;
+	char str[100];
+
+	pFile = fopen ("myfile.txt","r");
+
+	if (pFile!=NULL) {
+		ReadStuff ( pFile, " %s %d ", str, &val );
+		printf ("I have read %s and %d", str, val);
+		fclose (pFile);
+	}
+
+	return 0;
+}
+
+void GetMatchesSscanf ( const char * str, const char * format, ... )
+{
+	va_list args;
+	va_start (args, format);
+	vsscanf (str, format, args);
+	va_end (args);
+}
+
+int vsscanf_test ()
+{
+	int val;
+	char buf[100];
+
+	GetMatchesSscanf ( "99 bottles of beer on the wall", " %d %s ", &val, buf);
+
+	printf ("Product: %s\nQuantity: %d\n", buf, val);
+
+	return 0;
+}
+
+int main()
+{
+	scanf_test();
+
+	fscanf_test();
+
+	sscanf_test();
+
+	vscanf_test();
+
+	vfscanf_test();
+
+	vsscanf_test();
 
 	return 0;
 }
