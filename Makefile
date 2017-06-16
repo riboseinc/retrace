@@ -46,6 +46,7 @@ SRCS		+= select.c
 SRCS            += ssl.c
 SRCS		+= trace.c
 SRCS		+= scanf.c
+
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test
