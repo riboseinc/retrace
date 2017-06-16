@@ -1,5 +1,4 @@
-CFLAGS	+= -I ../ -fPIC -D_GNU_SOURCE -rdynamic -Wall -g 
-LDFLAGS	+= -ldl 
+CFLAGS	+= -I ../ -fPIC -D_GNU_SOURCE -rdynamic -Wall -g -fno-builtin
 
 OS              = $(shell uname)
 AUTOMATED-TEST  = runtests.sh
@@ -7,9 +6,9 @@ CMOCKA-TEST-BIN = cmockatest
 OBJS		= $(SRCS:.c=.o)
 BINARIES	= id env time fork exit malloc str pipe sock file trace scanf
 
-ifneq ($(OS),Darwin)
+ifeq ($(OS),Linux)
 	BINARIES += $(CMOCKA-TEST-BIN)
-	LDFLAGS += -lcmocka -z text -export-dynamic
+	LDFLAGS += -lcmocka -z text -export-dynamic -ldl
 endif
 
 
@@ -21,7 +20,7 @@ $(BINARIES): %: %.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 run:
-ifneq ($(OS),Darwin)
+ifeq ($(OS),Linux)
 	./$(CMOCKA-TEST-BIN)
 endif
 	./$(AUTOMATED-TEST)

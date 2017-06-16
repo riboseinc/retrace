@@ -2,30 +2,25 @@ OS 		= $(shell uname)
 LD		= ld
 GCC		= gcc
 RM		= rm -f
+RETRACE_CFLAGS	= $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
 
 ifeq ($(OS),Darwin)
-	RETRACE_CFLAGS = $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
-else
-	RETRACE_CFLAGS  = $(CFLAGS) -fPIC -D_GNU_SOURCE -rdynamic -Wall -Werror -pedantic -Wextra -ansi
-endif
-
-# assume Sierra for now to silence ld warnings
-ifeq ($(OS),Darwin)
+	RETRACE_LDFLAGS = $(LDFLAGS) -dylib -L/usr/local/opt/openssl/lib
+	RETRACE_LIBS	= -ldl -lssl
+	# assume Sierra for now to silence ld warnings
 	export MACOSX_DEPLOYMENT_TARGET = 10.12
-endif
-
-ifeq ($(OS),Darwin)
-	RETRACE_LDFLAGS = $(LDFLAGS) -dylib
-else
+	RETRACE_SO      = retrace.dylib
+	RETRACE_CFLAGS	+= -I/usr/local/opt/openssl/include
+else ifeq ($(OS),FreeBSD)
 	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
-endif
-
-RETRACE_LIBS	= -ldl -lncurses
-
-ifeq ($(OS),Darwin)
-	RETRACE_SO	= retrace.dylib
+	RETRACE_LIBS	=
+	RETRACE_SO	= retrace.so
+	RETRACE_CFLAGS	+= 
 else
-	RETRACE_SO     = retrace.so
+	RETRACE_LDFLAGS	= $(LDFLAGS) -G -z text --export-dynamic
+	RETRACE_LIBS	= -dl -lncurses
+	RETRACE_SO	= retrace.so
+	RETRACE_CFLAGS	+= -rdynamic -Werror -pedantic -Wextra -ansi
 endif
 
 SRCS		+= exit.c
@@ -50,6 +45,8 @@ SRCS		+= printf.c
 SRCS		+= select.c
 SRCS    += trace.c
 SRCS		+= scanf.c
+SRCS    += ssl.c
+
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test

@@ -43,7 +43,8 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 	else
 		trace_printf(1, "read(%d, %p, %d); [return: %d]\n", fd, buf, nbytes, ret);
 
-	trace_dump_data(buf, ret);
+	if (ret > 0)
+		trace_dump_data(buf, ret);
 
 	return ret;
 }
