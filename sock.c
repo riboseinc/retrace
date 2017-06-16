@@ -25,7 +25,21 @@
 
 #include "common.h"
 #include "sock.h"
-#include <arpa/inet.h>
+
+int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
+{
+	int sock;
+	rtr_socket_t real_socket;
+
+	real_socket = RETRACE_GET_REAL(socket);
+
+	sock = real_socket(domain, type, protocol);
+	trace_printf(1, "socket(%d, %d, %d) [return: %d]\n", domain, type, protocol, sock);
+
+	return sock;
+}
+
+RETRACE_REPLACE(socket)
 
 #define RETRACE_MAX_IP_ADDR_LEN 15
 #ifdef __linux__
