@@ -14,7 +14,7 @@ static int sock = -1;
 #define LISTEN_PORT					8081
 #define UNIX_SOCK_PATH				"test_unix_socket"
 
-static void test_socksrv_inet()
+static void test_socksrv_inet(void)
 {
 	struct sockaddr_in addr;
 
@@ -31,14 +31,11 @@ static void test_socksrv_inet()
 	addr.sin_addr.s_addr = INADDR_ANY;
 	addr.sin_port = htons(LISTEN_PORT);
 
-	if (bind(sock, (struct sockaddr *) &addr, sizeof(struct sockaddr_in)) < 0) {
+	if (bind(sock, (struct sockaddr *) &addr, sizeof(struct sockaddr_in)) < 0)
 		fprintf(stderr, "could not bind socket.\n");
-	}
-
-	return;
 }
 
-static void test_socksrv_unix()
+static void test_socksrv_unix(void)
 {
 	struct sockaddr_un addr;
 
@@ -54,14 +51,11 @@ static void test_socksrv_unix()
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, UNIX_SOCK_PATH);
 
-	if (bind(sock, (struct sockaddr *) &addr, sizeof(struct sockaddr_un)) < 0) {
+	if (bind(sock, (struct sockaddr *) &addr, sizeof(struct sockaddr_un)) < 0)
 		fprintf(stderr, "could not bind socket.\n");
-	}
-
-	return;
 }
 
-int main()
+int main(void)
 {
 	test_socksrv_inet();
 	test_socksrv_unix();
