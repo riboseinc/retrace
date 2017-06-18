@@ -26,6 +26,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <sys/un.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,19 +36,19 @@
 #include <arpa/inet.h> 
 #include <string.h>
 
-
 #define PORT 80
 #define IP "127.0.0.1"
 
-int main(int argc, char *argv[])
+static int sockfd = 0;
+
+static void test_inet()
 {
-	int sockfd = 0;
 	struct sockaddr_in serv_addr; 
 	const char *sendstr = "Retrace Test";
 
 	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		printf("\n Error : Could not create socket \n");
-		return 1;
+		return;
 	}
 
 	memset(&serv_addr, '0', sizeof(serv_addr));
@@ -57,17 +58,46 @@ int main(int argc, char *argv[])
 
 	if(inet_pton(AF_INET, IP, &serv_addr.sin_addr) <=0 ) {
 		printf("\n inet_pton error occured\n");
-		return 1;
+		return;
 	}
 
 	if( connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
 		printf("\n Error : Connect Failed \n");
-		return 1;
+		return;
 	}
 
 	write (sockfd, sendstr, strlen(sendstr));
-
 	close (sockfd);
+
+	return;	
+}
+
+static void test_unix()
+{
+	struct sockaddr_un addr;
+
+	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sockfd < 0) {
+		printf("\r Error: Could not create socket \n");
+		return;
+	}
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strcpy(addr.sun_path, "test");
+
+	if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) != 0) {
+		printf("\n could not connect to unix domain socket \n");
+	}
+
+	close(sockfd);
+	return;
+}
+
+int main(int argc, char *argv[])
+{
+	test_inet(test_inet);
+	test_unix(test_unix);
 
 	return 0;
 }

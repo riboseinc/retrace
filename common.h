@@ -25,10 +25,11 @@
 #define ARGUMENT_TYPE_STRING	2
 
 #define FILE_DESCRIPTOR_TYPE_UNKNOWN		0
-#define FILE_DESCRIPTOR_TYPE_FILE		1 /* from open() */
-#define FILE_DESCRIPTOR_TYPE_IPV4_CONNECT	2 /* from connect() */
+#define FILE_DESCRIPTOR_TYPE_FILE			1 /* from open() */
+#define FILE_DESCRIPTOR_TYPE_IPV4_CONNECT	2 /* from connect() using AF_INET */
 #define FILE_DESCRIPTOR_TYPE_IPV4_BIND		3 /* from bind() */
 #define FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT	4 /* from accept() */
+#define FILE_DESCRIPTOR_TYPE_UNIX_DOMAIN	5 /* from connect() using AF_UNIX */
 
 #ifdef __APPLE__
 
