@@ -59,18 +59,18 @@
 
 void *handle;
 
-#define RTR_TEST_START(func)                              \
-    static void test_rtr_##func(void **state)             \
-    {                                                     \
-        rtr_##func##_t rtr_##func = dlsym(handle, #func); \
-        assert_non_null(rtr_##func);					  \
-		assert_ptr_not_equal(rtr_##func, func);
+#define RTR_TEST_START(func)					\
+static void test_rtr_##func(void **state)			\
+{								\
+	rtr_##func##_t rtr_##func = dlsym(handle, #func);	\
+	assert_non_null(rtr_##func);				\
+	assert_ptr_not_equal(rtr_##func, func);
 
 #define RTR_TEST_END }
 
 RTR_TEST_START(tolower)
-	static char s[] = "abcDEF123";
-	static char ls[] = "abcdef123";
+	static const char s[] = "abcDEF123";
+	static const char ls[] = "abcdef123";
 	int i;
 	char buf[] = "ABCDEF123";
 
@@ -81,8 +81,8 @@ RTR_TEST_START(tolower)
 RTR_TEST_END
 
 RTR_TEST_START(toupper)
-	static char s[] = "abcDEF123";
-	static char us[] = "ABCDEF123";
+	static const char s[] = "abcDEF123";
+	static const char us[] = "ABCDEF123";
 	int i;
 	char buf[] = "abcdef123";
 
@@ -172,9 +172,9 @@ RTR_TEST_START(execvpe)
 RTR_TEST_END
 
 /*
-RTR_TEST_START(execveat)
-RTR_TEST_END
-*/
+ * RTR_TEST_START(execveat)
+ * RTR_TEST_END
+ */
 
 RTR_TEST_START(fexecve)
 RTR_TEST_END
@@ -277,8 +277,8 @@ RTR_TEST_END
 
 RTR_TEST_START(strchr)
 	char *p;
-	static char s1[] = "0123456789";
-	static char s2[] = "\t\r\n";
+	static const char s1[] = "0123456789";
+	static const char s2[] = "\t\r\n";
 
 	p = rtr_strchr(s1, '4');
 	assert_int_equal(p, s1+4);
@@ -329,152 +329,150 @@ RTR_TEST_END
 
 #define READ_BUF_SIZE 256
 RTR_TEST_START(read)
-int     fd;
-ssize_t ret;
-char    buf[READ_BUF_SIZE];
+	int     fd;
+	ssize_t ret;
+	char    buf[READ_BUF_SIZE];
 
-fd = open("/dev/urandom", O_RDONLY);
-assert_non_null(fd);
+	fd = open("/dev/urandom", O_RDONLY);
+	assert_non_null(fd);
 
-ret = rtr_read(fd, buf, sizeof(buf));
-assert_int_equal(ret, sizeof(buf));
+	ret = rtr_read(fd, buf, sizeof(buf));
+	assert_int_equal(ret, sizeof(buf));
 RTR_TEST_END
 
 #define WRITE_BUF_SIZE 256
 RTR_TEST_START(write)
-int     fd;
-ssize_t ret;
-char    buf[WRITE_BUF_SIZE];
+	int     fd;
+	ssize_t ret;
+	char    buf[WRITE_BUF_SIZE];
 
-fd = open("/dev/null", O_WRONLY);
-assert_non_null(fd);
+	fd = open("/dev/null", O_WRONLY);
+	assert_non_null(fd);
 
-ret = rtr_write(fd, buf, sizeof(buf));
-assert_int_equal(ret, sizeof(buf));
+	ret = rtr_write(fd, buf, sizeof(buf));
+	assert_int_equal(ret, sizeof(buf));
 RTR_TEST_END
 
 #define RTR_MALLOC_SIZE 256
 RTR_TEST_START(free)
-void *p, *saved;
+	void *p, *saved;
 
-p = malloc(RTR_MALLOC_SIZE);
-assert_non_null(p);
+	p = malloc(RTR_MALLOC_SIZE);
+	assert_non_null(p);
 
-saved = p;
+	saved = p;
 
-rtr_free(p);
-assert_ptr_equal(p, saved);
+	rtr_free(p);
+	assert_ptr_equal(p, saved);
 RTR_TEST_END
 
 RTR_TEST_START(malloc)
-void *p;
+	void *p;
 
-p = rtr_malloc(RTR_MALLOC_SIZE);
-assert_non_null(p);
+	p = rtr_malloc(RTR_MALLOC_SIZE);
+	assert_non_null(p);
 RTR_TEST_END
 
 RTR_TEST_START(realloc)
-void *p;
+	void *p;
 
-p = malloc(RTR_MALLOC_SIZE);
-assert_non_null(p);
+	p = malloc(RTR_MALLOC_SIZE);
+	assert_non_null(p);
 
-p = rtr_realloc(p, RTR_MALLOC_SIZE + 64);
-assert_non_null(p);
-
+	p = rtr_realloc(p, RTR_MALLOC_SIZE + 64);
+	assert_non_null(p);
 RTR_TEST_END
 
 RTR_TEST_START(calloc)
-void *p;
+	void *p;
 
-p = rtr_calloc(1, RTR_MALLOC_SIZE);
-assert_non_null(p);
-
+	p = rtr_calloc(1, RTR_MALLOC_SIZE);
+	assert_non_null(p);
 RTR_TEST_END
 
 RTR_TEST_START(fork)
-pid_t pid, parent;
+	pid_t pid, parent;
 
-parent = getpid();
+	parent = getpid();
 
-pid = rtr_fork();
-assert_true(pid >= 0);
+	pid = rtr_fork();
+	assert_true(pid >= 0);
 
-if (pid == 0) {
-    assert_true(getpid() != parent);
-    exit(0);
-}
+	if (pid == 0) {
+		assert_true(getpid() != parent);
+		exit(0);
+	}
 
-assert_int_equal(getpid(), parent);
+	assert_int_equal(getpid(), parent);
 RTR_TEST_END
 
 #define RTR_POPEN_CMD "which gcc 2>&1"
 #define RTR_POPEN_BUF_SIZE 256
 RTR_TEST_START(popen)
-int   ret;
-FILE *file;
-char  buf[RTR_POPEN_BUF_SIZE];
-char *p;
+	int   ret;
+	FILE *file;
+	char  buf[RTR_POPEN_BUF_SIZE];
+	char *p;
 
-file = rtr_popen(RTR_POPEN_CMD, "r");
-assert_non_null(file);
+	file = rtr_popen(RTR_POPEN_CMD, "r");
+	assert_non_null(file);
 
-p = fgets(buf, sizeof(buf), file);
-assert_non_null(p);
+	p = fgets(buf, sizeof(buf), file);
+	assert_non_null(p);
 
-ret = pclose(file);
-assert_int_equal(ret, 0);
+	ret = pclose(file);
+	assert_int_equal(ret, 0);
 RTR_TEST_END
 
 RTR_TEST_START(pclose)
-int   ret;
-FILE *file;
-char  buf[RTR_POPEN_BUF_SIZE];
-char *p;
+	int   ret;
+	FILE *file;
+	char  buf[RTR_POPEN_BUF_SIZE];
+	char *p;
 
-file = popen(RTR_POPEN_CMD, "r");
-assert_non_null(file);
+	file = popen(RTR_POPEN_CMD, "r");
+	assert_non_null(file);
 
-p = fgets(buf, sizeof(buf), file);
-assert_non_null(p);
+	p = fgets(buf, sizeof(buf), file);
+	assert_non_null(p);
 
-ret = rtr_pclose(file);
-assert_int_equal(ret, 0);
+	ret = rtr_pclose(file);
+	assert_int_equal(ret, 0);
 RTR_TEST_END
 
 static void
 test_pipe_common(int ret, int pipefd[2])
 {
-    assert_int_equal(ret, 0);
+	assert_int_equal(ret, 0);
 
-    assert_true(pipefd[0] >= 0);
-    assert_true(pipefd[1] >= 0);
-    assert_true(pipefd[0] != pipefd[1]);
+	assert_true(pipefd[0] >= 0);
+	assert_true(pipefd[1] >= 0);
+	assert_true(pipefd[0] != pipefd[1]);
 
-    close(pipefd[0]);
-    close(pipefd[1]);
+	close(pipefd[0]);
+	close(pipefd[1]);
 }
 
 RTR_TEST_START(pipe)
-int ret;
-int pipefd[2];
+	int ret;
+	int pipefd[2];
 
-ret = rtr_pipe(pipefd);
-test_pipe_common(ret, pipefd);
+	ret = rtr_pipe(pipefd);
+	test_pipe_common(ret, pipefd);
 RTR_TEST_END
 
 RTR_TEST_START(pipe2)
-int ret;
-int pipefd[2];
+	int ret;
+	int pipefd[2];
 
-ret = rtr_pipe2(pipefd, O_NONBLOCK);
-test_pipe_common(ret, pipefd);
+	ret = rtr_pipe2(pipefd, O_NONBLOCK);
+	test_pipe_common(ret, pipefd);
 RTR_TEST_END
 
 static void
 test_trace_printf(void **state)
 {
-    void (*trace_printf)(int, const char *, ...) = dlsym(handle, "trace_printf");
+	void (*trace_printf)(int, const char *, ...) = dlsym(handle, "trace_printf");
 	FILE *oldstderr = stderr;
 	char ebuf[256];
 	char pbuf[256];
@@ -497,16 +495,19 @@ test_trace_printf(void **state)
 static void
 test_trace_printf_str(void **state)
 {
-    void (*trace_printf_str)(const char *) = dlsym(handle, "trace_printf_str");
+	void (*trace_printf_str)(const char *);
 	FILE *oldstderr = stderr;
+	const char snip[] = "[SNIP]";
 	char buf[256];
 	char s[MAXLEN+1];
 	char s1[MAXLEN+2];
+
+	trace_printf_str = dlsym(handle, "trace_printf_str");
+
 	memset(s, '1', MAXLEN+1);
 	memset(s1, '1', MAXLEN+2);
 	s[MAXLEN] = '\0';
 	s1[MAXLEN+1] = '\0';
-	const char snip[] = "[SNIP]";
 
 	// special characters are handled correctly
 	stderr = fmemopen(buf, 256, "w");
@@ -514,7 +515,7 @@ test_trace_printf_str(void **state)
 	fclose(stderr);
 	stderr = oldstderr;
 	assert_string_equal(buf,
-		"abc" VAR "\\r" RST VAR "\\n" RST VAR "\\t" RST "def");
+			"abc" VAR "\\r" RST VAR "\\n" RST VAR "\\t" RST "def");
 
 	// MAXLEN string is unmodified
 	stderr = fmemopen(buf, 256, "w");
@@ -528,255 +529,294 @@ test_trace_printf_str(void **state)
 	trace_printf_str(s1);
 	fclose(stderr);
 	stderr = oldstderr;
-	assert_int_equal(strlen(buf), MAXLEN + sizeof(snip) -1);
+
+	assert_int_equal(strlen(buf), MAXLEN + sizeof(snip) - 1);
 	assert_int_equal(strncmp(s, buf, MAXLEN), 0);
 	assert_string_equal(buf+MAXLEN, snip);
 }
 
 RTR_TEST_START(printf)
-char buf[256], buf1[256];
-FILE *oldstdout = stdout;
-stdout = fmemopen(buf, 256, "w");
-int r = rtr_printf("%d %s %c", 42, "forty two", 42);
-fclose(stdout);
-stdout = fmemopen(buf1, 256, "w");
-int r1 = printf("%d %s %c", 42, "forty two", 42);
-fclose(stdout);
-stdout = oldstdout;
-assert_true(r > 0 && r == r1);
-assert_string_equal(buf, buf1);
+	int r, r1;
+	char buf[256], buf1[256];
+	FILE *oldstdout = stdout;
+
+	stdout = fmemopen(buf, 256, "w");
+	r = rtr_printf("%d %s %c", 42, "forty two", 42);
+	fclose(stdout);
+
+	stdout = fmemopen(buf1, 256, "w");
+	r1 = printf("%d %s %c", 42, "forty two", 42);
+	fclose(stdout);
+
+	stdout = oldstdout;
+
+	assert_true(r > 0 && r == r1);
+	assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 RTR_TEST_START(fprintf)
-char buf[256], buf1[256];
-FILE *f = fmemopen(buf, 256, "w");
-FILE *f1 = fmemopen(buf1, 256, "w");
-int r = rtr_fprintf(f, "%d %s %c", 42, "forty two", 42);
-int r1 = fprintf(f1, "%d %s %c", 42, "forty two", 42);
-fclose(f);
-fclose(f1);
-assert_true(r > 0 && r == r1);
-assert_string_equal(buf, buf1);
+	char buf[256], buf1[256];
+	FILE *f = fmemopen(buf, 256, "w");
+	FILE *f1 = fmemopen(buf1, 256, "w");
+	int r = rtr_fprintf(f, "%d %s %c", 42, "forty two", 42);
+	int r1 = fprintf(f1, "%d %s %c", 42, "forty two", 42);
+
+	fclose(f);
+	fclose(f1);
+	assert_true(r > 0 && r == r1);
+	assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 RTR_TEST_START(dprintf)
-char buf[256], buf1[256];
-int fd[2], fd1[2];
+	int r, r1;
+	char buf[256], buf1[256];
+	int fd[2], fd1[2];
 
-pipe(fd);
-int r = rtr_dprintf(fd[1], "%d %s %c", 42, "forty two", 42);
-read(fd[0], buf, 256);
-close(fd[0]);
-close(fd[1]);
+	pipe(fd);
+	r = rtr_dprintf(fd[1], "%d %s %c", 42, "forty two", 42);
+	read(fd[0], buf, 256);
+	close(fd[0]);
+	close(fd[1]);
 
-pipe(fd1);
-int r1 = dprintf(fd1[1], "%d %s %c", 42, "forty two", 42);
-read(fd1[0], buf1, 256);
-close(fd1[0]);
-close(fd1[1]);
+	pipe(fd1);
+	r1 = dprintf(fd1[1], "%d %s %c", 42, "forty two", 42);
+	read(fd1[0], buf1, 256);
+	close(fd1[0]);
+	close(fd1[1]);
 
-assert_true(r > 0 && r == r1);
-assert_string_equal(buf, buf1);
+	assert_true(r > 0 && r == r1);
+	assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 RTR_TEST_START(sprintf)
-char buf[256], buf1[256];
+	int r, r1;
+	char buf[256], buf1[256];
 
-int r = rtr_sprintf(buf, "%d %s %c", 42, "forty two", 42);
-int r1 = sprintf(buf1, "%d %s %c", 42, "forty two", 42);
+	r = rtr_sprintf(buf, "%d %s %c", 42, "forty two", 42);
+	r1 = sprintf(buf1, "%d %s %c", 42, "forty two", 42);
 
-assert_true(r > 0 && r == r1);
-assert_string_equal(buf, buf1);
+	assert_true(r > 0 && r == r1);
+	assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 RTR_TEST_START(snprintf)
-char buf[256], buf1[256];
+	int r, r1;
+	char buf[256], buf1[256];
 
-int r = rtr_snprintf(buf, 256, "%d %s %c", 42, "forty two", 42);
-int r1 = snprintf(buf1, 256, "%d %s %c", 42, "forty two", 42);
+	r = rtr_snprintf(buf, 256, "%d %s %c", 42, "forty two", 42);
+	r1 = snprintf(buf1, 256, "%d %s %c", 42, "forty two", 42);
 
-assert_true(r > 0 && r == r1);
-assert_string_equal(buf, buf1);
+	assert_true(r > 0 && r == r1);
+	assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 static int
-to_vprintf(rtr_vprintf_t fn, const char * fmt, ...)
+to_vprintf(rtr_vprintf_t fn, const char *fmt, ...)
 {
+	int result;
 	va_list ap;
+
 	va_start(ap, fmt);
-	int result = fn(fmt, ap);
+	result = fn(fmt, ap);
 	va_end(ap);
+
 	return result;
 }
 
 RTR_TEST_START(vprintf)
-char buf[256], buf1[256];
-FILE *oldstdout = stdout;
-stdout = fmemopen(buf, 256, "w");
-int r = to_vprintf(rtr_vprintf, "%d %s %c", 42, "forty two", 42);
-fclose(stdout);
-stdout = fmemopen(buf1, 256, "w");
-int r1 = to_vprintf(vprintf, "%d %s %c", 42, "forty two", 42);
-fclose(stdout);
-stdout = oldstdout;
-assert_true(r > 0 && r == r1);
-assert_string_equal(buf, buf1);
+	int r, r1;
+	char buf[256], buf1[256];
+	FILE *oldstdout = stdout;
+
+	stdout = fmemopen(buf, 256, "w");
+	r = to_vprintf(rtr_vprintf, "%d %s %c", 42, "forty two", 42);
+	fclose(stdout);
+
+	stdout = fmemopen(buf1, 256, "w");
+	r1 = to_vprintf(vprintf, "%d %s %c", 42, "forty two", 42);
+	fclose(stdout);
+
+	stdout = oldstdout;
+
+	assert_true(r > 0 && r == r1);
+	assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 static int
-to_vfprintf(rtr_vfprintf_t fn, FILE *f, const char * fmt, ...)
+to_vfprintf(rtr_vfprintf_t fn, FILE *f, const char *fmt, ...)
 {
+	int result;
 	va_list ap;
+
 	va_start(ap, fmt);
-	int result = fn(f, fmt, ap);
+	result = fn(f, fmt, ap);
 	va_end(ap);
+
 	return result;
 }
 
 RTR_TEST_START(vfprintf)
-char buf[256], buf1[256];
-FILE *f = fmemopen(buf, 256, "w");
-FILE *f1 = fmemopen(buf1, 256, "w");
-int r = to_vfprintf(rtr_vfprintf, f, "%d %s %c", 42, "forty two", 42);
-int r1 = to_vfprintf(vfprintf, f1, "%d %s %c", 42, "forty two", 42);
-fclose(f);
-fclose(f1);
-assert_true(r > 0 && r == r1);
-assert_string_equal(buf, buf1);
+	int r, r1;
+	FILE *f, *f1;
+	char buf[256], buf1[256];
+
+	f = fmemopen(buf, 256, "w");
+	f1 = fmemopen(buf1, 256, "w");
+
+	r = to_vfprintf(rtr_vfprintf, f, "%d %s %c", 42, "forty two", 42);
+	r1 = to_vfprintf(vfprintf, f1, "%d %s %c", 42, "forty two", 42);
+
+	fclose(f);
+	fclose(f1);
+
+	assert_true(r > 0 && r == r1);
+	assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 static int
-to_vdprintf(rtr_vdprintf_t fn, int fd, const char * fmt, ...)
+to_vdprintf(rtr_vdprintf_t fn, int fd, const char *fmt, ...)
 {
+	int result;
 	va_list ap;
+
 	va_start(ap, fmt);
-	int result = fn(fd, fmt, ap);
+	result = fn(fd, fmt, ap);
 	va_end(ap);
+
 	return result;
 }
 
 RTR_TEST_START(vdprintf)
-char buf[256], buf1[256];
-int fd[2], fd1[2];
+	int r, r1;
+	char buf[256], buf1[256];
+	int fd[2], fd1[2];
 
-pipe(fd);
-int r = to_vdprintf(rtr_vdprintf, fd[1], "%d %s %c", 42, "forty two", 42);
-read(fd[0], buf, 256);
-close(fd[0]);
-close(fd[1]);
+	pipe(fd);
+	r = to_vdprintf(rtr_vdprintf, fd[1], "%d %s %c", 42, "forty two", 42);
+	read(fd[0], buf, 256);
+	close(fd[0]);
+	close(fd[1]);
 
-pipe(fd1);
-int r1 = to_vdprintf(vdprintf, fd1[1], "%d %s %c", 42, "forty two", 42);
-read(fd1[0], buf1, 256);
-close(fd1[0]);
-close(fd1[1]);
+	pipe(fd1);
+	r1 = to_vdprintf(vdprintf, fd1[1], "%d %s %c", 42, "forty two", 42);
+	read(fd1[0], buf1, 256);
+	close(fd1[0]);
+	close(fd1[1]);
 
-assert_true(r > 0 && r == r1);
-assert_string_equal(buf, buf1);
+	assert_true(r > 0 && r == r1);
+	assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 static int
-to_vsprintf(rtr_vsprintf_t fn, char *str, const char * fmt, ...)
+to_vsprintf(rtr_vsprintf_t fn, char *str, const char *fmt, ...)
 {
+	int result;
 	va_list ap;
+
 	va_start(ap, fmt);
-	int result = fn(str, fmt, ap);
+	result = fn(str, fmt, ap);
 	va_end(ap);
+
 	return result;
 }
 
 RTR_TEST_START(vsprintf)
-char buf[256], buf1[256];
+	int r, r1;
+	char buf[256], buf1[256];
 
-int r = to_vsprintf(rtr_vsprintf, buf, "%d %s %c", 42, "forty two", 42);
-int r1 = to_vsprintf(vsprintf, buf1, "%d %s %c", 42, "forty two", 42);
+	r = to_vsprintf(rtr_vsprintf, buf, "%d %s %c", 42, "forty two", 42);
+	r1 = to_vsprintf(vsprintf, buf1, "%d %s %c", 42, "forty two", 42);
 
-assert_true(r > 0 && r == r1);
-assert_string_equal(buf, buf1);
+	assert_true(r > 0 && r == r1);
+	assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 static int
-to_vsnprintf(rtr_vsnprintf_t fn, char *str, size_t size, const char * fmt, ...)
+to_vsnprintf(rtr_vsnprintf_t fn, char *str, size_t size, const char *fmt, ...)
 {
+	int result;
 	va_list ap;
+
 	va_start(ap, fmt);
-	int result = fn(str, size, fmt, ap);
+	result = fn(str, size, fmt, ap);
 	va_end(ap);
+
 	return result;
 }
 
 RTR_TEST_START(vsnprintf)
-char buf[256], buf1[256];
+	int r, r1;
+	char buf[256], buf1[256];
 
-int r = to_vsnprintf(rtr_vsnprintf, buf, 256, "%d %s %c", 42, "forty two", 42);
-int r1 = to_vsnprintf(vsnprintf, buf1, 256, "%d %s %c", 42, "forty two", 42);
+	r = to_vsnprintf(rtr_vsnprintf, buf, 256, "%d %s %c", 42, "forty two", 42);
+	r1 = to_vsnprintf(vsnprintf, buf1, 256, "%d %s %c", 42, "forty two", 42);
 
-assert_true(r > 0 && r == r1);
-assert_string_equal(buf, buf1);
+	assert_true(r > 0 && r == r1);
+	assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 int
 main(void)
 {
-    int                     ret;
-    const struct CMUnitTest tests[] = {
-      cmocka_unit_test(test_rtr_perror),   cmocka_unit_test(test_rtr_tolower),
-      cmocka_unit_test(test_rtr_toupper),  cmocka_unit_test(test_rtr_putc),
+	int ret;
+	const struct CMUnitTest tests[] = {
+		cmocka_unit_test(test_rtr_perror),   cmocka_unit_test(test_rtr_tolower),
+		cmocka_unit_test(test_rtr_toupper),  cmocka_unit_test(test_rtr_putc),
 #ifndef __APPLE__
-      cmocka_unit_test(test_rtr__IO_putc),
+		cmocka_unit_test(test_rtr__IO_putc),
 #endif
-      cmocka_unit_test(test_rtr_getenv),   cmocka_unit_test(test_rtr_putenv),
-      cmocka_unit_test(test_rtr_unsetenv), cmocka_unit_test(test_rtr_execl),
-      cmocka_unit_test(test_rtr_execv),    cmocka_unit_test(test_rtr_execle),
-      cmocka_unit_test(test_rtr_execve),   cmocka_unit_test(test_rtr_execlp),
-      cmocka_unit_test(test_rtr_execvp),   cmocka_unit_test(test_rtr_execvpe),
-      /* cmocka_unit_test(test_rtr_execveat), */ cmocka_unit_test(test_rtr_fexecve),
-      cmocka_unit_test(test_rtr_system),   cmocka_unit_test(test_rtr_exit),
-      cmocka_unit_test(test_rtr_fopen),    cmocka_unit_test(test_rtr_fclose),
-      cmocka_unit_test(test_rtr_fseek),    cmocka_unit_test(test_rtr_fileno),
-      cmocka_unit_test(test_rtr_chmod),    cmocka_unit_test(test_rtr_fchmod),
-      cmocka_unit_test(test_rtr_stat),     cmocka_unit_test(test_rtr_dup),
-      cmocka_unit_test(test_rtr_dup2),     cmocka_unit_test(test_rtr_close),
-      cmocka_unit_test(test_rtr_getgid),   cmocka_unit_test(test_rtr_getegid),
-      cmocka_unit_test(test_rtr_getuid),   cmocka_unit_test(test_rtr_geteuid),
-      cmocka_unit_test(test_rtr_setuid),   cmocka_unit_test(test_rtr_seteuid),
-      cmocka_unit_test(test_rtr_setgid),   cmocka_unit_test(test_rtr_getpid),
-      cmocka_unit_test(test_rtr_getppid),  cmocka_unit_test(test_rtr_perror),
-      cmocka_unit_test(test_rtr_atoi),     cmocka_unit_test(test_rtr_bind),
-      cmocka_unit_test(test_rtr_connect),  cmocka_unit_test(test_rtr_strcpy),
-      cmocka_unit_test(test_rtr_strncpy),  cmocka_unit_test(test_rtr_strcat),
-      cmocka_unit_test(test_rtr_strncat),  cmocka_unit_test(test_rtr_strcmp),
-      cmocka_unit_test(test_rtr_strncmp),  cmocka_unit_test(test_rtr_strstr),
-      cmocka_unit_test(test_rtr_strchr),
-      cmocka_unit_test(test_rtr_strlen),   cmocka_unit_test(test_rtr_ctime),
-      cmocka_unit_test(test_rtr_ctime_r),  cmocka_unit_test(test_rtr_read),
-      cmocka_unit_test(test_rtr_write),    cmocka_unit_test(test_rtr_malloc),
-      cmocka_unit_test(test_rtr_free),     cmocka_unit_test(test_rtr_fork),
-      cmocka_unit_test(test_rtr_popen),    cmocka_unit_test(test_rtr_pclose),
-      cmocka_unit_test(test_rtr_pipe),     cmocka_unit_test(test_rtr_pipe2),
-      cmocka_unit_test(test_trace_printf), cmocka_unit_test(test_trace_printf_str),
-      cmocka_unit_test(test_rtr_printf),   cmocka_unit_test(test_rtr_fprintf),
-      cmocka_unit_test(test_rtr_dprintf),  cmocka_unit_test(test_rtr_sprintf),
-      cmocka_unit_test(test_rtr_snprintf), cmocka_unit_test(test_rtr_vprintf),
-      cmocka_unit_test(test_rtr_vfprintf), cmocka_unit_test(test_rtr_vdprintf),
-      cmocka_unit_test(test_rtr_vsprintf), cmocka_unit_test(test_rtr_vsnprintf),
+		cmocka_unit_test(test_rtr_getenv),   cmocka_unit_test(test_rtr_putenv),
+		cmocka_unit_test(test_rtr_unsetenv), cmocka_unit_test(test_rtr_execl),
+		cmocka_unit_test(test_rtr_execv),    cmocka_unit_test(test_rtr_execle),
+		cmocka_unit_test(test_rtr_execve),   cmocka_unit_test(test_rtr_execlp),
+		cmocka_unit_test(test_rtr_execvp),   cmocka_unit_test(test_rtr_execvpe),
+		/* cmocka_unit_test(test_rtr_execveat), */ cmocka_unit_test(test_rtr_fexecve),
+		cmocka_unit_test(test_rtr_system),   cmocka_unit_test(test_rtr_exit),
+		cmocka_unit_test(test_rtr_fopen),    cmocka_unit_test(test_rtr_fclose),
+		cmocka_unit_test(test_rtr_fseek),    cmocka_unit_test(test_rtr_fileno),
+		cmocka_unit_test(test_rtr_chmod),    cmocka_unit_test(test_rtr_fchmod),
+		cmocka_unit_test(test_rtr_stat),     cmocka_unit_test(test_rtr_dup),
+		cmocka_unit_test(test_rtr_dup2),     cmocka_unit_test(test_rtr_close),
+		cmocka_unit_test(test_rtr_getgid),   cmocka_unit_test(test_rtr_getegid),
+		cmocka_unit_test(test_rtr_getuid),   cmocka_unit_test(test_rtr_geteuid),
+		cmocka_unit_test(test_rtr_setuid),   cmocka_unit_test(test_rtr_seteuid),
+		cmocka_unit_test(test_rtr_setgid),   cmocka_unit_test(test_rtr_getpid),
+		cmocka_unit_test(test_rtr_getppid),  cmocka_unit_test(test_rtr_perror),
+		cmocka_unit_test(test_rtr_atoi),     cmocka_unit_test(test_rtr_bind),
+		cmocka_unit_test(test_rtr_connect),  cmocka_unit_test(test_rtr_strcpy),
+		cmocka_unit_test(test_rtr_strncpy),  cmocka_unit_test(test_rtr_strcat),
+		cmocka_unit_test(test_rtr_strncat),  cmocka_unit_test(test_rtr_strcmp),
+		cmocka_unit_test(test_rtr_strncmp),  cmocka_unit_test(test_rtr_strstr),
+		cmocka_unit_test(test_rtr_strchr),
+		cmocka_unit_test(test_rtr_strlen),   cmocka_unit_test(test_rtr_ctime),
+		cmocka_unit_test(test_rtr_ctime_r),  cmocka_unit_test(test_rtr_read),
+		cmocka_unit_test(test_rtr_write),    cmocka_unit_test(test_rtr_malloc),
+		cmocka_unit_test(test_rtr_free),     cmocka_unit_test(test_rtr_fork),
+		cmocka_unit_test(test_rtr_popen),    cmocka_unit_test(test_rtr_pclose),
+		cmocka_unit_test(test_rtr_pipe),     cmocka_unit_test(test_rtr_pipe2),
+		cmocka_unit_test(test_trace_printf), cmocka_unit_test(test_trace_printf_str),
+		cmocka_unit_test(test_rtr_printf),   cmocka_unit_test(test_rtr_fprintf),
+		cmocka_unit_test(test_rtr_dprintf),  cmocka_unit_test(test_rtr_sprintf),
+		cmocka_unit_test(test_rtr_snprintf), cmocka_unit_test(test_rtr_vprintf),
+		cmocka_unit_test(test_rtr_vfprintf), cmocka_unit_test(test_rtr_vdprintf),
+		cmocka_unit_test(test_rtr_vsprintf), cmocka_unit_test(test_rtr_vsnprintf),
 
-      /* dir functions */
-      cmocka_unit_test(test_rtr_opendir),  cmocka_unit_test(test_rtr_closedir),
-      cmocka_unit_test(test_rtr_fdopendir),  cmocka_unit_test(test_rtr_readdir_r),
-      cmocka_unit_test(test_rtr_telldir), cmocka_unit_test(test_rtr_seekdir),
-      cmocka_unit_test(test_rtr_rewinddir), cmocka_unit_test(test_rtr_dirfd),
-    };
+		/* dir functions */
+		cmocka_unit_test(test_rtr_opendir),  cmocka_unit_test(test_rtr_closedir),
+		cmocka_unit_test(test_rtr_fdopendir),  cmocka_unit_test(test_rtr_readdir_r),
+		cmocka_unit_test(test_rtr_telldir), cmocka_unit_test(test_rtr_seekdir),
+		cmocka_unit_test(test_rtr_rewinddir), cmocka_unit_test(test_rtr_dirfd),
+	};
 
-    handle = dlopen("../retrace.so", RTLD_LAZY);
-    if (!handle) {
-        fputs(dlerror(), stderr);
-        return 1;
-    }
+	handle = dlopen("../retrace.so", RTLD_LAZY);
+	if (!handle) {
+		fputs(dlerror(), stderr);
+		return 1;
+	}
 
-    ret = cmocka_run_group_tests(tests, NULL, NULL);
+	ret = cmocka_run_group_tests(tests, NULL, NULL);
 
-    dlclose(handle);
+	dlclose(handle);
 
-    return ret;
+	return ret;
 }
