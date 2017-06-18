@@ -24,64 +24,47 @@
  */
 
 #include "common.h"
-#include "malloc.h"
+#include "pledge.h"
 
-void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
+#ifdef __OpenBSD__
+
+int RETRACE_IMPLEMENTATION(pledge)(const char *promises, const char *paths[])
 {
-        void *p;
-        rtr_malloc_t real_malloc;
+	rtr_pledge_t real_pledge;
+	int r;
+	const char **s;
 
-        real_malloc = RETRACE_GET_REAL(malloc);
+	real_pledge = RETRACE_GET_REAL(pledge);
 
-        p = real_malloc(bytes);
+	r = real_pledge(promises, paths);
 
-        trace_printf(1, "malloc(%d); [%p]\n", bytes, p);
+	trace_printf(1, "pledge(\"%s\", ", promises);
+	
+	if (paths == NULL) {
+		trace_printf(0, "NULL");
+	} else {
+		trace_printf(0, "{");
 
-        return p;
+		s = paths;
+
+		if (*s) {
+			trace_printf(0, "\"%s\"", *s);
+			s++;
+		}
+
+		while (*s) {
+			trace_printf(0, ", \"%s\"", *s);
+			s++;
+		}
+
+		trace_printf(0, "}");
+	}
+
+	trace_printf(0, "); [return %d]\n", r);
+
+	return r;
 }
 
-RETRACE_REPLACE(malloc)
+RETRACE_REPLACE(pledge)
 
-void RETRACE_IMPLEMENTATION(free)(void *mem)
-{
-	rtr_free_t real_free;
-
-	real_free = RETRACE_GET_REAL(free);
-
-	trace_printf(1, "free(%p);\n", mem);
-
-	real_free(mem);
-}
-
-RETRACE_REPLACE(free)
-
-void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
-{
-        void *p;
-        rtr_calloc_t real_calloc;
-
-        real_calloc = RETRACE_GET_REAL(calloc);
-        p = real_calloc(nmemb, size);
-
-        trace_printf(1, "calloc(%d, %d); [%p]\n", nmemb, size, p);
-
-        return p;
-}
-
-RETRACE_REPLACE(calloc)
-
-void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
-{
-        void *p;
-        rtr_realloc_t real_realloc;
-
-        real_realloc = RETRACE_GET_REAL(realloc);
-        p = real_realloc(ptr, size);
-
-        trace_printf(1, "realloc(%p, %d); [%p]\n", ptr, size, p);
-
-        return p;
-}
-
-RETRACE_REPLACE(realloc)
-
+#endif /* __OpenBSD */
