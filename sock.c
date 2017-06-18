@@ -154,18 +154,30 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 #ifdef __linux__
 	struct sockaddr *address = _address.__sockaddr__;
 #endif
+	struct descriptor_info *di;
+	int clnt_fd;
 
 	real_accept = RETRACE_GET_REAL(accept);
 
-	trace_printf(1,
-			"accept(%d, \"%hu.%hu.%hu.%hu:%hu\", %zu);\n",
-			fd,
-			(unsigned short)address->sa_data[2] & 0xFF,
-			(unsigned short)address->sa_data[3] & 0xFF,
-			(unsigned short)address->sa_data[4] & 0xFF,
-			(unsigned short)address->sa_data[5] & 0xFF,
-			(256 * address->sa_data[0]) + address->sa_data[1],
-			*len);
+	/* get descriptor info */
+	di = file_descriptor_get(fd);
+	if (di && di->type == FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT) {
+		struct sockaddr_in clnt_addr;
+
+		clnt_fd = real_accept(fd, (struct sockaddr *) &clnt_addr, sizeof(struct sockaddr_in));
+		if (clnt_fd > 0) {
+			const char *clnt_ipaddr = inet_ntoa(clnt_addr.sin_addr);
+			int clnt_port = ntohs(clnt_addr.sin_port);
+
+			/* add file descriptor for client socket */
+			file_descriptor_update(clnt_fd, FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT, clnt_ipaddr, clnt_port);
+
+			trace_printf(1, "accept(%d, %s, %d); [client socket:%d]\n", fd, clnt_ipaddr, clnt_port, clnt_fd);
+		} else
+			trace_printf(1, "accept(%d, , , ); [error]\n", fd);
+
+		return clnt_fd;
+	}
 
 	return real_accept(fd, address, len);
 }

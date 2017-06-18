@@ -41,7 +41,7 @@
 
 static int sockfd = 0;
 
-static void test_inet()
+static void test_inet(void)
 {
 	struct sockaddr_in serv_addr; 
 	const char *sendstr = "Retrace Test";
@@ -72,7 +72,7 @@ static void test_inet()
 	return;	
 }
 
-static void test_unix()
+static void test_unix(void)
 {
 	struct sockaddr_un addr;
 
@@ -96,8 +96,8 @@ static void test_unix()
 
 int main(int argc, char *argv[])
 {
-	test_inet(test_inet);
-	test_unix(test_unix);
+	test_inet();
+	test_unix();
 
 	return 0;
 }
