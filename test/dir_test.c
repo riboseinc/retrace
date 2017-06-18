@@ -35,44 +35,43 @@
 
 #include <unistd.h>
 
-int main()
+int main(void)
 {
-        int dir_fd;
-        DIR *dirp;
+	int dir_fd;
+	DIR *dirp;
 
-        struct dirent prev_dir, *dir;
+	struct dirent prev_dir, *dir;
 
-        // open directory
-        dir_fd = open("/var", O_DIRECTORY);
-        if (dir_fd < 0)
-        {
-                fprintf(stderr, "could not open /tmp directory\n");
-                return -1;
-        }
+	/* open directory */
+	dir_fd = open("/var", O_DIRECTORY);
+	if (dir_fd < 0) {
+		fprintf(stderr, "could not open /tmp directory\n");
+		return -1;
+	}
 
-        // get dirent pointer
-        dirp = fdopendir(dir_fd);
-        if (!dirp)
-        {
-                fprintf(stderr, "could not get directory pointer from descriptor\n");
-                return -1;
-        }
+	/* get dirent pointer */
+	dirp = fdopendir(dir_fd);
+	if (!dirp) {
+		fprintf(stderr, "could not get directory pointer from descriptor\n");
+		return -1;
+	}
 
-        while (readdir_r(dirp, &prev_dir, &dir) == 0)
-        {
-                // check next directory pointer
-                if (!dir)
-                        break;
+	while (readdir_r(dirp, &prev_dir, &dir) == 0) {
+		long loc;
 
-                // get current directory position
-                long loc = telldir(dirp);
-                seekdir(dirp, loc);
-        }
+		/* check next directory pointer */
+		if (!dir)
+			break;
 
-        rewinddir(dirp);
+		/* get current directory position */
+		loc = telldir(dirp);
+		seekdir(dirp, loc);
+	}
 
-        // close directory descriptor
-        close(dir_fd);
+	rewinddir(dirp);
 
-        return 0;
+	/* close directory descriptor */
+	close(dir_fd);
+
+	return 0;
 }
