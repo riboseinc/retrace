@@ -51,5 +51,9 @@ int main(void)
 		fclose (f);
 	}
 
+#ifdef __APPLE__
+	strmode(717, buf);
+#endif
+
 	return 0;
 }

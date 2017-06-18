@@ -1,26 +1,25 @@
 OS 		= $(shell uname)
-LD		= ld
 GCC		= gcc
 RM		= rm -f
 RETRACE_CFLAGS	= $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
 
 ifeq ($(OS),Darwin)
-	RETRACE_LDFLAGS = $(LDFLAGS) -dylib -L/usr/local/opt/openssl/lib
+	RETRACE_LDFLAGS = $(LDFLAGS) -shared -L/usr/local/opt/openssl/lib
 	RETRACE_LIBS	= -ldl -lssl
 	# assume Sierra for now to silence ld warnings
 	export MACOSX_DEPLOYMENT_TARGET = 10.12
 	RETRACE_SO      = retrace.dylib
 	RETRACE_CFLAGS	+= -I/usr/local/opt/openssl/include
 else ifeq ($(OS),FreeBSD)
-	RETRACE_LDFLAGS = $(LDFLAGS) -G -z text --export-dynamic
+	RETRACE_LDFLAGS = $(LDFLAGS) -shared
 	RETRACE_LIBS	=
 	RETRACE_SO	= retrace.so
 	RETRACE_CFLAGS	+= 
 else
-	RETRACE_LDFLAGS	= $(LDFLAGS) -G -z text --export-dynamic
+	RETRACE_LDFLAGS	= $(LDFLAGS) -shared
 	RETRACE_LIBS	= -dl -lncurses
 	RETRACE_SO	= retrace.so
-	RETRACE_CFLAGS	+= -rdynamic -Werror -pedantic -Wextra -ansi
+	RETRACE_CFLAGS	+= -rdynamic
 endif
 
 SRCS		+= exit.c
@@ -45,6 +44,7 @@ SRCS		+= printf.c
 SRCS		+= select.c
 SRCS            += ssl.c
 SRCS		+= trace.c
+SRCS		+= pledge.c
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test
@@ -52,7 +52,7 @@ OBJS		= $(SRCS:.c=.o)
 all: $(RETRACE_SO)
 
 $(RETRACE_SO): $(OBJS)
-	$(LD) $(RETRACE_LDFLAGS) -o $@ $(RETRACE_LIBS) $^
+	$(CC) $(RETRACE_LDFLAGS) -o $@ $(RETRACE_LIBS) $^
 
 -include $(SRCS:.c=.d)
 

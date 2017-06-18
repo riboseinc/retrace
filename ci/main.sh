@@ -5,6 +5,10 @@ LD_LIBRARY_PATH="${CMOCKA_INSTALL}/lib"
 LDFLAGS="-L${CMOCKA_INSTALL}/lib"
 CFLAGS="-I${CMOCKA_INSTALL}/include"
 
+export LD_LIBRARY_PATH CFLAGS LDFLAGS
+
+CHECKPATCH=$CHECKPATCH_INSTALL/checkpatch.pl
+
 CHECKPATCH_FLAGS+=" --no-tree"
 CHECKPATCH_FLAGS+=" --ignore COMPLEX_MACRO"
 CHECKPATCH_FLAGS+=" --ignore TRAILING_SEMICOLON"
@@ -20,10 +24,27 @@ CHECKPATCH_FLAGS+=" --ignore FILE_PATH_CHANGES"
 CHECKPATCH_FLAGS+=" --ignore MISSING_SIGN_OFF"
 CHECKPATCH_FLAGS+=" --ignore RETURN_PARENTHESES"
 
-export LD_LIBRARY_PATH CFLAGS LDFLAGS
+# checkpatch.pl will ignore the following paths
+CHECKPATCH_IGNORE+=" checkpatch.pl.patch"
+CHECKPATCH_EXCLUDE=$(for p in $CHECKPATCH_IGNORE; do echo ":(exclude)$p" ; done)
+
+function _checkpatch() {
+		$CHECKPATCH $CHECKPATCH_FLAGS --no-tree -
+}
+
+function checkpatch() {
+		git show --oneline --no-patch $1
+		git format-patch -1 $1 --stdout -- $CHECKPATCH_EXCLUDE . | _checkpatch
+}
 
 make -j2
 make test
 
 # checkpatch
-git format-patch -1 --stdout | $CHECKPATCH_INSTALL/checkpatch.pl $CHECKPATCH_FLAGS -
+if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
+	checkpatch HEAD
+else
+	for c in $(git rev-list HEAD^1..HEAD^2); do
+		checkpatch $c
+	done
+fi
