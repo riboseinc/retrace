@@ -745,7 +745,6 @@ main(void)
       cmocka_unit_test(test_rtr_setuid),   cmocka_unit_test(test_rtr_seteuid),
       cmocka_unit_test(test_rtr_setgid),   cmocka_unit_test(test_rtr_getpid),
       cmocka_unit_test(test_rtr_getppid),  cmocka_unit_test(test_rtr_perror),
-      cmocka_unit_test(test_rtr_socket),
       cmocka_unit_test(test_rtr_atoi),     cmocka_unit_test(test_rtr_bind),
       cmocka_unit_test(test_rtr_connect),  cmocka_unit_test(test_rtr_strcpy),
       cmocka_unit_test(test_rtr_strncpy),  cmocka_unit_test(test_rtr_strcat),
