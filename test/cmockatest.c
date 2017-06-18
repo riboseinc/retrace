@@ -245,16 +245,16 @@ RTR_TEST_END
 RTR_TEST_START(perror)
 RTR_TEST_END
 
-/*RTR_TEST_START(socket)
+RTR_TEST_START(socket)
 RTR_TEST_END
-
-RTR_TEST_START(atoi)
-RTR_TEST_END*/
 
 RTR_TEST_START(bind)
 RTR_TEST_END
 
 RTR_TEST_START(connect)
+RTR_TEST_END
+
+RTR_TEST_START(accept)
 RTR_TEST_END
 
 RTR_TEST_START(strcpy)
@@ -785,8 +785,7 @@ main(void)
 		cmocka_unit_test(test_rtr_setuid),   cmocka_unit_test(test_rtr_seteuid),
 		cmocka_unit_test(test_rtr_setgid),   cmocka_unit_test(test_rtr_getpid),
 		cmocka_unit_test(test_rtr_getppid),  cmocka_unit_test(test_rtr_perror),
-		/* cmocka_unit_test(test_rtr_atoi), */ cmocka_unit_test(test_rtr_bind),
-		cmocka_unit_test(test_rtr_connect),  cmocka_unit_test(test_rtr_strcpy),
+		cmocka_unit_test(test_rtr_strcpy),
 		cmocka_unit_test(test_rtr_strncpy),  cmocka_unit_test(test_rtr_strcat),
 		cmocka_unit_test(test_rtr_strncat),  cmocka_unit_test(test_rtr_strcmp),
 		cmocka_unit_test(test_rtr_strncmp),  cmocka_unit_test(test_rtr_strstr),
@@ -809,6 +808,10 @@ main(void)
 		cmocka_unit_test(test_rtr_fdopendir),  cmocka_unit_test(test_rtr_readdir_r),
 		cmocka_unit_test(test_rtr_telldir), cmocka_unit_test(test_rtr_seekdir),
 		cmocka_unit_test(test_rtr_rewinddir), cmocka_unit_test(test_rtr_dirfd),
+
+		/* socket functions */
+		cmocka_unit_test(test_rtr_socket),   cmocka_unit_test(test_rtr_connect),
+		cmocka_unit_test(test_rtr_bind),     cmocka_unit_test(test_rtr_accept),
 	};
 
 	handle = dlopen("../retrace.so", RTLD_LAZY);
