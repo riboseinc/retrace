@@ -216,7 +216,7 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 				ret = real_fopen(redirect_file, mode);
 
 				if (config)
-					rtr_confing_close(config);
+					rtr_config_close(config);
 
 				break;
 			}
