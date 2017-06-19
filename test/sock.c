@@ -72,21 +72,8 @@ static int test_inet(void)
 	}
 
 	write(sockfd, sendstr, strlen(sendstr));
-<<<<<<< HEAD
-<<<<<<< HEAD
-
 	close(sockfd);
 
-=======
-
-	close(sockfd);
-
->>>>>>> fd517026d24bb7bc727402572f8b69951ae01e53
-=======
-
-	close(sockfd);
-
->>>>>>> fd517026d24bb7bc727402572f8b69951ae01e53
 	return 0;
 }
 
