@@ -58,15 +58,15 @@ char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 
 RETRACE_REPLACE(ctime)
 
-#ifdef __APPLE__
-int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *restrict tv, void *restrict tzp)
+#if defined(__APPLE__) || defined(__NetBSD__)
+int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, void *tzp)
 #else
 int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz)
 #endif
 {
 	int ret;
 	rtr_gettimeofday_t real_gettimeofday;
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__NetBSD__)
 	struct timezone *tz;
 
 	tz = (struct timezone *)tzp;

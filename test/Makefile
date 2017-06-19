@@ -4,7 +4,7 @@ OS              = $(shell uname)
 AUTOMATED-TEST  = runtests.sh
 CMOCKA-TEST-BIN = cmockatest
 OBJS		= $(SRCS:.c=.o)
-BINARIES	= id env time fork exit malloc str pipe sock file trace scanf
+BINARIES	= id env time fork exit malloc str pipe sock file trace pledge scanf
 
 ifeq ($(OS),Linux)
 	BINARIES += $(CMOCKA-TEST-BIN)

@@ -23,24 +23,48 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
-#include <unistd.h>
-#include <pwd.h>
+#include "common.h"
+#include "pledge.h"
 
-int main(void)
+#ifdef __OpenBSD__
+
+int RETRACE_IMPLEMENTATION(pledge)(const char *promises, const char *paths[])
 {
-	static struct passwd *pw;
+	rtr_pledge_t real_pledge;
+	int r;
+	const char **s;
 
-	setuid(111);
-	seteuid(222);
-	setgid(333);
-	getgid();
-	getuid();
-	geteuid();
-	getpid();
-	getppid();
+	real_pledge = RETRACE_GET_REAL(pledge);
 
-	pw = getpwuid(getuid());
+	r = real_pledge(promises, paths);
 
-	return 0;
+	trace_printf(1, "pledge(\"%s\", ", promises);
+	
+	if (paths == NULL) {
+		trace_printf(0, "NULL");
+	} else {
+		trace_printf(0, "{");
+
+		s = paths;
+
+		if (*s) {
+			trace_printf(0, "\"%s\"", *s);
+			s++;
+		}
+
+		while (*s) {
+			trace_printf(0, ", \"%s\"", *s);
+			s++;
+		}
+
+		trace_printf(0, "}");
+	}
+
+	trace_printf(0, "); [return %d]\n", r);
+
+	return r;
 }
+
+RETRACE_REPLACE(pledge)
+
+#endif /* __OpenBSD */

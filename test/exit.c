@@ -25,10 +25,9 @@
 
 #include <stdlib.h>
 
-int main (void)
+int main(void)
 {
-	exit (42);
+	exit(42);
 
-        return 0;
+	return 0;
 }
-
