@@ -96,8 +96,6 @@ int vscanf_test(void)
 {
 	FILE *oldstdin;
 	char buf[1024];
-	//
-	//
 	int fd[2];
 
 	pipe(fd);
