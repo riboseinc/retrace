@@ -1,4 +1,4 @@
- /*
+/*
  * Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,15 +25,15 @@
 
 #include <time.h>
 
-int main (void)
+int main(void)
 {
 	char buf[26];
+	time_t t;
 
-	time_t t = time(NULL);
+	t = time(NULL);
 
 	ctime(&t);
 	ctime_r(&t, buf);
 
-        return 0;
+	return 0;
 }
-

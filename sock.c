@@ -24,6 +24,8 @@
  */
 
 #include "common.h"
+#include "str.h"
+#include "malloc.h"
 #include "sock.h"
 
 #define RETRACE_MAX_IP_ADDR_LEN 15
@@ -50,6 +52,8 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 #endif
 {
 	rtr_connect_t real_connect;
+	rtr_strcmp_t  real_strcmp;
+	rtr_free_t    real_free;
 #ifdef __linux__
 	const struct sockaddr *address = _address.__sockaddr__;
 #endif
@@ -57,6 +61,8 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 	int ret;
 
 	real_connect = RETRACE_GET_REAL(connect);
+	real_strcmp = RETRACE_GET_REAL(strcmp);
+	real_free = RETRACE_GET_REAL(free);
 
 	if (!get_tracing_enabled())
 		return real_connect(fd, address, len);
@@ -64,15 +70,80 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 	if (address->sa_family == AF_INET) {
 		struct sockaddr_in *dst_addr = (struct sockaddr_in *) address;
 
+		struct sockaddr_in *remote_addr;
+		const char *remote_ipaddr;
+		int remote_port;
+
+		struct sockaddr_in redirect_addr;
+		int enabled_redirect = 0;
+
+		FILE *config = NULL;
+
+		/* get IP address and port number to connect */
 		const char *dst_ipaddr = inet_ntoa(dst_addr->sin_addr);
 		int dst_port = ntohs(dst_addr->sin_port);
 
-		/* connect to remote */
-		ret = real_connect(fd, (struct sockaddr *) dst_addr, sizeof(struct sockaddr_in));
-		if (ret == 0)
-			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, dst_ipaddr, dst_port);
+		/* get configuration for redirection */
+		while (1) {
+			char *match_ipaddr = NULL;
+			int match_port;
 
-		trace_printf(1, "connect(%d, %s:%d, ); [%d](AF_INET)\n", fd, dst_ipaddr, dst_port, ret);
+			char *redirect_ipaddr = NULL;
+			int redirect_port;
+
+			/* get redirect info from configuration file */
+			if (rtr_get_config_multiple(&config, "connect",
+					ARGUMENT_TYPE_STRING,
+					ARGUMENT_TYPE_INT,
+					ARGUMENT_TYPE_STRING,
+					ARGUMENT_TYPE_INT,
+					ARGUMENT_TYPE_END,
+					&match_ipaddr,
+					&match_port,
+					&redirect_ipaddr,
+					&redirect_port) == 0)
+				break;
+
+			/* check if IP address and port number is matched */
+			if (real_strcmp(match_ipaddr, dst_ipaddr) == 0 && match_port == dst_port) {
+				/* set redirect address info */
+				memset(&redirect_addr, 0, sizeof(redirect_addr));
+
+				redirect_addr.sin_family = AF_INET;
+				redirect_addr.sin_addr.s_addr = inet_addr(redirect_ipaddr);
+				redirect_addr.sin_port = htons(redirect_port);
+
+				/* set redirect flag */
+				enabled_redirect = 1;
+			}
+
+			/* free buffers */
+			if (redirect_ipaddr)
+				real_free(redirect_ipaddr);
+
+			if (match_ipaddr)
+				real_free(match_ipaddr);
+
+			/* check redirect flag */
+			if (enabled_redirect)
+				break;
+		}
+
+		/* close config */
+		if (config)
+			rtr_config_close(config);
+
+		/* set remote address info */
+		remote_addr = enabled_redirect ? &redirect_addr : (struct sockaddr_in *) address;
+		remote_ipaddr = inet_ntoa(remote_addr->sin_addr);
+		remote_port = ntohs(remote_addr->sin_port);
+
+		/* connect to remote */
+		ret = real_connect(fd, (struct sockaddr *) remote_addr, sizeof(struct sockaddr_in));
+		if (ret == 0)
+			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, remote_ipaddr, remote_port);
+
+		trace_printf(1, "connect(%d, %s:%d, ); [%d](AF_INET)\n", fd, remote_ipaddr, remote_port, ret);
 
 		return ret;
 	} else if (address->sa_family == AF_UNIX) {
@@ -154,18 +225,31 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 #ifdef __linux__
 	struct sockaddr *address = _address.__sockaddr__;
 #endif
+	struct descriptor_info *di;
+	int clnt_fd;
 
 	real_accept = RETRACE_GET_REAL(accept);
 
-	trace_printf(1,
-			"accept(%d, \"%hu.%hu.%hu.%hu:%hu\", %zu);\n",
-			fd,
-			(unsigned short)address->sa_data[2] & 0xFF,
-			(unsigned short)address->sa_data[3] & 0xFF,
-			(unsigned short)address->sa_data[4] & 0xFF,
-			(unsigned short)address->sa_data[5] & 0xFF,
-			(256 * address->sa_data[0]) + address->sa_data[1],
-			*len);
+	/* get descriptor info */
+	di = file_descriptor_get(fd);
+	if (di && di->type == FILE_DESCRIPTOR_TYPE_IPV4_BIND) {
+		struct sockaddr_in clnt_addr;
+		socklen_t addr_len = sizeof(struct sockaddr_in);
+
+		clnt_fd = real_accept(fd, (struct sockaddr *) &clnt_addr, &addr_len);
+		if (clnt_fd > 0) {
+			const char *clnt_ipaddr = inet_ntoa(clnt_addr.sin_addr);
+			int clnt_port = ntohs(clnt_addr.sin_port);
+
+			/* add file descriptor for client socket */
+			file_descriptor_update(clnt_fd, FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT, clnt_ipaddr, clnt_port);
+
+			trace_printf(1, "accept(%d, %s, %d); [client socket:%d]\n", fd, clnt_ipaddr, clnt_port, clnt_fd);
+		} else
+			trace_printf(1, "accept(%d, , , ); [error]\n", fd);
+
+		return clnt_fd;
+	}
 
 	return real_accept(fd, address, len);
 }

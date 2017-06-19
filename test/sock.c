@@ -33,7 +33,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <arpa/inet.h> 
+#include <arpa/inet.h>
 #include <string.h>
 
 #define PORT 80
@@ -41,14 +41,17 @@
 
 static int sockfd = 0;
 
-static void test_inet()
+static int test_inet(void)
 {
-	struct sockaddr_in serv_addr; 
+	int ret;
+	int sockfd = 0;
+	struct sockaddr_in serv_addr;
 	const char *sendstr = "Retrace Test";
 
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		printf("\n Error : Could not create socket \n");
-		return;
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sockfd < 0) {
+		printf("\nError : Could not create socket\n");
+		return 1;
 	}
 
 	memset(&serv_addr, '0', sizeof(serv_addr));
@@ -56,23 +59,32 @@ static void test_inet()
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_port = htons(PORT);
 
-	if(inet_pton(AF_INET, IP, &serv_addr.sin_addr) <=0 ) {
-		printf("\n inet_pton error occured\n");
-		return;
+	ret = inet_pton(AF_INET, IP, &serv_addr.sin_addr);
+	if (ret	<= 0) {
+		printf("\ninet_pton error occurred\n");
+		return 1;
 	}
 
-	if( connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-		printf("\n Error : Connect Failed \n");
-		return;
+	ret = connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+	if (ret < 0) {
+		printf("\nError : Connect Failed\n");
+		return 1;
 	}
 
-	write (sockfd, sendstr, strlen(sendstr));
-	close (sockfd);
+	write(sockfd, sendstr, strlen(sendstr));
+<<<<<<< HEAD
 
-	return;	
+	close(sockfd);
+
+=======
+
+	close(sockfd);
+
+>>>>>>> fd517026d24bb7bc727402572f8b69951ae01e53
+	return 0;
 }
 
-static void test_unix()
+static void test_unix(void)
 {
 	struct sockaddr_un addr;
 
@@ -86,9 +98,8 @@ static void test_unix()
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, "test");
 
-	if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) != 0) {
+	if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) != 0)
 		printf("\n could not connect to unix domain socket \n");
-	}
 
 	close(sockfd);
 	return;
@@ -96,8 +107,8 @@ static void test_unix()
 
 int main(int argc, char *argv[])
 {
-	test_inet(test_inet);
-	test_unix(test_unix);
+	test_inet();
+	test_unix();
 
-	return 0;
+	return;
 }
