@@ -18,6 +18,11 @@ typedef ssize_t (*rtr_sendto_t)(int sockfd, const void *buf, size_t len, int fla
 		const struct sockaddr *dest_addr, socklen_t addrlen);
 typedef ssize_t (*rtr_sendmsg_t)(int sockfd, const struct msghdr *msg, int flags);
 
+typedef ssize_t (*rtr_recv_t)(int sockfd, void *buf, size_t len, int flags);
+typedef ssize_t (*rtr_recvfrom_t)(int sockfd, void *buf, size_t len, int flags,
+	struct sockaddr *src_addr, socklen_t *addrlen);
+typedef ssize_t (*rtr_recvmsg_t)(int sockfd, struct msghdr *msg, int flags);
+
 RETRACE_DECL(socket);
 RETRACE_DECL(connect);
 RETRACE_DECL(bind);
@@ -28,5 +33,9 @@ RETRACE_DECL(setsockopt);
 RETRACE_DECL(send);
 RETRACE_DECL(sendto);
 RETRACE_DECL(sendmsg);
+
+RETRACE_DECL(recv);
+RETRACE_DECL(recvfrom);
+RETRACE_DECL(recvmsg);
 
 #endif /* __RETRACE_SOCK_H__ */

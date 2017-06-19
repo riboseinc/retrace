@@ -282,7 +282,7 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 	real_send = RETRACE_GET_REAL(send);
 
 	ret = real_send(sockfd, buf, len, flags);
-	trace_printf(1, "send(%d, %p, %d, %d) [return: %d]\n", sockfd, buf, len, flags);
+	trace_printf(1, "send(%d, %p, %d, %d) [return: %d]\n", sockfd, buf, len, flags, ret);
 	for (i = 0; i < len; i++)
 		trace_dump_data((unsigned char *)buf, 1);
 
@@ -302,33 +302,35 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 	real_sendto = RETRACE_GET_REAL(sendto);
 
 	ret = real_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
-	if (dest_addr->sa_family == AF_INET) {
-		struct sockaddr_in *in_addr = (struct sockaddr_in *)dest_addr;
-		const char *remote_addr = inet_ntoa(in_addr->sin_addr);
-		int remote_port = ntohs(in_addr->sin_port);
+	if (dest_addr) {
+		if (dest_addr->sa_family == AF_INET) {
+			struct sockaddr_in *in_addr = (struct sockaddr_in *)dest_addr;
 
-		/* update descriptor info */
-		di = file_descriptor_get(sockfd);
-		if (!di && ret > 0)
-			file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_addr, remote_port);
+			const char *remote_addr = inet_ntoa(in_addr->sin_addr);
+			int remote_port = ntohs(in_addr->sin_port);
 
-		trace_printf(1, "sendto(%d, %p, %d, %d, %s:%d[AF_INET]), [return: %d]\n",
-			sockfd, buf, len, flags, remote_addr, remote_port, ret);
-	} else if (dest_addr->sa_family == AF_UNIX) {
-		struct sockaddr_un *un_addr = (struct sockaddr_un *)dest_addr;
-		const char *remote_path = un_addr->sun_path;
+			/* update descriptor info */
+			di = file_descriptor_get(sockfd);
+			if (!di && ret > 0)
+				file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_addr, remote_port);
 
-		/* update descriptor info */
-		di = file_descriptor_get(sockfd);
-		if (!di && ret > 0)
-			file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_path, -1);
+			trace_printf(1, "sendto(%d, %p, %d, %d, %s:%d[AF_INET]), [return: %d]\n",
+				sockfd, buf, len, flags, remote_addr, remote_port, ret);
+		} else if (dest_addr->sa_family == AF_UNIX) {
+			struct sockaddr_un *un_addr = (struct sockaddr_un *)dest_addr;
+			const char *remote_path = un_addr->sun_path;
 
-		trace_printf(1, "sendto(%d, %p, %d, %d, %s[AF_UNIX|AF_LOCAL]), [return: %d]\n",
-			sockfd, buf, len, flags, remote_path, ret);
-	} else {
-		trace_printf(1, "sendto(%d, %p, %d, %d, %d[FamilyType]), [return: %d]\n",
-			sockfd, buf, len, flags, dest_addr->sa_family, ret);
-	}
+			/* update descriptor info */
+			di = file_descriptor_get(sockfd);
+			if (!di && ret > 0)
+				file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_path, -1);
+
+			trace_printf(1, "sendto(%d, %p, %d, %d, %s[AF_UNIX|AF_LOCAL]), [return: %d]\n",
+				sockfd, buf, len, flags, remote_path, ret);
+		}
+	} else
+		trace_printf(1, "sendto(%d, %p, %d, %d), [return: %d]\n",
+			sockfd, buf, len, flags, ret);
 
 	/* dump sending data */
 	for (i = 0; i < len; i++)
@@ -368,3 +370,80 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 }
 
 RETRACE_REPLACE(sendmsg)
+
+ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flags)
+{
+	rtr_recv_t real_recv;
+	int i, recv_len;
+
+	real_recv = RETRACE_GET_REAL(recv);
+
+	recv_len = real_recv(sockfd, buf, len, flags);
+	trace_printf(1, "recv(%d, %p, %d, %d) [return: %d]\n", sockfd, buf, len, flags, recv_len);
+	for (i = 0; i < recv_len; i++)
+		trace_dump_data((unsigned char *)buf, 1);
+
+	return recv_len;
+}
+
+RETRACE_REPLACE(recv)
+
+ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int flags,
+	struct sockaddr *src_addr, socklen_t *addrlen)
+{
+	rtr_recvfrom_t real_recvfrom;
+	int i, recv_len;
+
+	real_recvfrom = RETRACE_GET_REAL(recvfrom);
+
+	recv_len = real_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+	if (src_addr) {
+		if (src_addr->sa_family == AF_INET) {
+			struct sockaddr_in *in_addr = (struct sockaddr_in *)src_addr;
+			const char *src_ipaddr = inet_ntoa(in_addr->sin_addr);
+			int src_port = ntohs(in_addr->sin_port);
+
+			trace_printf(1, "recvfrom(%d, %p, %d, %d, %s:%d[AF_INET]), [return: %d]\n",
+				sockfd, buf, len, flags, src_ipaddr, src_port, recv_len);
+		} else if (src_addr->sa_family == AF_UNIX) {
+			struct sockaddr_un *un_addr = (struct sockaddr_un *)src_addr;
+			const char *src_path = un_addr->sun_path;
+
+			trace_printf(1, "recvfrom(%d, %p, %d, %d, %s[AF_UNIX|AF_LOCAL]), [return: %d]\n",
+				sockfd, buf, len, flags, src_path, recv_len);
+		}
+	} else
+		trace_printf(1, "recvfrom(%d, %p, %d, %d), [return: %d]\n",
+			sockfd, buf, len, flags, recv_len);
+
+	/* dump sending data */
+	for (i = 0; i < len; i++)
+		trace_dump_data((unsigned char *)buf, 1);
+
+	return recv_len;
+}
+
+RETRACE_REPLACE(recvfrom)
+
+ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flags)
+{
+	rtr_recvmsg_t real_recvmsg;
+	int i, j, recv_len;
+
+	real_recvmsg = RETRACE_GET_REAL(recvmsg);
+
+	recv_len = real_recvmsg(sockfd, msg, flags);
+	trace_printf(1, "recvmsg(%d, %p, %d) [return:%d]\n", sockfd, msg, flags, recv_len);
+
+	/* dump message data */
+	for (i = 0; i < msg->msg_iovlen; i++) {
+		struct iovec *msg_iov = &msg->msg_iov[i];
+
+		for (j = 0; j < msg_iov->iov_len; j++)
+			trace_dump_data((unsigned char *) msg_iov->iov_base, 1);
+	}
+
+	return recv_len;
+}
+
+RETRACE_REPLACE(recvmsg)
