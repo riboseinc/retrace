@@ -249,7 +249,6 @@ int RETRACE_IMPLEMENTATION(close)(int fd)
 	real_close = RETRACE_GET_REAL(close);
 
 	di = file_descriptor_get(fd);
-
 	if (di && di->location)
 		trace_printf(1, "close(%d) [was pointing to %s];\n", fd, di->location);
 	else

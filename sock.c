@@ -188,7 +188,7 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 		const char *bind_ipaddr = inet_ntoa(bind_addr->sin_addr);
 		int bind_port = ntohs(bind_addr->sin_port);
 
-		/* connect to remote */
+		/* bind socket */
 		ret = real_bind(fd, (struct sockaddr *) bind_addr, sizeof(struct sockaddr_in));
 		if (ret == 0)
 			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_BIND, bind_ipaddr, bind_port);
@@ -200,7 +200,7 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 		struct sockaddr_un *un_addr = (struct sockaddr_un *) address;
 		const char *sun_path = un_addr->sun_path;
 
-		/* connect to local */
+		/* bind local socket */
 		ret = real_bind(fd, (struct sockaddr *) un_addr, sizeof(struct sockaddr_un));
 		if (ret == 0)
 			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_BIND, sun_path, -1);
@@ -255,3 +255,21 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 }
 
 RETRACE_REPLACE(accept)
+
+int RETRACE_IMPLEMENTATION(setsockopt)(int fd, int level, int optname, const void *optval, socklen_t optlen)
+{
+	rtr_setsockopt_t real_setsockopt;
+	int i, ret;
+
+	real_setsockopt = RETRACE_GET_REAL(setsockopt);
+
+	ret = real_setsockopt(fd, level, optname, optval, optlen);
+
+	trace_printf(1, "setsockopt(%d, %d, %d, %p) [return:%d]\n", fd, level, optname, optval, ret);
+	for (i = 0; i < optlen; i++)
+		trace_dump_data((unsigned char *)optval + i, sizeof(socklen_t));
+
+	return ret;
+}
+
+RETRACE_REPLACE(setsockopt)

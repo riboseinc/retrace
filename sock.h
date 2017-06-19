@@ -11,9 +11,13 @@ typedef int (*rtr_connect_t)(int sockfd, const struct sockaddr *addr, socklen_t 
 typedef int (*rtr_bind_t)(int fd, const struct sockaddr *address, socklen_t len);
 typedef int (*rtr_accept_t)(int fd, struct sockaddr *address, socklen_t *len);
 
+typedef int (*rtr_setsockopt_t)(int fd, int level, int optname, const void *optval, socklen_t optlen);
+
 RETRACE_DECL(socket);
 RETRACE_DECL(connect);
 RETRACE_DECL(bind);
 RETRACE_DECL(accept);
+
+RETRACE_DECL(setsockopt);
 
 #endif /* __RETRACE_SOCK_H__ */
