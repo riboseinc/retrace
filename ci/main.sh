@@ -25,6 +25,8 @@ CHECKPATCH_FLAGS+=" --ignore MISSING_SIGN_OFF"
 CHECKPATCH_FLAGS+=" --ignore RETURN_PARENTHESES"
 CHECKPATCH_FLAGS+=" --ignore STATIC_CONST_CHAR_ARRAY"
 CHECKPATCH_FLAGS+=" --ignore ARRAY_SIZE"
+CHECKPATCH_FLAGS+=" --ignore NAKED_SSCANF"
+CHECKPATCH_FLAGS+=" --ignore SSCANF_TO_KSTRTO"
 
 # checkpatch.pl will ignore the following paths
 CHECKPATCH_IGNORE+=" checkpatch.pl.patch"
