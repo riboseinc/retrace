@@ -13,11 +13,20 @@ typedef int (*rtr_accept_t)(int fd, struct sockaddr *address, socklen_t *len);
 
 typedef int (*rtr_setsockopt_t)(int fd, int level, int optname, const void *optval, socklen_t optlen);
 
+typedef ssize_t (*rtr_send_t)(int sockfd, const void *buf, size_t len, int flags);
+typedef ssize_t (*rtr_sendto_t)(int sockfd, const void *buf, size_t len, int flags,
+		const struct sockaddr *dest_addr, socklen_t addrlen);
+typedef ssize_t (*rtr_sendmsg_t)(int sockfd, const struct msghdr *msg, int flags);
+
 RETRACE_DECL(socket);
 RETRACE_DECL(connect);
 RETRACE_DECL(bind);
 RETRACE_DECL(accept);
 
 RETRACE_DECL(setsockopt);
+
+RETRACE_DECL(send);
+RETRACE_DECL(sendto);
+RETRACE_DECL(sendmsg);
 
 #endif /* __RETRACE_SOCK_H__ */
