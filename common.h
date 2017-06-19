@@ -30,6 +30,8 @@
 #define FILE_DESCRIPTOR_TYPE_IPV4_BIND		3 /* from bind() */
 #define FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT	4 /* from accept() */
 #define FILE_DESCRIPTOR_TYPE_UNIX_DOMAIN	5 /* from connect() using AF_UNIX */
+#define FILE_DESCRIPTOR_TYPE_UDP_SENDTO		6 /* from sendto() over UDP */
+#define FILE_DESCRIPTOR_TYPE_UDP_SENDMSG	7 /* from sendmsg() over UDP local socket */
 
 #ifdef __APPLE__
 

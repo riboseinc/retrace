@@ -257,6 +257,27 @@ RTR_TEST_END
 RTR_TEST_START(accept)
 RTR_TEST_END
 
+RTR_TEST_START(setsockopt)
+RTR_TEST_END
+
+RTR_TEST_START(send)
+RTR_TEST_END
+
+RTR_TEST_START(sendto)
+RTR_TEST_END
+
+RTR_TEST_START(sendmsg)
+RTR_TEST_END
+
+RTR_TEST_START(recv)
+RTR_TEST_END
+
+RTR_TEST_START(recvfrom)
+RTR_TEST_END
+
+RTR_TEST_START(recvmsg)
+RTR_TEST_END
+
 RTR_TEST_START(strcpy)
 RTR_TEST_END
 
@@ -812,6 +833,10 @@ main(void)
 		/* socket functions */
 		cmocka_unit_test(test_rtr_socket),   cmocka_unit_test(test_rtr_connect),
 		cmocka_unit_test(test_rtr_bind),     cmocka_unit_test(test_rtr_accept),
+		cmocka_unit_test(test_rtr_setsockopt),
+		cmocka_unit_test(test_rtr_send),     cmocka_unit_test(test_rtr_sendto),
+		cmocka_unit_test(test_rtr_sendmsg),  cmocka_unit_test(test_rtr_recv),
+		cmocka_unit_test(test_rtr_recvfrom),  cmocka_unit_test(test_rtr_recvmsg),
 	};
 
 	handle = dlopen("../retrace.so", RTLD_LAZY);
