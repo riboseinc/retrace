@@ -27,8 +27,10 @@
 #include <unistd.h>
 #include <pwd.h>
 
-int main (void)
+int main(void)
 {
+	static struct passwd *pw;
+
 	setuid(111);
 	seteuid(222);
 	setgid(333);
@@ -38,8 +40,7 @@ int main (void)
 	getpid();
 	getppid();
 
-	struct passwd *pw = getpwuid(getuid());
+	pw = getpwuid(getuid());
 
 	return 0;
 }
-

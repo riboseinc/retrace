@@ -85,7 +85,7 @@ void trace_mode(mode_t mode, char *p);
 
 int rtr_get_config_multiple(FILE **config, const char *function, ...);
 int rtr_get_config_single(const char *function, ...);
-void rtr_confing_close(FILE *config);
+void rtr_config_close(FILE *config);
 
 int get_tracing_enabled(void);
 int trace_disable();
