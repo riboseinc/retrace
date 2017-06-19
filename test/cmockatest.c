@@ -56,6 +56,7 @@
 #include "pipe.h"
 #include "printf.h"
 #include "dir.h"
+#include "scanf.h"
 
 void *handle;
 
@@ -779,6 +780,160 @@ RTR_TEST_START(vsnprintf)
 	assert_string_equal(buf, buf1);
 RTR_TEST_END
 
+RTR_TEST_START(scanf)
+	FILE *oldstdin1, *oldstdin2;
+	char buf1[100], buf2[100];
+	int fd1[2], fd2[2];
+	int r1, r2;
+
+	pipe(fd1);
+	oldstdin1 = stdin;
+	stdin = fdopen(fd1[0], "r");
+	write(fd1[1], "string123 ", strlen("string123 "));
+	r1 = scanf("%s", buf1);
+	fclose(stdin);
+	stdin = oldstdin1;
+	close(fd1[1]);
+
+	pipe(fd2);
+	oldstdin2 = stdin;
+	stdin = fdopen(fd2[0], "r");
+	write(fd2[1], "string123 ", strlen("string123 "));
+	r2 = rtr_scanf("%s", buf2);
+	fclose(stdin);
+	stdin = oldstdin2;
+	close(fd2[1]);
+
+	assert_true(r1 > 0 && r1 == r2);
+	assert_string_equal(buf1, buf2);
+RTR_TEST_END
+
+RTR_TEST_START(fscanf)
+	char str1[100], str2[100];
+	FILE *fp1, *fp2;
+	int r1, r2;
+
+	fp1 = fopen("scanf_test1.txt", "w+");
+	fputs("fscanftest", fp1);
+	rewind(fp1);
+	r1 = fscanf(fp1, "%s", str1);
+
+	fp2 = fopen("scanf_test2.txt", "w+");
+	fputs("fscanftest", fp2);
+	rewind(fp2);
+	r2 = rtr_fscanf(fp2, "%s", str2);
+
+	assert_true(r1 > 0 && r1 == r2);
+	assert_string_equal(str1, str2);
+RTR_TEST_END
+
+RTR_TEST_START(sscanf)
+	char month1[20], month2[20], dtm[100];
+	int r1, r2;
+
+	strcpy(dtm, "October");
+	r1 = sscanf(dtm, "%s", month1);
+	r2 = rtr_sscanf(dtm, "%s", month2);
+
+	assert_true(r1 > 0 && r1 == r2);
+	assert_string_equal(month1, month2);
+RTR_TEST_END
+
+int
+to_vscanf(rtr_vscanf_t fn, const char *fmt, ...)
+{
+	va_list ap;
+	int result;
+
+	va_start(ap, fmt);
+	result = fn(fmt, ap);
+	va_end(ap);
+	return result;
+}
+
+RTR_TEST_START(vscanf)
+	FILE *oldstdin1, *oldstdin2;
+	char buf1[100], buf2[100];
+	int fd1[2], fd2[2];
+	int r1, r2;
+
+	pipe(fd1);
+	oldstdin1 = stdin;
+	stdin = fdopen(fd1[0], "r");
+	write(fd1[1], "string123 ", strlen("string123 "));
+	r1 = to_vscanf(vscanf, "%s", (char *)&buf1);
+	fclose(stdin);
+	stdin = oldstdin1;
+	close(fd1[1]);
+
+	pipe(fd2);
+	oldstdin2 = stdin;
+	stdin = fdopen(fd2[0], "r");
+	write(fd2[1], "string123 ", strlen("string123 "));
+	r2 = to_vscanf(rtr_vscanf, "%s", (char *)&buf2);
+	fclose(stdin);
+	stdin = oldstdin2;
+	close(fd2[1]);
+
+	assert_true(r1 > 0 && r1 == r2);
+	assert_string_equal(buf1, buf2);
+RTR_TEST_END
+
+int
+to_vfscanf(rtr_vfscanf_t fn, FILE *stream, const char *fmt, ...)
+{
+	va_list ap;
+	int result;
+
+	va_start(ap, fmt);
+	result = fn(stream, fmt, ap);
+	va_end(ap);
+	return result;
+}
+
+RTR_TEST_START(vfscanf)
+	char str1[100], str2[100];
+	FILE *fp1, *fp2;
+	int r1, r2;
+
+	fp1 = fopen("scanf_test1.txt", "w+");
+	fputs("fscanftest", fp1);
+	rewind(fp1);
+	r1 = to_vfscanf(vfscanf, fp1, "%s", str1);
+
+	fp2 = fopen("scanf_test2.txt", "w+");
+	fputs("fscanftest", fp2);
+	rewind(fp2);
+	r2 = to_vfscanf(rtr_vfscanf, fp2, "%s", str2);
+
+	assert_true(r1 > 0 && r1 == r2);
+	assert_string_equal(str1, str2);
+RTR_TEST_END
+
+int
+to_vsscanf(rtr_vsscanf_t fn, const char *str, const char *fmt, ...)
+{
+	va_list ap;
+	int result;
+
+	va_start(ap, fmt);
+	result = fn(str, fmt, ap);
+	va_end(ap);
+	return result;
+}
+
+RTR_TEST_START(vsscanf)
+	char month1[20], month2[20], dtm[100];
+	int r1, r2;
+
+	strcpy(dtm, "October");
+	r1 = to_vsscanf(vsscanf, dtm, "%s", month1);
+	r2 = to_vsscanf(rtr_vsscanf, dtm, "%s", month2);
+
+	assert_true(r1 > 0 && r1 == r2);
+	assert_string_equal(month1, month2);
+RTR_TEST_END
+
 int
 main(void)
 {
@@ -833,10 +988,16 @@ main(void)
 		/* socket functions */
 		cmocka_unit_test(test_rtr_socket),   cmocka_unit_test(test_rtr_connect),
 		cmocka_unit_test(test_rtr_bind),     cmocka_unit_test(test_rtr_accept),
+
 		cmocka_unit_test(test_rtr_setsockopt),
 		cmocka_unit_test(test_rtr_send),     cmocka_unit_test(test_rtr_sendto),
 		cmocka_unit_test(test_rtr_sendmsg),  cmocka_unit_test(test_rtr_recv),
 		cmocka_unit_test(test_rtr_recvfrom),  cmocka_unit_test(test_rtr_recvmsg),
+
+		/* scanf funcitons */
+		cmocka_unit_test(test_rtr_scanf),    cmocka_unit_test(test_rtr_fscanf),
+		cmocka_unit_test(test_rtr_sscanf),   cmocka_unit_test(test_rtr_vscanf),
+		cmocka_unit_test(test_rtr_vfscanf),  cmocka_unit_test(test_rtr_vsscanf),
 	};
 
 	handle = dlopen("../retrace.so", RTLD_LAZY);
