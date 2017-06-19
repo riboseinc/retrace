@@ -26,9 +26,10 @@
 
 #define FILE_DESCRIPTOR_TYPE_UNKNOWN		0
 #define FILE_DESCRIPTOR_TYPE_FILE		1 /* from open() */
-#define FILE_DESCRIPTOR_TYPE_IPV4_CONNECT	2 /* from connect() */
+#define FILE_DESCRIPTOR_TYPE_IPV4_CONNECT	2 /* from connect() using AF_INET */
 #define FILE_DESCRIPTOR_TYPE_IPV4_BIND		3 /* from bind() */
 #define FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT	4 /* from accept() */
+#define FILE_DESCRIPTOR_TYPE_UNIX_DOMAIN	5 /* from connect() using AF_UNIX */
 
 #ifdef __APPLE__
 
@@ -84,7 +85,7 @@ void trace_mode(mode_t mode, char *p);
 
 int rtr_get_config_multiple(FILE **config, const char *function, ...);
 int rtr_get_config_single(const char *function, ...);
-void rtr_confing_close(FILE *config);
+void rtr_config_close(FILE *config);
 
 int get_tracing_enabled(void);
 int trace_disable();
