@@ -26,6 +26,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <sys/un.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,11 +36,12 @@
 #include <arpa/inet.h>
 #include <string.h>
 
-
 #define PORT 80
 #define IP "127.0.0.1"
 
-int main(int argc, char *argv[])
+static int sockfd;
+
+static int test_inet(void)
 {
 	int ret;
 	int sockfd = 0;
@@ -70,8 +72,35 @@ int main(int argc, char *argv[])
 	}
 
 	write(sockfd, sendstr, strlen(sendstr));
+	close(sockfd);
+
+	return 0;
+}
+
+static void test_unix(void)
+{
+	struct sockaddr_un addr;
+
+	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sockfd < 0) {
+		printf("\rError: Could not create socket\n");
+		return;
+	}
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strcpy(addr.sun_path, "test");
+
+	if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) != 0)
+		printf("could not connect to unix domain socket\n");
 
 	close(sockfd);
+}
+
+int main(int argc, char *argv[])
+{
+	test_inet();
+	test_unix();
 
 	return 0;
 }
