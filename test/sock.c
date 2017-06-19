@@ -92,9 +92,8 @@ static void test_unix(void)
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, "test");
 
-	if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) != 0) {
+	if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) != 0)
 		printf("\n could not connect to unix domain socket \n");
-	}
 
 	close(sockfd);
 	return;
@@ -105,5 +104,5 @@ int main(int argc, char *argv[])
 	test_inet();
 	test_unix();
 
-	return 0;
+	return;	
 }
