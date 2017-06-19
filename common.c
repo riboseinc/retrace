@@ -436,7 +436,7 @@ cleanup:
 }
 
 void
-rtr_confing_close(FILE *config)
+rtr_config_close(FILE *config)
 {
 	fclose(config);
 }
@@ -456,7 +456,7 @@ int rtr_get_config_multiple(FILE **config, const char *function, ...)
 		ret = rtr_parse_config_file(*config, function, args);
 
 		if (!ret) {
-			rtr_confing_close(*config);
+			rtr_config_close(*config);
 			*config = NULL;
 		}
 	}
@@ -478,7 +478,7 @@ int rtr_get_config_single(const char *function, ...)
 
 		ret = rtr_parse_config_file(config_file, function, args);
 
-		rtr_confing_close(config_file);
+		rtr_config_close(config_file);
 	}
 
 	return ret;
