@@ -26,18 +26,23 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <unistd.h>
 
 int scanf_test(void)
 {
-	char ch;
-	char str[100];
-	
-	printf("Enter any character \n");
-	scanf("%c", &ch);
-	printf("Entered character is %c \n", ch);
-	printf("Enter any string ( upto 100 character ) \n");
-	scanf("%s", (char *)&str);
-	printf("Entered string is %s \n", str);
+	FILE *oldstdin;
+	char buf[1024];
+	int fd[2];
+	pipe(fd);
+	oldstdin = stdin;
+	stdin = fdopen(fd[0], "r");
+	write(fd[1], "string123 ", strlen("string123 "));
+	scanf("%s", buf);
+	fclose(stdin);
+	stdin = oldstdin;
+	close(fd[1]);
+
+	printf("%s\n", buf);
 
 	return 0;
 }
@@ -88,13 +93,19 @@ void GetMatchesVscanf(const char *format, ...)
 
 int vscanf_test(void)
 {
-	int val;
-	char str[100];
+	FILE *oldstdin;
+	char buf[1024];
+	int fd[2];
+	pipe(fd);
+	oldstdin = stdin;
+	stdin = fdopen(fd[0], "r");
+	write(fd[1], "string123 ", strlen("string123 "));
+	GetMatchesVscanf("%s", buf);
+	fclose(stdin);
+	stdin = oldstdin;
+	close(fd[1]);
 
-	printf("Please enter a number and a word: ");
-	fflush(stdout);
-	GetMatchesVscanf(" %d %99s ", &val, str);
-	printf("Number read: %d\nWord read: %s\n", val, str);
+	printf("%s\n", buf);
 
 	return 0;
 }

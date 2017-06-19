@@ -717,16 +717,31 @@ assert_string_equal(buf, buf1);
 RTR_TEST_END
 
 RTR_TEST_START(scanf)
-char str1[100], str2[100];
+FILE *oldstdin1, *oldstdin2;
+char buf1[100], buf2[100];
+int fd1[2], fd2[2];
 int r1, r2;
 
-printf("Input string: ");
-r1 = rtr_scanf("%s", (char *)&str1);
-printf("Input the same string again: ");
-r2 = scanf("%s", (char *)&str2);
+pipe(fd1);
+oldstdin1 = stdin;
+stdin = fdopen(fd1[0], "r");
+write(fd1[1], "string123 ", strlen("string123 "));
+r1 = scanf("%s", buf1);
+fclose(stdin);
+stdin = oldstdin1;
+close(fd1[1]);
+
+pipe(fd2);
+oldstdin2 = stdin;
+stdin = fdopen(fd2[0], "r");
+write(fd2[1], "string123 ", strlen("string123 "));
+r2 = rtr_scanf("%s", buf2);
+fclose(stdin);
+stdin = oldstdin2;
+close(fd2[1]);
 
 assert_true(r1 > 0 && r1 == r2);
-assert_string_equal(str1, str2);
+assert_string_equal(buf1, buf2);
 RTR_TEST_END
 
 RTR_TEST_START(fscanf)
@@ -773,16 +788,31 @@ to_vscanf(rtr_vscanf_t fn, const char *fmt, ...)
 }
 
 RTR_TEST_START(vscanf)
-char str1[100], str2[100];
+FILE *oldstdin1, *oldstdin2;
+char buf1[100], buf2[100];
+int fd1[2], fd2[2];
 int r1, r2;
 
-printf("Input string: ");
-r1 = to_vscanf(rtr_vscanf, "%s", (char *)&str1);
-printf("Input the same string again: ");
-r2 = to_vscanf(vscanf, "%s", (char *)&str2);
+pipe(fd1);
+oldstdin1 = stdin;
+stdin = fdopen(fd1[0], "r");
+write(fd1[1], "string123 ", strlen("string123 "));
+r1 = to_vscanf(vscanf, "%s", (char *)&buf1);
+fclose(stdin);
+stdin = oldstdin1;
+close(fd1[1]);
+
+pipe(fd2);
+oldstdin2 = stdin;
+stdin = fdopen(fd2[0], "r");
+write(fd2[1], "string123 ", strlen("string123 "));
+r2 = to_vscanf(rtr_vscanf, "%s", (char *)&buf2);
+fclose(stdin);
+stdin = oldstdin2;
+close(fd2[1]);
 
 assert_true(r1 > 0 && r1 == r2);
-assert_string_equal(str1, str2);
+assert_string_equal(buf1, buf2);
 RTR_TEST_END
 
 int
