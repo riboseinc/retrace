@@ -50,7 +50,7 @@ print_ssl_keys(SSL *ssl)
 {
 	SSL_SESSION *session = NULL;
 	size_t master_key_length = 0;
-	size_t client_random_lenght = 0;
+	size_t client_random_length = 0;
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 	unsigned char *client_random;
 	unsigned char *master_key;
@@ -61,11 +61,11 @@ print_ssl_keys(SSL *ssl)
 
 	if (ssl) {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-		session = ssl ->session;
+		session = ssl->session;
 
 		if (ssl->s3) {
 			client_random = ssl->s3->client_random;
-			client_random_lenght = SSL3_RANDOM_SIZE;
+			client_random_length = SSL3_RANDOM_SIZE;
 		}
 
 		if (session) {
@@ -87,16 +87,16 @@ print_ssl_keys(SSL *ssl)
 			session = real_SSL_get_session (ssl);
 
 			if (session) {
-				master_key_length = real_SSL_SESSION_get_master_key (session, master_key, SSL_MAX_MASTER_KEY_LENGTH);
-				client_random_lenght = real_SSL_get_client_random (ssl, client_random, SSL3_RANDOM_SIZE);
+				master_key_length = real_SSL_SESSION_get_master_key(session, master_key, SSL_MAX_MASTER_KEY_LENGTH);
+				client_random_length = real_SSL_get_client_random(ssl, client_random, SSL3_RANDOM_SIZE);
 			}
 		}
 #endif
 	}
 
-	if (master_key_length > 0 && client_random_lenght > 0) {
+	if (master_key_length > 0 && client_random_length > 0) {
 		trace_printf(0, "\tCLIENT_RANDOM ");
-		print_key(client_random, client_random_lenght);
+		print_key(client_random, client_random_length);
 		trace_printf(0, " ");
 		print_key(master_key, master_key_length);
 		trace_printf(0, "\n");
@@ -201,7 +201,7 @@ RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
 
 RETRACE_REPLACE(SSL_get_verify_result)
 
-#define DEFINE_TO_STR(def,str) case (def): str = #def; break;
+#define DEFINE_TO_STR(def, str) case (def): str = #def; break;
 
 long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 {
@@ -426,7 +426,7 @@ long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 	DEFINE_TO_STR(BIO_C_GET_ACCEPT, cmd_str)
 #endif
 #ifdef BIO_C_SET_SSL_RENEGOTIATE_BYTES
-        DEFINE_TO_STR(BIO_C_SET_SSL_RENEGOTIATE_BYTES, cmd_str)
+	DEFINE_TO_STR(BIO_C_SET_SSL_RENEGOTIATE_BYTES, cmd_str)
 #endif
 #ifdef BIO_C_GET_SSL_NUM_RENEGOTIATES
 	DEFINE_TO_STR(BIO_C_GET_SSL_NUM_RENEGOTIATES, cmd_str)
@@ -518,8 +518,9 @@ long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 #ifdef BIO_C_SET_CONNECT_MODE
 	DEFINE_TO_STR(BIO_C_SET_CONNECT_MODE, cmd_str)
 #endif
+
 	default:
-		cmd_str = "UNKNOW";
+		cmd_str = "UNKNOWN";
 	}
 
 	trace_printf(1, "BIO_ctrl(%p, \"%s\"(%d), %ld, %p); [return: %d]\n", bp, cmd_str, cmd, larg, parg, r);
@@ -529,7 +530,7 @@ long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 			int old_trace_state;
 
 			old_trace_state = trace_disable();
-			BIO_get_ssl (bp, &ssl);
+			BIO_get_ssl(bp, &ssl);
 			trace_restore(old_trace_state);
 		}
 
