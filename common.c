@@ -44,6 +44,7 @@
 #endif
 
 #include <stdarg.h>
+#include <errno.h>
 
 #include "common.h"
 #include "str.h"
@@ -106,7 +107,6 @@ trace_printf(int hdr, const char *fmt, ...)
 
 	if (!get_tracing_enabled())
 		return;
-
 	if (rtr_get_config_single("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_END, &output_file_path)) {
 		old_trace_state = trace_disable();
 		if (output_file_path) {
@@ -312,20 +312,23 @@ get_config_file()
 	rtr_malloc_t real_malloc;
 	rtr_free_t real_free;
 	rtr_getenv_t real_getenv;
+	int olderrno;
 
 	if (!get_tracing_enabled())
 		return NULL;
+
+	olderrno = errno;
 
 	old_trace_state = trace_disable();
 
 	real_fopen	= RETRACE_GET_REAL(fopen);
 	real_malloc	= RETRACE_GET_REAL(malloc);
 	real_free	= RETRACE_GET_REAL(free);
-	real_getenv = RETRACE_GET_REAL(getenv);
+	real_getenv	= RETRACE_GET_REAL(getenv);
 
 
 	/* If we have a RETRACE_CONFIG env var, try to open the config file from there. */
-	file_path = getenv("RETRACE_CONFIG");
+	file_path = real_getenv("RETRACE_CONFIG");
 
 	if (file_path)
 		config_file = real_fopen(file_path, "r");
@@ -357,6 +360,8 @@ get_config_file()
 		config_file = real_fopen("/etc/retrace.conf", "r");
 
 	trace_restore(old_trace_state);
+
+	errno = olderrno;
 
 	return config_file;
 }
@@ -460,7 +465,6 @@ rtr_parse_config_file(FILE *config_file, const char *function, va_list arg_types
 				break;
 		}
 
-		va_end(arg_types);
 		va_end(arg_values);
 	}
 
@@ -499,6 +503,8 @@ int rtr_get_config_multiple(FILE **config, const char *function, ...)
 
 		ret = rtr_parse_config_file(*config, function, args);
 
+		va_end(args);
+
 		if (!ret) {
 			rtr_config_close(*config);
 			*config = NULL;
@@ -521,6 +527,8 @@ int rtr_get_config_single(const char *function, ...)
 		va_start(args, function);
 
 		ret = rtr_parse_config_file(config_file, function, args);
+
+		va_end(args);
 
 		rtr_config_close(config_file);
 	}
