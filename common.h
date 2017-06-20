@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define SOMAXCONN	128
 #define MAXLEN		40
 
 #define VAR "\033[33m"  /* ANSI yellow for variable values */
@@ -32,6 +31,8 @@
 #define FILE_DESCRIPTOR_TYPE_UNIX_DOMAIN	5 /* from connect() using AF_UNIX */
 #define FILE_DESCRIPTOR_TYPE_UDP_SENDTO		6 /* from sendto() over UDP */
 #define FILE_DESCRIPTOR_TYPE_UDP_SENDMSG	7 /* from sendmsg() over UDP local socket */
+
+extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
 
 #ifdef __APPLE__
 
@@ -61,12 +62,12 @@ rtr_##func##_t rtr_get_real_##func() {                                     \
 	return ptr;                                                        \
 }
 #else
-#define RETRACE_REPLACE(func)                                                      \
-rtr_##func##_t rtr_get_real_##func() {                                             \
-	static rtr_##func##_t ptr;                                                 \
-	if (__atomic_load_n(&ptr, __ATOMIC_RELAXED) == NULL)                       \
-		__atomic_store_n(&ptr, dlsym(RTLD_NEXT, #func), __ATOMIC_RELAXED); \
-	return ptr;                                                                \
+#define RETRACE_REPLACE(func)                                                                  \
+rtr_##func##_t rtr_get_real_##func() {                                                         \
+	static rtr_##func##_t ptr;                                                             \
+	if (__atomic_load_n(&ptr, __ATOMIC_RELAXED) == NULL)                                   \
+		__atomic_store_n(&ptr, _dl_sym(RTLD_NEXT, #func, __func__), __ATOMIC_RELAXED); \
+	return ptr;                                                                            \
 }
 #endif
 #define RETRACE_GET_REAL(func) rtr_get_real_##func()

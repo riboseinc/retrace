@@ -261,15 +261,17 @@ RETRACE_REPLACE(accept)
 int RETRACE_IMPLEMENTATION(setsockopt)(int fd, int level, int optname, const void *optval, socklen_t optlen)
 {
 	rtr_setsockopt_t real_setsockopt;
-	int i, ret;
+	int ret;
 
 	real_setsockopt = RETRACE_GET_REAL(setsockopt);
 
 	ret = real_setsockopt(fd, level, optname, optval, optlen);
 
 	trace_printf(1, "setsockopt(%d, %d, %d, %p) [return:%d]\n", fd, level, optname, optval, ret);
+#if 0
 	for (i = 0; i < optlen; i++)
 		trace_dump_data((unsigned char *)optval + i, sizeof(socklen_t));
+#endif
 
 	return ret;
 }
@@ -279,14 +281,14 @@ RETRACE_REPLACE(setsockopt)
 ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, int flags)
 {
 	rtr_send_t real_send;
-	int i, ret;
+	int ret;
 
 	real_send = RETRACE_GET_REAL(send);
 
 	ret = real_send(sockfd, buf, len, flags);
 	trace_printf(1, "send(%d, %p, %d, %d) [return: %d]\n", sockfd, buf, len, flags, ret);
-	for (i = 0; i < len; i++)
-		trace_dump_data((unsigned char *)buf, 1);
+	if (ret > 0)
+		trace_dump_data((unsigned char *)buf, ret);
 
 	return ret;
 }
@@ -297,7 +299,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 		const struct sockaddr *dest_addr, socklen_t addrlen)
 {
 	rtr_sendto_t real_sendto;
-	int i, ret;
+	int ret;
 
 	struct descriptor_info *di;
 
@@ -335,8 +337,8 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 			sockfd, buf, len, flags, ret);
 
 	/* dump sending data */
-	for (i = 0; i < len; i++)
-		trace_dump_data((unsigned char *)buf, 1);
+	if (ret > 0)
+		trace_dump_data((unsigned char *)buf, ret);
 
 	return ret;
 }
@@ -346,7 +348,7 @@ RETRACE_REPLACE(sendto)
 ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, int flags)
 {
 	rtr_sendmsg_t real_sendmsg;
-	int i, j, ret;
+	int i, ret;
 
 	struct descriptor_info *di;
 
@@ -364,8 +366,8 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 	for (i = 0; i < msg->msg_iovlen; i++) {
 		struct iovec *msg_iov = &msg->msg_iov[i];
 
-		for (j = 0; j < msg_iov->iov_len; j++)
-			trace_dump_data((unsigned char *) msg_iov->iov_base, 1);
+		if (msg_iov->iov_len > 0)
+			trace_dump_data((unsigned char *) msg_iov->iov_base, msg_iov->iov_len);
 	}
 
 	return ret;
@@ -376,14 +378,15 @@ RETRACE_REPLACE(sendmsg)
 ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flags)
 {
 	rtr_recv_t real_recv;
-	int i, recv_len;
+	int recv_len;
 
 	real_recv = RETRACE_GET_REAL(recv);
 
 	recv_len = real_recv(sockfd, buf, len, flags);
 	trace_printf(1, "recv(%d, %p, %d, %d) [return: %d]\n", sockfd, buf, len, flags, recv_len);
-	for (i = 0; i < recv_len; i++)
-		trace_dump_data((unsigned char *)buf, 1);
+
+	if (recv_len > 0)
+		trace_dump_data((unsigned char *)buf, recv_len);
 
 	return recv_len;
 }
@@ -394,7 +397,7 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 	struct sockaddr *src_addr, socklen_t *addrlen)
 {
 	rtr_recvfrom_t real_recvfrom;
-	int i, recv_len;
+	int recv_len;
 
 	real_recvfrom = RETRACE_GET_REAL(recvfrom);
 
@@ -419,8 +422,8 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 			sockfd, buf, len, flags, recv_len);
 
 	/* dump sending data */
-	for (i = 0; i < len; i++)
-		trace_dump_data((unsigned char *)buf, 1);
+	if (recv_len > 0)
+		trace_dump_data((unsigned char *)buf, recv_len);
 
 	return recv_len;
 }
@@ -430,7 +433,7 @@ RETRACE_REPLACE(recvfrom)
 ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flags)
 {
 	rtr_recvmsg_t real_recvmsg;
-	int i, j, recv_len;
+	int i, recv_len;
 
 	real_recvmsg = RETRACE_GET_REAL(recvmsg);
 
@@ -441,8 +444,8 @@ ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flag
 	for (i = 0; i < msg->msg_iovlen; i++) {
 		struct iovec *msg_iov = &msg->msg_iov[i];
 
-		for (j = 0; j < msg_iov->iov_len; j++)
-			trace_dump_data((unsigned char *) msg_iov->iov_base, 1);
+		if (msg_iov->iov_len > 0)
+			trace_dump_data((unsigned char *) msg_iov->iov_base, msg_iov->iov_len);
 	}
 
 	return recv_len;
