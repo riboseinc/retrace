@@ -87,8 +87,8 @@ print_ssl_keys(SSL *ssl)
 			session = real_SSL_get_session (ssl);
 
 			if (session) {
-				master_key_length = real_SSL_SESSION_get_master_key (session, master_key, SSL_MAX_MASTER_KEY_LENGTH);
-				client_random_length = real_SSL_get_client_random (ssl, client_random, SSL3_RANDOM_SIZE);
+				master_key_length = real_SSL_SESSION_get_master_key(session, master_key, SSL_MAX_MASTER_KEY_LENGTH);
+				client_random_length = real_SSL_get_client_random(ssl, client_random, SSL3_RANDOM_SIZE);
 			}
 		}
 #endif
@@ -201,7 +201,7 @@ RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
 
 RETRACE_REPLACE(SSL_get_verify_result)
 
-#define DEFINE_TO_STR(def, str) case (def): str = #def; break;
+#define DEFINE_TO_STR(def, str) case (def): do { str = #def; break; } while (0);
 
 long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 {
