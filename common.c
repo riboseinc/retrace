@@ -101,22 +101,41 @@ trace_printf(int hdr, const char *fmt, ...)
 	char *str;
 	va_list arglist;
 	int old_trace_state;
-
-	str = alloca(maxlen);
+	FILE *output_file = stderr;
+	char *output_file_path;
 
 	if (!get_tracing_enabled())
 		return;
 
+	if (rtr_get_config_single("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_END, &output_file_path)) {
+		old_trace_state = trace_disable();
+		if (output_file_path) {
+			FILE *out_file_tmp = fopen(output_file_path, "a");
+
+			if (out_file_tmp)
+				output_file = out_file_tmp;
+
+			free(output_file_path);
+		}
+
+		trace_restore(old_trace_state);
+	}
+
 	old_trace_state = trace_disable();
+
+	str = alloca(maxlen);
 
 	va_start(arglist, fmt);
 	vsnprintf(str, maxlen, fmt, arglist);
 	va_end(arglist);
 
 	if (hdr == 1)
-		fprintf(stderr, "(%d) ", getpid());
+		fprintf(output_file, "(%d) ", getpid());
 
-	fprintf(stderr, "%s", str);
+	fprintf(output_file, "%s", str);
+
+	if (output_file != stderr)
+		fclose(output_file);
 
 	trace_restore(old_trace_state);
 }
@@ -174,7 +193,13 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 	char *hex_str, *asc_str;
 	char *hexp, *ascp;
 	size_t i;
+	int disable = 0;
 	int old_trace_state;
+
+	if (rtr_get_config_single("disabledatadump", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &disable)) {
+		if (disable)
+			return;
+	}
 
 	if (!get_tracing_enabled())
 		return;
@@ -452,7 +477,12 @@ cleanup:
 void
 rtr_config_close(FILE *config)
 {
+	int old_trace_state;
+
+	old_trace_state = trace_disable();
 	fclose(config);
+	trace_restore(old_trace_state);
+
 }
 
 int rtr_get_config_multiple(FILE **config, const char *function, ...)
