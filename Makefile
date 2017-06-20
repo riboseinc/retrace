@@ -5,7 +5,7 @@ RETRACE_CFLAGS	= $(CFLAGS) -fPIC -D_GNU_SOURCE -Wall
 
 ifeq ($(OS),Darwin)
 	RETRACE_LDFLAGS = $(LDFLAGS) -shared -L/usr/local/opt/openssl/lib
-	RETRACE_LIBS	= -ldl -lssl
+	RETRACE_LIBS	= -ldl -lssl -lcrypto
 	# assume Sierra for now to silence ld warnings
 	export MACOSX_DEPLOYMENT_TARGET = 10.12
 	RETRACE_SO      = retrace.dylib
