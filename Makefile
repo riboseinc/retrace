@@ -17,7 +17,7 @@ else ifeq ($(OS),FreeBSD)
 	RETRACE_CFLAGS	+= 
 else
 	RETRACE_LDFLAGS	= $(LDFLAGS) -shared
-	RETRACE_LIBS	= -dl -lncurses
+	RETRACE_LIBS	= -ldl -lncurses
 	RETRACE_SO	= retrace.so
 	RETRACE_CFLAGS	+= -rdynamic
 endif
@@ -53,7 +53,7 @@ OBJS		= $(SRCS:.c=.o)
 all: $(RETRACE_SO)
 
 $(RETRACE_SO): $(OBJS)
-	$(CC) $(RETRACE_LDFLAGS) -o $@ $(RETRACE_LIBS) $^
+	$(CC) $(RETRACE_LDFLAGS) -o $@ $^ $(RETRACE_LIBS)
 
 -include $(SRCS:.c=.d)
 
