@@ -6,3 +6,4 @@ connect,127.0.0.1,80,192.168.1.78,9090
 fopen,/etc/passwd,/tmp/passwd
 logtofile,retrace.log
 disabledatadump,1
+SSL_get_verify_result,10
