@@ -3,7 +3,7 @@
 
 void test(void)
 {
-	printf ("Test function\n");
+	printf("Test function\n");
 }
 
 int main(void)
@@ -12,7 +12,7 @@ int main(void)
 
 	handle = dlopen(NULL, RTLD_LAZY);
 
-	printf ("Dlopen returned %p\n", handle);
+	printf("Dlopen returned %p\n", handle);
 	if (handle) {
 		dlsym(handle, "test");
 
