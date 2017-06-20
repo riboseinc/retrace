@@ -25,10 +25,9 @@
 
 #include <unistd.h>
 
-int main (void)
+int main(void)
 {
 	fork();
 
-        return 0;
+	return 0;
 }
-
