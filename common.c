@@ -111,10 +111,11 @@ trace_printf(int hdr, const char *fmt, ...)
 		old_trace_state = trace_disable();
 		if (output_file_path) {
 			FILE *out_file_tmp = fopen(output_file_path, "a");
+
 			if (out_file_tmp)
 				output_file = out_file_tmp;
 
-			free (output_file_path);
+			free(output_file_path);
 		}
 
 		trace_restore(old_trace_state);
@@ -134,7 +135,7 @@ trace_printf(int hdr, const char *fmt, ...)
 	fprintf(output_file, "%s", str);
 
 	if (output_file != stderr)
-		fclose (output_file);
+		fclose(output_file);
 
 	trace_restore(old_trace_state);
 }
