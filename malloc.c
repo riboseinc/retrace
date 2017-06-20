@@ -55,6 +55,7 @@ void RETRACE_IMPLEMENTATION(free)(void *mem)
 
 RETRACE_REPLACE(free)
 
+#if 0
 void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 {
         void *p;
@@ -84,4 +85,4 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 }
 
 RETRACE_REPLACE(realloc)
-
+#endif
