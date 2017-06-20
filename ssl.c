@@ -201,7 +201,7 @@ RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
 
 RETRACE_REPLACE(SSL_get_verify_result)
 
-#define DEFINE_TO_STR(def, str) case (def): do { str = #def; break; } while (0);
+#define DEFINE_TO_STR(def, str) case (def): str = #def; break;
 
 long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 {
