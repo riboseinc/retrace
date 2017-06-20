@@ -26,6 +26,22 @@
 #include "common.h"
 #include "malloc.h"
 
+void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
+{
+        void *p;
+        rtr_malloc_t real_malloc;
+
+        real_malloc = RETRACE_GET_REAL(malloc);
+
+        p = real_malloc(bytes);
+
+        trace_printf(1, "malloc(%d); [%p]\n", bytes, p);
+
+        return p;
+}
+
+RETRACE_REPLACE(malloc)
+
 void RETRACE_IMPLEMENTATION(free)(void *mem)
 {
 	rtr_free_t real_free;
@@ -39,18 +55,34 @@ void RETRACE_IMPLEMENTATION(free)(void *mem)
 
 RETRACE_REPLACE(free)
 
-void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
+#if 0
+void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 {
-	void *p;
-	rtr_malloc_t real_malloc;
+        void *p;
+        rtr_calloc_t real_calloc;
 
-	real_malloc = RETRACE_GET_REAL(malloc);
+        real_calloc = RETRACE_GET_REAL(calloc);
+        p = real_calloc(nmemb, size);
 
-	p = real_malloc(bytes);
+        trace_printf(1, "calloc(%d, %d); [%p]\n", nmemb, size, p);
 
-	trace_printf(1, "malloc(%d); [%p]\n", bytes, p);
-
-	return p;
+        return p;
 }
 
-RETRACE_REPLACE(malloc)
+RETRACE_REPLACE(calloc)
+
+void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
+{
+        void *p;
+        rtr_realloc_t real_realloc;
+
+        real_realloc = RETRACE_GET_REAL(realloc);
+        p = real_realloc(ptr, size);
+
+        trace_printf(1, "realloc(%p, %d); [%p]\n", ptr, size, p);
+
+        return p;
+}
+
+RETRACE_REPLACE(realloc)
+#endif

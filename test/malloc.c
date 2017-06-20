@@ -25,12 +25,13 @@
 
 #include <stdlib.h>
 
-int main (void)
+int main(void)
 {
-	void *p = malloc (42);
+	void *p;
 
-	free (p);
+	p = malloc(42);
 
-        return 0;
+	free(p);
+
+	return 0;
 }
-

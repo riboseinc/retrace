@@ -9,6 +9,7 @@ if $(uname | grep -q ^Darwin); then
         DYLD_INSERT_LIBRARIES=../retrace.dylib ./malloc
         DYLD_INSERT_LIBRARIES=../retrace.dylib ./pipe
         DYLD_INSERT_LIBRARIES=../retrace.dylib ./sock
+        DYLD_INSERT_LIBRARIES=../retrace.dylib ./sock_srv
         DYLD_INSERT_LIBRARIES=../retrace.dylib ./str
         DYLD_INSERT_LIBRARIES=../retrace.dylib ./time
 else
@@ -20,7 +21,9 @@ else
         LD_PRELOAD=../retrace.so ./malloc
         LD_PRELOAD=../retrace.so ./pipe
         LD_PRELOAD=../retrace.so ./sock
+        LD_PRELOAD=../retrace.so ./sock_srv
         LD_PRELOAD=../retrace.so ./str
         LD_PRELOAD=../retrace.so ./time
+        LD_PRELOAD=../retrace.so ./pledge
 fi
 

@@ -4,3 +4,9 @@
 test/cmockatest
 test/*.o
 core
+test/retracetest.deleteme
+test/scanf
+test/scanf_test.txt
+test/scanf_test1.txt
+test/scanf_test2.txt
+test/trace

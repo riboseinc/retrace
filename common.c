@@ -35,9 +35,14 @@
 #ifdef __linux__
 #include <syscall.h>
 #endif
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <pthread_np.h>
 #endif
+
+#ifdef __NetBSD__
+#include <lwp.h>
+#endif
+
 #include <stdarg.h>
 
 #include "common.h"
@@ -225,8 +230,10 @@ initialize_tracing_key(void)
 static int
 is_main_thread(void)
 {
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 	return pthread_main_np();
+#elif defined(__NetBSD__)
+	return (_lwp_self() == 1);
 #else
 	rtr_getpid_t real_getpid;
 
@@ -453,7 +460,7 @@ cleanup:
 }
 
 void
-rtr_confing_close(FILE *config)
+rtr_config_close(FILE *config)
 {
 	int old_trace_state;
 
@@ -478,7 +485,7 @@ int rtr_get_config_multiple(FILE **config, const char *function, ...)
 		ret = rtr_parse_config_file(*config, function, args);
 
 		if (!ret) {
-			rtr_confing_close(*config);
+			rtr_config_close(*config);
 			*config = NULL;
 		}
 	}
@@ -500,7 +507,7 @@ int rtr_get_config_single(const char *function, ...)
 
 		ret = rtr_parse_config_file(config_file, function, args);
 
-		rtr_confing_close(config_file);
+		rtr_config_close(config_file);
 	}
 
 	return ret;

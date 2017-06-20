@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <string.h>
 
 #include "common.h"
 #include "file.h"
@@ -39,12 +40,15 @@ int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 {
 	rtr_stat_t real_stat;
 	char perm[10];
+	int r;
 
 	real_stat = RETRACE_GET_REAL(stat);
 
 	trace_printf(1, "stat(\"%s\", buf);\n", path);
 
-	if (real_stat(path, buf) == 0) {
+	r = real_stat(path, buf);
+
+	if (r == 0) {
 		trace_printf(1, "struct stat {\n");
 		trace_printf(1, "\tst_dev = %lu\n", buf->st_dev);
 		trace_printf(1, "\tst_ino = %i\n", buf->st_ino);
@@ -67,7 +71,7 @@ int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 		trace_printf(1, "}\n");
 	}
 
-	return real_stat(path, buf);
+	return r;
 }
 
 RETRACE_REPLACE(stat)
@@ -212,7 +216,7 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 				ret = real_fopen(redirect_file, mode);
 
 				if (config)
-					rtr_confing_close(config);
+					rtr_config_close(config);
 
 				break;
 			}
@@ -245,7 +249,6 @@ int RETRACE_IMPLEMENTATION(close)(int fd)
 	real_close = RETRACE_GET_REAL(close);
 
 	di = file_descriptor_get(fd);
-
 	if (di && di->location)
 		trace_printf(1, "close(%d) [was pointing to %s];\n", fd, di->location);
 	else
@@ -521,3 +524,16 @@ int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 }
 
 RETRACE_REPLACE(fgetc)
+
+void RETRACE_IMPLEMENTATION(strmode)(int mode, char *bp)
+{
+	rtr_strmode_t real_strmode;
+
+	real_strmode = RETRACE_GET_REAL(strmode);
+
+	real_strmode(mode, bp);
+
+	trace_printf(1, "strmode(%d, \"%s\");\n", mode, bp);
+}
+
+RETRACE_REPLACE(strmode)
