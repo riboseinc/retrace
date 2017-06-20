@@ -39,7 +39,7 @@ int RETRACE_IMPLEMENTATION(pledge)(const char *promises, const char *paths[])
 	r = real_pledge(promises, paths);
 
 	trace_printf(1, "pledge(\"%s\", ", promises);
-	
+
 	if (paths == NULL) {
 		trace_printf(0, "NULL");
 	} else {
