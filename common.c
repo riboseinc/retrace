@@ -174,6 +174,12 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 	char *hex_str, *asc_str;
 	char *hexp, *ascp;
 	size_t i;
+	int old_trace_state;
+
+	if (!get_tracing_enabled())
+		return;
+
+	old_trace_state = trace_disable();
 
 	hex_str = alloca(hex_len);
 	asc_str = alloca(asc_len);
@@ -181,8 +187,11 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 
 	for (i = 0; i < nbytes; i++) {
 		if (i % DUMP_LINE_SIZE == 0) {
-			if (i)
+			if (i) {
+				trace_restore(old_trace_state);
 				trace_printf(0, fmt, i - DUMP_LINE_SIZE, hex_str, asc_str);
+				old_trace_state = trace_disable();
+			}
 			hexp = hex_str;
 			memset(asc_str, 0, asc_len);
 			ascp = asc_str;
@@ -193,8 +202,13 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 	if (nbytes % DUMP_LINE_SIZE) {
 		int n = DUMP_LINE_SIZE - nbytes % DUMP_LINE_SIZE;
 		sprintf(hexp, "%*s", n * 2 + n/2, "");
+
+		trace_restore(old_trace_state);
 		trace_printf(0, fmt, i - DUMP_LINE_SIZE + n, hex_str, asc_str);
+		old_trace_state = trace_disable();
 	}
+
+	trace_restore(old_trace_state);
 }
 
 static void
