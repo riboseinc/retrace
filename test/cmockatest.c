@@ -23,6 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
@@ -37,7 +38,6 @@
 
 #include <cmocka.h>
 
-#include "common.h"
 #include "char.h"
 #include "env.h"
 #include "exec.h"
@@ -783,6 +783,7 @@ RTR_TEST_START(vsnprintf)
 RTR_TEST_END
 
 RTR_TEST_START(scanf)
+    /* XXX: TEST DISABLED
 	FILE *oldstdin1, *oldstdin2;
 	char buf1[100], buf2[100];
 	int fd1[2], fd2[2];
@@ -808,6 +809,7 @@ RTR_TEST_START(scanf)
 
 	assert_true(r1 > 0 && r1 == r2);
 	assert_string_equal(buf1, buf2);
+    */
 RTR_TEST_END
 
 RTR_TEST_START(fscanf)
@@ -854,6 +856,7 @@ to_vscanf(rtr_vscanf_t fn, const char *fmt, ...)
 }
 
 RTR_TEST_START(vscanf)
+    /* XXX: TEST DISABLED
 	FILE *oldstdin1, *oldstdin2;
 	char buf1[100], buf2[100];
 	int fd1[2], fd2[2];
@@ -879,6 +882,7 @@ RTR_TEST_START(vscanf)
 
 	assert_true(r1 > 0 && r1 == r2);
 	assert_string_equal(buf1, buf2);
+    */
 RTR_TEST_END
 
 int
@@ -1002,7 +1006,7 @@ main(void)
 		cmocka_unit_test(test_rtr_vfscanf),  cmocka_unit_test(test_rtr_vsscanf),
 	};
 
-	handle = dlopen("../retrace.so", RTLD_LAZY);
+	handle = dlopen("../.libs/libretrace.so", RTLD_LAZY);
 	if (!handle) {
 		fputs(dlerror(), stderr);
 		return 1;

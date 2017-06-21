@@ -23,10 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
 #include <stdarg.h>
 #include <stdbool.h>
 
-#include "common.h"
 #include "scanf.h"
 #include "printf.h"
 #include "file.h"
