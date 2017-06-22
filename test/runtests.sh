@@ -1,5 +1,7 @@
 #!/bin/sh
 
+export RETRACE_CONFIG=../retrace.conf.example
+
 if $(uname | grep -q ^Darwin); then
         DYLD_INSERT_LIBRARIES=../retrace.dylib ./env
         DYLD_INSERT_LIBRARIES=../retrace.dylib ./exit

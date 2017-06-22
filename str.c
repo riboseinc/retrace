@@ -23,9 +23,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
 #include <string.h>
 
-#include "common.h"
 #include "str.h"
 
 char *RETRACE_IMPLEMENTATION(strstr)(const char *s1, const char *s2)

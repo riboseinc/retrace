@@ -23,6 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
@@ -37,7 +38,6 @@
 
 #include <cmocka.h>
 
-#include "common.h"
 #include "char.h"
 #include "env.h"
 #include "exec.h"
@@ -1002,7 +1002,7 @@ main(void)
 		cmocka_unit_test(test_rtr_vfscanf),  cmocka_unit_test(test_rtr_vsscanf),
 	};
 
-	handle = dlopen("../retrace.so", RTLD_LAZY);
+	handle = dlopen("../.libs/libretrace.so", RTLD_LAZY);
 	if (!handle) {
 		fputs(dlerror(), stderr);
 		return 1;

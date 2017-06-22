@@ -1,0 +1,105 @@
+#!/bin/sh
+
+readonly __progname="$(basename $0)"
+
+errx() {
+	echo -e "${__progname}: $@" >&2
+	exit 1
+}
+
+usage() {
+	echo "usage: ${__progname} [-f configuration file location] <executable>"
+	exit 1
+}
+
+get_lib_file() {
+    local fname="$1"
+
+    # check for the local file
+    local path="$fname"
+    if [ -f "$path" ]; then
+        output="$path"
+        return 0
+    fi
+
+    # check in autotools generated dir
+    local path=".libs/$fname"
+    if [ -f "$path" ]; then
+        output="$path"
+        return 0
+    fi
+
+    # check in the PREFIX path
+    local path="@libdir@/$fname"
+    if [ -f "$path" ]; then
+        output="$path"
+        return 0
+    fi
+
+    # check default library path
+    local path="/usr/lib/$fname"
+    if [ -f "$path" ]; then
+        output="$path"
+        return 0
+    fi
+
+    # check default library path
+    local path="/usr/lib64/$fname"
+    if [ -f "$path" ]; then
+        output="$path"
+        return 0
+    fi
+
+    return 1
+}
+
+
+main() {
+	[ $# -lt 1  ] && \
+		usage
+
+    local cfg_env=""
+
+    # check for -f config
+    if [ $# -ge 3 -a "$1" = "-f" ]; then
+		readonly local config="$2"
+
+		[ ! -f "${config}" ] && \
+			errx "cannot open '${config}'"
+
+        cfg_env="${config}"
+
+        shift 2
+	elif [ "${RETRACE_CONFIG}" ]; then
+		readonly local config="${RETRACE_CONFIG}"
+
+		[ ! -f "${config}" ] && \
+			errx "cannot open '${config}'"
+	fi
+
+	if $(uname | grep -q ^Darwin); then
+        readonly lib="libretrace.dylib"
+        get_lib_file "$lib"
+        if [ $? != 0 ]; then
+            errx "Cannot find '${lib}'"
+        fi
+
+		DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
+	else
+        readonly lib="libretrace.so"
+        get_lib_file "$lib"
+        if [ $? != 0 ]; then
+            errx "Cannot find '${lib}'"
+        fi
+
+        if [ -z "$cfg_env" ]; then
+            LD_PRELOAD="${output}" "$@"
+        else
+            RETRACE_CONFIG="$cfg_env" LD_PRELOAD="${output}" "$@"
+        fi
+    fi
+}
+
+main "$@"
+
+exit $?

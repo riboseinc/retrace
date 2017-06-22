@@ -58,6 +58,8 @@ char *RETRACE_IMPLEMENTATION(dlerror)(void)
 
 RETRACE_REPLACE(dlerror)
 
+#if !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
+#ifdef HAVE_ATOMIC_BUILTINS
 void *RETRACE_IMPLEMENTATION(dlsym)(void *handle, const char *symbol)
 {
 	rtr_dlsym_t real_dlsym;
@@ -73,6 +75,8 @@ void *RETRACE_IMPLEMENTATION(dlsym)(void *handle, const char *symbol)
 }
 
 RETRACE_REPLACE(dlsym)
+#endif
+#endif
 
 int RETRACE_IMPLEMENTATION(dlclose)(void *handle)
 {

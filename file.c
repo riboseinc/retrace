@@ -23,12 +23,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
 #include <string.h>
 
-#include "common.h"
 #include "file.h"
 #include "str.h"
 
