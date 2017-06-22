@@ -1,7 +1,7 @@
 # Introduction
-"retrace" is Linux (shared object) and macOS (dynamic library) that displays C library calls and has the ability to redirect function inputs and outputs.
+`retrace` is Linux (shared object) and macOS (dynamic library) that displays C library calls and has the ability to redirect function inputs and outputs.
 
-retrace can be used to assist revese engineering/debugging dynamically linked binary Linux ELF and macOS Mach-O executables.
+`retrace` can be used to assist reverse engineering/debugging dynamically linked binary Linux/FreeBSD ELF and MacOS Mach-O executables.
 
 # Build Instructions
 
@@ -25,6 +25,14 @@ To build cmocka tests you can specify an optional flag `--with-cmocka=[PATH]` (t
 
 
 By the default `retrace` is installed in `/usr/bin` directory.
+
+# Running retrace
+
+```
+$ retrace [-f configuration file location] <executable>
+```
+
+Configuration file path can be set either in `RETRACE_CONFIG` environment variable or by specifying `-f [path]` command line argument.
 
 
 # Trace usage example
