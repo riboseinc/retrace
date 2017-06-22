@@ -8,7 +8,7 @@ errx() {
 }
 
 usage() {
-	echo "usage: ${__progname} <executable>"
+	echo "usage: ${__progname} [-f configuration file location] <executable>"
 	exit 1
 }
 
@@ -55,10 +55,22 @@ get_lib_file() {
 
 
 main() {
-	[ -z "$1" ] && \
+	[ $# -lt 1  ] && \
 		usage
 
-	if [ "${RETRACE_CONFIG}" ]; then
+    local cfg_env=""
+
+    # check for -f config
+    if [ $# -ge 3 -a "$1" = "-f" ]; then
+		readonly local config="$2"
+
+		[ ! -f "${config}" ] && \
+			errx "cannot open '${config}'"
+
+        cfg_env="${config}"
+
+        shift 2
+	elif [ "${RETRACE_CONFIG}" ]; then
 		readonly local config="${RETRACE_CONFIG}"
 
 		[ ! -f "${config}" ] && \
@@ -80,7 +92,11 @@ main() {
             errx "Cannot find '${lib}'"
         fi
 
-        LD_PRELOAD="${output}" "$@"
+        if [ -z "$cfg_env" ]; then
+            LD_PRELOAD="${output}" "$@"
+        else
+            RETRACE_CONFIG="$cfg_env" LD_PRELOAD="${output}" "$@"
+        fi
     fi
 }
 
