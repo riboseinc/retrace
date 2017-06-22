@@ -23,6 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
@@ -37,7 +38,6 @@
 
 #include <cmocka.h>
 
-#include "common.h"
 #include "char.h"
 #include "env.h"
 #include "exec.h"

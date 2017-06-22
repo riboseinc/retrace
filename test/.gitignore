@@ -17,3 +17,5 @@ retracetest.deleteme
 runtests.sh.log
 runtests.sh.trs
 test-suite.log
+cmockatest.log
+cmockatest.trs

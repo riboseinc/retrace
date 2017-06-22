@@ -3,14 +3,31 @@
 
 retrace can be used to assist revese engineering/debugging dynamically linked binary Linux ELF and macOS Mach-O executables.
 
-# Compilation
+# Build Instructions
+
+For platforms with Autotools, the generic way to build and install `retrace` is:
+
 ```
+$ sh autogen.sh
+$ ./configure --enable-tests
 $ make
+$ make check
+$ sudo make install
 ```
+
+You need Autotools installed in your system (`autoconf`, `automake`, `libtool`, `gcc` packages).
+OpenSSL library and headers are automatically detected, you can specify an optional flag `--with-openssl=[PATH]` (to use a non standard OpenSSL installation root).
+
+In order to build tests: run configure script with `--enable-tests` flag.
+To build cmocka tests you can specify an optional flag `--with-cmocka=[PATH]` (to use a non standard cmocka installation root).
+
+
+By the default `retrace` is installed in `/usr/bin` directory.
+
 
 # Trace usage example
 ```
-$ ./retrace.sh /usr/bin/id
+$ retrace /usr/bin/id
 (2051) geteuid();
 (2051) getuid();
 (2051) getegid();
@@ -34,7 +51,7 @@ uid=1000(test) gid=1000(test) groups=1000(test),10(wheel)
 # Redirect usage example
 ```
 $ export RETRACE_CONFIG="/home/test/retrace_redirect.conf"
-$ ./retrace.sh /usr/bin/id
+$ retrace /usr/bin/id
 (4982) geteuid(); [redirection in effect: '0']
 (4982) getuid(); [redirection in effect: '0']
 (4982) getegid(); [redirection in effect: '0']
