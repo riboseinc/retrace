@@ -82,13 +82,14 @@ AM_CONDITIONAL([OPENBSD], [test "$isopenbsd" = "xtrue"])
 #fi
 
 # MacOS specific configuration
-#if test "x$isdarwin" = "xyes"; then
-#fi
+if test "x$isdarwin" = "xyes"; then
+    CFLAGS="$CFLAGS -mmacosx-version-min=10.12"
+    LDFLAGS="$LDFLAGS -mmacosx-version-min=10.12"
+fi
 
 # FreeBSD specific configuration
 #if test "x$isfreebsd" = "xyes"; then
 #fi
-
 
 # Test for __atomic support
 AC_MSG_CHECKING([for gcc __atomic builtins])

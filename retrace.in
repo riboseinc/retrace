@@ -66,7 +66,7 @@ main() {
 	fi
 
 	if $(uname | grep -q ^Darwin); then
-		readonly lib="./retrace.dylib"
+        readonly lib="libretrace.dylib"
         get_lib_file "$lib"
         if [ $? != 0 ]; then
             errx "Cannot find '${lib}'"
@@ -74,14 +74,14 @@ main() {
 
 		DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
 	else
-		readonly lib="retrace.so"
+        readonly lib="libretrace.so"
         get_lib_file "$lib"
         if [ $? != 0 ]; then
             errx "Cannot find '${lib}'"
         fi
 
-		LD_PRELOAD="${output}" "$@"
-	fi
+        LD_PRELOAD="${output}" "$@"
+    fi
 }
 
 main "$@"

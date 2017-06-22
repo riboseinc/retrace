@@ -78,7 +78,7 @@ rtr_##func##_t rtr_get_real_##func() {                                          
 rtr_##func##_t rtr_get_real_##func() {                                     \
 	static rtr_##func##_t ptr = (rtr_##func##_t) NULL;                 \
 	if (ptr == NULL)                                                   \
-		*(void **) (&ptr) = _dl_sym(RTLD_NEXT, #func);               \
+		*(void **) (&ptr) = dlsym(RTLD_NEXT, #func);               \
 	return ptr;                                                        \
 }
 

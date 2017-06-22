@@ -2,10 +2,9 @@ ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS= test
 
-lib_LTLIBRARIES= retrace.la
-
-retrace_la_LDFLAGS= $(AM_LDFLAGS) -module -avoid-version -shared
-retrace_la_CFLAGS= $(AM_CFLAGS) $(LIBSSL_FLAGS)
+lib_LTLIBRARIES= libretrace.la
+libretrace_la_LDFLAGS= -no-undefined -avoid-version
+libretrace_la_CFLAGS= $(AM_CFLAGS) $(LIBSSL_FLAGS)
 
 # include all headers here
 noinst_HEADERS= \
@@ -39,7 +38,7 @@ if OPENSSL
 endif
 
 # include all C files here
-retrace_la_SOURCES= \
+libretrace_la_SOURCES= \
 	char.c \
 	common.c \
 	dir.c \
@@ -66,7 +65,7 @@ retrace_la_SOURCES= \
 	write.c
 
 if OPENSSL
-	retrace_la_SOURCES+= ssl.c
+	libretrace_la_SOURCES+= ssl.c
 endif
 
 

@@ -38,3 +38,4 @@ autom4te.cache/
 .libs/
 retrace
 retrace.la
+libretrace.la

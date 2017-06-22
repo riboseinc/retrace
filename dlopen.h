@@ -9,7 +9,9 @@ typedef int (*rtr_dlclose_t)(void *handle);
 
 RETRACE_DECL(dlopen);
 RETRACE_DECL(dlerror);
+#ifdef HAVE_ATOMIC_BUILTINS
 RETRACE_DECL(dlsym);
+#endif
 RETRACE_DECL(dlclose);
 
 
