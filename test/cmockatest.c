@@ -1002,7 +1002,7 @@ main(void)
 		cmocka_unit_test(test_rtr_vfscanf),  cmocka_unit_test(test_rtr_vsscanf),
 	};
 
-	handle = dlopen("../retrace.so", RTLD_LAZY);
+	handle = dlopen("../.libs/libretrace.so", RTLD_LAZY);
 	if (!handle) {
 		fputs(dlerror(), stderr);
 		return 1;

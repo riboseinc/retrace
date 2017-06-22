@@ -195,7 +195,7 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 	real_strcmp	= RETRACE_GET_REAL(strcmp);
 
 	if (get_tracing_enabled() && file) {
-		FILE *config = NULL;
+		RTR_CONFIG_HANDLE config = NULL;
 
 		while (1) {
 			int r;
@@ -209,32 +209,23 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 					&redirect_file);
 			if (r == 0)
 				break;
-
 			if (real_strcmp(match_file, file) == 0) {
 				did_redirect = 1;
 
 				ret = real_fopen(redirect_file, mode);
 
-				if (config)
-					rtr_config_close(config);
-
 				break;
 			}
-
-			free(match_file);
-			free(redirect_file);
 		}
 	}
 
 	if (!did_redirect)
 		ret = real_fopen(file, mode);
 
-	trace_printf(1, "fopen(\"%s\", \"%s\"); [%d]\n", did_redirect ? redirect_file : file, mode, fd);
-
-	if (did_redirect) {
-		free(match_file);
-		free(redirect_file);
-	}
+	trace_printf(1, "fopen(\"%s%s\", \"%s\"); [%d]\n",
+	    did_redirect ? redirect_file : file,
+	    did_redirect ? " [redirected]" : "",
+	    mode, fd);
 
 	return ret;
 }

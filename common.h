@@ -99,7 +99,9 @@ void trace_printf_str(const char *string);
 void trace_dump_data(const unsigned char *buf, size_t nbytes);
 void trace_mode(mode_t mode, char *p);
 
-int rtr_get_config_multiple(FILE **config, const char *function, ...);
+typedef const void *RTR_CONFIG_HANDLE;
+
+int rtr_get_config_multiple(RTR_CONFIG_HANDLE *config, const char *function, ...);
 int rtr_get_config_single(const char *function, ...);
 void rtr_config_close(FILE *config);
 
