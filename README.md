@@ -16,7 +16,9 @@ $ sudo make install
 ```
 
 You need Autotools installed in your system (`autoconf`, `automake`, `libtool`, `gcc` packages).
+
 OpenSSL library and headers are automatically detected, you can specify an optional flag `--with-openssl=[PATH]` (to use a non standard OpenSSL installation root).
+
 
 In order to build tests: run configure script with `--enable-tests` flag.
 To build cmocka tests you can specify an optional flag `--with-cmocka=[PATH]` (to use a non standard cmocka installation root).
