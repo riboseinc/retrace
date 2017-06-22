@@ -14,3 +14,6 @@ scanf
 sock_srv
 trace
 retracetest.deleteme
+runtests.sh.log
+runtests.sh.trs
+test-suite.log

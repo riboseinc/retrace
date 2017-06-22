@@ -10,6 +10,9 @@ core
 *.swp
 *~
 
+# archives
+*.tar.gz
+
 # autotools related stuff
 compile
 config.guess
