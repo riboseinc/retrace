@@ -33,10 +33,7 @@ static int init_rand = 0;
 void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 {
         void *p;
-        rtr_malloc_t real_malloc;
 	double fail_chance = 0;
-
-        real_malloc = RETRACE_GET_REAL(malloc);
 
 	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance)) {
 		long int random_value;
@@ -62,28 +59,21 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
         return p;
 }
 
-RETRACE_REPLACE(malloc)
+RETRACE_REPLACE(malloc, void *, (size_t bytes), (bytes))
 
 void RETRACE_IMPLEMENTATION(free)(void *mem)
 {
-	rtr_free_t real_free;
-
-	real_free = RETRACE_GET_REAL(free);
-
 	trace_printf(1, "free(%p);\n", mem);
 
 	real_free(mem);
 }
 
-RETRACE_REPLACE(free)
+RETRACE_REPLACE(free, void, (void *mem), (mem))
 
 void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 {
         void *p;
-        rtr_calloc_t real_calloc;
 	double fail_chance = 0;
-
-        real_calloc = RETRACE_GET_REAL(calloc);
 
 	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance)) {
 		long int random_value;
@@ -109,15 +99,12 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
         return p;
 }
 
-RETRACE_REPLACE(calloc)
+RETRACE_REPLACE(calloc, void *, (size_t nmemb, size_t size), (nmemb, size))
 
 void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 {
         void *p;
-        rtr_realloc_t real_realloc;
 	double fail_chance;
-
-        real_realloc = RETRACE_GET_REAL(realloc);
 
 	if (size > 0 && rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance)) {
 		long int random_value;
@@ -144,4 +131,4 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
         return p;
 }
 
-RETRACE_REPLACE(realloc)
+RETRACE_REPLACE(realloc, void *, (void *ptr, size_t size), (ptr, size))

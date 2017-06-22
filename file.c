@@ -38,11 +38,8 @@
 
 int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 {
-	rtr_stat_t real_stat;
 	char perm[10];
 	int r;
-
-	real_stat = RETRACE_GET_REAL(stat);
 
 	trace_printf(1, "stat(\"%s\", buf);\n", path);
 
@@ -74,14 +71,11 @@ int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 	return r;
 }
 
-RETRACE_REPLACE(stat)
+RETRACE_REPLACE(stat, int, (const char *path, struct stat *buf), (path, buf))
 
 int RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode)
 {
-	rtr_chmod_t real_chmod;
 	char perm[10];
-
-	real_chmod = RETRACE_GET_REAL(chmod);
 
 	trace_mode(mode, perm);
 
@@ -90,14 +84,11 @@ int RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode)
 	return real_chmod(path, mode);
 }
 
-RETRACE_REPLACE(chmod)
+RETRACE_REPLACE(chmod, int, (const char *path, mode_t mode), (path, mode))
 
 int RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
 {
-	rtr_fchmod_t real_fchmod;
 	char perm[10];
-
-	real_fchmod = RETRACE_GET_REAL(fchmod);
 
 	trace_mode(mode, perm);
 
@@ -106,14 +97,11 @@ int RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
 	return real_fchmod(fd, mode);
 }
 
-RETRACE_REPLACE(fchmod)
+RETRACE_REPLACE(fchmod, int, (int fd, mode_t mode), (fd, mode))
 
 int RETRACE_IMPLEMENTATION(fileno)(FILE *stream)
 {
 	int fd;
-	rtr_fileno_t real_fileno;
-
-	real_fileno = RETRACE_GET_REAL(fileno);
 
 	fd = real_fileno(stream);
 
@@ -122,16 +110,11 @@ int RETRACE_IMPLEMENTATION(fileno)(FILE *stream)
 	return real_fileno(stream);
 }
 
-RETRACE_REPLACE(fileno)
+RETRACE_REPLACE(fileno, int, (FILE *stream), (stream))
 
 int RETRACE_IMPLEMENTATION(fseek)(FILE *stream, long offset, int whence)
 {
 	int fd;
-	rtr_fseek_t real_fseek;
-	rtr_fileno_t real_fileno;
-
-	real_fseek	= RETRACE_GET_REAL(fseek);
-	real_fileno	= RETRACE_GET_REAL(fileno);
 
 	fd = real_fileno(stream);
 
@@ -151,17 +134,12 @@ int RETRACE_IMPLEMENTATION(fseek)(FILE *stream, long offset, int whence)
 	return real_fseek(stream, offset, whence);
 }
 
-RETRACE_REPLACE(fseek)
+RETRACE_REPLACE(fseek, int, (FILE *stream, long offset, int whence), (stream, offset, whence))
 
 int RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
 {
 	int fd;
 	struct descriptor_info *di;
-	rtr_fclose_t real_fclose;
-	rtr_fileno_t real_fileno;
-
-	real_fclose = RETRACE_GET_REAL(fclose);
-	real_fileno = RETRACE_GET_REAL(fileno);
 
 	fd = real_fileno(stream);
 
@@ -179,7 +157,7 @@ int RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
 	return real_fclose(stream);
 }
 
-RETRACE_REPLACE(fclose)
+RETRACE_REPLACE(fclose, int, (FILE *stream), (stream))
 
 FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 {
@@ -188,11 +166,6 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 	char *match_file = NULL;
 	FILE *ret;
 	char *redirect_file = NULL;
-	rtr_fopen_t real_fopen;
-	rtr_strcmp_t real_strcmp;
-
-	real_fopen	= RETRACE_GET_REAL(fopen);
-	real_strcmp	= RETRACE_GET_REAL(strcmp);
 
 	if (get_tracing_enabled() && file) {
 		RTR_CONFIG_HANDLE config = NULL;
@@ -230,14 +203,11 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 	return ret;
 }
 
-RETRACE_REPLACE(fopen)
+RETRACE_REPLACE(fopen, FILE *, (const char *file, const char *mode), (file, mode))
 
 int RETRACE_IMPLEMENTATION(close)(int fd)
 {
 	struct descriptor_info *di;
-	rtr_close_t real_close;
-
-	real_close = RETRACE_GET_REAL(close);
 
 	di = file_descriptor_get(fd);
 	if (di && di->location)
@@ -250,40 +220,29 @@ int RETRACE_IMPLEMENTATION(close)(int fd)
 	return real_close(fd);
 }
 
-RETRACE_REPLACE(close)
+RETRACE_REPLACE(close, int, (int fd), (fd))
 
 int RETRACE_IMPLEMENTATION(dup)(int oldfd)
 {
-	rtr_dup_t real_dup;
-
-	real_dup = RETRACE_GET_REAL(dup);
-
 	trace_printf(1, "dup(%d)\n", oldfd);
 
 	return real_dup(oldfd);
 }
 
-RETRACE_REPLACE(dup)
+RETRACE_REPLACE(dup, int, (int oldfd), (oldfd))
 
 int RETRACE_IMPLEMENTATION(dup2)(int oldfd, int newfd)
 {
-	rtr_dup2_t real_dup2;
-
-	real_dup2 = RETRACE_GET_REAL(dup2);
-
 	trace_printf(1, "dup2(%d, %d)\n", oldfd, newfd);
 
 	return real_dup2(oldfd, newfd);
 }
 
-RETRACE_REPLACE(dup2)
+RETRACE_REPLACE(dup2, int, (int oldfd, int newfd), (oldfd, newfd))
 
 mode_t RETRACE_IMPLEMENTATION(umask)(mode_t mask)
 {
 	mode_t old_mask;
-	rtr_umask_t real_umask;
-
-	real_umask = RETRACE_GET_REAL(umask);
 
 	old_mask = real_umask(mask);
 
@@ -292,14 +251,11 @@ mode_t RETRACE_IMPLEMENTATION(umask)(mode_t mask)
 	return old_mask;
 }
 
-RETRACE_REPLACE(umask)
+RETRACE_REPLACE(umask, mode_t, (mode_t mask), (mask))
 
 int RETRACE_IMPLEMENTATION(mkfifo)(const char *pathname, mode_t mode)
 {
 	int ret;
-	rtr_mkfifo_t real_mkfifo;
-
-	real_mkfifo = RETRACE_GET_REAL(mkfifo);
 
 	ret = real_mkfifo(pathname, mode);
 
@@ -308,25 +264,41 @@ int RETRACE_IMPLEMENTATION(mkfifo)(const char *pathname, mode_t mode)
 	return ret;
 }
 
-RETRACE_REPLACE(mkfifo)
+RETRACE_REPLACE(mkfifo, int, (const char *pathname, mode_t mode), (pathname, mode))
+
+typedef int (*rtr_open_mode_t)(const char *pathname, int flags, mode_t mode);
+typedef int (*rtr_open_nomode_t)(const char *pathname, int flags);
+
+#ifdef __APPLE__
+#define MODEFLAGS O_CREAT
+#else
+#define MODEFLAGS (O_CREAT | O_TMPFILE)
+#endif
+
+static int
+open_v(const char *pathname, int flags, va_list ap)
+{
+	if (flags & MODEFLAGS)
+		return real_open(pathname, flags, va_arg(ap, int));
+	return real_open(pathname, flags);
+}
 
 int RETRACE_IMPLEMENTATION(open)(const char *pathname, int flags, ...)
 {
 	int fd;
-	mode_t mode;
-	rtr_open_t real_open;
-	va_list arglist;
+	va_list ap;
 
-	real_open = RETRACE_GET_REAL(open);
+	va_start(ap, flags);
+	fd = open_v(pathname, flags, ap);
+	va_end(ap);
 
-	va_start(arglist, flags);
-	mode = va_arg(arglist, int);
-
-	fd = real_open(pathname, flags, mode);
-
-	va_end(arglist);
-
-	trace_printf(1, "open(%s, %u, %u) [return: fd]\n", pathname, flags, mode, fd);
+	if (flags & MODEFLAGS) {
+		va_start(ap, flags);
+		trace_printf(1, "open(%s, %u, %u) [return: fd]\n", pathname,
+		    flags, va_arg(ap, int), fd);
+		va_end(ap);
+	} else
+		trace_printf(1, "open(%s, %u) [return: fd]\n", pathname, flags, fd);
 
 	if (fd > 0) {
 		file_descriptor_update(
@@ -336,18 +308,13 @@ int RETRACE_IMPLEMENTATION(open)(const char *pathname, int flags, ...)
 	return fd;
 }
 
-RETRACE_REPLACE(open)
+RETRACE_REPLACE_V(open, int, (const char *pathname, int flags, ...), flags, open_v, (pathname, flags, ap))
 
 size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
 	size_t i;
 	int r, fd;
 	struct descriptor_info *di = NULL;
-	rtr_fwrite_t real_fwrite;
-	rtr_fileno_t real_fileno;
-
-	real_fwrite = RETRACE_GET_REAL(fwrite);
-	real_fileno = RETRACE_GET_REAL(fileno);
 
 	r = real_fwrite(ptr, size, nmemb, stream);
 
@@ -373,17 +340,12 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 	return r;
 }
 
-RETRACE_REPLACE(fwrite)
+RETRACE_REPLACE(fwrite, size_t, (const void *ptr, size_t size, size_t nmemb, FILE *stream), (ptr, size, nmemb, stream))
 
 size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
 	int i, r, fd;
 	struct descriptor_info *di = NULL;
-	rtr_fread_t real_fread;
-	rtr_fileno_t real_fileno;
-
-	real_fread	= RETRACE_GET_REAL(fread);
-	real_fileno	= RETRACE_GET_REAL(fileno);
 
 	r = real_fread(ptr, size, nmemb, stream);
 
@@ -411,18 +373,13 @@ size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE 
 	return r;
 }
 
-RETRACE_REPLACE(fread)
+RETRACE_REPLACE(fread, size_t, (void *ptr, size_t size, size_t nmemb, FILE *stream), (ptr, size, nmemb, stream))
 
 int RETRACE_IMPLEMENTATION(fputc)(int c, FILE *stream)
 {
 	int fd;
 	int r;
 	struct descriptor_info *di = NULL;
-	rtr_fputc_t real_fputc;
-	rtr_fileno_t real_fileno;
-
-	real_fputc	= RETRACE_GET_REAL(fputc);
-	real_fileno	= RETRACE_GET_REAL(fileno);
 
 	r = real_fputc(c, stream);
 
@@ -445,17 +402,12 @@ int RETRACE_IMPLEMENTATION(fputc)(int c, FILE *stream)
 	return r;
 }
 
-RETRACE_REPLACE(fputc)
+RETRACE_REPLACE(fputc, int, (int c, FILE *stream), (c, stream))
 
 int RETRACE_IMPLEMENTATION(fputs)(const char *s, FILE *stream)
 {
 	int r, fd;
 	struct descriptor_info *di = NULL;
-	rtr_fputs_t real_fputs;
-	rtr_fileno_t real_fileno;
-
-	real_fputs	= RETRACE_GET_REAL(fputs);
-	real_fileno	= RETRACE_GET_REAL(fileno);
 
 	r = real_fputs(s, stream);
 
@@ -478,18 +430,13 @@ int RETRACE_IMPLEMENTATION(fputs)(const char *s, FILE *stream)
 	return r;
 }
 
-RETRACE_REPLACE(fputs)
+RETRACE_REPLACE(fputs, int, (const char *s, FILE *stream), (s, stream))
 
 int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 {
 	int r;
 	int fd;
 	struct descriptor_info *di = NULL;
-	rtr_fgetc_t real_fgetc;
-	rtr_fileno_t real_fileno;
-
-	real_fgetc	= RETRACE_GET_REAL(fgetc);
-	real_fileno	= RETRACE_GET_REAL(fileno);
 
 	r = real_fgetc(stream);
 
@@ -514,17 +461,13 @@ int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 	return r;
 }
 
-RETRACE_REPLACE(fgetc)
+RETRACE_REPLACE(fgetc, int, (FILE *stream), (stream))
 
 void RETRACE_IMPLEMENTATION(strmode)(int mode, char *bp)
 {
-	rtr_strmode_t real_strmode;
-
-	real_strmode = RETRACE_GET_REAL(strmode);
-
 	real_strmode(mode, bp);
 
 	trace_printf(1, "strmode(%d, \"%s\");\n", mode, bp);
 }
 
-RETRACE_REPLACE(strmode)
+RETRACE_REPLACE(strmode, void, (int mode, char *bp), (mode, bp))

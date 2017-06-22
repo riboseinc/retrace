@@ -105,10 +105,7 @@ print_ssl_keys(SSL *ssl)
 
 int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
 {
-	rtr_SSL_write_t real_SSL_write;
 	int r;
-
-	real_SSL_write = RETRACE_GET_REAL(SSL_write);
 
 	r = real_SSL_write(ssl, buf, num);
 
@@ -118,14 +115,13 @@ int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
 	return (r);
 }
 
-RETRACE_REPLACE(SSL_write)
+RETRACE_REPLACE(SSL_write, int, (SSL * ssl, const void *buf, int num),
+	(ssl, buf, num))
+
 
 int RETRACE_IMPLEMENTATION(SSL_read)(SSL *ssl, void *buf, int num)
 {
-	rtr_SSL_read_t real_SSL_read;
 	int r;
-
-	real_SSL_read = RETRACE_GET_REAL(SSL_read);
 
 	r = real_SSL_read(ssl, buf, num);
 
@@ -137,14 +133,13 @@ int RETRACE_IMPLEMENTATION(SSL_read)(SSL *ssl, void *buf, int num)
 	return (r);
 }
 
-RETRACE_REPLACE(SSL_read)
+RETRACE_REPLACE(SSL_read, int, (SSL * ssl, void *buf, int num),
+	(ssl, buf, num))
+
 
 int RETRACE_IMPLEMENTATION(SSL_connect)(SSL *ssl)
 {
-	rtr_SSL_connect_t real_SSL_connect;
 	int r;
-
-	real_SSL_connect = RETRACE_GET_REAL(SSL_connect);
 
 	r = real_SSL_connect(ssl);
 
@@ -154,15 +149,13 @@ int RETRACE_IMPLEMENTATION(SSL_connect)(SSL *ssl)
 	return (r);
 }
 
-RETRACE_REPLACE(SSL_connect)
+RETRACE_REPLACE(SSL_connect, int, (SSL * ssl), (ssl))
+
 
 
 int RETRACE_IMPLEMENTATION(SSL_accept)(SSL *ssl)
 {
-	rtr_SSL_accept_t real_SSL_accept;
 	int r;
-
-	real_SSL_accept = RETRACE_GET_REAL(SSL_accept);
 
 	r = real_SSL_accept(ssl);
 
@@ -172,16 +165,14 @@ int RETRACE_IMPLEMENTATION(SSL_accept)(SSL *ssl)
 	return (r);
 }
 
-RETRACE_REPLACE(SSL_accept)
+RETRACE_REPLACE(SSL_accept, int, (SSL * ssl), (ssl))
+
 
 long
 RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
 {
-	rtr_SSL_get_verify_result_t real_SSL_get_verify_result;
 	int r;
 	int redirect_id = 0;
-
-	real_SSL_get_verify_result = RETRACE_GET_REAL(SSL_get_verify_result);
 
 	if (rtr_get_config_single("SSL_get_verify_result", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 
@@ -199,18 +190,16 @@ RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
 	return r;
 }
 
-RETRACE_REPLACE(SSL_get_verify_result)
+RETRACE_REPLACE(SSL_get_verify_result, long, (const SSL * ssl), (ssl))
+
 
 #define DEFINE_TO_STR(def, str) case (def): str = #def; break;
 
 long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 {
-	rtr_BIO_ctrl_t real_BIO_ctrl;
 	long r;
 	SSL *ssl = NULL;
 	char *cmd_str;
-
-	real_BIO_ctrl = RETRACE_GET_REAL(BIO_ctrl);
 
 	r = real_BIO_ctrl(bp, cmd, larg, parg);
 
@@ -541,4 +530,5 @@ long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 	return (r);
 }
 
-RETRACE_REPLACE(BIO_ctrl)
+RETRACE_REPLACE(BIO_ctrl, long, (BIO * bp, int cmd, long larg, void *parg),
+	(bp, cmd, larg, parg))

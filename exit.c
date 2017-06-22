@@ -28,13 +28,9 @@
 
 void RETRACE_IMPLEMENTATION(exit)(int status)
 {
-	rtr_exit_t real_exit;
-
-	real_exit = RETRACE_GET_REAL(exit);
-
 	trace_printf(1, "exit(%s%d%s);\n", VAR, status, RST);
 
 	real_exit(status);
 }
 
-RETRACE_REPLACE(exit)
+RETRACE_REPLACE(exit, void, (int status), (status))

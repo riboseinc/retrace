@@ -195,7 +195,6 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 	static const char fmt[] = "\t%07u\t%s | %s\n";
 	static const size_t asc_len = DUMP_LINE_SIZE + 1;
 	static const size_t hex_len = DUMP_LINE_SIZE * 2 + DUMP_LINE_SIZE/2 + 2;
-	rtr_sprintf_t real_sprintf;
 	char *hex_str, *asc_str;
 	char *hexp, *ascp;
 	size_t i;
@@ -214,7 +213,6 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 
 	hex_str = alloca(hex_len);
 	asc_str = alloca(asc_len);
-	real_sprintf = RETRACE_GET_REAL(sprintf);
 
 	for (i = 0; i < nbytes; i++) {
 		if (i % DUMP_LINE_SIZE == 0) {
@@ -256,10 +254,6 @@ is_main_thread(void)
 #elif defined(__NetBSD__)
 	return (_lwp_self() == 1);
 #else
-	rtr_getpid_t real_getpid;
-
-	real_getpid = RETRACE_GET_REAL(getpid);
-
 	return (syscall(SYS_gettid) == real_getpid());
 #endif
 }
@@ -313,18 +307,9 @@ get_config_file()
 {
 	FILE *config_file = NULL;
 	char *file_path;
-	rtr_fopen_t real_fopen;
-	rtr_malloc_t real_malloc;
-	rtr_free_t real_free;
-	rtr_getenv_t real_getenv;
 	int olderrno;
 
 	olderrno = errno;
-
-	real_fopen	= RETRACE_GET_REAL(fopen);
-	real_malloc	= RETRACE_GET_REAL(malloc);
-	real_free	= RETRACE_GET_REAL(free);
-	real_getenv	= RETRACE_GET_REAL(getenv);
 
 	/* If we have a RETRACE_CONFIG env var, try to open the config file from there. */
 	file_path = real_getenv("RETRACE_CONFIG");
@@ -374,15 +359,6 @@ get_config() {
 	char *buf = NULL, *p;
 	size_t buflen = 0;
 	ssize_t sz;
-	rtr_free_t real_free;
-	rtr_malloc_t real_malloc;
-	rtr_strchr_t real_strchr;
-	rtr_fclose_t real_fclose;
-
-	real_free = RETRACE_GET_REAL(free);
-	real_malloc = RETRACE_GET_REAL(malloc);
-	real_strchr = RETRACE_GET_REAL(strchr);
-	real_fclose = RETRACE_GET_REAL(fclose);
 
 	if (pconfig != NULL)
 		return (SLIST_FIRST(pconfig));
@@ -448,8 +424,6 @@ rtr_parse_config(const struct config_entry **pentry,
 	char *parg;
 	void *pvar;
 	va_list arg_values;
-	rtr_strcmp_t real_strcmp;
-	rtr_strlen_t real_strlen;
 
 	/*
 	 * If we disabled tracing because we are executing some internal code,
@@ -466,9 +440,6 @@ rtr_parse_config(const struct config_entry **pentry,
 
 	if (*pentry == NULL)
 		*pentry = get_config();
-
-	real_strcmp = RETRACE_GET_REAL(strcmp);
-	real_strlen = RETRACE_GET_REAL(strlen);
 
 	/*
 	 * Advance past the types until we find the values.

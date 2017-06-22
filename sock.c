@@ -36,9 +36,6 @@
 int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
 {
 	int sock;
-	rtr_socket_t real_socket;
-
-	real_socket = RETRACE_GET_REAL(socket);
 
 	sock = real_socket(domain, type, protocol);
 	trace_printf(1, "socket(%d, %d, %d) [return: %d]\n", domain, type, protocol, sock);
@@ -46,24 +43,19 @@ int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
 	return sock;
 }
 
-RETRACE_REPLACE(socket)
+RETRACE_REPLACE(socket, int, (int domain, int type, int protocol),
+	(domain, type, protocol))
+
 
 #ifdef __linux__
 int RETRACE_IMPLEMENTATION(connect)(int fd, __CONST_SOCKADDR_ARG _address, socklen_t len)
+{
+	const struct sockaddr *address = _address.__sockaddr__;
 #else
 int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_t len)
-#endif
 {
-	rtr_connect_t real_connect;
-	rtr_strcmp_t  real_strcmp;
-#ifdef __linux__
-	const struct sockaddr *address = _address.__sockaddr__;
 #endif
-
 	int ret;
-
-	real_connect = RETRACE_GET_REAL(connect);
-	real_strcmp = RETRACE_GET_REAL(strcmp);
 
 	if (!get_tracing_enabled())
 		return real_connect(fd, address, len);
@@ -154,22 +146,25 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 	return real_connect(fd, address, len);
 }
 
-RETRACE_REPLACE(connect)
+#ifdef __linux__
+RETRACE_REPLACE(connect, int,
+	(int fd, __CONST_SOCKADDR_ARG _address, socklen_t len),
+	(fd, _address, len))
+#else
+RETRACE_REPLACE(connect, int,
+	(int fd, const struct sockaddr *address, socklen_t len),
+	(fd, address, len))
+#endif
 
 #ifdef __linux__
 int RETRACE_IMPLEMENTATION(bind)(int fd, __CONST_SOCKADDR_ARG _address, socklen_t len)
+{
+	const struct sockaddr *address = _address.__sockaddr__;
 #else
 int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen_t len)
-#endif
 {
-	rtr_bind_t real_bind;
-#ifdef __linux__
-	const struct sockaddr *address = _address.__sockaddr__;
 #endif
-
 	int ret;
-
-	real_bind = RETRACE_GET_REAL(bind);
 
 	if (address->sa_family == AF_INET) {
 		struct sockaddr_in *bind_addr = (struct sockaddr_in *) address;
@@ -202,22 +197,27 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 	return real_bind(fd, address, len);
 }
 
-RETRACE_REPLACE(bind)
+#ifdef __linux__
+RETRACE_REPLACE(bind, int,
+	(int fd, __CONST_SOCKADDR_ARG _address, socklen_t len),
+	(fd, _address, len))
+#else
+RETRACE_REPLACE(bind, int,
+	(int fd, const struct sockaddr *address, socklen_t len),
+	(fd, address, len))
+
+#endif
 
 #ifdef __linux__
 int RETRACE_IMPLEMENTATION(accept)(int fd, __SOCKADDR_ARG _address, socklen_t *len)
+{
+	struct sockaddr *address = _address.__sockaddr__;
 #else
 int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *len)
-#endif
 {
-	rtr_accept_t real_accept;
-#ifdef __linux__
-	struct sockaddr *address = _address.__sockaddr__;
 #endif
 	struct descriptor_info *di;
 	int clnt_fd;
-
-	real_accept = RETRACE_GET_REAL(accept);
 
 	/* get descriptor info */
 	di = file_descriptor_get(fd);
@@ -243,14 +243,19 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 	return real_accept(fd, address, len);
 }
 
-RETRACE_REPLACE(accept)
+#ifdef __linux__
+RETRACE_REPLACE(accept, int,
+	(int fd, __SOCKADDR_ARG _address, socklen_t *len),
+	(fd, _address, len))
+#else
+RETRACE_REPLACE(accept, int,
+	(int fd, struct sockaddr *address, socklen_t *len),
+	(fd, address, len))
+#endif
 
 int RETRACE_IMPLEMENTATION(setsockopt)(int fd, int level, int optname, const void *optval, socklen_t optlen)
 {
-	rtr_setsockopt_t real_setsockopt;
 	int ret;
-
-	real_setsockopt = RETRACE_GET_REAL(setsockopt);
 
 	ret = real_setsockopt(fd, level, optname, optval, optlen);
 
@@ -263,14 +268,15 @@ int RETRACE_IMPLEMENTATION(setsockopt)(int fd, int level, int optname, const voi
 	return ret;
 }
 
-RETRACE_REPLACE(setsockopt)
+RETRACE_REPLACE(setsockopt, int,
+	(int fd, int level, int optname, const void *optval,
+	    socklen_t optlen),
+	(fd, level, optname, optval, optlen))
+
 
 ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, int flags)
 {
-	rtr_send_t real_send;
 	int ret;
-
-	real_send = RETRACE_GET_REAL(send);
 
 	ret = real_send(sockfd, buf, len, flags);
 	trace_printf(1, "send(%d, %p, %d, %d) [return: %d]\n", sockfd, buf, len, flags, ret);
@@ -280,17 +286,17 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 	return ret;
 }
 
-RETRACE_REPLACE(send)
+RETRACE_REPLACE(send, ssize_t,
+	(int sockfd, const void *buf, size_t len, int flags),
+	(sockfd, buf, len, flags))
+
 
 ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, int flags,
 		const struct sockaddr *dest_addr, socklen_t addrlen)
 {
-	rtr_sendto_t real_sendto;
 	int ret;
 
 	struct descriptor_info *di;
-
-	real_sendto = RETRACE_GET_REAL(sendto);
 
 	ret = real_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 	if (dest_addr) {
@@ -330,16 +336,17 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 	return ret;
 }
 
-RETRACE_REPLACE(sendto)
+RETRACE_REPLACE(sendto, ssize_t,
+	(int sockfd, const void *buf, size_t len, int flags,
+	    const struct sockaddr *dest_addr, socklen_t addrlen),
+	(sockfd, buf, len, flags, dest_addr, addrlen))
+
 
 ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, int flags)
 {
-	rtr_sendmsg_t real_sendmsg;
 	int i, ret;
 
 	struct descriptor_info *di;
-
-	real_sendmsg = RETRACE_GET_REAL(sendmsg);
 
 	ret = real_sendmsg(sockfd, msg, flags);
 	trace_printf(1, "sendmsg(%d, %p, %d) [return:%d]\n", sockfd, msg, flags, ret);
@@ -360,14 +367,14 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 	return ret;
 }
 
-RETRACE_REPLACE(sendmsg)
+RETRACE_REPLACE(sendmsg, ssize_t,
+	(int sockfd, const struct msghdr *msg, int flags),
+	(sockfd, msg, flags))
+
 
 ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flags)
 {
-	rtr_recv_t real_recv;
 	int recv_len;
-
-	real_recv = RETRACE_GET_REAL(recv);
 
 	recv_len = real_recv(sockfd, buf, len, flags);
 	trace_printf(1, "recv(%d, %p, %d, %d) [return: %d]\n", sockfd, buf, len, flags, recv_len);
@@ -378,15 +385,15 @@ ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flag
 	return recv_len;
 }
 
-RETRACE_REPLACE(recv)
+RETRACE_REPLACE(recv, ssize_t,
+	(int sockfd, void *buf, size_t len, int flags),
+	(sockfd, buf, len, flags))
+
 
 ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int flags,
 	struct sockaddr *src_addr, socklen_t *addrlen)
 {
-	rtr_recvfrom_t real_recvfrom;
 	int recv_len;
-
-	real_recvfrom = RETRACE_GET_REAL(recvfrom);
 
 	recv_len = real_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
 	if (src_addr) {
@@ -415,14 +422,15 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 	return recv_len;
 }
 
-RETRACE_REPLACE(recvfrom)
+RETRACE_REPLACE(recvfrom, ssize_t,
+	(int sockfd, void *buf, size_t len, int flags,
+	    struct sockaddr *src_addr, socklen_t *addrlen),
+	(sockfd, buf, len, flags, src_addr, addrlen))
+
 
 ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flags)
 {
-	rtr_recvmsg_t real_recvmsg;
 	int i, recv_len;
-
-	real_recvmsg = RETRACE_GET_REAL(recvmsg);
 
 	recv_len = real_recvmsg(sockfd, msg, flags);
 	trace_printf(1, "recvmsg(%d, %p, %d) [return:%d]\n", sockfd, msg, flags, recv_len);
@@ -438,4 +446,5 @@ ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flag
 	return recv_len;
 }
 
-RETRACE_REPLACE(recvmsg)
+RETRACE_REPLACE(recvmsg, ssize_t, (int sockfd, struct msghdr *msg, int flags),
+	(sockfd, msg, flags))

@@ -34,7 +34,7 @@
 #define FILE_DESCRIPTOR_TYPE_UDP_SENDTO		6 /* from sendto() over UDP */
 #define FILE_DESCRIPTOR_TYPE_UDP_SENDMSG	7 /* from sendmsg() over UDP local socket */
 
-extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
+#define RETRACE_DECL(func) extern rtr_##func##_t real_##func
 
 #ifdef __APPLE__
 
@@ -46,45 +46,59 @@ static struct {										\
 	(const void *)(unsigned long)&_replacment,					\
 	(const void *)(unsigned long)&_replacee						\
 };
-#define RETRACE_DECL(func)
 #define RETRACE_IMPLEMENTATION(func) retrace_impl_##func
-#define RETRACE_REPLACE(func) DYLD_INTERPOSE(retrace_impl_##func, func)
-#define RETRACE_GET_REAL(func) func
+
+#define RETRACE_REPLACE(func, type, defn, args)				\
+DYLD_INTERPOSE(retrace_impl_##func, func)				\
+rtr_##func##_t real_##func = func;
+
+#define RETRACE_REPLACE_V(func, type, defn, last, vfunc, vargs)		\
+DYLD_INTERPOSE(retrace_impl_##func, func)				\
+rtr_##func##_t real_##func = func;
 
 #else /* !__APPLE__ */
 
-#define RETRACE_DECL(func) rtr_##func##_t rtr_get_real_##func()
 #define RETRACE_IMPLEMENTATION(func) (func)
 
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
-#define RETRACE_REPLACE(func)                                              \
-rtr_##func##_t rtr_get_real_##func() {                                     \
-	static rtr_##func##_t ptr = (rtr_##func##_t) NULL;                 \
-	if (ptr == NULL)                                                   \
-		*(void **) (&ptr) = dlsym(RTLD_NEXT, #func);               \
-	return ptr;                                                        \
-}
+#ifdef __OpenBSD__
 
-#elif HAVE_ATOMIC_BUILTINS
-#define RETRACE_REPLACE(func)                                                                  \
-rtr_##func##_t rtr_get_real_##func() {                                                         \
-	static rtr_##func##_t ptr;                                                             \
-	if (__atomic_load_n(&ptr, __ATOMIC_RELAXED) == NULL)                                   \
-		__atomic_store_n(&ptr, _dl_sym(RTLD_NEXT, #func, __func__), __ATOMIC_RELAXED); \
-	return ptr;                                                                            \
-}
+#define RETRACE_FIXUP(func) real##func = dlsym(RTLD_NEXT, #func)
 
-#else
-#define RETRACE_REPLACE(func)                                              \
-rtr_##func##_t rtr_get_real_##func() {                                     \
-	static rtr_##func##_t ptr = (rtr_##func##_t) NULL;                 \
-	if (ptr == NULL)                                                   \
-		*(void **) (&ptr) = dlsym(RTLD_NEXT, #func);               \
-	return ptr;                                                        \
-}
+#else /* !__OpenBSD */
 
-#endif
-#define RETRACE_GET_REAL(func) rtr_get_real_##func()
+extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
+
+#ifdef HAVE_ATOMIC_BUILTINS
+
+#define RETRACE_FIXUP(func) __atomic_store_n(&real_##func,		\
+	_dl_sym(RTLD_NEXT, #func, __func__), __ATOMIC_RELAXED)		\
+
+#else /* !HAVE_ATOMIC_BUILTINS */
+
+#define RETRACE_FIXUP(func) real##func =				\
+	_dl_sym(RTLD_NEXT, #func, __func__)				\
+
+#endif /* HAVE_ATOMIC_BUILTINS */
+
+#endif /* __OpenBSD__ */
+
+#define RETRACE_REPLACE(func, type, defn, args)				\
+type rtr_fixup_##func defn {						\
+	RETRACE_FIXUP(func);						\
+	return real_##func args;					\
+}									\
+rtr_##func##_t real_##func = rtr_fixup_##func;
+
+#define RETRACE_REPLACE_V(func, type, defn, last, vfunc, vargs)		\
+type rtr_fixup_##func defn {						\
+	RETRACE_FIXUP(func);						\
+	va_list ap;							\
+	va_start(ap, last);						\
+	type ret = vfunc vargs;						\
+	va_end(ap);							\
+	return (ret);							\
+}									\
+rtr_##func##_t real_##func = rtr_fixup_##func;
 
 #endif /* !__APPLE__ */
 

@@ -31,9 +31,6 @@
 int RETRACE_IMPLEMENTATION(pipe)(int pipefd[2])
 {
 	int ret;
-	rtr_pipe_t real_pipe;
-
-	real_pipe = RETRACE_GET_REAL(pipe);
 
 	ret = real_pipe(pipefd);
 
@@ -42,16 +39,14 @@ int RETRACE_IMPLEMENTATION(pipe)(int pipefd[2])
 	return ret;
 }
 
-RETRACE_REPLACE(pipe)
+RETRACE_REPLACE(pipe, int, (int pipefd[2]), (pipefd))
+
 
 #ifndef __APPLE__
 
 int RETRACE_IMPLEMENTATION(pipe2)(int pipefd[2], int flags)
 {
 	int ret;
-	rtr_pipe2_t real_pipe2;
-
-	real_pipe2 = RETRACE_GET_REAL(pipe2);
 
 	ret = real_pipe2(pipefd, flags);
 
@@ -60,6 +55,6 @@ int RETRACE_IMPLEMENTATION(pipe2)(int pipefd[2], int flags)
 	return ret;
 }
 
-RETRACE_REPLACE(pipe2)
+RETRACE_REPLACE(pipe2, int, (int pipefd[2], int flags), (pipefd, flags))
 
 #endif

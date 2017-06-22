@@ -7,9 +7,15 @@
 #include <arpa/inet.h>
 
 typedef int (*rtr_socket_t)(int domain, int type, int protocol);
-typedef int (*rtr_connect_t)(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+#ifdef __linux__
+typedef int (*rtr_connect_t)(int fd, __CONST_SOCKADDR_ARG address, socklen_t len);
+typedef int (*rtr_bind_t)(int fd, __CONST_SOCKADDR_ARG address, socklen_t len);
+typedef int (*rtr_accept_t)(int fd, __SOCKADDR_ARG address, socklen_t *len);
+#else
+typedef int (*rtr_connect_t)(int fd, const struct sockaddr *address, socklen_t len);
 typedef int (*rtr_bind_t)(int fd, const struct sockaddr *address, socklen_t len);
 typedef int (*rtr_accept_t)(int fd, struct sockaddr *address, socklen_t *len);
+#endif
 
 typedef int (*rtr_setsockopt_t)(int fd, int level, int optname, const void *optval, socklen_t optlen);
 

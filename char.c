@@ -41,12 +41,7 @@ static void
 trace_putc(const char *name, int c, FILE* stream)
 {
 	static char specials[] = "\nn\rr\tt";
-	rtr_fileno_t real_fileno;
-	rtr_strchr_t real_strchr;
 	char *p;
-
-	real_fileno = RETRACE_GET_REAL(fileno);
-	real_strchr = RETRACE_GET_REAL(strchr);
 
 	p = c == '\0' ? " 0" : real_strchr(specials, c);
 
@@ -60,10 +55,11 @@ RETRACE_IMPLEMENTATION(putc)(int c, FILE *stream)
 {
 	trace_putc("putc", c, stream);
 
-	return (RETRACE_GET_REAL(putc)(c, stream));
+	return (real_putc(c, stream));
 }
 
-RETRACE_REPLACE(putc)
+RETRACE_REPLACE(putc, int, (int c, FILE *stream), (c, stream))
+
 
 #ifndef __APPLE__
 int
@@ -71,28 +67,28 @@ RETRACE_IMPLEMENTATION(_IO_putc)(int c, FILE *stream)
 {
 	trace_putc("__IO_putc", c, stream);
 
-	return (RETRACE_GET_REAL(_IO_putc)(c, stream));
+	return (real__IO_putc(c, stream));
 }
 
-RETRACE_REPLACE(_IO_putc)
+RETRACE_REPLACE(_IO_putc, int, (int c, FILE *stream), (c, stream))
+
 #endif
 
 int
 RETRACE_IMPLEMENTATION(toupper)(int c)
 {
-	rtr_toupper_t real_toupper = RETRACE_GET_REAL(toupper);
 	trace_printf(1, "toupper('%c');\n", c);
 	return (real_toupper(c));
 }
 
-RETRACE_REPLACE(toupper)
+RETRACE_REPLACE(toupper, int, (int c), (c))
+
 
 int
 RETRACE_IMPLEMENTATION(tolower)(int c)
 {
-	rtr_tolower_t real_tolower = RETRACE_GET_REAL(tolower);
 	trace_printf(1, "tolower('%c');\n", c);
 	return (real_tolower(c));
 }
 
-RETRACE_REPLACE(tolower)
+RETRACE_REPLACE(tolower, int, (int c), (c))

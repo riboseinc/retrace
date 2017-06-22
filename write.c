@@ -30,9 +30,6 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 {
 	ssize_t ret;
 	struct descriptor_info *di;
-	rtr_write_t real_write;
-
-	real_write = RETRACE_GET_REAL(write);
 
 	ret = real_write(fd, buf, nbytes);
 
@@ -48,4 +45,5 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 	return ret;
 }
 
-RETRACE_REPLACE(write)
+RETRACE_REPLACE(write, ssize_t, (int fd, const void *buf, size_t nbytes),
+	(fd, buf, nbytes))

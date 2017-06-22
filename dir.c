@@ -29,11 +29,6 @@
 DIR *RETRACE_IMPLEMENTATION(opendir)(const char *dirname)
 {
 	DIR *dirp;
-	rtr_opendir_t real_opendir;
-	rtr_dirfd_t real_dirfd;
-
-	real_opendir	= RETRACE_GET_REAL(opendir);
-	real_dirfd	= RETRACE_GET_REAL(dirfd);
 
 	dirp = real_opendir(dirname);
 
@@ -45,45 +40,33 @@ DIR *RETRACE_IMPLEMENTATION(opendir)(const char *dirname)
 	return dirp;
 }
 
-RETRACE_REPLACE(opendir)
+RETRACE_REPLACE(opendir, DIR *, (const char *dirname), (dirname))
+
 
 int RETRACE_IMPLEMENTATION(closedir)(DIR *dirp)
 {
-	rtr_closedir_t real_closedir;
-	rtr_dirfd_t real_dirfd;
-
-	real_closedir	= RETRACE_GET_REAL(closedir);
-	real_dirfd	= RETRACE_GET_REAL(dirfd);
-
 	trace_printf(1, "closedir(%d);\n", real_dirfd(dirp));
 
 	return real_closedir(dirp);
 }
 
-RETRACE_REPLACE(closedir)
+RETRACE_REPLACE(closedir, int, (DIR *dirp), (dirp))
+
 
 DIR *RETRACE_IMPLEMENTATION(fdopendir)(int fd)
 {
-	rtr_fdopendir_t real_fdopendir;
-
-	real_fdopendir = RETRACE_GET_REAL(fdopendir);
-
 	trace_printf(1, "fdopendir(%d)\n", fd);
 
 	return real_fdopendir(fd);
 }
 
-RETRACE_REPLACE(fdopendir)
+RETRACE_REPLACE(fdopendir, DIR *, (int fd), (fd))
+
 
 int RETRACE_IMPLEMENTATION(readdir_r)(DIR *dirp, struct dirent *entry, struct dirent **result)
 {
 	int dir_fd;
 	int ret;
-	rtr_readdir_r_t real_readdir_r;
-	rtr_dirfd_t real_dirfd;
-
-	real_readdir_r	= RETRACE_GET_REAL(readdir_r);
-	real_dirfd	= RETRACE_GET_REAL(dirfd);
 
 	/* get directory file descriptor */
 	dir_fd = real_dirfd(dirp);
@@ -100,17 +83,15 @@ int RETRACE_IMPLEMENTATION(readdir_r)(DIR *dirp, struct dirent *entry, struct di
 	return ret;
 }
 
-RETRACE_REPLACE(readdir_r)
+RETRACE_REPLACE(readdir_r, int,
+	(DIR *dirp, struct dirent *entry, struct dirent **result),
+	(dirp, entry, result))
+
 
 long RETRACE_IMPLEMENTATION(telldir)(DIR *dirp)
 {
 	int dir_fd;
 	long offset;
-	rtr_telldir_t real_telldir;
-	rtr_dirfd_t real_dirfd;
-
-	real_telldir	= RETRACE_GET_REAL(telldir);
-	real_dirfd	= RETRACE_GET_REAL(dirfd);
 
 	dir_fd = real_dirfd(dirp);
 	offset = real_telldir(dirp);
@@ -120,16 +101,12 @@ long RETRACE_IMPLEMENTATION(telldir)(DIR *dirp)
 	return offset;
 }
 
-RETRACE_REPLACE(telldir)
+RETRACE_REPLACE(telldir, long, (DIR *dirp), (dirp))
+
 
 void RETRACE_IMPLEMENTATION(seekdir)(DIR *dirp, long loc)
 {
 	int dir_fd;
-	rtr_seekdir_t real_seekdir;
-	rtr_dirfd_t real_dirfd;
-
-	real_seekdir	= RETRACE_GET_REAL(seekdir);
-	real_dirfd	= RETRACE_GET_REAL(dirfd);
 
 	/* get dir fd */
 	dir_fd = real_dirfd(dirp);
@@ -138,16 +115,12 @@ void RETRACE_IMPLEMENTATION(seekdir)(DIR *dirp, long loc)
 	trace_printf(1, "seekdir(%d, %ld);\n", dir_fd, loc);
 }
 
-RETRACE_REPLACE(seekdir)
+RETRACE_REPLACE(seekdir, void, (DIR *dirp, long loc), (dirp, loc))
+
 
 void RETRACE_IMPLEMENTATION(rewinddir)(DIR *dirp)
 {
 	int dir_fd;
-	rtr_rewinddir_t real_rewinddir;
-	rtr_dirfd_t real_dirfd;
-
-	real_rewinddir	= RETRACE_GET_REAL(rewinddir);
-	real_dirfd	= RETRACE_GET_REAL(dirfd);
 
 	/* get dir fd */
 	dir_fd = real_dirfd(dirp);
@@ -156,14 +129,12 @@ void RETRACE_IMPLEMENTATION(rewinddir)(DIR *dirp)
 	trace_printf(1, "rewinddir(%d);\n", dir_fd);
 }
 
-RETRACE_REPLACE(rewinddir)
+RETRACE_REPLACE(rewinddir, void, (DIR *dirp), (dirp))
+
 
 int RETRACE_IMPLEMENTATION(dirfd)(DIR *dirp)
 {
 	int dir_fd;
-	rtr_dirfd_t real_dirfd;
-
-	real_dirfd = RETRACE_GET_REAL(dirfd);
 
 	/* get dir fd */
 	dir_fd = real_dirfd(dirp);
@@ -173,4 +144,4 @@ int RETRACE_IMPLEMENTATION(dirfd)(DIR *dirp)
 	return dir_fd;
 }
 
-RETRACE_REPLACE(dirfd)
+RETRACE_REPLACE(dirfd, int, (DIR *dirp), (dirp))

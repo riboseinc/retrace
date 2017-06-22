@@ -29,9 +29,6 @@
 pid_t RETRACE_IMPLEMENTATION(fork)(void)
 {
 	pid_t p;
-	rtr_fork_t real_fork;
-
-	real_fork = RETRACE_GET_REAL(fork);
 
 	p = real_fork();
 
@@ -40,4 +37,4 @@ pid_t RETRACE_IMPLEMENTATION(fork)(void)
 	return p;
 }
 
-RETRACE_REPLACE(fork)
+RETRACE_REPLACE(fork, pid_t, (void), ())

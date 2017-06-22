@@ -28,10 +28,7 @@
 
 void *RETRACE_IMPLEMENTATION(dlopen)(const char *filename, int flag)
 {
-	rtr_dlopen_t real_dlopen;
 	void *r;
-
-	real_dlopen = RETRACE_GET_REAL(dlopen);
 
 	r = real_dlopen(filename, flag);
 
@@ -40,14 +37,13 @@ void *RETRACE_IMPLEMENTATION(dlopen)(const char *filename, int flag)
 	return r;
 }
 
-RETRACE_REPLACE(dlopen)
+RETRACE_REPLACE(dlopen, void *, (const char *filename, int flag),
+	(filename, flag))
+
 
 char *RETRACE_IMPLEMENTATION(dlerror)(void)
 {
-	rtr_dlerror_t real_dlerror;
 	char *r;
-
-	real_dlerror = RETRACE_GET_REAL(dlerror);
 
 	r = real_dlerror();
 
@@ -56,16 +52,14 @@ char *RETRACE_IMPLEMENTATION(dlerror)(void)
 	return r;
 }
 
-RETRACE_REPLACE(dlerror)
+RETRACE_REPLACE(dlerror, char *, (void), ())
+
 
 #if !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
 #ifdef HAVE_ATOMIC_BUILTINS
 void *RETRACE_IMPLEMENTATION(dlsym)(void *handle, const char *symbol)
 {
-	rtr_dlsym_t real_dlsym;
 	void *r;
-
-	real_dlsym = RETRACE_GET_REAL(dlsym);
 
 	r = real_dlsym(handle, symbol);
 
@@ -74,16 +68,14 @@ void *RETRACE_IMPLEMENTATION(dlsym)(void *handle, const char *symbol)
 	return r;
 }
 
-RETRACE_REPLACE(dlsym)
+RETRACE_REPLACE(dlsym, void *, (void *handle, const char *symbol),
+	(handle, symbol))
 #endif
 #endif
 
 int RETRACE_IMPLEMENTATION(dlclose)(void *handle)
 {
-	rtr_dlclose_t real_dlclose;
 	int r;
-
-	real_dlclose = RETRACE_GET_REAL(dlclose);
 
 	r = real_dlclose(handle);
 
@@ -92,4 +84,4 @@ int RETRACE_IMPLEMENTATION(dlclose)(void *handle)
 	return r;
 }
 
-RETRACE_REPLACE(dlclose)
+RETRACE_REPLACE(dlclose, int, (void *handle), (handle))

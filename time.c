@@ -29,10 +29,6 @@
 char *RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
 {
 	char *r;
-	rtr_ctime_r_t real_ctime_r;
-
-	real_ctime_r = RETRACE_GET_REAL(ctime_r);
-
 	r = real_ctime_r(timep, buf);
 
 	trace_printf(1, "ctime_r(\"%u\", \"%s\");\n", timep ? timep : 0, buf);
@@ -40,14 +36,11 @@ char *RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
 	return r;
 }
 
-RETRACE_REPLACE(ctime_r)
+RETRACE_REPLACE(ctime_r, char *, (const time_t *timep, char *buf), (timep, buf))
 
 char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 {
 	char *r;
-	rtr_ctime_t real_ctime;
-
-	real_ctime = RETRACE_GET_REAL(ctime);
 
 	r = real_ctime(timep);
 
@@ -56,7 +49,7 @@ char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 	return r;
 }
 
-RETRACE_REPLACE(ctime)
+RETRACE_REPLACE(ctime, char *, (const time_t *timep), (timep))
 
 #if defined(__APPLE__) || defined(__NetBSD__)
 int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, void *tzp)
@@ -65,14 +58,11 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz
 #endif
 {
 	int ret;
-	rtr_gettimeofday_t real_gettimeofday;
 #if defined(__APPLE__) || defined(__NetBSD__)
 	struct timezone *tz;
 
 	tz = (struct timezone *)tzp;
 #endif
-
-	real_gettimeofday = RETRACE_GET_REAL(gettimeofday);
 
 	ret = real_gettimeofday(tv, tz);
 	if (ret == 0) {
@@ -97,4 +87,8 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz
 	return ret;
 }
 
-RETRACE_REPLACE(gettimeofday)
+#if defined(__APPLE__) || defined(__NetBSD__)
+RETRACE_REPLACE(gettimeofday, int, (struct timeval *tv, void *tzp), (tv, tsp))
+#else
+RETRACE_REPLACE(gettimeofday, int, (struct timeval *tv, struct timezone *tz), (tv, tz))
+#endif
