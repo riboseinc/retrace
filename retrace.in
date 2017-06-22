@@ -12,6 +12,48 @@ usage() {
 	exit 1
 }
 
+get_lib_file() {
+    local fname="$1"
+
+    # check for the local file
+    local path="$fname"
+    if [[ -f "$path" ]]; then
+        output="$path"
+        return 0
+    fi
+
+    # check in autotools generated dir
+    local path=".libs/$fname"
+    if [[ -f "$path" ]]; then
+        output="$path"
+        return 0
+    fi
+
+    # check in the PREFIX path
+    local path="@libdir@/$fname"
+    if [[ -f "$path" ]]; then
+        output="$path"
+        return 0
+    fi
+
+    # check default library path
+    local path="/usr/lib/$fname"
+    if [[ -f "$path" ]]; then
+        output="$path"
+        return 0
+    fi
+
+    # check default library path
+    local path="/usr/lib64/$fname"
+    if [[ -f "$path" ]]; then
+        output="$path"
+        return 0
+    fi
+
+    return 1
+}
+
+
 main() {
 	[ -z "$1" ] && \
 		usage
@@ -25,16 +67,20 @@ main() {
 
 	if $(uname | grep -q ^Darwin); then
 		readonly lib="./retrace.dylib"
-		[ ! -f "${lib}" ] && \
-			errx "cannot open '${lib}'"
+        get_lib_file "$lib"
+        if [ $? != 0 ]; then
+            errx "Cannot find '${lib}'"
+        fi
 
-		DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${lib}" "$@"
+		DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
 	else
-		readonly lib="./retrace.so"
-		[ ! -f "${lib}" ] && \
-			errx "cannot open '${lib}'"
+		readonly lib="retrace.so"
+        get_lib_file "$lib"
+        if [ $? != 0 ]; then
+            errx "Cannot find '${lib}'"
+        fi
 
-		LD_PRELOAD="${lib}" "$@"
+		LD_PRELOAD="${output}" "$@"
 	fi
 }
 

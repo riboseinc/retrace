@@ -32,3 +32,6 @@ test-driver
 m4/
 autom4te.cache/
 .deps/
+.libs/
+retrace
+retrace.la

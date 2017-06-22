@@ -23,10 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 
-#include "common.h"
 #include "ssl.h"
 
 

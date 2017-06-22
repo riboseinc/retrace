@@ -8,4 +8,9 @@ pipe
 sock
 str
 time
-
+dlopen
+pledge
+scanf
+sock_srv
+trace
+retracetest.deleteme

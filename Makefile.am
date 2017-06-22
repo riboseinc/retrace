@@ -4,7 +4,7 @@ SUBDIRS= test
 
 lib_LTLIBRARIES= retrace.la
 
-retrace_la_LDFLAGS= -module -avoid-version -shared $(AM_LDFLAGS)
+retrace_la_LDFLAGS= $(AM_LDFLAGS) -module -avoid-version -shared
 retrace_la_CFLAGS= $(AM_CFLAGS) $(LIBSSL_FLAGS)
 
 # include all headers here
@@ -37,7 +37,6 @@ noinst_HEADERS= \
 if OPENSSL
 	noinst_HEADERS+= ssl.h
 endif
-
 
 # include all C files here
 retrace_la_SOURCES= \

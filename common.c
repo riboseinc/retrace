@@ -23,6 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
 #include <sys/types.h>
 
 #include <pwd.h>
@@ -46,7 +47,6 @@
 #include <stdarg.h>
 #include <errno.h>
 
-#include "common.h"
 #include "str.h"
 #include "id.h"
 #include "file.h"
