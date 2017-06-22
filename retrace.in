@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 readonly __progname="$(basename $0)"
 
@@ -17,35 +17,35 @@ get_lib_file() {
 
     # check for the local file
     local path="$fname"
-    if [[ -f "$path" ]]; then
+    if [ -f "$path" ]; then
         output="$path"
         return 0
     fi
 
     # check in autotools generated dir
     local path=".libs/$fname"
-    if [[ -f "$path" ]]; then
+    if [ -f "$path" ]; then
         output="$path"
         return 0
     fi
 
     # check in the PREFIX path
     local path="@libdir@/$fname"
-    if [[ -f "$path" ]]; then
+    if [ -f "$path" ]; then
         output="$path"
         return 0
     fi
 
     # check default library path
     local path="/usr/lib/$fname"
-    if [[ -f "$path" ]]; then
+    if [ -f "$path" ]; then
         output="$path"
         return 0
     fi
 
     # check default library path
     local path="/usr/lib64/$fname"
-    if [[ -f "$path" ]]; then
+    if [ -f "$path" ]; then
         output="$path"
         return 0
     fi
@@ -58,7 +58,7 @@ main() {
 	[ -z "$1" ] && \
 		usage
 
-	if [[ "${RETRACE_CONFIG}" ]]; then
+	if [ "${RETRACE_CONFIG}" ]; then
 		readonly local config="${RETRACE_CONFIG}"
 
 		[ ! -f "${config}" ] && \

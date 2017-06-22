@@ -9,8 +9,10 @@ typedef int (*rtr_dlclose_t)(void *handle);
 
 RETRACE_DECL(dlopen);
 RETRACE_DECL(dlerror);
+#if !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
 #ifdef HAVE_ATOMIC_BUILTINS
 RETRACE_DECL(dlsym);
+#endif
 #endif
 RETRACE_DECL(dlclose);
 

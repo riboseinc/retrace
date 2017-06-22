@@ -70,7 +70,7 @@ endif
 
 
 retrace: retrace.in
-	@sed -e "s|\@libdir\@|$(libdir)|" $< > $@
+	@sed -e "s|\@libdir\@|$(libdir)|" retrace.in > $@
 	chmod +x $@
 
 dist_bin_SCRIPTS= retrace

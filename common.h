@@ -55,7 +55,7 @@ static struct {										\
 #define RETRACE_DECL(func) rtr_##func##_t rtr_get_real_##func()
 #define RETRACE_IMPLEMENTATION(func) (func)
 
-#ifdef __OpenBSD__
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 #define RETRACE_REPLACE(func)                                              \
 rtr_##func##_t rtr_get_real_##func() {                                     \
 	static rtr_##func##_t ptr = (rtr_##func##_t) NULL;                 \
