@@ -44,6 +44,8 @@
 #endif
 
 #include <stdarg.h>
+#include <errno.h>
+#include <sys/queue.h>
 
 #include "common.h"
 #include "str.h"
@@ -94,6 +96,13 @@ static pthread_once_t tracing_key_once = PTHREAD_ONCE_INIT;
 struct descriptor_info **g_descriptor_list;
 unsigned int g_descriptor_list_size;
 
+struct config_entry {
+	SLIST_ENTRY(config_entry) next;
+	char *line;  /* line with commas replaced by '\0' */
+	int nargs;
+};
+SLIST_HEAD(config_head, config_entry);
+
 void
 trace_printf(int hdr, const char *fmt, ...)
 {
@@ -106,7 +115,6 @@ trace_printf(int hdr, const char *fmt, ...)
 
 	if (!get_tracing_enabled())
 		return;
-
 	if (rtr_get_config_single("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_END, &output_file_path)) {
 		old_trace_state = trace_disable();
 		if (output_file_path) {
@@ -114,8 +122,6 @@ trace_printf(int hdr, const char *fmt, ...)
 
 			if (out_file_tmp)
 				output_file = out_file_tmp;
-
-			free(output_file_path);
 		}
 
 		trace_restore(old_trace_state);
@@ -305,27 +311,23 @@ trace_disable()
 static FILE *
 get_config_file()
 {
-	int old_trace_state;
 	FILE *config_file = NULL;
 	char *file_path;
 	rtr_fopen_t real_fopen;
 	rtr_malloc_t real_malloc;
 	rtr_free_t real_free;
 	rtr_getenv_t real_getenv;
+	int olderrno;
 
-	if (!get_tracing_enabled())
-		return NULL;
-
-	old_trace_state = trace_disable();
+	olderrno = errno;
 
 	real_fopen	= RETRACE_GET_REAL(fopen);
 	real_malloc	= RETRACE_GET_REAL(malloc);
 	real_free	= RETRACE_GET_REAL(free);
-	real_getenv = RETRACE_GET_REAL(getenv);
-
+	real_getenv	= RETRACE_GET_REAL(getenv);
 
 	/* If we have a RETRACE_CONFIG env var, try to open the config file from there. */
-	file_path = getenv("RETRACE_CONFIG");
+	file_path = real_getenv("RETRACE_CONFIG");
 
 	if (file_path)
 		config_file = real_fopen(file_path, "r");
@@ -356,23 +358,98 @@ get_config_file()
 	if (!config_file)
 		config_file = real_fopen("/etc/retrace.conf", "r");
 
-	trace_restore(old_trace_state);
+	errno = olderrno;
 
 	return config_file;
 }
 
-static int
-rtr_parse_config_file(FILE *config_file, const char *function, va_list arg_types)
-{
-	int retval = 0;
-	int old_trace_state;
-	size_t len;
-	size_t line_size = 0;
-	char *config_line = NULL;
-	char *current_function = NULL;
-	char *arg_start = NULL;
-	rtr_strncmp_t real_strncmp;
+static const struct config_entry *
+get_config() {
+	static struct config_head empty_config
+	    = SLIST_HEAD_INITIALIZER(empty_config);
+	static struct config_head *pconfig;
+	struct config_head *plist;
+	struct config_entry *pentry, *ptail;
+	FILE *config_file;
+	char *buf = NULL, *p;
+	size_t buflen = 0;
+	ssize_t sz;
 	rtr_free_t real_free;
+	rtr_malloc_t real_malloc;
+	rtr_strchr_t real_strchr;
+	rtr_fclose_t real_fclose;
+
+	real_free = RETRACE_GET_REAL(free);
+	real_malloc = RETRACE_GET_REAL(malloc);
+	real_strchr = RETRACE_GET_REAL(strchr);
+	real_fclose = RETRACE_GET_REAL(fclose);
+
+	if (pconfig != NULL)
+		return (SLIST_FIRST(pconfig));
+
+	config_file = get_config_file();
+	if (config_file == NULL) {
+		pconfig = &empty_config;
+		return NULL;
+	}
+
+	for (plist = real_malloc(sizeof(struct config_head)); plist;) {
+		sz = getline(&buf, &buflen, config_file);
+		if (sz <= 0) {	/* done reading config */
+			pconfig = plist;
+			plist = NULL;
+			break;
+		}
+
+		pentry = real_malloc(sizeof(struct config_entry));
+		if (pentry == NULL)
+			break;
+
+		if (SLIST_EMPTY(plist))
+			SLIST_INSERT_HEAD(plist, pentry, next);
+		else
+			SLIST_INSERT_AFTER(ptail, pentry, next);
+
+		pentry->line =
+		    strndup(buf, buf[sz - 1] == '\n' ? sz - 1 : sz);
+		if (pentry->line == NULL)
+			break;
+
+		pentry->nargs = 0;
+		for (p = real_strchr(pentry->line, ','); p; p = strchr(++p, ',')) {
+			*p = '\0';
+			++pentry->nargs;
+		}
+
+		ptail = pentry;
+	}
+
+	real_free(buf);
+	real_fclose(config_file);
+	if (plist != NULL) {  /* partially read config */
+		while (!SLIST_EMPTY(plist)) {
+			pentry = SLIST_FIRST(plist);
+			SLIST_REMOVE_HEAD(plist, next);
+			real_free(pentry->line);
+			real_free(pentry);
+		}
+		real_free(plist);
+		pconfig = &empty_config;
+	}
+
+	return (SLIST_FIRST(pconfig));
+}
+
+static int
+rtr_parse_config(const struct config_entry **pentry,
+	const char *function, va_list arg_types)
+{
+	int retval, nargs, old_trace_state;
+	char *parg;
+	void *pvar;
+	va_list arg_values;
+	rtr_strcmp_t real_strcmp;
+	rtr_strlen_t real_strlen;
 
 	/*
 	 * If we disabled tracing because we are executing some internal code,
@@ -387,145 +464,79 @@ rtr_parse_config_file(FILE *config_file, const char *function, va_list arg_types
 	 */
 	old_trace_state = trace_disable();
 
-	real_strncmp = RETRACE_GET_REAL(strncmp);
-	real_free = RETRACE_GET_REAL(free);
+	if (*pentry == NULL)
+		*pentry = get_config();
 
-	if (!config_file)
-		goto cleanup;
+	real_strcmp = RETRACE_GET_REAL(strcmp);
+	real_strlen = RETRACE_GET_REAL(strlen);
 
-	len = strlen(function);
+	/*
+	 * Advance past the types until we find the values.
+	 * Counting how many arguments we need to fill
+	 */
+	__va_copy(arg_values, arg_types);
+	nargs = 0;
+	while (va_arg(arg_values, int) != ARGUMENT_TYPE_END)
+		++nargs;
 
-	while (getline(&config_line, &line_size, config_file) != -1) {
-		char *function_end = strchr(config_line, ',');
-
-		if (function_end) {
-			*function_end = '\0';
-
-			if (real_strncmp(function, config_line, len) == 0) {
-				arg_start = function_end + 1;
-				retval = 1;
-				break;
+	retval = 0;
+	while (*pentry != NULL && retval == 0) {
+		if (real_strcmp(function, (*pentry)->line) == 0
+		    && (*pentry)->nargs == nargs) {
+			parg = (*pentry)->line; /* points to func name */
+			while (nargs--) {
+				parg += real_strlen(parg) + 1;
+				pvar = va_arg(arg_values, void *);
+				switch (va_arg(arg_types, int)) {
+				case ARGUMENT_TYPE_INT:
+					*((int *)pvar) = atoi(parg);
+					break;
+				case ARGUMENT_TYPE_STRING:
+					*((char **)pvar) = parg;
+					break;
+				}
 			}
+			retval = 1;
 		}
-
-		real_free(config_line);
-		config_line = NULL;
+		(*pentry) = SLIST_NEXT(*pentry, next);
 	}
 
-	if (current_function)
-		real_free(current_function);
-
-	if (arg_start) {
-		/* Count how many arguments we have */
-		va_list arg_values;
-		int     current_argument;
-
-		__va_copy(arg_values, arg_types);
-
-		/* Advance past the types until we find the values */
-		do {
-			current_argument = va_arg(arg_values, int);
-		} while (current_argument != ARGUMENT_TYPE_END);
-
-		/* Now start filling the requests */
-		for (current_argument = va_arg(arg_types, int);
-			 current_argument != ARGUMENT_TYPE_END;
-			 current_argument = va_arg(arg_types, int)) {
-			void *current_value = va_arg(arg_values, void *);
-			char *arg_end;
-
-			arg_end = strchr(arg_start, ',');
-
-			if (arg_end)
-				*arg_end = '\0';
-			else {
-				/* skip the newline for the last string argument */
-				if (arg_start && strlen(arg_start) &&
-					arg_start[strlen(arg_start) - 1] == '\n')
-					arg_start[strlen(arg_start) - 1] = '\0';
-			}
-
-			switch (current_argument) {
-			case ARGUMENT_TYPE_INT:
-				*((int *)current_value) = atoi(arg_start);
-				break;
-			case ARGUMENT_TYPE_STRING:
-				*((char **)current_value) = strdup(arg_start);
-				break;
-			}
-
-			if (arg_end != NULL)
-				arg_start = arg_end + 1;
-			else
-				break;
-		}
-
-		va_end(arg_types);
-		va_end(arg_values);
-	}
-
-cleanup:
-	if (config_line)
-		real_free(config_line);
-
-	/* Restore tracing */
+	va_end(arg_values);
 	trace_restore(old_trace_state);
 
 	return retval;
 }
 
-void
-rtr_config_close(FILE *config)
-{
-	int old_trace_state;
-
-	old_trace_state = trace_disable();
-	fclose(config);
-	trace_restore(old_trace_state);
-
-}
-
-int rtr_get_config_multiple(FILE **config, const char *function, ...)
+int rtr_get_config_multiple(RTR_CONFIG_HANDLE *handle, const char *function, ...)
 {
 	int ret = 0;
+	const struct config_entry **config = (const struct config_entry **)handle;
 
-	if (*config == NULL)
-		*config = get_config_file();
+	va_list args;
 
-	if (*config) {
-		va_list args;
+	va_start(args, function);
 
-		va_start(args, function);
+	ret = rtr_parse_config(config, function, args);
 
-		ret = rtr_parse_config_file(*config, function, args);
+	va_end(args);
 
-		if (!ret) {
-			rtr_config_close(*config);
-			*config = NULL;
-		}
-	}
+	if (!ret)
+		*config = NULL;
 
-	return ret;
+	return (ret);
 }
 
 int rtr_get_config_single(const char *function, ...)
 {
-	int ret = 0;
-	FILE *config_file;
+	const struct config_entry *config = NULL;
+	va_list args;
+	int ret;
 
-	config_file = get_config_file();
+	va_start(args, function);
+	ret = rtr_parse_config(&config, function, args);
+	va_end(args);
 
-	if (config_file) {
-		va_list args;
-
-		va_start(args, function);
-
-		ret = rtr_parse_config_file(config_file, function, args);
-
-		rtr_config_close(config_file);
-	}
-
-	return ret;
+	return (ret);
 }
 
 

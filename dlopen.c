@@ -23,41 +23,69 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-#include <string.h>
+#include "common.h"
+#include "dlopen.h"
 
-int main(void)
+void *RETRACE_IMPLEMENTATION(dlopen)(const char *filename, int flag)
 {
-	FILE *f;
-	char *s = "This is a test string :)";
-	char buf[1024];
+	rtr_dlopen_t real_dlopen;
+	void *r;
 
-	f = fopen("retracetest.deleteme", "w+");
+	real_dlopen = RETRACE_GET_REAL(dlopen);
 
-	if (f) {
-		fwrite(s, strlen(s), 1, f);
-		fputs(s,  f);
-		fputc('6', f);
+	r = real_dlopen(filename, flag);
 
-		rewind(f);
+	trace_printf(1, "dlopen(\"%s\", %d); [return %p]\n", filename, flag, r);
 
-		fread(buf, strlen(s), 1, f);
-
-		rewind(f);
-
-		fgets(buf, strlen(s), f);
-		fgetc(f);
-
-		fclose(f);
-	}
-
-#ifdef __APPLE__
-	strmode(717, buf);
-#endif
-
-	f = fopen("/etc/passwd", "w+");
-	if (f != NULL)
-		fclose(f);
-
-	return 0;
+	return r;
 }
+
+RETRACE_REPLACE(dlopen)
+
+char *RETRACE_IMPLEMENTATION(dlerror)(void)
+{
+	rtr_dlerror_t real_dlerror;
+	char *r;
+
+	real_dlerror = RETRACE_GET_REAL(dlerror);
+
+	r = real_dlerror();
+
+	trace_printf(1, "dlerror(); [return: \"%s\"]\n", r);
+
+	return r;
+}
+
+RETRACE_REPLACE(dlerror)
+
+void *RETRACE_IMPLEMENTATION(dlsym)(void *handle, const char *symbol)
+{
+	rtr_dlsym_t real_dlsym;
+	void *r;
+
+	real_dlsym = RETRACE_GET_REAL(dlsym);
+
+	r = real_dlsym(handle, symbol);
+
+	trace_printf(1, "dlsym(%p, \"%s\"); [return: %p]\n", handle, symbol, r);
+
+	return r;
+}
+
+RETRACE_REPLACE(dlsym)
+
+int RETRACE_IMPLEMENTATION(dlclose)(void *handle)
+{
+	rtr_dlclose_t real_dlclose;
+	int r;
+
+	real_dlclose = RETRACE_GET_REAL(dlclose);
+
+	r = real_dlclose(handle);
+
+	trace_printf(1, "dlclose(%p); [return: %d]\n", handle, r);
+
+	return r;
+}
+
+RETRACE_REPLACE(dlclose)

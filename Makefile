@@ -46,6 +46,8 @@ SRCS            += ssl.c
 SRCS		+= trace.c
 SRCS		+= pledge.c
 SRCS		+= scanf.c
+SRCS		+= dlopen.c
+SRCS		+= netdb.c
 OBJS		= $(SRCS:.c=.o)
 
 .PHONY: all clean test
