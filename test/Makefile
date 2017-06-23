@@ -24,6 +24,8 @@ ifeq ($(OS),Linux)
 	./$(CMOCKA-TEST-BIN)
 endif
 	./$(AUTOMATED-TEST)
+	RETRACE_CONFIG=../retrace.conf.example ./$(AUTOMATED-TEST)
+	rm -f retracetest.deleteme
 
 -include $(SRCS:.c=.d)
 
