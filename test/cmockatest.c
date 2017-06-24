@@ -373,9 +373,33 @@ RTR_TEST_START(gethostbyname2)
 RTR_TEST_END
 
 RTR_TEST_START(getaddrinfo)
+	struct addrinfo hints, *result;
+	int ret;
+
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = 0;
+	hints.ai_protocol = 0;
+
+	ret = rtr_getaddrinfo("www.google.com", NULL, &hints, &result);
+	if (result)
+		freeaddrinfo(result);
 RTR_TEST_END
 
 RTR_TEST_START(freeaddrinfo)
+	struct addrinfo hints, *result;
+	int ret;
+
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = 0;
+	hints.ai_protocol = 0;
+
+	ret = getaddrinfo("www.google.com", NULL, &hints, &result);
+	if (result)
+		rtr_freeaddrinfo(result);
 RTR_TEST_END
 
 #define READ_BUF_SIZE 256

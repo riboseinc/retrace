@@ -34,19 +34,15 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyname)(const char *name)
 
 	hent = real_gethostbyname(name);
 	if (hent) {
-		struct in_addr **addr_list;
 		int i;
 
 		trace_printf(1, "gethostbyname(\"%s\") = [", name);
 
-		addr_list = (struct in_addr **) hent->h_addr_list;
-		for (i = 0; addr_list[i] != NULL; i++) {
+		for (i = 0; hent->h_addr_list[i] != NULL; i++) {
 			char ip_addr[INET6_ADDRSTRLEN];
 
-			inet_ntop(hent->h_addrtype, addr_list[i], ip_addr, sizeof(ip_addr));
-			if (i > 0)
-				trace_printf(0, ",");
-			trace_printf(0, "%s", ip_addr);
+			inet_ntop(hent->h_addrtype, hent->h_addr_list[i], ip_addr, sizeof(ip_addr));
+			trace_printf(0, i > 0 ? ",%s" : "%s", ip_addr);
 		}
 
 		trace_printf(0, "]\n");
@@ -63,29 +59,20 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyaddr)(const void *addr, socklen_
 {
 	struct hostent *hent;
 
+	char ip_addr[INET6_ADDRSTRLEN];
+
+	/* get IP address */
+	inet_ntop(type, addr, ip_addr, sizeof(ip_addr));
+
 	hent = real_gethostbyaddr(addr, len, type);
-	if (addr) {
-		char ip_addr[INET6_ADDRSTRLEN];
-
-		if (type == AF_INET) {
-			struct in_addr *in_addr = (struct in_addr *) addr;
-
-			inet_ntop(AF_INET, in_addr, ip_addr, sizeof(ip_addr));
-		} else if (type == AF_INET6) {
-			struct in6_addr *in6_addr = (struct in6_addr *) addr;
-
-			inet_ntop(AF_INET, in6_addr, ip_addr, sizeof(ip_addr));
-		}
-
-		if (hent)
-			trace_printf(1, "gethostbyaddr(IP => %s, , type => %s) = [Hostname:%s]\n", ip_addr,
-				type == AF_INET ? "AF_INET" : "AF_INET6",
-				hent->h_name);
-		else
-			trace_printf(1, "gethostbyaddr(IP => %s, , type => %s) = [Error:%s]\n", ip_addr,
-				type == AF_INET ? "AF_INET" : "AF_INET6",
-				hstrerror(h_errno));
-	}
+	if (hent)
+		trace_printf(1, "gethostbyaddr(IP => %s, , type => %s) = [Hostname:%s]\n", ip_addr,
+			type == AF_INET ? "AF_INET" : "AF_INET6",
+			hent->h_name);
+	else
+		trace_printf(1, "gethostbyaddr(IP => %s, , type => %s) = [Error:%s]\n", ip_addr,
+			type == AF_INET ? "AF_INET" : "AF_INET6",
+			hstrerror(h_errno));
 
 	return hent;
 }
@@ -98,7 +85,7 @@ void RETRACE_IMPLEMENTATION(sethostent)(int stayopen)
 {
 	trace_printf(1, "sethostent(%d)\n", stayopen);
 
-	return real_sethostent(stayopen);
+	real_sethostent(stayopen);
 }
 
 RETRACE_REPLACE(sethostent, void, (int stayopen), (stayopen))
@@ -108,7 +95,7 @@ void RETRACE_IMPLEMENTATION(endhostent)(void)
 {
 	trace_printf(1, "endhostent()\n");
 
-	return real_endhostent();
+	real_endhostent();
 }
 
 RETRACE_REPLACE(endhostent, void, (void), ())
@@ -120,19 +107,15 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostent)(void)
 
 	hent = real_gethostent();
 	if (hent) {
-		struct in_addr **addr_list;
 		int i;
 
 		trace_printf(1, "gethostent() = [");
 
-		addr_list = (struct in_addr **) hent->h_addr_list;
-		for (i = 0; addr_list[i] != NULL; i++) {
+		for (i = 0; hent->h_addr_list[i] != NULL; i++) {
 			char ip_addr[INET6_ADDRSTRLEN];
 
-			inet_ntop(hent->h_addrtype, addr_list[i], ip_addr, sizeof(ip_addr));
-			if (i > 0)
-				trace_printf(0, ",");
-			trace_printf(0, "%s", ip_addr);
+			inet_ntop(hent->h_addrtype, hent->h_addr_list[i], ip_addr, sizeof(ip_addr));
+			trace_printf(0, i > 0 ? ",%s" : "%s", ip_addr);
 		}
 
 		trace_printf(0, "]\n");
@@ -149,36 +132,20 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyname2)(const char *name, int af)
 {
 	struct hostent *hent;
 
+	char ip_addr[INET6_ADDRSTRLEN];
+	int i;
+
 	hent = real_gethostbyname2(name, af);
 	if (hent) {
+		int i;
+
 		trace_printf(1, "gethostbyname2(\"%s\", %s) = [", name, af == AF_INET ? "AF_INET" : "AF_INET6");
 
-		if (af == AF_INET) {
-			struct in_addr **addr_list;
-			int i;
+		for (i = 0; hent->h_addr_list[i] != NULL; i++) {
+			char ip_addr[INET6_ADDRSTRLEN];
 
-			addr_list = (struct in_addr **) hent->h_addr_list;
-			for (i = 0; addr_list[i] != NULL; i++) {
-				char ip_addr[INET6_ADDRSTRLEN];
-
-				inet_ntop(hent->h_addrtype, addr_list[i], ip_addr, sizeof(ip_addr));
-				if (i > 0)
-					trace_printf(0, ",");
-				trace_printf(0, "%s", ip_addr);
-			}
-		} else if (af == AF_INET6) {
-			struct in6_addr **addr_list;
-			int i;
-
-			addr_list = (struct in6_addr **) hent->h_addr_list;
-			for (i = 0; addr_list[i] != NULL; i++) {
-				char ip_addr[INET6_ADDRSTRLEN];
-
-				inet_ntop(hent->h_addrtype, addr_list[i], ip_addr, sizeof(ip_addr));
-				if (i > 0)
-					trace_printf(0, ",");
-				trace_printf(0, "%s", ip_addr);
-			}
+			inet_ntop(hent->h_addrtype, hent->h_addr_list[i], ip_addr, sizeof(ip_addr));
+			trace_printf(0, i > 0 ? ",%s" : "%s", ip_addr);
 		}
 
 		trace_printf(0, "]\n");
@@ -218,10 +185,7 @@ int RETRACE_IMPLEMENTATION(getaddrinfo)(const char *node, const char *service,
 				inet_ntop(rp->ai_family, &(in_addr->sin6_addr), addr, sizeof(addr));
 			}
 
-			if (rp != result)
-				trace_printf(0, ",");
-
-			trace_printf(0, "%s", addr);
+			trace_printf(0, (rp != result) ? ",%s" : "%s", addr);
 		}
 
 		trace_printf(0, "]\n");
