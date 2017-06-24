@@ -19,6 +19,7 @@ noinst_HEADERS= \
 	fork.h \
 	id.h \
 	malloc.h \
+	rtr-netdb.h \
 	perror.h \
 	pipe.h \
 	pledge.h \
@@ -50,6 +51,7 @@ libretrace_la_SOURCES= \
 	fork.c \
 	id.c \
 	malloc.c \
+	netdb.c \
 	perror.c \
 	pipe.c \
 	pledge.c \

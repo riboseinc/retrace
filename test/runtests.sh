@@ -11,3 +11,5 @@
 ../retrace -f ../retrace.conf.example ./str
 ../retrace -f ../retrace.conf.example ./time
 ../retrace -f ../retrace.conf.example ./dlopen
+../retrace -f ../retrace.conf.example ./getaddrinfo
+
