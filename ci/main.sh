@@ -29,7 +29,7 @@ CHECKPATCH_FLAGS+=" --ignore NAKED_SSCANF"
 CHECKPATCH_FLAGS+=" --ignore SSCANF_TO_KSTRTO"
 
 # checkpatch.pl will ignore the following paths
-CHECKPATCH_IGNORE+=" checkpatch.pl.patch"
+CHECKPATCH_IGNORE+=" checkpatch.pl.patch Makefile test/Makefile"
 CHECKPATCH_EXCLUDE=$(for p in $CHECKPATCH_IGNORE; do echo ":(exclude)$p" ; done)
 
 function _checkpatch() {
