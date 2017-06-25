@@ -72,10 +72,10 @@ case $host_os in
   ;;
 esac
 
-AM_CONDITIONAL([LINUX],   [test "$islinux" = "xtrue"])
-AM_CONDITIONAL([DARWIN],  [test "$isdarwin" = "xtrue"])
-AM_CONDITIONAL([FREEBSD], [test "$isfreebsd" = "xtrue"])
-AM_CONDITIONAL([OPENBSD], [test "$isopenbsd" = "xtrue"])
+AM_CONDITIONAL([LINUX],   [test "x$islinux" = "xyes"])
+AM_CONDITIONAL([DARWIN],  [test "x$isdarwin" = "xyes"])
+AM_CONDITIONAL([FREEBSD], [test "x$isfreebsd" = "xyes"])
+AM_CONDITIONAL([OPENBSD], [test "x$isopenbsd" = "xyes"])
 
 # Linux specific configuration
 #if test "x$islinux" = "xyes"; then
