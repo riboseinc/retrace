@@ -1,6 +1,7 @@
 #ifndef __RETRACE_COMMON_H__
 #define __RETRACE_COMMON_H__
 
+#include "config.h"
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <sys/time.h>
@@ -53,7 +54,8 @@ static struct {										\
 
 #define RETRACE_DECL(func) rtr_##func##_t rtr_get_real_##func()
 #define RETRACE_IMPLEMENTATION(func) (func)
-#ifdef __OpenBSD__
+
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 #define RETRACE_REPLACE(func)                                              \
 rtr_##func##_t rtr_get_real_##func() {                                     \
 	static rtr_##func##_t ptr = (rtr_##func##_t) NULL;                 \
@@ -61,7 +63,8 @@ rtr_##func##_t rtr_get_real_##func() {                                     \
 		*(void **) (&ptr) = dlsym(RTLD_NEXT, #func);               \
 	return ptr;                                                        \
 }
-#else
+
+#elif HAVE_ATOMIC_BUILTINS
 #define RETRACE_REPLACE(func)                                                                  \
 rtr_##func##_t rtr_get_real_##func() {                                                         \
 	static rtr_##func##_t ptr;                                                             \
@@ -69,6 +72,16 @@ rtr_##func##_t rtr_get_real_##func() {                                          
 		__atomic_store_n(&ptr, _dl_sym(RTLD_NEXT, #func, __func__), __ATOMIC_RELAXED); \
 	return ptr;                                                                            \
 }
+
+#else
+#define RETRACE_REPLACE(func)                                              \
+rtr_##func##_t rtr_get_real_##func() {                                     \
+	static rtr_##func##_t ptr = (rtr_##func##_t) NULL;                 \
+	if (ptr == NULL)                                                   \
+		*(void **) (&ptr) = dlsym(RTLD_NEXT, #func);               \
+	return ptr;                                                        \
+}
+
 #endif
 #define RETRACE_GET_REAL(func) rtr_get_real_##func()
 

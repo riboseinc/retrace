@@ -8,4 +8,14 @@ pipe
 sock
 str
 time
-
+dlopen
+pledge
+scanf
+sock_srv
+trace
+retracetest.deleteme
+runtests.sh.log
+runtests.sh.trs
+test-suite.log
+cmockatest.log
+cmockatest.trs

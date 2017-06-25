@@ -42,8 +42,8 @@ function checkpatch() {
 		git format-patch -1 $1 --stdout -- $CHECKPATCH_EXCLUDE . | _checkpatch
 }
 
-make -j2
-make test
+sh autogen.sh && ./configure --disable-silent-rules --enable-tests --with-cmocka=${CMOCKA_INSTALL} && make clean && make
+make check
 
 # checkpatch
 if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then

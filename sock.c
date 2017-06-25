@@ -28,6 +28,7 @@
 #include "malloc.h"
 #include "sock.h"
 #include <string.h>
+#include <netinet/in.h>
 
 
 #define RETRACE_MAX_IP_ADDR_LEN 15
