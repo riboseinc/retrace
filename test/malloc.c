@@ -24,14 +24,49 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
+
+#define TEST_LOOPS 1000.0
 
 int main(void)
 {
 	void *p;
+	int i;
+	double failed_malloc = 0;
+	double failed_realloc = 0;
+	double failed_calloc = 0;
 
-	p = malloc(42);
+	for (i = 0; i < TEST_LOOPS; i++) {
+		p = malloc(42);
 
-	free(p);
+		if (p)
+			free(p);
+		else
+			failed_malloc++;
+	}
+
+	for (i = 0; i < TEST_LOOPS; i++) {
+		p = calloc(1, 42);
+
+		if (p)
+			free(p);
+		else
+			failed_calloc++;
+	}
+
+	for (i = 0; i < TEST_LOOPS; i++) {
+		p = realloc(NULL, 42);
+
+		if (p)
+			free(p);
+		else
+			failed_realloc++;
+	}
+
+
+	printf ("Failed %.0f calls to malloc from %.0f (%.02f%%)\n", failed_malloc, TEST_LOOPS, failed_malloc / TEST_LOOPS * 100);
+	printf ("Failed %.0f calls to malloc from %.0f (%.02f%%)\n", failed_calloc, TEST_LOOPS, failed_calloc / TEST_LOOPS * 100);
+	printf ("Failed %.0f calls to malloc from %.0f (%.02f%%)\n", failed_realloc, TEST_LOOPS, failed_realloc / TEST_LOOPS * 100);
 
 	return 0;
 }

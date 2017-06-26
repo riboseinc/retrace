@@ -7,3 +7,4 @@ fopen,/etc/passwd,/tmp/passwd
 logtofile,retrace.log
 disabledatadump,1
 SSL_get_verify_result,10
+memoryfuzzing,0.05

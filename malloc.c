@@ -26,12 +26,34 @@
 #include "common.h"
 #include "malloc.h"
 
+#include <stdlib.h>
+
+static int init_rand = 0;
+
 void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 {
         void *p;
         rtr_malloc_t real_malloc;
+	double fail_chance = 0;
 
         real_malloc = RETRACE_GET_REAL(malloc);
+
+	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance)) {
+		long int random_value;
+
+		if (!init_rand) {
+			srand (time(NULL));
+			init_rand = 1;
+		}
+
+		random_value = rand();
+
+		if (random_value <= (RAND_MAX * fail_chance)) {
+			trace_printf(1, "malloc(%d); [redirecting: NULL]\n", bytes);
+
+			return NULL;
+		}
+	}
 
         p = real_malloc(bytes);
 
@@ -59,8 +81,27 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 {
         void *p;
         rtr_calloc_t real_calloc;
+	double fail_chance = 0;
 
         real_calloc = RETRACE_GET_REAL(calloc);
+
+	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance)) {
+		long int random_value;
+
+		if (!init_rand) {
+			srand (time(NULL));
+			init_rand = 1;
+		}
+
+		random_value = rand();
+
+		if (random_value <= (RAND_MAX * fail_chance)) {
+			trace_printf(1, "calloc(%d, %d); [redirecting: NULL]\n", nmemb, size);
+
+			return NULL;
+		}
+	}
+
         p = real_calloc(nmemb, size);
 
         trace_printf(1, "calloc(%d, %d); [%p]\n", nmemb, size, p);
@@ -74,8 +115,28 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 {
         void *p;
         rtr_realloc_t real_realloc;
+	double fail_chance;
 
         real_realloc = RETRACE_GET_REAL(realloc);
+
+	if (size > 0 && rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance)) {
+		long int random_value;
+
+		if (!init_rand) {
+			srand (time(NULL));
+			init_rand = 1;
+		}
+
+		random_value = rand();
+
+		if (random_value <= (RAND_MAX * fail_chance)) {
+			trace_printf(1, "realloc(%p, %d); [redirecting: NULL]\n", ptr, size);
+
+			return NULL;
+		}
+	}
+
+
         p = real_realloc(ptr, size);
 
         trace_printf(1, "realloc(%p, %d); [%p]\n", ptr, size, p);

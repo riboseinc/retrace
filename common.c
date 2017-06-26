@@ -494,6 +494,9 @@ rtr_parse_config(const struct config_entry **pentry,
 				case ARGUMENT_TYPE_STRING:
 					*((char **)pvar) = parg;
 					break;
+				case ARGUMENT_TYPE_DOUBLE:
+					*((double *)pvar) = atof(parg);
+					break;
 				}
 			}
 			retval = 1;
