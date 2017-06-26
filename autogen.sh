@@ -1,6 +1,6 @@
 #!/bin/sh
 if [ "$LIBTOOLIZE" = "" ] && [ "`uname`" = "Darwin" ]; then
-  LIBTOOLIZE=glibtoolize
+    LIBTOOLIZE=glibtoolize
 fi
 
 ACLOCAL=${ACLOCAL:-aclocal}
@@ -9,8 +9,11 @@ AUTOMAKE=${AUTOMAKE:-automake}
 AUTORECONF=${AUTORECONF:-autoreconf}
 LIBTOOLIZE=${LIBTOOLIZE:-libtoolize}
 
-"$LIBTOOLIZE" --copy
+if [ -x "`which autoreconf 2>/dev/null`" ] ; then
+    exec autoreconf -ivf
+fi
+
 "$ACLOCAL" -I m4
+"$LIBTOOLIZE" --copy
 "$AUTOCONF"
-"$AUTORECONF"
-"$AUTOMAKE" --add-missing --copy
+"$AUTOMAKE" --add-missing --force-missing --copy
