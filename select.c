@@ -60,7 +60,6 @@ int
 RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 			fd_set *exceptfds, struct timeval *timeout)
 {
-	rtr_select_t real_select;
 	fd_set inr, inw, inx;
 	int ret;
 
@@ -68,7 +67,6 @@ RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 	copy_fd_set(&inw, writefds);
 	copy_fd_set(&inx, exceptfds);
 
-	real_select = RETRACE_GET_REAL(select);
 	ret = real_select(nfds, readfds, writefds, exceptfds, timeout);
 
 	if (timeout != NULL)
@@ -85,4 +83,7 @@ RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 	return (ret);
 }
 
-RETRACE_REPLACE(select)
+RETRACE_REPLACE(select, int,
+	(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+	    struct timeval *timeout),
+	(nfds, readfds, writefds, exceptfds, timeout))

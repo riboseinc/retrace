@@ -30,11 +30,6 @@
 FILE *RETRACE_IMPLEMENTATION(popen)(const char *command, const char *type)
 {
 	FILE *ret;
-	rtr_popen_t real_popen;
-	rtr_fileno_t real_fileno;
-
-	real_popen	= RETRACE_GET_REAL(popen);
-	real_fileno	= RETRACE_GET_REAL(fileno);
 
 	ret = real_popen(command, type);
 
@@ -43,16 +38,13 @@ FILE *RETRACE_IMPLEMENTATION(popen)(const char *command, const char *type)
 	return ret;
 }
 
-RETRACE_REPLACE(popen)
+RETRACE_REPLACE(popen, FILE *, (const char *command, const char *type),
+	(command, type))
+
 
 int RETRACE_IMPLEMENTATION(pclose)(FILE *stream)
 {
 	int ret;
-	rtr_pclose_t real_pclose;
-	rtr_fileno_t real_fileno;
-
-	real_pclose = RETRACE_GET_REAL(pclose);
-	real_fileno = RETRACE_GET_REAL(fileno);
 
 	ret = real_pclose(stream);
 
@@ -61,4 +53,4 @@ int RETRACE_IMPLEMENTATION(pclose)(FILE *stream)
 	return ret;
 }
 
-RETRACE_REPLACE(pclose)
+RETRACE_REPLACE(pclose, int, (FILE *stream), (stream))
