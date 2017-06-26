@@ -23,50 +23,73 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
+#include "common.h"
+#include "dlopen.h"
 
-#define TEST_LOOPS 1000.0
-
-int main(void)
+void *RETRACE_IMPLEMENTATION(dlopen)(const char *filename, int flag)
 {
-	void *p;
-	int i;
-	double failed_malloc = 0;
-	double failed_realloc = 0;
-	double failed_calloc = 0;
+	rtr_dlopen_t real_dlopen;
+	void *r;
 
-	for (i = 0; i < TEST_LOOPS; i++) {
-		p = malloc(42);
+	real_dlopen = RETRACE_GET_REAL(dlopen);
 
-		if (p)
-			free(p);
-		else
-			failed_malloc++;
-	}
+	r = real_dlopen(filename, flag);
 
-	for (i = 0; i < TEST_LOOPS; i++) {
-		p = calloc(1, 42);
+	trace_printf(1, "dlopen(\"%s\", %d); [return %p]\n", filename, flag, r);
 
-		if (p)
-			free(p);
-		else
-			failed_calloc++;
-	}
-
-	for (i = 0; i < TEST_LOOPS; i++) {
-		p = realloc(NULL, 42);
-
-		if (p)
-			free(p);
-		else
-			failed_realloc++;
-	}
-
-
-	printf ("Failed %.0f calls to malloc from %.0f (%.02f%%)\n", failed_malloc, TEST_LOOPS, failed_malloc / TEST_LOOPS * 100);
-	printf ("Failed %.0f calls to malloc from %.0f (%.02f%%)\n", failed_calloc, TEST_LOOPS, failed_calloc / TEST_LOOPS * 100);
-	printf ("Failed %.0f calls to malloc from %.0f (%.02f%%)\n", failed_realloc, TEST_LOOPS, failed_realloc / TEST_LOOPS * 100);
-
-	return 0;
+	return r;
 }
+
+RETRACE_REPLACE(dlopen)
+
+char *RETRACE_IMPLEMENTATION(dlerror)(void)
+{
+	rtr_dlerror_t real_dlerror;
+	char *r;
+
+	real_dlerror = RETRACE_GET_REAL(dlerror);
+
+	r = real_dlerror();
+
+	trace_printf(1, "dlerror(); [return: \"%s\"]\n", r);
+
+	return r;
+}
+
+RETRACE_REPLACE(dlerror)
+
+#if !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
+#ifdef HAVE_ATOMIC_BUILTINS
+void *RETRACE_IMPLEMENTATION(dlsym)(void *handle, const char *symbol)
+{
+	rtr_dlsym_t real_dlsym;
+	void *r;
+
+	real_dlsym = RETRACE_GET_REAL(dlsym);
+
+	r = real_dlsym(handle, symbol);
+
+	trace_printf(1, "dlsym(%p, \"%s\"); [return: %p]\n", handle, symbol, r);
+
+	return r;
+}
+
+RETRACE_REPLACE(dlsym)
+#endif
+#endif
+
+int RETRACE_IMPLEMENTATION(dlclose)(void *handle)
+{
+	rtr_dlclose_t real_dlclose;
+	int r;
+
+	real_dlclose = RETRACE_GET_REAL(dlclose);
+
+	r = real_dlclose(handle);
+
+	trace_printf(1, "dlclose(%p); [return: %d]\n", handle, r);
+
+	return r;
+}
+
+RETRACE_REPLACE(dlclose)

@@ -1,8 +1,8 @@
 getuid,34
 geteuid,42
 connect,127.0.0.1,8080,192.168.1.110,9090
-connect,127.0.0.1,81,192.168.1.78,9091
-connect,127.0.0.1,80,192.168.1.78,9090
+connect,127.0.0.1,81,127.0.0.1,9091
+connect,127.0.0.1,80,127.0.0.1,9090
 fopen,/etc/passwd,/tmp/passwd
 logtofile,retrace.log
 disabledatadump,1

@@ -28,6 +28,7 @@
 #include "malloc.h"
 #include "sock.h"
 #include <string.h>
+#include <netinet/in.h>
 
 
 #define RETRACE_MAX_IP_ADDR_LEN 15
@@ -55,7 +56,6 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 {
 	rtr_connect_t real_connect;
 	rtr_strcmp_t  real_strcmp;
-	rtr_free_t    real_free;
 #ifdef __linux__
 	const struct sockaddr *address = _address.__sockaddr__;
 #endif
@@ -64,7 +64,6 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 
 	real_connect = RETRACE_GET_REAL(connect);
 	real_strcmp = RETRACE_GET_REAL(strcmp);
-	real_free = RETRACE_GET_REAL(free);
 
 	if (!get_tracing_enabled())
 		return real_connect(fd, address, len);
@@ -79,7 +78,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 		struct sockaddr_in redirect_addr;
 		int enabled_redirect = 0;
 
-		FILE *config = NULL;
+		RTR_CONFIG_HANDLE config = NULL;
 
 		/* get IP address and port number to connect */
 		const char *dst_ipaddr = inet_ntoa(dst_addr->sin_addr);
@@ -117,23 +116,9 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 
 				/* set redirect flag */
 				enabled_redirect = 1;
-			}
-
-			/* free buffers */
-			if (redirect_ipaddr)
-				real_free(redirect_ipaddr);
-
-			if (match_ipaddr)
-				real_free(match_ipaddr);
-
-			/* check redirect flag */
-			if (enabled_redirect)
 				break;
+			}
 		}
-
-		/* close config */
-		if (config)
-			rtr_config_close(config);
 
 		/* set remote address info */
 		remote_addr = enabled_redirect ? &redirect_addr : (struct sockaddr_in *) address;
@@ -145,7 +130,9 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 		if (ret == 0)
 			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, remote_ipaddr, remote_port);
 
-		trace_printf(1, "connect(%d, %s:%d, ); [%d](AF_INET)\n", fd, remote_ipaddr, remote_port, ret);
+		trace_printf(1, "connect(%d, %s:%d%s); [%d](AF_INET)\n",
+		    fd, remote_ipaddr, remote_port,
+		    enabled_redirect ? " [redirected]" : "", ret);
 
 		return ret;
 	} else if (address->sa_family == AF_UNIX) {

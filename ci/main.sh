@@ -27,9 +27,10 @@ CHECKPATCH_FLAGS+=" --ignore STATIC_CONST_CHAR_ARRAY"
 CHECKPATCH_FLAGS+=" --ignore ARRAY_SIZE"
 CHECKPATCH_FLAGS+=" --ignore NAKED_SSCANF"
 CHECKPATCH_FLAGS+=" --ignore SSCANF_TO_KSTRTO"
+CHECKPATCH_FLAGS+=" --ignore EXECUTE_PERMISSIONS"
 
 # checkpatch.pl will ignore the following paths
-CHECKPATCH_IGNORE+=" checkpatch.pl.patch"
+CHECKPATCH_IGNORE+=" checkpatch.pl.patch Makefile test/Makefile"
 CHECKPATCH_EXCLUDE=$(for p in $CHECKPATCH_IGNORE; do echo ":(exclude)$p" ; done)
 
 function _checkpatch() {
@@ -41,8 +42,8 @@ function checkpatch() {
 		git format-patch -1 $1 --stdout -- $CHECKPATCH_EXCLUDE . | _checkpatch
 }
 
-make -j2
-make test
+sh autogen.sh && ./configure --disable-silent-rules --enable-tests --with-cmocka=${CMOCKA_INSTALL} && make clean && make
+make check
 
 # checkpatch
 if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
