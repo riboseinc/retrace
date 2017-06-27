@@ -76,7 +76,7 @@ main() {
             errx "cannot open '${config}'"
         fi
 
-        cfg_env="${config}"
+        export RETRACE_CONFIG="${config}"
 
         shift 2
 
