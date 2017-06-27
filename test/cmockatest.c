@@ -57,6 +57,7 @@
 #include "printf.h"
 #include "dir.h"
 #include "scanf.h"
+#include "rtr-netdb.h"
 
 void *handle;
 
@@ -352,6 +353,55 @@ RTR_TEST_END
 RTR_TEST_START(dirfd)
 RTR_TEST_END
 
+/* netdb functions test */
+RTR_TEST_START(gethostbyname)
+RTR_TEST_END
+
+RTR_TEST_START(gethostbyaddr)
+RTR_TEST_END
+
+RTR_TEST_START(sethostent)
+RTR_TEST_END
+
+RTR_TEST_START(endhostent)
+RTR_TEST_END
+
+RTR_TEST_START(gethostent)
+RTR_TEST_END
+
+RTR_TEST_START(gethostbyname2)
+RTR_TEST_END
+
+RTR_TEST_START(getaddrinfo)
+	struct addrinfo hints, *result;
+	int ret;
+
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = 0;
+	hints.ai_protocol = 0;
+
+	ret = rtr_getaddrinfo("www.google.com", NULL, &hints, &result);
+	if (result)
+		freeaddrinfo(result);
+RTR_TEST_END
+
+RTR_TEST_START(freeaddrinfo)
+	struct addrinfo hints, *result;
+	int ret;
+
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = 0;
+	hints.ai_protocol = 0;
+
+	ret = getaddrinfo("www.google.com", NULL, &hints, &result);
+	if (result)
+		rtr_freeaddrinfo(result);
+RTR_TEST_END
+
 #define READ_BUF_SIZE 256
 RTR_TEST_START(read)
 	int     fd;
@@ -398,7 +448,6 @@ RTR_TEST_START(malloc)
 	assert_non_null(p);
 RTR_TEST_END
 
-#if 0
 RTR_TEST_START(realloc)
 	void *p;
 
@@ -415,7 +464,6 @@ RTR_TEST_START(calloc)
 	p = rtr_calloc(1, RTR_MALLOC_SIZE);
 	assert_non_null(p);
 RTR_TEST_END
-#endif
 
 RTR_TEST_START(fork)
 	pid_t pid, parent;
@@ -1004,6 +1052,12 @@ main(void)
 		cmocka_unit_test(test_rtr_scanf),    cmocka_unit_test(test_rtr_fscanf),
 		cmocka_unit_test(test_rtr_sscanf),   cmocka_unit_test(test_rtr_vscanf),
 		cmocka_unit_test(test_rtr_vfscanf),  cmocka_unit_test(test_rtr_vsscanf),
+
+		/* netdb functions */
+		cmocka_unit_test(test_rtr_gethostbyname), cmocka_unit_test(test_rtr_gethostbyaddr),
+		cmocka_unit_test(test_rtr_sethostent),    cmocka_unit_test(test_rtr_endhostent),
+		cmocka_unit_test(test_rtr_gethostent),    cmocka_unit_test(test_rtr_gethostbyname2),
+		cmocka_unit_test(test_rtr_getaddrinfo),      cmocka_unit_test(test_rtr_freeaddrinfo)
 	};
 
 	handle = dlopen("../.libs/libretrace.so", RTLD_LAZY);
