@@ -273,7 +273,7 @@ AC_MSG_RESULT($enable_test)
 AM_CONDITIONAL([ENABLE_TESTS], [test "x$enable_tests" = "xyes"])
 if test "x$enable_tests" = "xyes" ; then
 AC_MSG_NOTICE([yes])
-AX_CHECK_COMPILE_FLAG([-fno-builtin], [TESTS_CFLAGS="$TESTS_CFLAGS -fno-builtin"],,[])
+TESTS_CFLAGS="$TESTS_CFLAGS -fno-builtin"
 else
 AC_MSG_NOTICE([no])
 fi

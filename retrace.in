@@ -76,7 +76,7 @@ main() {
             errx "cannot open '${config}'"
         fi
 
-        export RETRACE_CONFIG="${config}"
+        cfg_env="${config}"
 
         shift 2
 
@@ -98,7 +98,14 @@ main() {
             errx "Cannot find '${lib}'"
         fi
 
-        DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
+        if [ -z "$cfg_env" ]; then
+            DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
+        else
+            # XXX: enabling config causes the test applications crash on MacOS.
+            # disabled config for now
+            # RETRACE_CONFIG="$cfg_env" DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
+            DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
+        fi
     else
         readonly lib="libretrace.so"
 
