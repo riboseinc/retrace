@@ -272,7 +272,11 @@ typedef int (*rtr_open_nomode_t)(const char *pathname, int flags);
 #ifdef __APPLE__
 #define MODEFLAGS O_CREAT
 #else
+#ifdef O_TMPFILE
 #define MODEFLAGS (O_CREAT | O_TMPFILE)
+#else
+#define MODEFLAGS O_CREAT
+#endif
 #endif
 
 static int
