@@ -13,9 +13,11 @@ pledge
 scanf
 sock_srv
 trace
+getaddrinfo
 retracetest.deleteme
 runtests.sh.log
 runtests.sh.trs
 test-suite.log
 cmockatest.log
 cmockatest.trs
+retrace.log

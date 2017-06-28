@@ -39,3 +39,4 @@ autom4te.cache/
 retrace
 retrace.la
 libretrace.la
+gmon.out

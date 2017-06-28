@@ -263,6 +263,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 AC_MSG_RESULT([no])
 ])
 
+TESTS_CFLAGS=""
 AC_MSG_CHECKING(whether to run tests)
 AC_ARG_ENABLE([tests],
    [AS_HELP_STRING([--enable-tests], [enable running tests on make check (default is NO)])],
@@ -272,9 +273,12 @@ AC_MSG_RESULT($enable_test)
 AM_CONDITIONAL([ENABLE_TESTS], [test "x$enable_tests" = "xyes"])
 if test "x$enable_tests" = "xyes" ; then
 AC_MSG_NOTICE([yes])
+AX_CHECK_COMPILE_FLAG([-fno-builtin], [TESTS_CFLAGS="$TESTS_CFLAGS -fno-builtin"],,[])
 else
 AC_MSG_NOTICE([no])
 fi
+AC_SUBST([TESTS_CFLAGS])
+
 
 
 cmocka=false
@@ -353,6 +357,23 @@ if test "x$cmocka" = "xtrue" ; then
 else
     AC_DEFINE(USE_CMOCKA, [0], [Define to use cmocka])
 fi
+
+AC_ARG_ENABLE(debug,
+     AS_HELP_STRING(--enable-debug, turn on debugging (disabled by default)),
+     [], [enable_debug=no]
+)
+if test "x$enable_debug" = "xyes" ; then
+    CFLAGS="$CFLAGS -g3 -O0 -DDEBUG"
+fi
+
+AC_ARG_ENABLE(profiling,
+     AS_HELP_STRING(--enable-profiling, turn on profiling (disabled by default)),
+     [], [enable_profiling=no]
+)
+if test "x$enable_profiling" = "xyes" ; then
+    CFLAGS="$CFLAGS -pg"
+fi
+
 
 AC_CONFIG_FILES([Makefile test/Makefile])
 AC_OUTPUT

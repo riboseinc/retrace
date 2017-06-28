@@ -76,5 +76,6 @@ retrace: retrace.in
 	chmod +x $@
 
 dist_bin_SCRIPTS= retrace
-EXTRA_DIST= retrace.in autogen.sh
+pkgdata_DATA= retrace.conf.example
+EXTRA_DIST= retrace.in autogen.sh retrace.conf.example
 CLEANFILES = $(dist_bin_SCRIPTS)

@@ -3,6 +3,10 @@ if [ "$LIBTOOLIZE" = "" ] && [ "`uname`" = "Darwin" ]; then
     LIBTOOLIZE=glibtoolize
 fi
 
+if [ ! -d m4 ]; then
+    mkdir m4
+fi
+
 ACLOCAL=${ACLOCAL:-aclocal}
 AUTOCONF=${AUTOCONF:-autoconf}
 AUTOMAKE=${AUTOMAKE:-automake}

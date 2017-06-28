@@ -15,7 +15,7 @@ $ make check
 $ sudo make install
 ```
 
-You need Autotools installed in your system (`autoconf`, `automake`, `libtool`, `gcc` packages).
+You need Autotools installed in your system (`autoconf`, `automake`, `libtool`, `make`, `gcc` packages).
 
 OpenSSL library and headers are automatically detected, you can specify an optional flag `--with-openssl=[PATH]` (to use a non standard OpenSSL installation root).
 
