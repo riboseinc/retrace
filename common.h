@@ -62,7 +62,7 @@ rtr_##func##_t real_##func = func;
 
 #ifdef __OpenBSD__
 
-#define RETRACE_FIXUP(func) real##func = dlsym(RTLD_NEXT, #func)
+#define RETRACE_FIXUP(func) real_##func = dlsym(RTLD_NEXT, #func)
 
 #else /* !__OpenBSD */
 
@@ -75,7 +75,7 @@ extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
 
 #else /* !HAVE_ATOMIC_BUILTINS */
 
-#define RETRACE_FIXUP(func) real##func =				\
+#define RETRACE_FIXUP(func) real_##func =				\
 	_dl_sym(RTLD_NEXT, #func, __func__)				\
 
 #endif /* HAVE_ATOMIC_BUILTINS */
