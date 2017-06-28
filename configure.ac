@@ -121,11 +121,14 @@ AC_ARG_WITH([openssl], AS_HELP_STRING(--with-openssl=PATH, base of OpenSSL insta
    *)
      # determine if library is installed
      SAVE_CFLAGS=$CFLAGS
+     SAVE_CPPFLAGS=$CPPFLAGS
      CFLAGS="-I$with_openssl/include $CFLAGS"
+     CPPFLAGS="-I$with_openssl/include $CPPFLAGS"
      LIBSSL_FLAGS="-I$with_openssl/include"
      AC_CHECK_HEADERS([openssl/ssl.h], [openssl=true], [AC_MSG_NOTICE([OpenSSL not found, OpenSSL support disabled])])
      AC_SUBST(LIBSSL_FLAGS)
      CFLAGS=$SAVE_CFLAGS
+     CPPFLAGS=$SAVE_CPPFLAGS
      ;;
    esac
   ],
