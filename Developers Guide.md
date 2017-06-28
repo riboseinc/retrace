@@ -12,12 +12,19 @@ contributors.
 ## Configure script flags:
 
 `autogen.sh`: script must be run every time any of configure.ac / Makefile.am files are modified.
+
 `--disable-silent-rules`: by the default the compilation does not show CFLAGS, by disabling silent rules you can see all compiler flags (which can be useful for developers)
+
 `--enable-tests`: by the default we do not build test files (our users will only want to get the final binary, they don't really need to build tests). Adding this flag will enable test application compilation.
+
 `--prefix=[installation root]`: you can optionally specify the installation root (by the default it is /usr)
+
 `--enable-debug`: turn on debugging (disabled by default)
+
 `--enable-profiling`: turn on profiling (disabled by default)
+
 `--with-openssl=PATH`: base of OpenSSL installation (by default it checks the default system path)
+
 `--with-cmocka=PATH`: base of cmocka installation
 
 ## How to build "cmocka" tests:
