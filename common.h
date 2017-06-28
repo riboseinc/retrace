@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 
 #define MAXLEN		40
 
@@ -24,6 +25,7 @@
 #define ARGUMENT_TYPE_INT	1
 #define ARGUMENT_TYPE_STRING	2
 #define ARGUMENT_TYPE_DOUBLE	3
+#define ARGUMENT_TYPE_UINT	4
 
 #define FILE_DESCRIPTOR_TYPE_UNKNOWN		0
 #define FILE_DESCRIPTOR_TYPE_FILE		1 /* from open() */
@@ -39,26 +41,27 @@
 #define PARAMETER_TYPE_INT		1 /* int */
 #define PARAMETER_TYPE_POINTER		2 /* opaque pointer, we will print the address */
 #define PARAMETER_TYPE_UINT		3 /* unsigned int */
-#define PARAMETER_TYPE_FLOAT		4 /* float */
-#define PARAMETER_TYPE_DOUBLE		5 /* double */
-#define PARAMETER_TYPE_STRING		6 /* Zero terminated string */
-#define PARAMETER_TYPE_STRING_LEN	7 /* Non zero terminated string, the length of the string precedes the string */
-#define PARAMETER_TYPE_MEMORY_BUFFER	8 /* A pointer to a memory buffer, the length of the string precedes the string */
-#define PARAMETER_TYPE_CHAR		9 /* char */
-#define PARAMETER_TYPE_FILE_STREAM	10 /* FILE* */
-#define PARAMETER_TYPE_FILE_DESCRIPTOR	11 /* int used as a file descriptor */
-#define PARAMETER_TYPE_DIR		12 /* DIR */
-#define PARAMETER_TYPE_INT_OCTAL	13 /* int, print as octal */
-#define PARAMETER_TYPE_MEM_BUFFER_ARRAY	14 /* first size of buffers, then number of buffers, memory pointer at the end */
-#define PARAMETER_TYPE_PRINTF_FORMAT	15 /* printf format string followed by pointer to a va_list */
-#define PARAMETER_TYPE_STRING_ARRAY	16 /* fist the size of the array, then an array of char * */
-#define PARAMETER_TYPE_IOVEC		17 /* number of buffers, then array of struct iovec */
-#define PARAMETER_TYPE_UTSNAME		18 /* struct utsname*  */
-#define PARAMETER_TYPE_TIMEVAL		19 /* struct timeval* */
-#define PARAMETER_TYPE_TIMEZONE		20 /* struct timezone* */
-#define PARAMETER_TYPE_SSL		21 /* OpenSSL's SSL* */
-#define PARAMETER_TYPE_SSL_WITH_KEY	22 /* OpenSSL's SSL* but attempt to dump the ssl key */
-
+#define PARAMETER_TYPE_LONG		4 /* long */
+#define PARAMETER_TYPE_ULONG		5 /* unsigned long */
+#define PARAMETER_TYPE_FLOAT		6 /* float */
+#define PARAMETER_TYPE_DOUBLE		7 /* double */
+#define PARAMETER_TYPE_STRING		8 /* Zero terminated string */
+#define PARAMETER_TYPE_STRING_LEN	9 /* Non zero terminated string, the length of the string precedes the string */
+#define PARAMETER_TYPE_MEMORY_BUFFER	10 /* A pointer to a memory buffer, the length of the string precedes the string */
+#define PARAMETER_TYPE_CHAR		11 /* char */
+#define PARAMETER_TYPE_FILE_STREAM	12 /* FILE* */
+#define PARAMETER_TYPE_FILE_DESCRIPTOR	13 /* int used as a file descriptor */
+#define PARAMETER_TYPE_DIR		14 /* DIR */
+#define PARAMETER_TYPE_INT_OCTAL	15 /* int, print as octal */
+#define PARAMETER_TYPE_MEM_BUFFER_ARRAY	16 /* first size of buffers, then number of buffers, memory pointer at the end */
+#define PARAMETER_TYPE_PRINTF_FORMAT	17 /* printf format string followed by pointer to a va_list */
+#define PARAMETER_TYPE_STRING_ARRAY	18 /* fist the size of the array, then an array of char * */
+#define PARAMETER_TYPE_IOVEC		19 /* number of buffers, then array of struct iovec */
+#define PARAMETER_TYPE_UTSNAME		20 /* struct utsname*  */
+#define PARAMETER_TYPE_TIMEVAL		21 /* struct timeval* */
+#define PARAMETER_TYPE_TIMEZONE		22 /* struct timezone* */
+#define PARAMETER_TYPE_SSL		23 /* OpenSSL's SSL* */
+#define PARAMETER_TYPE_SSL_WITH_KEY	24 /* OpenSSL's SSL* but attempt to dump the ssl key */
 
 #define PARAMETER_FLAG_OUTPUT_VARIABLE		0x40000000 /* This is an output variable, is uninitialized in EVENT_TYPE_BEFORE_CALL */
 #define PARAMETER_FLAG_STRING_NEXT		0x80000000 /* There's a string parameter that describes the string */
@@ -160,6 +163,10 @@ struct descriptor_info {
 void retrace_log_and_redirect_before(struct rtr_event_info *event_info);
 void retrace_log_and_redirect_after(struct rtr_event_info *event_info);
 
+struct ts_info {
+	int type;
+	const char *str;
+};
 
 void trace_printf(int hdr, const char *fmt, ...);
 void trace_printf_str(const char *string);
@@ -180,5 +187,11 @@ void trace_restore(int oldstate);
 void file_descriptor_update(int fd, unsigned int type, const char *location, int port);
 struct descriptor_info *file_descriptor_get(int fd);
 void file_descriptor_remove(int fd);
+
+/* get fuzzing flag by caculating fail status randomly */
+int rtr_get_fuzzing_flag(double fail_rate, unsigned int *pseed);
+
+/* get string from type */
+void rtr_get_type_string(int type, const struct ts_info *ts_info, char *str, size_t size);
 
 #endif /* __RETRACE_COMMON_H__ */

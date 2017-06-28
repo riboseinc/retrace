@@ -92,6 +92,9 @@ static int g_enable_tracing = RTR_TRACE_ENABLED;
 static pthread_key_t g_enable_tracing_key = -1;
 static pthread_once_t tracing_key_once = PTHREAD_ONCE_INIT;
 
+static int g_init_rand;
+static unsigned int g_rand_seed;
+
 /*
  * Global list of file descriptors so we can track
  * their usage across different functions
@@ -113,6 +116,12 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		break;
 	case PARAMETER_TYPE_UINT:
 		trace_printf(0, "%u", *((unsigned int *) *value));
+		break;
+	case PARAMETER_TYPE_LONG:
+		trace_printf(0, "%ld", *((long *) *value));
+		break;
+	case PARAMETER_TYPE_ULONG:
+		trace_printf(0, "%lu", *((unsigned long *) *value));
 		break;
 	case PARAMETER_TYPE_FLOAT:
 		trace_printf(0, "%f", *((float *) *value));
@@ -811,6 +820,9 @@ rtr_parse_config(const struct config_entry **pentry,
 				case ARGUMENT_TYPE_DOUBLE:
 					*((double *)pvar) = atof(parg);
 					break;
+				case ARGUMENT_TYPE_UINT:
+					*((unsigned int *)pvar) = (unsigned int)strtoul(parg, NULL, 0);
+					break;
 				}
 			}
 			retval = 1;
@@ -1087,4 +1099,55 @@ trace_mode(mode_t mode, char *p)
 	}
 
 	*p = '\0';
+}
+
+/* get fuzzing flag by caculating fail status randomly */
+int
+rtr_get_fuzzing_flag(double fail_rate, unsigned int *pseed)
+{
+	long int random_value;
+
+	if (!g_init_rand) {
+		g_rand_seed = *pseed > 0 ? *pseed : time(NULL);
+
+		srand(g_rand_seed);
+		g_init_rand = 1;
+	}
+
+	/* set seed value */
+	if (*pseed == 0)
+		*pseed = g_rand_seed;
+
+	random_value = rand();
+	if (random_value <= (RAND_MAX * fail_rate))
+		return 1;
+
+	return 0;
+}
+
+/* get string from type value */
+void
+rtr_get_type_string(int type, const struct ts_info *ts_info, char *str, size_t size)
+{
+	const struct ts_info *p;
+	size_t str_len = 0;
+
+	/* init result string */
+	memset(str, 0, size);
+
+	for (p = ts_info; p->str != NULL; p++) {
+		if ((p->type & type) != p->type)
+			continue;
+
+		if ((str_len + real_strlen(p->str) + 2) > size)
+			break;
+
+		if (str_len > 0) {
+			real_strcat(str + str_len, "|");
+			str_len++;
+		}
+
+		real_strcpy(str + str_len, p->str);
+		str_len += real_strlen(p->str);
+	}
 }
