@@ -28,10 +28,22 @@
 
 char *RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
 {
-	char *r;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&timep, &buf};
+	char *r = NULL;
+
+
+	event_info.function_name = "ctime_r";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_STRING;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
 	r = real_ctime_r(timep, buf);
 
-	trace_printf(1, "ctime_r(\"%u\", \"%s\");\n", timep ? timep : 0, buf);
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -40,11 +52,22 @@ RETRACE_REPLACE(ctime_r, char *, (const time_t *timep, char *buf), (timep, buf))
 
 char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&timep};
 	char *r;
+
+
+	event_info.function_name = "ctime";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
 
 	r = real_ctime(timep);
 
-	trace_printf(1, "ctime(\"%u\") [return: %s];\n", timep ? timep : 0, r);
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -57,6 +80,15 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, void *tzp)
 int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz)
 #endif
 {
+	struct rtr_event_info event_info;
+
+#if defined(__APPLE__) || defined(__NetBSD__)
+	unsigned int parameter_types[] = {PARAMETER_TYPE_TIMEVAL, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&tv, &tzp};
+#else
+	unsigned int parameter_types[] = {PARAMETER_TYPE_TIMEVAL, PARAMETER_TYPE_TIMEZONE, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&tv, &tz};
+#endif
 	int ret;
 #if defined(__APPLE__) || defined(__NetBSD__)
 	struct timezone *tz;
@@ -64,25 +96,17 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz
 	tz = (struct timezone *)tzp;
 #endif
 
+
+	event_info.function_name = "gettimeofday";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
+
 	ret = real_gettimeofday(tv, tz);
-	if (ret == 0) {
-		int tz_minuteswest = 0;
-		int tz_dsttime = 0;
-		time_t tv_sec;
-		suseconds_t tv_usec;
 
-		tv_sec	= tv->tv_sec;
-		tv_usec	= tv->tv_usec;
-
-		if (tz != NULL) {
-			tz_minuteswest	= tz->tz_minuteswest;
-			tz_dsttime	= tz->tz_dsttime;
-		}
-
-		trace_printf(1, "gettimeofday(timeval:[%ld, %ld], timezone:[%d, %d]);\n",
-				tv_sec, tv_usec, tz_minuteswest, tz_dsttime);
-	} else
-		trace_printf(1, "gettimeofday(); -1\n");
+	retrace_log_and_redirect_after(&event_info);
 
 	return ret;
 }

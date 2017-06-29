@@ -49,5 +49,7 @@ int main(void)
 	strncat(buf, "strncat", 7);
 	strcpy(buf, "strcpy");
 
+	p = strchr(buf, 'y');
+
 	return 0;
 }

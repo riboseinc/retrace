@@ -35,12 +35,13 @@ int main(void)
 	seteuid(222);
 	setgid(333);
 	getgid();
+	getegid();
 	getuid();
 	geteuid();
 	getpid();
 	getppid();
 
-	pw = getpwuid(getuid());
+//	pw = getpwuid(getuid());
 
 	return 0;
 }

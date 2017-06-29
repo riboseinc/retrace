@@ -35,10 +35,23 @@
 
 int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_INT, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&domain, &type, &protocol};
 	int sock;
 
+
+
+	event_info.function_name = "socket";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &sock;
+	retrace_log_and_redirect_before(&event_info);
+
 	sock = real_socket(domain, type, protocol);
-	trace_printf(1, "socket(%d, %d, %d) [return: %d]\n", domain, type, protocol, sock);
+
+	retrace_log_and_redirect_after(&event_info);
 
 	return sock;
 }
@@ -49,13 +62,25 @@ RETRACE_REPLACE(socket, int, (int domain, int type, int protocol),
 
 #ifdef __linux__
 int RETRACE_IMPLEMENTATION(connect)(int fd, __CONST_SOCKADDR_ARG _address, socklen_t len)
-{
-	const struct sockaddr *address = _address.__sockaddr__;
 #else
 int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, socklen_t len)
-{
 #endif
+{
+	struct rtr_event_info event_info;
+#ifdef __linux__
+	const struct sockaddr *address = _address.__sockaddr__;
+#endif
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &address, &len};
 	int ret;
+
+
+	event_info.function_name = "connect";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
 
 	if (!get_tracing_enabled())
 		return real_connect(fd, address, len);
@@ -141,7 +166,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 		return ret;
 	}
 
-	trace_printf(1, "connect(%d, sa_family:%d)\n", fd, address->sa_family);
+	retrace_log_and_redirect_after(&event_info);
 
 	return real_connect(fd, address, len);
 }
@@ -165,36 +190,39 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 {
 #endif
 	int ret;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &address, &len};
 
-	if (address->sa_family == AF_INET) {
-		struct sockaddr_in *bind_addr = (struct sockaddr_in *) address;
 
-		const char *bind_ipaddr = inet_ntoa(bind_addr->sin_addr);
-		int bind_port = ntohs(bind_addr->sin_port);
+	event_info.function_name = "bind";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
 
-		/* bind socket */
-		ret = real_bind(fd, (struct sockaddr *) bind_addr, sizeof(struct sockaddr_in));
-		if (ret == 0)
+	ret = real_bind(fd, address, len);
+
+	if (ret == 0) {
+		if (address->sa_family == AF_INET) {
+			struct sockaddr_in *bind_addr = (struct sockaddr_in *) address;
+
+			const char *bind_ipaddr = inet_ntoa(bind_addr->sin_addr);
+			int bind_port = ntohs(bind_addr->sin_port);
+
 			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_BIND, bind_ipaddr, bind_port);
+		} else if (address->sa_family == AF_UNIX) {
+			struct sockaddr_un *un_addr = (struct sockaddr_un *) address;
+			const char *sun_path = un_addr->sun_path;
 
-		trace_printf(1, "bind(%d, %s:%d, ); [%d](AF_INET)\n", fd, bind_ipaddr, bind_port, ret);
-
-		return ret;
-	} else if (address->sa_family == AF_UNIX) {
-		struct sockaddr_un *un_addr = (struct sockaddr_un *) address;
-		const char *sun_path = un_addr->sun_path;
-
-		/* bind local socket */
-		ret = real_bind(fd, (struct sockaddr *) un_addr, sizeof(struct sockaddr_un));
-		if (ret == 0)
-			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_BIND, sun_path, -1);
-
-		trace_printf(1, "bind(%d, \"%s\", ); [%d](AF_UNIX|AF_LOCAL)\n", fd, sun_path, ret);
-
-		return ret;
+			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_UNIX_BIND, sun_path, -1);
+		}
 	}
 
-	return real_bind(fd, address, len);
+	retrace_log_and_redirect_after(&event_info);
+
+	return (ret);
 }
 
 #ifdef __linux__
@@ -217,30 +245,52 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 {
 #endif
 	struct descriptor_info *di;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+					  PARAMETER_TYPE_POINTER,
+					  PARAMETER_TYPE_POINTER,
+					  PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &address, &len};
 	int clnt_fd;
+	struct sockaddr_in local_addr;
+	socklen_t local_len = 0;
+
+
+	event_info.function_name = "accept";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_FILE_DESCRIPTOR;
+	event_info.return_value = &clnt_fd;
+	retrace_log_and_redirect_before(&event_info);
+
+	/* If we are tracking this descriptor and is a IPV4 server, try to gets
+	 * the client address, even if the caller isn't interested on it
+	 */
+	di = file_descriptor_get(fd);
+	if (di && di->type == FILE_DESCRIPTOR_TYPE_IPV4_BIND && address == NULL) {
+		address = (struct sockaddr *) &local_addr;
+		local_len = sizeof(struct sockaddr_in);
+		len = &local_len;
+	}
+
+	clnt_fd = real_accept(fd, address, len);
 
 	/* get descriptor info */
 	di = file_descriptor_get(fd);
 	if (di && di->type == FILE_DESCRIPTOR_TYPE_IPV4_BIND) {
-		struct sockaddr_in clnt_addr;
-		socklen_t addr_len = sizeof(struct sockaddr_in);
-
-		clnt_fd = real_accept(fd, (struct sockaddr *) &clnt_addr, &addr_len);
+		struct sockaddr_in *clnt_addr = (struct sockaddr_in *) address;
 		if (clnt_fd > 0) {
-			const char *clnt_ipaddr = inet_ntoa(clnt_addr.sin_addr);
-			int clnt_port = ntohs(clnt_addr.sin_port);
+			const char *clnt_ipaddr = inet_ntoa(clnt_addr->sin_addr);
+			int clnt_port = ntohs(clnt_addr->sin_port);
 
 			/* add file descriptor for client socket */
 			file_descriptor_update(clnt_fd, FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT, clnt_ipaddr, clnt_port);
-
-			trace_printf(1, "accept(%d, %s, %d); [client socket:%d]\n", fd, clnt_ipaddr, clnt_port, clnt_fd);
-		} else
-			trace_printf(1, "accept(%d, , , ); [error]\n", fd);
-
-		return clnt_fd;
+		}
 	}
 
-	return real_accept(fd, address, len);
+	retrace_log_and_redirect_after(&event_info);
+
+	return (clnt_fd);
 }
 
 #ifdef __linux__
@@ -256,14 +306,26 @@ RETRACE_REPLACE(accept, int,
 int RETRACE_IMPLEMENTATION(setsockopt)(int fd, int level, int optname, const void *optval, socklen_t optlen)
 {
 	int ret;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+					  PARAMETER_TYPE_INT,
+					  PARAMETER_TYPE_INT,
+					  PARAMETER_TYPE_POINTER,
+					  PARAMETER_TYPE_INT,
+					  PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &level, &optname, &optval, &optlen};
+
+
+	event_info.function_name = "setsockopt";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_setsockopt(fd, level, optname, optval, optlen);
 
-	trace_printf(1, "setsockopt(%d, %d, %d, %p) [return:%d]\n", fd, level, optname, optval, ret);
-#if 0
-	for (i = 0; i < optlen; i++)
-		trace_dump_data((unsigned char *)optval + i, sizeof(socklen_t));
-#endif
+	retrace_log_and_redirect_after(&event_info);
 
 	return ret;
 }
@@ -277,11 +339,21 @@ RETRACE_REPLACE(setsockopt, int,
 ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, int flags)
 {
 	int ret;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_MEMORY_BUFFER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&sockfd, &len, &buf, &len, &flags};
+
+
+	event_info.function_name = "send";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_send(sockfd, buf, len, flags);
-	trace_printf(1, "send(%d, %p, %d, %d) [return: %d]\n", sockfd, buf, len, flags, ret);
-	if (ret > 0)
-		trace_dump_data((unsigned char *)buf, ret);
+
+	retrace_log_and_redirect_after(&event_info);
 
 	return ret;
 }
@@ -295,10 +367,26 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 		const struct sockaddr *dest_addr, socklen_t addrlen)
 {
 	int ret;
-
 	struct descriptor_info *di;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+					  PARAMETER_TYPE_MEMORY_BUFFER,
+					  PARAMETER_TYPE_INT,
+					  PARAMETER_TYPE_POINTER,
+					  PARAMETER_TYPE_INT,
+					  PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&sockfd, &len, &buf, &len, &flags, &dest_addr, &addrlen};
+
+
+	event_info.function_name = "sendto";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+
 	if (dest_addr) {
 		if (dest_addr->sa_family == AF_INET) {
 			struct sockaddr_in *in_addr = (struct sockaddr_in *)dest_addr;
@@ -310,9 +398,6 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 			di = file_descriptor_get(sockfd);
 			if (!di && ret > 0)
 				file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_addr, remote_port);
-
-			trace_printf(1, "sendto(%d, %p, %d, %d, %s:%d[AF_INET]), [return: %d]\n",
-				sockfd, buf, len, flags, remote_addr, remote_port, ret);
 		} else if (dest_addr->sa_family == AF_UNIX) {
 			struct sockaddr_un *un_addr = (struct sockaddr_un *)dest_addr;
 			const char *remote_path = un_addr->sun_path;
@@ -321,17 +406,10 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 			di = file_descriptor_get(sockfd);
 			if (!di && ret > 0)
 				file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_path, -1);
-
-			trace_printf(1, "sendto(%d, %p, %d, %d, %s[AF_UNIX|AF_LOCAL]), [return: %d]\n",
-				sockfd, buf, len, flags, remote_path, ret);
 		}
-	} else
-		trace_printf(1, "sendto(%d, %p, %d, %d), [return: %d]\n",
-			sockfd, buf, len, flags, ret);
+	}
 
-	/* dump sending data */
-	if (ret > 0)
-		trace_dump_data((unsigned char *)buf, ret);
+	retrace_log_and_redirect_after(&event_info);
 
 	return ret;
 }
@@ -344,25 +422,32 @@ RETRACE_REPLACE(sendto, ssize_t,
 
 ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, int flags)
 {
-	int i, ret;
-
+	int ret;
 	struct descriptor_info *di;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+					  PARAMETER_TYPE_POINTER,
+					  PARAMETER_TYPE_INT,
+					  PARAMETER_TYPE_IOVEC,
+					  PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&sockfd, &msg, &msg->msg_iovlen, &msg->msg_iov, &flags};
+
+
+	event_info.function_name = "sendmsg";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_sendmsg(sockfd, msg, flags);
-	trace_printf(1, "sendmsg(%d, %p, %d) [return:%d]\n", sockfd, msg, flags, ret);
 
 	/* update descriptor info */
 	di = file_descriptor_get(sockfd);
 	if (!di && msg->msg_name)
 		file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDMSG, (char *)msg->msg_name, -1);
 
-	/* dump message data */
-	for (i = 0; i < msg->msg_iovlen; i++) {
-		struct iovec *msg_iov = &msg->msg_iov[i];
-
-		if (msg_iov->iov_len > 0)
-			trace_dump_data((unsigned char *) msg_iov->iov_base, msg_iov->iov_len);
-	}
+	retrace_log_and_redirect_after(&event_info);
 
 	return ret;
 }
@@ -374,13 +459,26 @@ RETRACE_REPLACE(sendmsg, ssize_t,
 
 ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flags)
 {
-	int recv_len;
+	ssize_t recv_len = 0;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+					  PARAMETER_TYPE_MEMORY_BUFFER,
+					  PARAMETER_TYPE_INT,
+					  PARAMETER_TYPE_INT,
+					  PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&sockfd, &recv_len, &buf, &len, &flags};
+
+
+	event_info.function_name = "recv";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &recv_len;
+	retrace_log_and_redirect_before(&event_info);
 
 	recv_len = real_recv(sockfd, buf, len, flags);
-	trace_printf(1, "recv(%d, %p, %d, %d) [return: %d]\n", sockfd, buf, len, flags, recv_len);
 
-	if (recv_len > 0)
-		trace_dump_data((unsigned char *)buf, recv_len);
+	retrace_log_and_redirect_after(&event_info);
 
 	return recv_len;
 }

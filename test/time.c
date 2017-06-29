@@ -29,11 +29,14 @@ int main(void)
 {
 	char buf[26];
 	time_t t;
+	struct timeval *tv;
 
 	t = time(NULL);
 
 	ctime(&t);
 	ctime_r(&t, buf);
+
+	gettimeofday(&tv, NULL);
 
 	return 0;
 }

@@ -23,19 +23,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdio.h>
 #include <stdlib.h>
-#include <sys/utsname.h>
+#include <errno.h>
 
 int main(void)
 {
-	struct utsname buf;
+	errno = EADDRINUSE;
 
-	uname(&buf);
-
-	putenv("RETRACE_TEST=teststring");
-	getenv("RETRACE_TEST");
-	unsetenv("RETRACE_TEST");
+	perror("retrace");
 
 	return 0;
 }
-

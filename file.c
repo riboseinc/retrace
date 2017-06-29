@@ -76,12 +76,27 @@ RETRACE_REPLACE(stat, int, (const char *path, struct stat *buf), (path, buf))
 int RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode)
 {
 	char perm[10];
+	char *perm_p = &perm[0];
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_INT_OCTAL | PARAMETER_FLAG_STRING_NEXT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&path, &mode, &perm_p};
+	int r;
 
 	trace_mode(mode, perm);
 
-	trace_printf(1, "chmod(\"%s\", %o); [%s]\n", path, mode, perm);
 
-	return real_chmod(path, mode);
+	event_info.function_name = "chmod";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_chmod(path, mode);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return (r);
 }
 
 RETRACE_REPLACE(chmod, int, (const char *path, mode_t mode), (path, mode))
@@ -89,23 +104,49 @@ RETRACE_REPLACE(chmod, int, (const char *path, mode_t mode), (path, mode))
 int RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
 {
 	char perm[10];
+	char *perm_p = &perm[0];
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_INT_OCTAL | PARAMETER_FLAG_STRING_NEXT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &mode, &perm_p};
+	int r;
 
 	trace_mode(mode, perm);
 
-	trace_printf(1, "fchmod(%d, %o); [%s]\n", fd, mode, perm);
 
-	return real_fchmod(fd, mode);
+	event_info.function_name = "fchmod";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_fchmod(fd, mode);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return (r);
 }
 
 RETRACE_REPLACE(fchmod, int, (int fd, mode_t mode), (fd, mode))
 
 int RETRACE_IMPLEMENTATION(fileno)(FILE *stream)
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&stream};
 	int fd;
+
+
+	event_info.function_name = "fileno";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &fd;
+	retrace_log_and_redirect_before(&event_info);
 
 	fd = real_fileno(stream);
 
-	trace_printf(1, "fileno(%d);\n", fd);
+	retrace_log_and_redirect_after(&event_info);
 
 	return real_fileno(stream);
 }
@@ -114,47 +155,65 @@ RETRACE_REPLACE(fileno, int, (FILE *stream), (stream))
 
 int RETRACE_IMPLEMENTATION(fseek)(FILE *stream, long offset, int whence)
 {
-	int fd;
-
-	fd = real_fileno(stream);
-
-	trace_printf(1, "fseek(%d, %lx, ", fd, offset);
+	char *operation = NULL;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_INT, PARAMETER_TYPE_INT | PARAMETER_FLAG_STRING_NEXT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&stream, &offset, &whence, &operation};
+	int r;
 
 	if (whence == 0)
-		trace_printf(0, "SEEK_SET");
+		operation = "SEEK_SET";
 	else if (whence == 1)
-		trace_printf(0, "SEEK_CUR");
+		operation = "SEEK_CUR";
 	else if (whence == 2)
-		trace_printf(0, "SEEK_END");
+		operation = "SEEK_END";
 	else
-		trace_printf(0, "UNDEFINED");
+		operation = "UNDEFINED";
 
-	trace_printf(0, ");\n");
 
-	return real_fseek(stream, offset, whence);
+	event_info.function_name = "fseek";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_fseek(stream, offset, whence);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return r;
 }
 
 RETRACE_REPLACE(fseek, int, (FILE *stream, long offset, int whence), (stream, offset, whence))
 
 int RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
 {
-	int fd;
-	struct descriptor_info *di;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&stream};
+	int r;
+	int fd = -1;
 
-	fd = real_fileno(stream);
-
-	if (fd > 0)
+	if (stream)
 		fd = real_fileno(stream);
 
-	di = file_descriptor_get(fd);
-	if (di && di->location)
-		trace_printf(1, "fclose(%d); [to: \"%s\"]\n", fd, di->location);
-	else
-		trace_printf(1, "fclose(%d);\n", fd);
 
-	file_descriptor_remove(fd);
+	event_info.function_name = "fclose";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
 
-	return real_fclose(stream);
+	r = real_fclose(stream);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	if (fd > 0)
+		file_descriptor_remove(fd);
+
+	return r;
 }
 
 RETRACE_REPLACE(fclose, int, (FILE *stream), (stream))
@@ -166,6 +225,17 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 	char *match_file = NULL;
 	FILE *ret;
 	char *redirect_file = NULL;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&file, &mode};
+
+
+	event_info.function_name = "fopen";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_FILE_STREAM;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
 
 	if (get_tracing_enabled() && file) {
 		RTR_CONFIG_HANDLE config = NULL;
@@ -195,10 +265,16 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 	if (!did_redirect)
 		ret = real_fopen(file, mode);
 
-	trace_printf(1, "fopen(\"%s%s\", \"%s\"); [%d]\n",
-	    did_redirect ? redirect_file : file,
-	    did_redirect ? " [redirected]" : "",
-	    mode, fd);
+	if (ret) {
+		int fd;
+
+		fd = real_fileno(ret);
+
+		file_descriptor_update(
+			fd, FILE_DESCRIPTOR_TYPE_FILE, file, 0);
+	}
+
+	retrace_log_and_redirect_after(&event_info);
 
 	return ret;
 }
@@ -207,46 +283,96 @@ RETRACE_REPLACE(fopen, FILE *, (const char *file, const char *mode), (file, mode
 
 int RETRACE_IMPLEMENTATION(close)(int fd)
 {
-	struct descriptor_info *di;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd};
+	int r;
 
-	di = file_descriptor_get(fd);
-	if (di && di->location)
-		trace_printf(1, "close(%d) [was pointing to %s];\n", fd, di->location);
-	else
-		trace_printf(1, "close(%d);\n", fd);
+
+	event_info.function_name = "close";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_close(fd);
+
+	retrace_log_and_redirect_after(&event_info);
 
 	file_descriptor_remove(fd);
 
-	return real_close(fd);
+	return (r);
 }
 
 RETRACE_REPLACE(close, int, (int fd), (fd))
 
 int RETRACE_IMPLEMENTATION(dup)(int oldfd)
 {
-	trace_printf(1, "dup(%d)\n", oldfd);
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&oldfd};
+	int r;
 
-	return real_dup(oldfd);
+
+	event_info.function_name = "dup";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_FILE_DESCRIPTOR;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_dup(oldfd);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return (r);
 }
 
 RETRACE_REPLACE(dup, int, (int oldfd), (oldfd))
 
 int RETRACE_IMPLEMENTATION(dup2)(int oldfd, int newfd)
 {
-	trace_printf(1, "dup2(%d, %d)\n", oldfd, newfd);
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&oldfd, &newfd};
+	int r;
 
-	return real_dup2(oldfd, newfd);
+
+	event_info.function_name = "dup2";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_dup2(oldfd, newfd);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return (r);
 }
 
 RETRACE_REPLACE(dup2, int, (int oldfd, int newfd), (oldfd, newfd))
 
 mode_t RETRACE_IMPLEMENTATION(umask)(mode_t mask)
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT,  PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&mask};
 	mode_t old_mask;
+
+
+	event_info.function_name = "umask";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &old_mask;
+	retrace_log_and_redirect_before(&event_info);
 
 	old_mask = real_umask(mask);
 
-	trace_printf(1, "umask(%d); [%d]\n", mask, old_mask);
+	retrace_log_and_redirect_after(&event_info);
 
 	return old_mask;
 }
@@ -255,19 +381,27 @@ RETRACE_REPLACE(umask, mode_t, (mode_t mask), (mask))
 
 int RETRACE_IMPLEMENTATION(mkfifo)(const char *pathname, mode_t mode)
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&pathname, &mode};
 	int ret;
+
+
+	event_info.function_name = "mkfifo";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_mkfifo(pathname, mode);
 
-	trace_printf(1, "mkfifo(%s, %d); [%d]\n", pathname, mode, ret);
+	retrace_log_and_redirect_after(&event_info);
 
 	return ret;
 }
 
 RETRACE_REPLACE(mkfifo, int, (const char *pathname, mode_t mode), (pathname, mode))
-
-typedef int (*rtr_open_mode_t)(const char *pathname, int flags, mode_t mode);
-typedef int (*rtr_open_nomode_t)(const char *pathname, int flags);
 
 #ifdef __APPLE__
 #define MODEFLAGS O_CREAT
@@ -282,9 +416,37 @@ typedef int (*rtr_open_nomode_t)(const char *pathname, int flags);
 static int
 open_v(const char *pathname, int flags, va_list ap)
 {
+	int r;
+	mode_t mode = 0;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_INT, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&pathname, &flags, &mode};
+
 	if (flags & MODEFLAGS)
-		return real_open(pathname, flags, va_arg(ap, int));
-	return real_open(pathname, flags);
+		mode = va_arg(ap, int);
+
+
+	event_info.function_name = "open";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+
+	if (flags & MODEFLAGS)
+		r = real_open(pathname, flags, mode);
+	else
+		r =  real_open(pathname, flags);
+
+	if (r > 0) {
+		file_descriptor_update(
+			r, FILE_DESCRIPTOR_TYPE_FILE, pathname, 0);
+	}
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return r;
 }
 
 int RETRACE_IMPLEMENTATION(open)(const char *pathname, int flags, ...)
@@ -296,19 +458,6 @@ int RETRACE_IMPLEMENTATION(open)(const char *pathname, int flags, ...)
 	fd = open_v(pathname, flags, ap);
 	va_end(ap);
 
-	if (flags & MODEFLAGS) {
-		va_start(ap, flags);
-		trace_printf(1, "open(%s, %u, %u) [return: fd]\n", pathname,
-		    flags, va_arg(ap, int), fd);
-		va_end(ap);
-	} else
-		trace_printf(1, "open(%s, %u) [return: fd]\n", pathname, flags, fd);
-
-	if (fd > 0) {
-		file_descriptor_update(
-				fd, FILE_DESCRIPTOR_TYPE_FILE, pathname, 0);
-	}
-
 	return fd;
 }
 
@@ -316,30 +465,23 @@ RETRACE_REPLACE_V(open, int, (const char *pathname, int flags, ...), flags, open
 
 size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
-	size_t i;
-	int r, fd;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_MEM_BUFFER_ARRAY, PARAMETER_TYPE_INT, PARAMETER_TYPE_INT, PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&size, &nmemb, &ptr, &size, &nmemb, &stream};
+	int r;
 	struct descriptor_info *di = NULL;
+
+
+	event_info.function_name = "fwrite";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fwrite(ptr, size, nmemb, stream);
 
-	if (get_tracing_enabled()) {
-		int old_trace_state;
-
-		old_trace_state = trace_disable();
-
-		fd = real_fileno(stream);
-		di = file_descriptor_get(fd);
-
-		if (di && di->location)
-			trace_printf(1, "fwrite(%p, %u, %u, %p) [to: \"%s\", return: %u]\n", ptr, size, nmemb, stream, di->location, r);
-		else
-			trace_printf(1, "fwrite(%p, %u, %u, %p) [return: %u]\n", ptr, size, nmemb, stream, r);
-
-		for (i = 0; i < nmemb; i++)
-			trace_dump_data((unsigned char *)ptr + i, size);
-
-		trace_restore(old_trace_state);
-	}
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -348,31 +490,22 @@ RETRACE_REPLACE(fwrite, size_t, (const void *ptr, size_t size, size_t nmemb, FIL
 
 size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
-	int i, r, fd;
-	struct descriptor_info *di = NULL;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_MEM_BUFFER_ARRAY, PARAMETER_TYPE_INT, PARAMETER_TYPE_INT, PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&size, &nmemb, &ptr, &size, &nmemb, &stream};
+	int r;
+
+
+	event_info.function_name = "fread";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fread(ptr, size, nmemb, stream);
 
-	if (get_tracing_enabled()) {
-		int old_trace_state;
-
-		old_trace_state = trace_disable();
-
-		if (stream) {
-			fd = real_fileno(stream);
-			di = file_descriptor_get(fd);
-		}
-
-		if (di && di->location)
-			trace_printf(1, "fread(%p, %u, %u, %p) [to: \"%s\", return: %u]\n", ptr, size, nmemb, stream, di->location, r);
-		else
-			trace_printf(1, "fread(%p, %u, %u, %p) [return: %u]\n", ptr, size, nmemb, stream, r);
-
-		for (i = 0; i < r; i++)
-			trace_dump_data((unsigned char *)ptr + i, size);
-
-		trace_restore(old_trace_state);
-	}
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -381,27 +514,22 @@ RETRACE_REPLACE(fread, size_t, (void *ptr, size_t size, size_t nmemb, FILE *stre
 
 int RETRACE_IMPLEMENTATION(fputc)(int c, FILE *stream)
 {
-	int fd;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_CHAR, PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&c, &stream};
 	int r;
-	struct descriptor_info *di = NULL;
+
+
+	event_info.function_name = "fputc";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fputc(c, stream);
 
-	if (get_tracing_enabled()) {
-		int old_trace_state;
-
-		old_trace_state = trace_disable();
-
-		fd = real_fileno(stream);
-		di = file_descriptor_get(fd);
-
-		if (di && di->location)
-			trace_printf(1, "fputc('%c'(%d), %p) [to: \"%s\", return: %d]\n", c, c, stream, di->location, r);
-		else
-			trace_printf(1, "fputc('%c'(%d), %p) [return: %d]\n", c, c, stream, r);
-
-		trace_restore(old_trace_state);
-	}
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -410,26 +538,22 @@ RETRACE_REPLACE(fputc, int, (int c, FILE *stream), (c, stream))
 
 int RETRACE_IMPLEMENTATION(fputs)(const char *s, FILE *stream)
 {
-	int r, fd;
-	struct descriptor_info *di = NULL;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&s, &stream};
+	int r;
+
+
+	event_info.function_name = "fputs";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fputs(s, stream);
 
-	if (get_tracing_enabled()) {
-		int old_trace_state;
-
-		old_trace_state = trace_disable();
-
-		fd = real_fileno(stream);
-		di = file_descriptor_get(fd);
-
-		if (di && di->location)
-			trace_printf(1, "fputs(\"%s\", %p) [to: \"%s\", return: %d]\n", s, stream, di->location, r);
-		else
-			trace_printf(1, "fputs(\"%s\", %p) [return: %d]\n", s, stream, r);
-
-		trace_restore(old_trace_state);
-	}
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -438,29 +562,22 @@ RETRACE_REPLACE(fputs, int, (const char *s, FILE *stream), (s, stream))
 
 int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&stream};
 	int r;
-	int fd;
-	struct descriptor_info *di = NULL;
+
+
+	event_info.function_name = "fgetc";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fgetc(stream);
 
-	if (get_tracing_enabled()) {
-		int old_trace_state;
-
-		old_trace_state = trace_disable();
-
-		if (stream) {
-			fd = real_fileno(stream);
-			di = file_descriptor_get(fd);
-		}
-
-		if (di && di->location)
-			trace_printf(1, "fgetc(%p) [to: \"%s\", return: '%c'(%d)]\n", stream, di->location, r, r);
-		else
-			trace_printf(1, "fgetc(%p) [return: '%c'(%d)])\n", stream, r, r);
-
-		trace_restore(old_trace_state);
-	}
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -469,9 +586,20 @@ RETRACE_REPLACE(fgetc, int, (FILE *stream), (stream))
 
 void RETRACE_IMPLEMENTATION(strmode)(int mode, char *bp)
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&mode, &bp};
+
+
+	event_info.function_name = "strmode";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_END;
+	retrace_log_and_redirect_before(&event_info);
+
 	real_strmode(mode, bp);
 
-	trace_printf(1, "strmode(%d, \"%s\");\n", mode, bp);
+	retrace_log_and_redirect_after(&event_info);
 }
 
 RETRACE_REPLACE(strmode, void, (int mode, char *bp), (mode, bp))
