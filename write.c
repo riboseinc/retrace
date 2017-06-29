@@ -26,11 +26,16 @@
 #include "common.h"
 #include "write.h"
 
+static int init_rand = 0;
+
 ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 {
 	struct rtr_event_info event_info;
-	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_MEMORY_BUFFER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&fd, &nbytes, &buf, &nbytes};
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+					  PARAMETER_TYPE_MEMORY_BUFFER,
+					  PARAMETER_TYPE_INT,
+					  PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &nbytes, &buf, &nbytes, NULL};
 	ssize_t ret = 0;
 
 	event_info.function_name = "write";
@@ -38,6 +43,19 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+
+	if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_END)) {
+		long int random_value;
+
+		if (!init_rand) {
+			srand (time(NULL));
+			init_rand = 1;
+		}
+
+		random_value = rand();
+
+		nbytes = random_value % nbytes;
+        }
 
 	retrace_log_and_redirect_before(&event_info);
 

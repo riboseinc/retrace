@@ -26,6 +26,8 @@
 #include "common.h"
 #include "read.h"
 
+static int init_rand = 0;
+
 ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 {
 	ssize_t ret = 0;
@@ -39,6 +41,20 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
 	retrace_log_and_redirect_before(&event_info);
+
+	if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_END)) {
+		long int random_value;
+
+		if (!init_rand) {
+			srand (time(NULL));
+			init_rand = 1;
+		}
+
+		random_value = rand();
+
+		nbytes = random_value % nbytes;
+	}
+
 
 	ret = real_read(fd, buf, nbytes);
 
