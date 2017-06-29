@@ -114,7 +114,7 @@ rtr_##func##_t real_##func = func;
 
 #else /* !__OpenBSD */
 
-__attribute__ ((regparm (3))) extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
+__attribute__((regparm (3))) extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
 
 #ifdef HAVE_ATOMIC_BUILTINS
 
