@@ -47,6 +47,9 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <sys/queue.h>
+#include <dirent.h>
+#include <sys/uio.h>
+#include <sys/utsname.h>
 
 #include "str.h"
 #include "id.h"
@@ -54,6 +57,8 @@
 #include "malloc.h"
 #include "printf.h"
 #include "env.h"
+#include "dir.h"
+#include "ssl.h"
 
 /*
  * Global setting, we set this to disable all our
@@ -96,6 +101,344 @@ static pthread_once_t tracing_key_once = PTHREAD_ONCE_INIT;
 struct descriptor_info **g_descriptor_list;
 unsigned int g_descriptor_list_size;
 
+void **
+retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, void **value)
+{
+	switch (type) {
+	case PARAMETER_TYPE_INT:
+		trace_printf(0, "%d", (*(int *) *value));
+		break;
+	case PARAMETER_TYPE_POINTER:
+		trace_printf(0, "%p", (*(void **) *value));
+		break;
+	case PARAMETER_TYPE_UINT:
+		trace_printf(0, "%u", *((unsigned int *) *value));
+		break;
+	case PARAMETER_TYPE_FLOAT:
+		trace_printf(0, "%f", *((float *) *value));
+		break;
+	case PARAMETER_TYPE_DOUBLE:
+		trace_printf(0, "%f", *((double *) *value));
+		break;
+	case PARAMETER_TYPE_STRING:
+
+		if (event_type == EVENT_TYPE_BEFORE_CALL && flags & PARAMETER_FLAG_OUTPUT_VARIABLE) {
+			trace_printf(0, "%p", (*(void **) *value));
+		} else {
+			if ((*(char **) *value) != NULL)
+				trace_printf_str((*(char **) *value));
+			else
+				trace_printf_str("(nil)");
+		}
+		break;
+	case PARAMETER_TYPE_STRING_LEN:
+		trace_printf_str((*(char **) *value));
+		break;
+	case PARAMETER_TYPE_MEMORY_BUFFER:
+		value++;
+
+		trace_printf(0, "%p", (*(void **) *value));
+		break;
+	case PARAMETER_TYPE_MEM_BUFFER_ARRAY:
+		value += 2;
+		trace_printf(0, "%p", (*(void **) *value));
+		break;
+	case PARAMETER_TYPE_CHAR:
+		trace_printf(0, "'%c'(%d)", (*(char **) *value), *((int *) *value));
+		break;
+	case PARAMETER_TYPE_DIR:
+	{
+		int fd = -1;
+		DIR *dirp;
+
+		dirp = *((DIR **) *value);
+
+		if (dirp)
+			fd = real_dirfd(dirp);
+
+		trace_printf(0, "%p (fd %d)", dirfd, fd);
+		break;
+	}
+	case PARAMETER_TYPE_FILE_STREAM:
+	{
+		int fd = -1;
+		FILE *stream;
+		struct descriptor_info *di;
+
+		stream = *((FILE **) *value);
+
+		if (stream)
+			fd = real_fileno(stream);
+
+		trace_printf(0, "%p [fd %d]", stream, fd);
+
+		if (fd > 0) {
+			di = file_descriptor_get(fd);
+			if (di && di->location)
+				trace_printf(0, " [%s]", di->location);
+		}
+
+		break;
+	}
+	case PARAMETER_TYPE_FILE_DESCRIPTOR:
+	{
+		int fd = *((int *) *value);
+		struct descriptor_info *di;
+
+		trace_printf(0, "%d", fd);
+
+		if (event_type != EVENT_TYPE_BEFORE_CALL || (flags & PARAMETER_FLAG_OUTPUT_VARIABLE)) {
+			di = file_descriptor_get(fd);
+			if (di && di->location)
+				trace_printf(0, " [%s]", di->location);
+		}
+
+
+		break;
+	}
+	case PARAMETER_TYPE_INT_OCTAL:
+		trace_printf(0, "%o", *((int *) *value));
+		break;
+	case PARAMETER_TYPE_PRINTF_FORMAT:
+	{
+		char *fmt;
+		va_list *ap;
+		char buf[1024];
+
+		fmt = *((char **) *value);
+		value++;
+		ap = (va_list *) *value;
+
+		real_vsnprintf(buf, 1024, fmt, *ap);
+		trace_printf(0, "\"");
+		trace_printf_str(fmt);
+		trace_printf(0, "\" -> \"");
+		trace_printf_str(buf);
+		trace_printf(0, "\"");
+
+		break;
+	}
+	case PARAMETER_TYPE_STRING_ARRAY:
+	{
+		char **argv;
+
+		argv = *((char ***) *value);
+
+		while (*argv) {
+			trace_printf_str(*argv);
+			trace_printf(0, ", ");
+
+			argv++;
+		}
+		trace_printf(0, "NULL");
+		break;
+
+	}
+	case PARAMETER_TYPE_IOVEC:
+	{
+		value++;
+		break;
+	}
+	case PARAMETER_TYPE_UTSNAME:
+	{
+		struct utsname *buf;
+
+		buf = *((struct utsname **) *value);
+
+		trace_printf(0, "%p [%s, %s, %s, %s, %s]", buf, buf->sysname, buf->nodename,
+				buf->release, buf->version, buf->machine);
+		break;
+
+	}
+	case PARAMETER_TYPE_TIMEVAL:
+	{
+		struct timeval *tv;
+		time_t tv_sec;
+		suseconds_t tv_usec;
+
+		tv = *((struct timeval **) *value);
+
+		trace_printf(1, "%p", tv);
+
+		if (tv) {
+			tv_sec  = tv->tv_sec;
+			tv_usec = tv->tv_usec;
+
+			trace_printf(1, "[%ld, %ld]", tv_sec, tv_usec);
+		}
+		break;
+	}
+	case PARAMETER_TYPE_TIMEZONE:
+	{
+		struct timezone *tz;
+		int tz_minuteswest = 0;
+		int tz_dsttime = 0;
+
+		tz = *((struct timezone **) *value);
+
+		trace_printf(0, "%p", tz);
+		if (tz != NULL) {
+			tz_minuteswest	= tz->tz_minuteswest;
+			tz_dsttime	= tz->tz_dsttime;
+
+			trace_printf(0, "[%d, %d]", tz_minuteswest, tz_dsttime);
+		}
+
+		break;
+	}
+	case PARAMETER_TYPE_SSL:
+	case PARAMETER_TYPE_SSL_WITH_KEY:
+		trace_printf(0, "%p", (*(void **) *value));
+		break;
+	}
+
+	/* There's a string following this parameter that expands its meaning */
+	if ((flags & PARAMETER_FLAG_STRING_NEXT) == PARAMETER_FLAG_STRING_NEXT) {
+		value++;
+		trace_printf(0, " [%s]", (*(char **) *value));
+	}
+
+	return value + 1;
+}
+
+void **
+retrace_dump_parameter(unsigned int type, int flags, void **value)
+{
+	if (type == PARAMETER_TYPE_MEMORY_BUFFER) {
+		int size;
+
+		size = *((int *) *value);
+		value++;
+
+		if (size > 0)
+			trace_dump_data((*(unsigned char **) *value), size);
+	} else if (type == PARAMETER_TYPE_MEM_BUFFER_ARRAY) {
+		int size;
+		int nmemb;
+		int i;
+		void *data;
+
+		size = *((int *) *value);
+		value++;
+		nmemb = *((int *) *value);
+		value++;
+		data = *((void **) (*value));
+
+		if (size > 0)
+			for (i = 0; i < nmemb; i++)
+				trace_dump_data(data + i, size);
+	} else if (type == PARAMETER_TYPE_IOVEC) {
+		int i;
+		int size;
+		struct iovec *iov;
+
+		size = *((size_t *) *value);
+		value++;
+		iov = *((struct iovec **) *value);
+
+		for (i = 0; i < size; i++) {
+			struct iovec *msg_iov = &iov[i];
+
+			if (msg_iov->iov_len > 0)
+				trace_dump_data((unsigned char *) iov->iov_base, msg_iov->iov_len);
+		}
+	} else if (type == PARAMETER_TYPE_SSL_WITH_KEY) {
+#ifdef HAVE_OPENSSL_SSL_H
+		void *ssl = (*(void **) *value);
+
+		if (ssl != NULL)
+			print_ssl_keys(ssl);
+#endif /* HAVE_OPENSSL_SSL */
+	}
+
+	return value + 1;
+}
+
+
+void
+retrace_event(struct rtr_event_info *event_info)
+{
+	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
+		unsigned int *parameter_type;
+		void **parameter_value;
+		int has_memory_buffers = 0;
+
+		parameter_type = event_info->parameter_types;
+		parameter_value = event_info->parameter_values;
+
+#if 0
+		if (event_info->event_type == EVENT_TYPE_BEFORE_CALL)
+			trace_printf(1, "->: ", event_info->function_name);
+		else if (event_info->event_type == EVENT_TYPE_AFTER_CALL)
+			trace_printf(1, "<-: ", event_info->function_name);
+#endif
+
+		trace_printf(0, "%s(", event_info->function_name);
+
+		while (GET_PARAMETER_TYPE(*parameter_type) != PARAMETER_TYPE_END) {
+
+			if (GET_PARAMETER_TYPE(*parameter_type) == PARAMETER_TYPE_MEMORY_BUFFER ||
+			    GET_PARAMETER_TYPE(*parameter_type) == PARAMETER_TYPE_MEM_BUFFER_ARRAY ||
+			    GET_PARAMETER_TYPE(*parameter_type) == PARAMETER_TYPE_IOVEC ||
+			    GET_PARAMETER_TYPE(*parameter_type) == PARAMETER_TYPE_SSL_WITH_KEY)
+				has_memory_buffers = 1;
+
+			parameter_value = retrace_print_parameter(event_info->event_type,
+								  GET_PARAMETER_TYPE(*parameter_type),
+								  GET_PARAMETER_FLAGS(*parameter_type),
+								  parameter_value);
+			trace_printf(0, ", ");
+
+			parameter_type++;
+		}
+
+		trace_printf(0, ")");
+
+		/* Return value is only valid in EVENT_TYPE_AFTER_CALL */
+		if (event_info->event_type == EVENT_TYPE_AFTER_CALL && event_info->return_value_type != PARAMETER_TYPE_END) {
+			trace_printf(0, " = ");
+			retrace_print_parameter(event_info->event_type,
+						 GET_PARAMETER_TYPE(event_info->return_value_type),
+						 GET_PARAMETER_FLAGS(event_info->return_value_type),
+						 &event_info->return_value);
+		}
+
+		trace_printf(0, "\n");
+
+		/* Give another pass to dump memory buffers in case we have any */
+		if (has_memory_buffers && event_info->event_type == EVENT_TYPE_AFTER_CALL) {
+			parameter_type = event_info->parameter_types;
+			parameter_value = event_info->parameter_values;
+
+			while (GET_PARAMETER_TYPE(*parameter_type) != PARAMETER_TYPE_END) {
+
+				parameter_value = retrace_dump_parameter(GET_PARAMETER_TYPE(*parameter_type), 0, parameter_value);
+
+				parameter_type++;
+			}
+
+		}
+	}
+}
+
+void
+retrace_log_and_redirect_before(struct rtr_event_info *event_info)
+{
+	/* Don't do anything for now */
+#if 0
+	event_info->event_type = EVENT_TYPE_BEFORE_CALL;
+	retrace_event(event_info);
+#endif
+}
+
+void
+retrace_log_and_redirect_after(struct rtr_event_info *event_info)
+{
+	event_info->event_type = EVENT_TYPE_AFTER_CALL;
+	retrace_event(event_info);
+}
+
+
 struct config_entry {
 	SLIST_ENTRY(config_entry) next;
 	char *line;  /* line with commas replaced by '\0' */
@@ -132,7 +475,7 @@ trace_printf(int hdr, const char *fmt, ...)
 	str = alloca(maxlen);
 
 	va_start(arglist, fmt);
-	vsnprintf(str, maxlen, fmt, arglist);
+	real_vsnprintf(str, maxlen, fmt, arglist);
 	va_end(arglist);
 
 	if (hdr == 1)
@@ -158,7 +501,7 @@ trace_printf_str(const char *string)
 	char *p;
 	int old_trace_state;
 
-	if (!get_tracing_enabled() || *string == '\0')
+	if (!get_tracing_enabled() || string == NULL || *string == '\0')
 		return;
 
 	old_trace_state = trace_disable();

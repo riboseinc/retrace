@@ -28,7 +28,16 @@
 
 void RETRACE_IMPLEMENTATION(exit)(int status)
 {
-	trace_printf(1, "exit(%s%d%s);\n", VAR, status, RST);
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&status};
+
+
+	event_info.function_name = "exit";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_END;
+	retrace_log_and_redirect_before(&event_info);
 
 	real_exit(status);
 }

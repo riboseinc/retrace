@@ -33,6 +33,54 @@
 #define FILE_DESCRIPTOR_TYPE_UNIX_DOMAIN	5 /* from connect() using AF_UNIX */
 #define FILE_DESCRIPTOR_TYPE_UDP_SENDTO		6 /* from sendto() over UDP */
 #define FILE_DESCRIPTOR_TYPE_UDP_SENDMSG	7 /* from sendmsg() over UDP local socket */
+#define FILE_DESCRIPTOR_TYPE_UNIX_BIND		8 /* bind AF_UNIX */
+
+#define PARAMETER_TYPE_END		0
+#define PARAMETER_TYPE_INT		1 /* int */
+#define PARAMETER_TYPE_POINTER		2 /* opaque pointer, we will print the address */
+#define PARAMETER_TYPE_UINT		3 /* unsigned int */
+#define PARAMETER_TYPE_FLOAT		4 /* float */
+#define PARAMETER_TYPE_DOUBLE		5 /* double */
+#define PARAMETER_TYPE_STRING		6 /* Zero terminated string */
+#define PARAMETER_TYPE_STRING_LEN	7 /* Non zero terminated string, the length of the string precedes the string */
+#define PARAMETER_TYPE_MEMORY_BUFFER	8 /* A pointer to a memory buffer, the length of the string precedes the string */
+#define PARAMETER_TYPE_CHAR		9 /* char */
+#define PARAMETER_TYPE_FILE_STREAM	10 /* FILE* */
+#define PARAMETER_TYPE_FILE_DESCRIPTOR	11 /* int used as a file descriptor */
+#define PARAMETER_TYPE_DIR		12 /* DIR */
+#define PARAMETER_TYPE_INT_OCTAL	13 /* int, print as octal */
+#define PARAMETER_TYPE_MEM_BUFFER_ARRAY	14 /* first size of buffers, then number of buffers, memory pointer at the end */
+#define PARAMETER_TYPE_PRINTF_FORMAT	15 /* printf format string followed by pointer to a va_list */
+#define PARAMETER_TYPE_STRING_ARRAY	16 /* fist the size of the array, then an array of char * */
+#define PARAMETER_TYPE_IOVEC		17 /* number of buffers, then array of struct iovec */
+#define PARAMETER_TYPE_UTSNAME		18 /* struct utsname*  */
+#define PARAMETER_TYPE_TIMEVAL		19 /* struct timeval* */
+#define PARAMETER_TYPE_TIMEZONE		20 /* struct timezone* */
+#define PARAMETER_TYPE_SSL		21 /* OpenSSL's SSL* */
+#define PARAMETER_TYPE_SSL_WITH_KEY	22 /* OpenSSL's SSL* but attempt to dump the ssl key */
+
+
+#define PARAMETER_FLAG_OUTPUT_VARIABLE		0x40000000 /* This is an output variable, is uninitialized in EVENT_TYPE_BEFORE_CALL */
+#define PARAMETER_FLAG_STRING_NEXT		0x80000000 /* There's a string parameter that describes the string */
+#define PARAMETER_FLAGS_ALL (PARAMETER_FLAG_STRING_NEXT | PARAMETER_FLAG_OUTPUT_VARIABLE)
+
+#define EVENT_TYPE_BEFORE_CALL		0
+#define EVENT_TYPE_AFTER_CALL		1
+
+#define GET_PARAMETER_TYPE(param) (param & ~PARAMETER_FLAGS_ALL)
+#define GET_PARAMETER_FLAGS(param) (param & PARAMETER_FLAGS_ALL)
+
+struct rtr_event_info {
+	unsigned int event_type;
+
+	char *function_name;
+
+	unsigned int *parameter_types;
+	void **parameter_values;
+
+	unsigned int return_value_type;
+	void *return_value;
+};
 
 #define RETRACE_DECL(func) extern rtr_##func##_t real_##func
 
@@ -108,6 +156,10 @@ struct descriptor_info {
 	char *location; /* File name or address */
 	int port;
 };
+
+void retrace_log_and_redirect_before(struct rtr_event_info *event_info);
+void retrace_log_and_redirect_after(struct rtr_event_info *event_info);
+
 
 void trace_printf(int hdr, const char *fmt, ...);
 void trace_printf_str(const char *string);
