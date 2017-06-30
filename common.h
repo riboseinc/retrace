@@ -85,6 +85,8 @@ struct rtr_event_info {
 	void *return_value;
 };
 
+#define RETRACE_INTERNAL __attribute__((visibility("hidden")))
+
 #define RETRACE_DECL(func) extern rtr_##func##_t real_##func
 
 #ifdef __APPLE__
@@ -138,7 +140,7 @@ type rtr_fixup_##func defn {						\
 	RETRACE_FIXUP(func);						\
 	return real_##func args;					\
 }									\
-rtr_##func##_t real_##func = rtr_fixup_##func;
+RETRACE_INTERNAL rtr_##func##_t real_##func = rtr_fixup_##func;
 
 #define RETRACE_REPLACE_V(func, type, defn, last, vfunc, vargs)		\
 type rtr_fixup_##func defn {						\
@@ -169,7 +171,7 @@ struct ts_info {
 };
 
 void trace_printf(int hdr, const char *fmt, ...);
-void trace_printf_str(const char *string);
+void trace_printf_str(const char *string, int maxlength);
 void trace_dump_data(const unsigned char *buf, size_t nbytes);
 void trace_mode(mode_t mode, char *p);
 void trace_printf_backtrace(void);

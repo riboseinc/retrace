@@ -80,8 +80,8 @@ RETRACE_REPLACE(strlen, size_t, (const char *s), (s))
 int RETRACE_IMPLEMENTATION(strncmp)(const char *s1, const char *s2, size_t n)
 {
 	struct rtr_event_info event_info;
-	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&s1, &s2, &n};
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING_LEN, PARAMETER_TYPE_STRING_LEN, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&n, &s1, &n, &s2, &n};
 	int result;
 
 
@@ -128,8 +128,8 @@ RETRACE_REPLACE(strcmp, int, (const char *s1, const char *s2), (s1, s2))
 char *RETRACE_IMPLEMENTATION(strncpy)(char *s1, const char *s2, size_t n)
 {
 	struct rtr_event_info event_info;
-	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&s1, &s2, &n};
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING_LEN, PARAMETER_TYPE_STRING_LEN, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&n, &s1, &n, &s2, &n};
 	char *result = NULL;
 
 

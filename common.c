@@ -136,14 +136,21 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 			trace_printf(0, "%p", (*(void **) *value));
 		} else {
 			if ((*(char **) *value) != NULL)
-				trace_printf_str((*(char **) *value));
+				trace_printf_str((*(char **) *value), -1);
 			else
-				trace_printf_str("(nil)");
+				trace_printf_str("(nil)", -1);
 		}
 		break;
 	case PARAMETER_TYPE_STRING_LEN:
-		trace_printf_str((*(char **) *value));
+	{
+		int len;
+
+		len = (*(int *) *value);
+		value++;
+
+		trace_printf_str((*(char **) *value), len);
 		break;
+	}
 	case PARAMETER_TYPE_MEMORY_BUFFER:
 		value++;
 
@@ -221,9 +228,9 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 
 		real_vsnprintf(buf, 1024, fmt, *ap);
 		trace_printf(0, "\"");
-		trace_printf_str(fmt);
+		trace_printf_str(fmt, -1);
 		trace_printf(0, "\" -> \"");
-		trace_printf_str(buf);
+		trace_printf_str(buf, -1);
 		trace_printf(0, "\"");
 
 		break;
@@ -235,7 +242,7 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		argv = *((char ***) *value);
 
 		while (*argv) {
-			trace_printf_str(*argv);
+			trace_printf_str(*argv, -1);
 			trace_printf(0, ", ");
 
 			argv++;
@@ -368,6 +375,9 @@ retrace_dump_parameter(unsigned int type, int flags, void **value)
 void
 retrace_event(struct rtr_event_info *event_info)
 {
+	if (!get_tracing_enabled())
+		return;
+
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		unsigned int *parameter_type;
 		void **parameter_value;
@@ -459,8 +469,6 @@ SLIST_HEAD(config_head, config_entry);
 void
 trace_printf(int hdr, const char *fmt, ...)
 {
-	static const size_t maxlen = 1024;
-	char *str;
 	va_list arglist;
 	int old_trace_state;
 	FILE *output_file = stderr;
@@ -471,7 +479,7 @@ trace_printf(int hdr, const char *fmt, ...)
 	if (rtr_get_config_single("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_END, &output_file_path)) {
 		old_trace_state = trace_disable();
 		if (output_file_path) {
-			FILE *out_file_tmp = fopen(output_file_path, "a");
+			FILE *out_file_tmp = real_fopen(output_file_path, "a");
 
 			if (out_file_tmp)
 				output_file = out_file_tmp;
@@ -482,25 +490,21 @@ trace_printf(int hdr, const char *fmt, ...)
 
 	old_trace_state = trace_disable();
 
-	str = alloca(maxlen);
+	if (hdr == 1)
+		real_fprintf(output_file, "(%d) ", real_getpid());
 
 	va_start(arglist, fmt);
-	real_vsnprintf(str, maxlen, fmt, arglist);
+	real_vfprintf(output_file, fmt, arglist);
 	va_end(arglist);
 
-	if (hdr == 1)
-		fprintf(output_file, "(%d) ", getpid());
-
-	fprintf(output_file, "%s", str);
-
 	if (output_file != stderr)
-		fclose(output_file);
+		real_fclose(output_file);
 
 	trace_restore(old_trace_state);
 }
 
 void
-trace_printf_str(const char *string)
+trace_printf_str(const char *string, int maxlength)
 {
 	static const char CR[] = VAR "\\r" RST;
 	static const char LF[] = VAR "\\n" RST;
@@ -516,7 +520,12 @@ trace_printf_str(const char *string)
 
 	old_trace_state = trace_disable();
 
-	for (i = 0, p = buf; i < MAXLEN && string[i] != '\0'; i++) {
+	if (maxlength != -1)
+		maxlength = maxlength > MAXLEN ? MAXLEN : maxlength;
+	else
+		maxlength = MAXLEN;
+
+	for (i = 0, p = buf; i < maxlength && string[i] != '\0'; i++) {
 		if (string[i] == '\n')
 			strcpy(p, LF);
 		else if (string[i] == '\r')
@@ -579,11 +588,13 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 			ascp = asc_str;
 		}
 		*(ascp++) = buf[i] > 31 && buf[i] < 127 ? buf[i] : '.';
+
 		hexp += real_sprintf(hexp, i % 2 ? "%02x" : " %02x", buf[i]);
 	}
 	if (nbytes % DUMP_LINE_SIZE) {
 		int n = DUMP_LINE_SIZE - nbytes % DUMP_LINE_SIZE;
-		sprintf(hexp, "%*s", n * 2 + n/2, "");
+
+		real_sprintf(hexp, "%*s", n * 2 + n/2, "");
 
 		trace_restore(old_trace_state);
 		trace_printf(0, fmt, i - DUMP_LINE_SIZE + n, hex_str, asc_str);
@@ -745,7 +756,7 @@ get_config() {
 			break;
 
 		pentry->nargs = 0;
-		for (p = real_strchr(pentry->line, ','); p; p = strchr(++p, ',')) {
+		for (p = real_strchr(pentry->line, ','); p; p = real_strchr(++p, ',')) {
 			*p = '\0';
 			++pentry->nargs;
 		}
