@@ -101,10 +101,7 @@ main() {
         if [ -z "$cfg_env" ]; then
             DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
         else
-            # XXX: enabling config causes the test applications crash on MacOS.
-            # disabled config for now
-            # RETRACE_CONFIG="$cfg_env" DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
-            DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
+	    RETRACE_CONFIG="$cfg_env" DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
         fi
     else
         readonly lib="libretrace.so"
