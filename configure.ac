@@ -125,6 +125,7 @@ AC_ARG_WITH([openssl], AS_HELP_STRING(--with-openssl=PATH, base of OpenSSL insta
      CFLAGS="-I$with_openssl/include $CFLAGS"
      CPPFLAGS="-I$with_openssl/include $CPPFLAGS"
      LIBSSL_FLAGS="-I$with_openssl/include"
+     LDFLAGS="-L$with_openssl/lib"
      AC_CHECK_HEADERS([openssl/ssl.h], [openssl=true], [AC_MSG_NOTICE([OpenSSL not found, OpenSSL support disabled])])
      AC_SUBST(LIBSSL_FLAGS)
      CFLAGS=$SAVE_CFLAGS
