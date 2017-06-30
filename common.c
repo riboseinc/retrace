@@ -735,7 +735,7 @@ get_config() {
 			break;
 
 		pentry->nargs = 0;
-		for (p = real_strchr(pentry->line, ','); p; p = strchr(++p, ',')) {
+		for (p = real_strchr(pentry->line, ','); p; p = real_strchr(++p, ',')) {
 			*p = '\0';
 			++pentry->nargs;
 		}
