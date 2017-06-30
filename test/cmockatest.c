@@ -35,6 +35,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <string.h>
+#include <sys/mman.h>
 
 #include <cmocka.h>
 
@@ -464,6 +465,45 @@ RTR_TEST_START(calloc)
 	p = rtr_calloc(1, RTR_MALLOC_SIZE);
 	assert_non_null(p);
 RTR_TEST_END
+
+RTR_TEST_START(mmap)
+	void *p;
+
+	p = rtr_mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	assert_non_null(p);
+RTR_TEST_END
+
+RTR_TEST_START(munmap)
+	void *p;
+
+	p = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	assert_non_null(p);
+
+	rtr_munmap(p, sizeof(int));
+RTR_TEST_END
+
+#ifndef __APPLE__
+
+RTR_TEST_START(brk)
+	void *p, *q;
+
+	p = sbrk(0);
+	q = sbrk(1024);
+
+	assert_ptr_equal(p, q);
+	assert_non_null(q);
+
+	rtr_brk(q);
+RTR_TEST_END
+
+RTR_TEST_START(sbrk)
+	void *p;
+
+	p = rtr_sbrk(0);
+	assert_non_null(p);
+RTR_TEST_END
+
+#endif
 
 RTR_TEST_START(fork)
 	pid_t pid, parent;
@@ -1022,8 +1062,17 @@ main(void)
 		cmocka_unit_test(test_rtr_strchr),
 		cmocka_unit_test(test_rtr_strlen),   cmocka_unit_test(test_rtr_ctime),
 		cmocka_unit_test(test_rtr_ctime_r),  cmocka_unit_test(test_rtr_read),
-		cmocka_unit_test(test_rtr_write),    cmocka_unit_test(test_rtr_malloc),
-		cmocka_unit_test(test_rtr_free),     cmocka_unit_test(test_rtr_fork),
+		cmocka_unit_test(test_rtr_write),
+
+		cmocka_unit_test(test_rtr_malloc),   cmocka_unit_test(test_rtr_free),
+		cmocka_unit_test(test_rtr_realloc),  cmocka_unit_test(test_rtr_calloc),
+		cmocka_unit_test(test_rtr_mmap),     cmocka_unit_test(test_rtr_munmap),
+
+#ifndef __APPLE__
+		cmocka_unit_test(test_rtr_brk),      cmocka_unit_test(test_rtr_sbrk),
+#endif
+
+		cmocka_unit_test(test_rtr_fork),
 		cmocka_unit_test(test_rtr_popen),    cmocka_unit_test(test_rtr_pclose),
 		cmocka_unit_test(test_rtr_pipe),     cmocka_unit_test(test_rtr_pipe2),
 		cmocka_unit_test(test_trace_printf), cmocka_unit_test(test_trace_printf_str),

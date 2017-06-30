@@ -50,6 +50,7 @@
 #include <dirent.h>
 #include <sys/uio.h>
 #include <sys/utsname.h>
+#include <execinfo.h>
 
 #include "str.h"
 #include "id.h"
@@ -92,6 +93,9 @@ static int g_enable_tracing = RTR_TRACE_ENABLED;
 static pthread_key_t g_enable_tracing_key = -1;
 static pthread_once_t tracing_key_once = PTHREAD_ONCE_INIT;
 
+static int g_init_rand;
+static unsigned int g_rand_seed;
+
 /*
  * Global list of file descriptors so we can track
  * their usage across different functions
@@ -113,6 +117,12 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		break;
 	case PARAMETER_TYPE_UINT:
 		trace_printf(0, "%u", *((unsigned int *) *value));
+		break;
+	case PARAMETER_TYPE_LONG:
+		trace_printf(0, "%ld", *((long *) *value));
+		break;
+	case PARAMETER_TYPE_ULONG:
+		trace_printf(0, "%lu", *((unsigned long *) *value));
 		break;
 	case PARAMETER_TYPE_FLOAT:
 		trace_printf(0, "%f", *((float *) *value));
@@ -668,12 +678,12 @@ get_config_file()
 			char *file_path_user;
 			char *file_name_user = ".retrace.conf";
 
-			file_path_user = (char *)real_malloc(strlen(file_path) + strlen(file_name_user) + 2);
+			file_path_user = (char *)real_malloc(real_strlen(file_path) + real_strlen(file_name_user) + 2);
 
 			if (file_path_user) {
-				strcpy(file_path_user, file_path);
-				strcat(file_path_user, "/");
-				strcat(file_path_user, file_name_user);
+				real_strcpy(file_path_user, file_path);
+				real_strcat(file_path_user, "/");
+				real_strcat(file_path_user, file_name_user);
 
 				config_file = real_fopen(file_path_user, "r");
 
@@ -811,6 +821,9 @@ rtr_parse_config(const struct config_entry **pentry,
 				case ARGUMENT_TYPE_DOUBLE:
 					*((double *)pvar) = atof(parg);
 					break;
+				case ARGUMENT_TYPE_UINT:
+					*((unsigned int *)pvar) = (unsigned int)strtoul(parg, NULL, 0);
+					break;
 				}
 			}
 			retval = 1;
@@ -865,7 +878,7 @@ descriptor_info_new(int fd, unsigned int type, const char *location, int port)
 
 	old_trace_state = trace_disable();
 
-	di = (struct descriptor_info *) malloc(sizeof(struct descriptor_info));
+	di = (struct descriptor_info *) real_malloc(sizeof(struct descriptor_info));
 
 	if (di) {
 		di->fd = fd;
@@ -918,7 +931,7 @@ file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 
 	if (g_descriptor_list == NULL) {
 		g_descriptor_list_size = DESCRIPTOR_LIST_INITIAL_SIZE;
-		g_descriptor_list = (struct descriptor_info **)malloc(
+		g_descriptor_list = (struct descriptor_info **)real_malloc(
 		  DESCRIPTOR_LIST_INITIAL_SIZE * sizeof(struct descriptor_info *));
 
 		memset(g_descriptor_list,
@@ -1087,4 +1100,82 @@ trace_mode(mode_t mode, char *p)
 	}
 
 	*p = '\0';
+}
+
+/* printf backtrace callback */
+void trace_printf_backtrace(void)
+{
+	void *callstack[128];
+	int old_trace_state;
+
+	/* check tracing has enabled to avoid infinite loop, because backtrace() uses malloc() function */
+	if (!get_tracing_enabled())
+		return;
+
+	old_trace_state = trace_disable();
+
+	int i, frames = backtrace(callstack, 128);
+	char **strs = backtrace_symbols(callstack, frames);
+
+	if (strs != NULL) {
+		printf("%s======== begin callstack =========\n", INF);
+		for (i = 2; i < frames; ++i)
+			printf("%s\n", strs[i]);
+		printf("======== end callstack =========%s\n", RST);
+
+		real_free(strs);
+	}
+
+	trace_restore(old_trace_state);
+}
+
+/* get fuzzing flag by caculating fail status randomly */
+int
+rtr_get_fuzzing_flag(double fail_rate, unsigned int *pseed)
+{
+	long int random_value;
+
+	if (!g_init_rand) {
+		g_rand_seed = *pseed > 0 ? *pseed : time(NULL);
+
+		srand(g_rand_seed);
+		g_init_rand = 1;
+	}
+
+	/* set seed value */
+	if (*pseed == 0)
+		*pseed = g_rand_seed;
+
+	random_value = rand();
+	if (random_value <= (RAND_MAX * fail_rate))
+		return 1;
+
+	return 0;
+}
+
+/* get string from type value */
+void
+rtr_get_type_string(int type, const struct ts_info *ts_info, char *str, size_t size)
+{
+	const struct ts_info *p;
+	size_t str_len = 0;
+
+	/* init result string */
+	memset(str, 0, size);
+
+	for (p = ts_info; p->str != NULL; p++) {
+		if ((p->type & type) != p->type)
+			continue;
+
+		if ((str_len + real_strlen(p->str) + 2) > size)
+			break;
+
+		if (str_len > 0) {
+			real_strcat(str + str_len, "|");
+			str_len++;
+		}
+
+		real_strcpy(str + str_len, p->str);
+		str_len += real_strlen(p->str);
+	}
 }
