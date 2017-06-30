@@ -138,7 +138,7 @@ AC_ARG_WITH([openssl], AS_HELP_STRING(--with-openssl=PATH, base of OpenSSL insta
   ]
 )
 
-AM_CONDITIONAL(OPENSSL, [test "$openssl" = "xtrue"])
+AM_CONDITIONAL(OPENSSL, [test "x$openssl" = "xtrue"])
 if test "x$openssl" = "xtrue" ; then
     AC_DEFINE(USE_OPENSSL, [1], [Define to use OpenSSL])
 else
