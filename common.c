@@ -1114,8 +1114,10 @@ void trace_printf_backtrace(void)
 	char **strs = backtrace_symbols(callstack, frames);
 
 	if (strs != NULL) {
+		printf("%s======== begin callstack =========\n", INF);
 		for (i = 2; i < frames; ++i)
 			printf("%s\n", strs[i]);
+		printf("======== end callstack =========%s\n", RST);
 
 		real_free(strs);
 	}
