@@ -114,12 +114,12 @@ rtr_##func##_t real_##func = func;
 
 #else /* !__OpenBSD */
 
-extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
+__attribute__((regparm (3))) extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
 
 #ifdef HAVE_ATOMIC_BUILTINS
 
 #define RETRACE_FIXUP(func) __atomic_store_n(&real_##func,		\
-	_dl_sym(RTLD_NEXT, #func, __func__), __ATOMIC_RELAXED)		\
+	_dl_sym(RTLD_NEXT, #func, rtr_fixup_##func), __ATOMIC_RELAXED)	\
 
 #else /* !HAVE_ATOMIC_BUILTINS */
 
