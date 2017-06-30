@@ -38,6 +38,7 @@ int RETRACE_IMPLEMENTATION(pipe)(int pipefd[2])
 	int ret = 0;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "pipe";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -68,6 +69,7 @@ int RETRACE_IMPLEMENTATION(pipe2)(int pipefd[2], int flags)
 	int ret;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "pipe2";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

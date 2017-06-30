@@ -44,6 +44,7 @@ RETRACE_IMPLEMENTATION(scanf)(const char *format, ...)
 
 	va_start(ap, format);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "scanf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -78,6 +79,7 @@ RETRACE_IMPLEMENTATION(fscanf)(FILE *stream, const char *format, ...)
 
 	va_start(ap, format);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fscanf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -112,6 +114,7 @@ RETRACE_IMPLEMENTATION(sscanf)(const char *str, const char *format, ...)
 
 	va_start(ap, format);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sscanf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -144,6 +147,7 @@ RETRACE_IMPLEMENTATION(vscanf)(const char *format, va_list ap)
 
 	__va_copy(ap1, ap);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vscanf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -176,6 +180,7 @@ RETRACE_IMPLEMENTATION(vsscanf)(const char *str, const char *format, va_list ap)
 
 	__va_copy(ap1, ap);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vsscanf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -210,6 +215,7 @@ RETRACE_IMPLEMENTATION(vfscanf)(FILE *stream, const char *format, va_list ap)
 
 	__va_copy(ap1, ap);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vfscanf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

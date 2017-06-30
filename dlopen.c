@@ -34,6 +34,7 @@ void *RETRACE_IMPLEMENTATION(dlopen)(const char *filename, int flag)
 	void *r = NULL;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dlopen";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -59,6 +60,7 @@ char *RETRACE_IMPLEMENTATION(dlerror)(void)
 	char *r = NULL;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dlerror";
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_STRING;
@@ -85,6 +87,7 @@ void *RETRACE_IMPLEMENTATION(dlsym)(void *handle, const char *symbol)
 	void *r = NULL;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dlsym";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -112,6 +115,7 @@ int RETRACE_IMPLEMENTATION(dlclose)(void *handle)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dlclose";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

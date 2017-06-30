@@ -41,10 +41,9 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 	void *p = NULL;
 
 	double fail_chance = 0;
-	unsigned int seed_val;
-
 	int redirect = 0;
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "malloc";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -53,23 +52,23 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END,
-		&fail_chance, &seed_val) &&
-		rtr_get_fuzzing_flag(fail_chance, &seed_val)) {
+	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance) &&
+		rtr_get_fuzzing_flag(fail_chance)) {
 		/* set errno as ENOMEM */
 		errno = ENOMEM;
 		redirect = 1;
+		event_info.extra_info = "redirected : NULL";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 	}
 
 	if (!redirect)
 		p = real_malloc(bytes);
 
-	retrace_log_and_redirect_after(&event_info);
-
 	if (redirect) {
-		trace_printf(1, "malloc(%lu) => [redirected : NULL], seed : %d\n", bytes, seed_val);
 		trace_printf_backtrace();
 	}
+
+	retrace_log_and_redirect_after(&event_info);
 
 	return p;
 }
@@ -82,6 +81,7 @@ void RETRACE_IMPLEMENTATION(free)(void *mem)
 	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&mem};
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "free";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -104,9 +104,9 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 	void *p = NULL;
 
 	double fail_chance = 0;
-	unsigned int seed_val;
 	int redirect = 0;
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "calloc";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -115,12 +115,13 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END,
-		&fail_chance, &seed_val) &&
-		rtr_get_fuzzing_flag(fail_chance, &seed_val)) {
+	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance) &&
+		rtr_get_fuzzing_flag(fail_chance)) {
 		/* set errno as ENOMEM */
 		errno = ENOMEM;
 		redirect = 1;
+		event_info.extra_info = "redirected : NULL";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 	}
 
 	if (!redirect)
@@ -128,10 +129,8 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 
 	retrace_log_and_redirect_after(&event_info);
 
-	if (redirect) {
-		trace_printf(1, "calloc(%lu, %lu) => [redirected : NULL], seed : %d\n", nmemb, size, seed_val);
+	if (redirect)
 		trace_printf_backtrace();
-	}
 
 	return p;
 }
@@ -147,9 +146,9 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 	void *p = NULL;
 
 	double fail_chance;
-	unsigned int seed_val;
 	int redirect = 0;
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "realloc";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -158,12 +157,13 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 
 	retrace_log_and_redirect_before(&event_info);
 
-	if (size > 0 && rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END,
-		&fail_chance, &seed_val) &&
-		rtr_get_fuzzing_flag(fail_chance, &seed_val)) {
+	if (size > 0 && rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance) &&
+		rtr_get_fuzzing_flag(fail_chance)) {
 		/* set errno as ENOMEM */
 		errno = ENOMEM;
 		redirect = 1;
+		event_info.extra_info = "redirected : NULL";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 	}
 
 	if (!redirect)
@@ -171,10 +171,8 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 
 	retrace_log_and_redirect_after(&event_info);
 
-	if (redirect) {
-		trace_printf(1, "realloc(%p, %lu) => [redirected : NULL], seed : %d\n", ptr, size, seed_val);
+	if (redirect)
 		trace_printf_backtrace();
-	}
 
 	return p;
 }
@@ -214,7 +212,6 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 	void *p = (void *) -1;
 
 	double fail_chance = 0;
-	unsigned int seed_val;
 	int redirect = 0;
 
 	char prot_str[RTR_MMAP_MAX_PROT_STRLEN + 1];
@@ -227,6 +224,7 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 
 	rtr_get_type_string(flags, mmap_flags_ts, flags_str, sizeof(flags_str));
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "mmap";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -236,12 +234,13 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 	retrace_log_and_redirect_before(&event_info);
 
 	/* mmap fuzzing */
-	if ((flags & MAP_ANONYMOUS) && rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END,
-		&fail_chance, &seed_val) &&
-		rtr_get_fuzzing_flag(fail_chance, &seed_val)) {
+	if ((flags & MAP_ANONYMOUS) && rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance) &&
+		rtr_get_fuzzing_flag(fail_chance)) {
 		/* set errno as ENOMEM */
 		errno = ENOMEM;
 		redirect = 1;
+		event_info.extra_info = "redirected : (void *) -1";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 	}
 
 	if (!redirect)
@@ -249,11 +248,8 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 
 	retrace_log_and_redirect_after(&event_info);
 
-	if (redirect) {
-		trace_printf(1, "mmap(%p, %d, %s, %s, %d, %lu) => [redirected : (void *) -1], seed : %d\n",
-			addr, length, prot_str, flags_str, fd, offset, seed_val);
+	if (redirect)
 		trace_printf_backtrace();
-	}
 
 	return p;
 }
@@ -266,9 +262,9 @@ int RETRACE_IMPLEMENTATION(munmap)(void *addr, size_t length)
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&addr, &length};
-
 	int ret;
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "munmap";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -297,9 +293,9 @@ int RETRACE_IMPLEMENTATION(brk)(void *addr)
 	int ret = -1;
 
 	double fail_chance = 0;
-	unsigned int seed_val;
 	int redirect = 0;
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "brk";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -309,12 +305,13 @@ int RETRACE_IMPLEMENTATION(brk)(void *addr)
 	retrace_log_and_redirect_before(&event_info);
 
 	/* brk fuzzing */
-	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END,
-		&fail_chance, &seed_val) &&
-		rtr_get_fuzzing_flag(fail_chance, &seed_val)) {
+	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance) &&
+		rtr_get_fuzzing_flag(fail_chance)) {
 		/* set errno as ENOMEM */
 		errno = ENOMEM;
 		redirect = 1;
+		event_info.extra_info = "redirected : -1";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 	}
 
 	if (!redirect)
@@ -322,10 +319,8 @@ int RETRACE_IMPLEMENTATION(brk)(void *addr)
 
 	retrace_log_and_redirect_after(&event_info);
 
-	if (redirect) {
-		trace_printf(1, "brk(%p) => [redirected : -1], seed : %p\n", addr, seed_val);
+	if (redirect)
 		trace_printf_backtrace();
-	}
 
 	return ret;
 }
@@ -341,9 +336,9 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 	void *p = (void *) -1;
 
 	double fail_chance = 0;
-	unsigned int seed_val;
 	int redirect = 0;
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sbrk";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -353,12 +348,13 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 	retrace_log_and_redirect_before(&event_info);
 
 	/* sbrk fuzzing */
-	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END,
-		&fail_chance, &seed_val) &&
-		rtr_get_fuzzing_flag(fail_chance, &seed_val)) {
+	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END, &fail_chance) &&
+		rtr_get_fuzzing_flag(fail_chance)) {
 		/* set errno as ENOMEM */
 		errno = ENOMEM;
 		redirect = 1;
+		event_info.extra_info = "redirected : (void *) -1";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 	}
 
 	if (!redirect)
@@ -366,10 +362,8 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 
 	retrace_log_and_redirect_after(&event_info);
 
-	if (redirect) {
-		trace_printf(1, "sbrk(%lu) => [redirected : (void *) -1], seed : %d\n", increment, seed_val);
+	if (redirect)
 		trace_printf_backtrace();
-	}
 
 	return p;
 }

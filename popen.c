@@ -35,6 +35,7 @@ FILE *RETRACE_IMPLEMENTATION(popen)(const char *command, const char *type)
 	FILE *ret;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "popen";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -61,6 +62,7 @@ int RETRACE_IMPLEMENTATION(pclose)(FILE *stream)
 	int ret;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "pclose";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

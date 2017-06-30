@@ -42,6 +42,7 @@ int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
 
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "socket";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -75,6 +76,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 	int ret;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "connect";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -195,6 +197,7 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 	void const *parameter_values[] = {&fd, &address, &len};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "bind";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -256,6 +259,7 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 	socklen_t local_len = 0;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "accept";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -316,6 +320,7 @@ int RETRACE_IMPLEMENTATION(setsockopt)(int fd, int level, int optname, const voi
 	void const *parameter_values[] = {&fd, &level, &optname, &optval, &optlen};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "setsockopt";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -344,6 +349,7 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 	void const *parameter_values[] = {&sockfd, &len, &buf, &len, &flags};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "send";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -378,6 +384,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 	void const *parameter_values[] = {&sockfd, &len, &buf, &len, &flags, &dest_addr, &addrlen};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sendto";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -433,6 +440,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 	void const *parameter_values[] = {&sockfd, &msg, &msg->msg_iovlen, &msg->msg_iov, &flags};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sendmsg";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -469,6 +477,7 @@ ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flag
 	void const *parameter_values[] = {&sockfd, &recv_len, &buf, &len, &flags};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "recv";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

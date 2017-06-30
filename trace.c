@@ -72,6 +72,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	void const *parameter_values[] = {&request, &request_str, &pid, &addr, &data};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "ptrace";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

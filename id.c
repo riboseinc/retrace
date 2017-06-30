@@ -36,6 +36,7 @@ int RETRACE_IMPLEMENTATION(setuid)(uid_t uid)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "setuid";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
@@ -60,6 +61,7 @@ int RETRACE_IMPLEMENTATION(seteuid)(uid_t uid)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "seteuid";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
@@ -84,6 +86,7 @@ int RETRACE_IMPLEMENTATION(setgid)(gid_t gid)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "setgid";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
@@ -108,6 +111,7 @@ gid_t RETRACE_IMPLEMENTATION(getgid)()
 	int gid;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getgid";
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
@@ -131,6 +135,7 @@ gid_t RETRACE_IMPLEMENTATION(getegid)()
 	int egid;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getegid";
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
@@ -161,6 +166,7 @@ uid_t RETRACE_IMPLEMENTATION(getuid)()
 	}
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getuid";
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
@@ -192,6 +198,7 @@ uid_t RETRACE_IMPLEMENTATION(geteuid)()
 	}
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "geteuid";
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
@@ -214,6 +221,7 @@ pid_t RETRACE_IMPLEMENTATION(getpid)()
 	int pid;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getpid";
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
@@ -237,6 +245,7 @@ pid_t RETRACE_IMPLEMENTATION(getppid)()
 	int ppid;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getppid";
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;

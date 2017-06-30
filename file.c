@@ -85,6 +85,7 @@ int RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode)
 	trace_mode(mode, perm);
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "chmod";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -113,6 +114,7 @@ int RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
 	trace_mode(mode, perm);
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fchmod";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -137,6 +139,7 @@ int RETRACE_IMPLEMENTATION(fileno)(FILE *stream)
 	int fd;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fileno";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -171,6 +174,7 @@ int RETRACE_IMPLEMENTATION(fseek)(FILE *stream, long offset, int whence)
 		operation = "UNDEFINED";
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fseek";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -199,6 +203,7 @@ int RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
 		fd = real_fileno(stream);
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fclose";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -230,6 +235,7 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 	void const *parameter_values[] = {&file, &mode};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fopen";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -289,6 +295,7 @@ int RETRACE_IMPLEMENTATION(close)(int fd)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "close";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -315,6 +322,7 @@ int RETRACE_IMPLEMENTATION(dup)(int oldfd)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dup";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -339,6 +347,7 @@ int RETRACE_IMPLEMENTATION(dup2)(int oldfd, int newfd)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dup2";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -363,6 +372,7 @@ mode_t RETRACE_IMPLEMENTATION(umask)(mode_t mask)
 	mode_t old_mask;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "umask";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -387,6 +397,7 @@ int RETRACE_IMPLEMENTATION(mkfifo)(const char *pathname, mode_t mode)
 	int ret;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "mkfifo";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -426,6 +437,7 @@ open_v(const char *pathname, int flags, va_list ap)
 		mode = va_arg(ap, int);
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "open";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -472,6 +484,7 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 	struct descriptor_info *di = NULL;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fwrite";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -496,6 +509,7 @@ size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE 
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fread";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -520,6 +534,7 @@ int RETRACE_IMPLEMENTATION(fputc)(int c, FILE *stream)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fputc";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -544,6 +559,7 @@ int RETRACE_IMPLEMENTATION(fputs)(const char *s, FILE *stream)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fputs";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -568,6 +584,7 @@ int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fgetc";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -591,6 +608,7 @@ void RETRACE_IMPLEMENTATION(strmode)(int mode, char *bp)
 	void const *parameter_values[] = {&mode, &bp};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strmode";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

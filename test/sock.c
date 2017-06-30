@@ -47,6 +47,7 @@ static int test_inet(void)
 	int sockfd = 0;
 	struct sockaddr_in serv_addr;
 	const char *sendstr = "Retrace Test";
+	char buf[1024];
 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0) {
@@ -72,7 +73,7 @@ static int test_inet(void)
 	}
 
 	write(sockfd, sendstr, strlen(sendstr));
-	read(sockfd, sendstr, strlen(sendstr));
+	read(sockfd, buf, strlen(sendstr));
 	close(sockfd);
 
 	return 0;

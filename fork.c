@@ -33,6 +33,7 @@ pid_t RETRACE_IMPLEMENTATION(fork)(void)
 	pid_t p;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fork";
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;

@@ -116,6 +116,7 @@ int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
 	void const *parameter_values[] = {&ssl, &num, &buf, &num};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_write";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -142,6 +143,7 @@ int RETRACE_IMPLEMENTATION(SSL_read)(SSL *ssl, void *buf, int num)
 	void const *parameter_values[] = {&ssl, &r, &buf, &num};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_read";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -168,6 +170,7 @@ int RETRACE_IMPLEMENTATION(SSL_connect)(SSL *ssl)
 	void const *parameter_values[] = {&ssl};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_connect";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -194,6 +197,7 @@ int RETRACE_IMPLEMENTATION(SSL_accept)(SSL *ssl)
 	void const *parameter_values[] = {&ssl};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_accept";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -221,6 +225,7 @@ RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
 	void const *parameter_values[] = {&ssl};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_get_verify_result";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -573,6 +578,7 @@ long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 	}
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "BIO_ctrl";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

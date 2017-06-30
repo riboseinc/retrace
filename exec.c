@@ -36,6 +36,7 @@ int RETRACE_IMPLEMENTATION(system)(const char *command)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "system";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -77,6 +78,7 @@ execl_v(const char *path, const char *arg0, va_list ap)
 	trace_restore(old_trace_state);
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execl";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -114,6 +116,7 @@ int RETRACE_IMPLEMENTATION(execv)(const char *path, char *const argv[])
 	void const *parameter_values[] = {&path, &argv};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execv";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -161,6 +164,7 @@ execle_v(const char *path, const char *arg0, va_list ap)
 	trace_restore(old_trace_state);
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execle";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -200,6 +204,7 @@ int RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *c
 	void const *parameter_values[] = {&path, &argv, &envp};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execve";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -265,6 +270,7 @@ int RETRACE_IMPLEMENTATION(execvp)(const char *file, char *const argv[])
 	void const *parameter_values[] = {&file, &argv};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execvp";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -291,6 +297,7 @@ int RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *
 	void const *parameter_values[] = {&file, &argv, &envp};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execvpe";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -322,6 +329,7 @@ int RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname,
 	void const *parameter_values[] = {&dirfd, &pathname, &argv, &envp, &flags};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execveat";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -350,6 +358,7 @@ int RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp
 	void const *parameter_values[] = {&fd, &argv, &envp};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fexecve";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

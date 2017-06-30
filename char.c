@@ -46,6 +46,7 @@ RETRACE_IMPLEMENTATION(putc)(int c, FILE *stream)
 	int r = 0;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "putc";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -73,6 +74,7 @@ RETRACE_IMPLEMENTATION(_IO_putc)(int c, FILE *stream)
 	int r = 0;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "_IO_putc";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -100,6 +102,7 @@ RETRACE_IMPLEMENTATION(toupper)(int c)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "toupper";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -126,6 +129,7 @@ RETRACE_IMPLEMENTATION(tolower)(int c)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "tolower";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
