@@ -1,4 +1,4 @@
-AM_CFLAGS = $(TESTS_CFLAGS)
+AM_CFLAGS = $(TESTS_CFLAGS) -g
 
 dist_check_SCRIPTS = runtests.sh
 noinst_PROGRAMS =

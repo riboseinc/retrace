@@ -50,6 +50,7 @@
 #include <dirent.h>
 #include <sys/uio.h>
 #include <sys/utsname.h>
+#include <execinfo.h>
 
 #include "str.h"
 #include "id.h"
@@ -677,12 +678,12 @@ get_config_file()
 			char *file_path_user;
 			char *file_name_user = ".retrace.conf";
 
-			file_path_user = (char *)real_malloc(strlen(file_path) + strlen(file_name_user) + 2);
+			file_path_user = (char *)real_malloc(real_strlen(file_path) + real_strlen(file_name_user) + 2);
 
 			if (file_path_user) {
-				strcpy(file_path_user, file_path);
-				strcat(file_path_user, "/");
-				strcat(file_path_user, file_name_user);
+				real_strcpy(file_path_user, file_path);
+				real_strcat(file_path_user, "/");
+				real_strcat(file_path_user, file_name_user);
 
 				config_file = real_fopen(file_path_user, "r");
 
@@ -877,7 +878,7 @@ descriptor_info_new(int fd, unsigned int type, const char *location, int port)
 
 	old_trace_state = trace_disable();
 
-	di = (struct descriptor_info *) malloc(sizeof(struct descriptor_info));
+	di = (struct descriptor_info *) real_malloc(sizeof(struct descriptor_info));
 
 	if (di) {
 		di->fd = fd;
@@ -930,7 +931,7 @@ file_descriptor_add(int fd, unsigned int type, const char *location, int port)
 
 	if (g_descriptor_list == NULL) {
 		g_descriptor_list_size = DESCRIPTOR_LIST_INITIAL_SIZE;
-		g_descriptor_list = (struct descriptor_info **)malloc(
+		g_descriptor_list = (struct descriptor_info **)real_malloc(
 		  DESCRIPTOR_LIST_INITIAL_SIZE * sizeof(struct descriptor_info *));
 
 		memset(g_descriptor_list,
@@ -1099,6 +1100,27 @@ trace_mode(mode_t mode, char *p)
 	}
 
 	*p = '\0';
+}
+
+/* printf backtrace callback */
+void trace_printf_backtrace(void)
+{
+	void *callstack[128];
+	int old_trace_state;
+
+	old_trace_state = trace_disable();
+
+	int i, frames = backtrace(callstack, 128);
+	char **strs = backtrace_symbols(callstack, frames);
+
+	if (strs != NULL) {
+		for (i = 2; i < frames; ++i)
+			printf("%s\n", strs[i]);
+
+		real_free(strs);
+	}
+
+	trace_restore(old_trace_state);
 }
 
 /* get fuzzing flag by caculating fail status randomly */

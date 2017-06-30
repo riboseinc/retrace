@@ -50,6 +50,7 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &p;
+
 	retrace_log_and_redirect_before(&event_info);
 
 	if (rtr_get_config_single("memoryfuzzing", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END,
@@ -64,6 +65,11 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 		p = real_malloc(bytes);
 
 	retrace_log_and_redirect_after(&event_info);
+
+	if (redirect) {
+		trace_printf(1, "malloc(%lu) => [redirected : NULL], seed : %d\n", bytes, seed_val);
+		trace_printf_backtrace();
+	}
 
 	return p;
 }
@@ -86,7 +92,6 @@ void RETRACE_IMPLEMENTATION(free)(void *mem)
 	real_free(mem);
 
 	retrace_log_and_redirect_after(&event_info);
-
 }
 
 RETRACE_REPLACE(free, void, (void *mem), (mem))
@@ -122,6 +127,11 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 		p = real_calloc(nmemb, size);
 
 	retrace_log_and_redirect_after(&event_info);
+
+	if (redirect) {
+		trace_printf(1, "calloc(%lu, %lu) => [redirected : NULL], seed : %d\n", nmemb, size, seed_val);
+		trace_printf_backtrace();
+	}
 
 	return p;
 }
@@ -161,6 +171,11 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 
 	retrace_log_and_redirect_after(&event_info);
 
+	if (redirect) {
+		trace_printf(1, "realloc(%p, %lu) => [redirected : NULL], seed : %d\n", ptr, size, seed_val);
+		trace_printf_backtrace();
+	}
+
 	return p;
 }
 
@@ -196,13 +211,12 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 		PARAMETER_TYPE_INT, PARAMETER_TYPE_LONG, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&addr, &length, &prot, &flags, &fd, &offset};
 
-	void *p = NULL;
+	void *p = (void *) -1;
 
 	double fail_chance = 0;
 	unsigned int seed_val;
 	int redirect = 0;
 
-#if 0	/* leave it for future implementation, because current logging doesn't support it */
 	char prot_str[RTR_MMAP_MAX_PROT_STRLEN + 1];
 	char flags_str[RTR_MMAP_MAX_FLAGS_STRLEN + 1];
 
@@ -212,7 +226,6 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 		real_strcpy(prot_str, "PROT_NONE");
 
 	rtr_get_type_string(flags, mmap_flags_ts, flags_str, sizeof(flags_str));
-#endif
 
 	event_info.function_name = "mmap";
 	event_info.parameter_types = parameter_types;
@@ -235,6 +248,12 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 		p = real_mmap(addr, length, prot, flags, fd, offset);
 
 	retrace_log_and_redirect_after(&event_info);
+
+	if (redirect) {
+		trace_printf(1, "mmap(%p, %d, %s, %s, %d, %lu) => [redirected : (void *) -1], seed : %d\n",
+			addr, length, prot_str, flags_str, fd, offset, seed_val);
+		trace_printf_backtrace();
+	}
 
 	return p;
 }
@@ -303,6 +322,11 @@ int RETRACE_IMPLEMENTATION(brk)(void *addr)
 
 	retrace_log_and_redirect_after(&event_info);
 
+	if (redirect) {
+		trace_printf(1, "brk(%p) => [redirected : -1], seed : %p\n", addr, seed_val);
+		trace_printf_backtrace();
+	}
+
 	return ret;
 }
 
@@ -314,7 +338,7 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&increment};
 
-	void *p = NULL;
+	void *p = (void *) -1;
 
 	double fail_chance = 0;
 	unsigned int seed_val;
@@ -341,6 +365,11 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 		p = real_sbrk(increment);
 
 	retrace_log_and_redirect_after(&event_info);
+
+	if (redirect) {
+		trace_printf(1, "sbrk(%lu) => [redirected : (void *) -1], seed : %d\n", increment, seed_val);
+		trace_printf_backtrace();
+	}
 
 	return p;
 }
