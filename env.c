@@ -38,6 +38,7 @@ int RETRACE_IMPLEMENTATION(unsetenv)(const char *name)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "unsetenv";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -62,6 +63,7 @@ int RETRACE_IMPLEMENTATION(putenv)(char *string)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "putenv";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -86,6 +88,7 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 	char *env = NULL;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getenv";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -112,6 +115,7 @@ int RETRACE_IMPLEMENTATION(uname)(struct utsname *buf)
 	void const *parameter_values[] = {&buf};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "uname";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

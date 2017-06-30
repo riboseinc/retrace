@@ -34,6 +34,7 @@ char *RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
 	char *r = NULL;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "ctime_r";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -58,6 +59,7 @@ char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 	char *r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "ctime";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -97,6 +99,7 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz
 #endif
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "gettimeofday";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

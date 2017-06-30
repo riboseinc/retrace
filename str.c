@@ -37,6 +37,7 @@ char *RETRACE_IMPLEMENTATION(strstr)(const char *s1, const char *s2)
 
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strstr";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -61,6 +62,7 @@ size_t RETRACE_IMPLEMENTATION(strlen)(const char *s)
 	void const *parameter_values[] = {&s};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strlen";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -85,6 +87,7 @@ int RETRACE_IMPLEMENTATION(strncmp)(const char *s1, const char *s2, size_t n)
 	int result;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strncmp";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -109,6 +112,7 @@ int RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 	int result;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strcmp";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -133,6 +137,7 @@ char *RETRACE_IMPLEMENTATION(strncpy)(char *s1, const char *s2, size_t n)
 	char *result = NULL;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strncpy";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -157,6 +162,7 @@ char *RETRACE_IMPLEMENTATION(strcat)(char *s1, const char *s2)
 	char *result = NULL;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strcat";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -181,6 +187,7 @@ char *RETRACE_IMPLEMENTATION(strncat)(char *s1, const char *s2, size_t n)
 	void const *parameter_values[] = {&s1, &s2, &n};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strncat";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -205,6 +212,7 @@ char *RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
 	void const *parameter_values[] = {&s1, &s2};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strcpy";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -229,6 +237,7 @@ char *RETRACE_IMPLEMENTATION(strchr)(const char *s, int c)
 	void const *parameter_values[] = {&s, &c};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strchr";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

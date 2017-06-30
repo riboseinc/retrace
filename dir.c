@@ -34,6 +34,7 @@ DIR *RETRACE_IMPLEMENTATION(opendir)(const char *dirname)
 	DIR *dirp = NULL;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "opendir";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -59,6 +60,7 @@ int RETRACE_IMPLEMENTATION(closedir)(DIR *dirp)
 	int r;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "closedir";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -84,6 +86,7 @@ DIR *RETRACE_IMPLEMENTATION(fdopendir)(int fd)
 	DIR *dirp = NULL;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fdopendir";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -109,6 +112,7 @@ int RETRACE_IMPLEMENTATION(readdir_r)(DIR *dirp, struct dirent *entry, struct di
 	int ret;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "readdir_r";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -136,6 +140,7 @@ long RETRACE_IMPLEMENTATION(telldir)(DIR *dirp)
 	long offset;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "telldir";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -160,6 +165,7 @@ void RETRACE_IMPLEMENTATION(seekdir)(DIR *dirp, long loc)
 	void const *parameter_values[] = {&dirp, &loc};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "seekdir";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -181,6 +187,7 @@ void RETRACE_IMPLEMENTATION(rewinddir)(DIR *dirp)
 	void const *parameter_values[] = {&dirp};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "rewinddir";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -203,6 +210,7 @@ int RETRACE_IMPLEMENTATION(dirfd)(DIR *dirp)
 	int dir_fd;
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dirfd";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

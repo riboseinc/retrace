@@ -423,6 +423,12 @@ retrace_event(struct rtr_event_info *event_info)
 						 &event_info->return_value);
 		}
 
+		if (event_info->extra_info)
+			trace_printf(0, " [%s]", event_info->extra_info);
+
+		if (event_info->event_flags & EVENT_FLAGS_PRINT_RAND_SEED)
+			trace_printf(0, " [fuzzing seed: %u]", g_rand_seed);
+
 		trace_printf(0, "\n");
 
 		/* Give another pass to dump memory buffers in case we have any */
@@ -1140,28 +1146,39 @@ void trace_printf_backtrace(void)
 	trace_restore(old_trace_state);
 }
 
-/* get fuzzing flag by caculating fail status randomly */
-int
-rtr_get_fuzzing_flag(double fail_rate, unsigned int *pseed)
+static void
+rtr_init_random(void)
 {
-	long int random_value;
-
 	if (!g_init_rand) {
-		g_rand_seed = *pseed > 0 ? *pseed : time(NULL);
+		if (!rtr_get_config_single("fuzzingseed", ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END, &g_rand_seed))
+			g_rand_seed = time(NULL);
 
 		srand(g_rand_seed);
 		g_init_rand = 1;
 	}
+}
 
-	/* set seed value */
-	if (*pseed == 0)
-		*pseed = g_rand_seed;
+/* get fuzzing flag by caculating fail status randomly */
+int
+rtr_get_fuzzing_flag(double fail_rate)
+{
+	long int random_value;
+
+	rtr_init_random();
 
 	random_value = rand();
 	if (random_value <= (RAND_MAX * fail_rate))
 		return 1;
 
 	return 0;
+}
+
+int
+rtr_get_fuzzing_random(void)
+{
+	rtr_init_random();
+
+	return rand();
 }
 
 /* get string from type value */

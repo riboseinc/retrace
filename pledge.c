@@ -37,6 +37,7 @@ int RETRACE_IMPLEMENTATION(pledge)(const char *promises, const char *paths[])
 	void const *parameter_values[] = {&promises};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "pledge";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

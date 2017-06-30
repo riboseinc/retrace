@@ -33,6 +33,7 @@ void RETRACE_IMPLEMENTATION(perror)(const char *s)
 	void const *parameter_values[] = {&s};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "perror";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

@@ -41,6 +41,7 @@ RETRACE_IMPLEMENTATION(printf)(const char *fmt, ...)
 
 	va_start(ap, fmt);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "printf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -73,6 +74,7 @@ RETRACE_IMPLEMENTATION(fprintf)(FILE *stream, const char *fmt, ...)
 
 	va_start(ap, fmt);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fprintf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -105,6 +107,7 @@ RETRACE_IMPLEMENTATION(dprintf)(int fd, const char *fmt, ...)
 
 	va_start(ap, fmt);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dprintf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -137,6 +140,7 @@ RETRACE_IMPLEMENTATION(sprintf)(char *str, const char *fmt, ...)
 
 	va_start(ap, fmt);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sprintf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -169,6 +173,7 @@ RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
 
 	va_start(ap, fmt);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "snprintf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -201,6 +206,7 @@ RETRACE_IMPLEMENTATION(vprintf)(const char *fmt, va_list ap)
 
 	__va_copy(ap1, ap);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vprintf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -233,6 +239,7 @@ RETRACE_IMPLEMENTATION(vfprintf)(FILE *stream, const char *fmt, va_list ap)
 
 	__va_copy(ap1, ap);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vfprintf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -265,6 +272,7 @@ RETRACE_IMPLEMENTATION(vdprintf)(int fd, const char *fmt, va_list ap)
 
 	__va_copy(ap1, ap);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vdprintf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -297,6 +305,7 @@ RETRACE_IMPLEMENTATION(vsprintf)(char *str, const char *fmt, va_list ap)
 
 	__va_copy(ap1, ap);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vsprintf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
@@ -329,6 +338,7 @@ RETRACE_IMPLEMENTATION(vsnprintf)(char *str, size_t size, const char *fmt, va_li
 
 	__va_copy(ap1, ap);
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vsnprintf";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;

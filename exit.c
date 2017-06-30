@@ -33,6 +33,7 @@ void RETRACE_IMPLEMENTATION(exit)(int status)
 	void *parameter_values[] = {&status};
 
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "exit";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;

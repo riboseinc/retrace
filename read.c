@@ -33,12 +33,20 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_MEMORY_BUFFER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&fd, &ret, &buf, &nbytes};
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "read";
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
 	retrace_log_and_redirect_before(&event_info);
+
+	if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_END)) {
+		nbytes = rtr_get_fuzzing_random() % nbytes;
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+	}
+
 
 	ret = real_read(fd, buf, nbytes);
 

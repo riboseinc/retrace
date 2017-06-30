@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <string.h>
 
 #define MAXLEN		40
 
@@ -70,6 +71,8 @@
 #define EVENT_TYPE_BEFORE_CALL		0
 #define EVENT_TYPE_AFTER_CALL		1
 
+#define EVENT_FLAGS_PRINT_RAND_SEED	0x00000001
+
 #define GET_PARAMETER_TYPE(param) (param & ~PARAMETER_FLAGS_ALL)
 #define GET_PARAMETER_FLAGS(param) (param & PARAMETER_FLAGS_ALL)
 
@@ -83,6 +86,9 @@ struct rtr_event_info {
 
 	unsigned int return_value_type;
 	void *return_value;
+
+	unsigned int event_flags;
+	char *extra_info;
 };
 
 #define RETRACE_INTERNAL __attribute__((visibility("hidden")))
@@ -192,7 +198,8 @@ struct descriptor_info *file_descriptor_get(int fd);
 void file_descriptor_remove(int fd);
 
 /* get fuzzing flag by caculating fail status randomly */
-int rtr_get_fuzzing_flag(double fail_rate, unsigned int *pseed);
+int rtr_get_fuzzing_flag(double fail_rate);
+int rtr_get_fuzzing_random(void);
 
 /* get string from type */
 void rtr_get_type_string(int type, const struct ts_info *ts_info, char *str, size_t size);
