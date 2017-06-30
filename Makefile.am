@@ -35,7 +35,7 @@ noinst_HEADERS= \
 	write.h
 
 if OPENSSL
-	noinst_HEADERS+= ssl.h
+noinst_HEADERS+= ssl.h
 endif
 
 # include all C files here
@@ -67,7 +67,8 @@ libretrace_la_SOURCES= \
 	write.c
 
 if OPENSSL
-	libretrace_la_SOURCES+= ssl.c
+libretrace_la_SOURCES+= ssl.c
+libretrace_la_LDFLAGS+= -lssl -lcrypto
 endif
 
 
