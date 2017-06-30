@@ -610,7 +610,7 @@ test_trace_printf(void **state)
 static void
 test_trace_printf_str(void **state)
 {
-	void (*trace_printf_str)(const char *);
+	void (*trace_printf_str)(const char *, int len);
 	FILE *oldstderr = stderr;
 	const char snip[] = "[SNIP]";
 	char buf[256];
@@ -626,7 +626,7 @@ test_trace_printf_str(void **state)
 
 	// special characters are handled correctly
 	stderr = fmemopen(buf, 256, "w");
-	trace_printf_str("abc\r\n\tdef");
+	trace_printf_str("abc\r\n\tdef", -1);
 	fclose(stderr);
 	stderr = oldstderr;
 	assert_string_equal(buf,
@@ -634,14 +634,14 @@ test_trace_printf_str(void **state)
 
 	// MAXLEN string is unmodified
 	stderr = fmemopen(buf, 256, "w");
-	trace_printf_str(s);
+	trace_printf_str(s, -1);
 	fclose(stderr);
 	stderr = oldstderr;
 	assert_string_equal(buf, s);
 
 	// MAXLEN+1 string is [SNIP]ped
 	stderr = fmemopen(buf, 256, "w");
-	trace_printf_str(s1);
+	trace_printf_str(s1, -1);
 	fclose(stderr);
 	stderr = oldstderr;
 
