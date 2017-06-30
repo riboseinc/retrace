@@ -1108,6 +1108,10 @@ void trace_printf_backtrace(void)
 	void *callstack[128];
 	int old_trace_state;
 
+	/* check tracing has enabled to avoid infinite loop, because backtrace() uses malloc() function */
+	if (!get_tracing_enabled())
+		return;
+
 	old_trace_state = trace_disable();
 
 	int i, frames = backtrace(callstack, 128);
