@@ -105,9 +105,14 @@ static unsigned int g_rand_seed;
 struct descriptor_info **g_descriptor_list;
 unsigned int g_descriptor_list_size;
 
-void **
+static pthread_mutex_t printing_lock = PTHREAD_MUTEX_INITIALIZER;
+static int is_main_thread(void);
+
+static void **
 retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, void **value)
 {
+	trace_printf(0, VAR);
+
 	switch (type) {
 	case PARAMETER_TYPE_INT:
 		trace_printf(0, "%d", (*(int *) *value));
@@ -135,10 +140,12 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		if (event_type == EVENT_TYPE_BEFORE_CALL && flags & PARAMETER_FLAG_OUTPUT_VARIABLE) {
 			trace_printf(0, "%p", (*(void **) *value));
 		} else {
-			if ((*(char **) *value) != NULL)
+			if ((*(char **) *value) != NULL) {
+				trace_printf(0, "\"");
 				trace_printf_str((*(char **) *value), -1);
-			else
-				trace_printf_str("(nil)", -1);
+				trace_printf(0, "\"");
+			} else
+				trace_printf(0, "(nil)");
 		}
 		break;
 	case PARAMETER_TYPE_STRING_LEN:
@@ -148,7 +155,10 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		len = (*(int *) *value);
 		value++;
 
+		trace_printf(0, "\"");
 		trace_printf_str((*(char **) *value), len);
+		trace_printf(0, "\"");
+
 		break;
 	}
 	case PARAMETER_TYPE_MEMORY_BUFFER:
@@ -173,7 +183,17 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		if (dirp)
 			fd = real_dirfd(dirp);
 
-		trace_printf(0, "%p (fd %d)", dirfd, fd);
+		trace_printf(0, "%p" RST INF " [fd %d]" RST VAR, dirfd, fd);
+
+		if (fd > 0) {
+			struct descriptor_info *di;
+
+			di = file_descriptor_get(fd);
+
+			if (di && di->location)
+				trace_printf(0, RST INF " [%s]" RST VAR, di->location);
+		}
+
 		break;
 	}
 	case PARAMETER_TYPE_FILE_STREAM:
@@ -187,12 +207,12 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		if (stream)
 			fd = real_fileno(stream);
 
-		trace_printf(0, "%p [fd %d]", stream, fd);
+		trace_printf(0, "%p" RST INF " [fd %d]" RST VAR, stream, fd);
 
 		if (fd > 0) {
 			di = file_descriptor_get(fd);
 			if (di && di->location)
-				trace_printf(0, " [%s]", di->location);
+				trace_printf(0, RST INF " [%s]" RST VAR, di->location);
 		}
 
 		break;
@@ -207,7 +227,7 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		if (event_type != EVENT_TYPE_BEFORE_CALL || (flags & PARAMETER_FLAG_OUTPUT_VARIABLE)) {
 			di = file_descriptor_get(fd);
 			if (di && di->location)
-				trace_printf(0, " [%s]", di->location);
+				trace_printf(0, RST INF " [%s]" RST VAR, di->location);
 		}
 
 
@@ -221,12 +241,16 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		char *fmt;
 		va_list *ap;
 		char buf[1024];
+		int old_trace_state;
 
 		fmt = *((char **) *value);
 		value++;
 		ap = (va_list *) *value;
 
+		old_trace_state = trace_disable();
 		real_vsnprintf(buf, 1024, fmt, *ap);
+		trace_restore(old_trace_state);
+
 		trace_printf(0, "\"");
 		trace_printf_str(fmt, -1);
 		trace_printf(0, "\" -> \"");
@@ -309,10 +333,12 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		break;
 	}
 
+	trace_printf(0, RST);
+
 	/* There's a string following this parameter that expands its meaning */
 	if ((flags & PARAMETER_FLAG_STRING_NEXT) == PARAMETER_FLAG_STRING_NEXT) {
 		value++;
-		trace_printf(0, " [%s]", (*(char **) *value));
+		trace_printf(0, INF " [%s]" RST, (*(char **) *value));
 	}
 
 	return value + 1;
@@ -378,6 +404,8 @@ retrace_event(struct rtr_event_info *event_info)
 	if (!get_tracing_enabled())
 		return;
 
+	pthread_mutex_lock(&printing_lock);
+
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		unsigned int *parameter_type;
 		void **parameter_value;
@@ -393,7 +421,7 @@ retrace_event(struct rtr_event_info *event_info)
 			trace_printf(1, "<-: ", event_info->function_name);
 #endif
 
-		trace_printf(0, "%s(", event_info->function_name);
+		trace_printf(1, FUNC "%s" RST "(", event_info->function_name);
 
 		while (GET_PARAMETER_TYPE(*parameter_type) != PARAMETER_TYPE_END) {
 
@@ -445,6 +473,8 @@ retrace_event(struct rtr_event_info *event_info)
 
 		}
 	}
+
+	pthread_mutex_unlock(&printing_lock);
 }
 
 void
@@ -496,8 +526,12 @@ trace_printf(int hdr, const char *fmt, ...)
 
 	old_trace_state = trace_disable();
 
-	if (hdr == 1)
+	if (hdr == 1) {
 		real_fprintf(output_file, "(%d) ", real_getpid());
+
+		if (!is_main_thread())
+			real_fprintf(output_file, "(thread: %u) ", pthread_self());
+	}
 
 	va_start(arglist, fmt);
 	real_vfprintf(output_file, fmt, arglist);

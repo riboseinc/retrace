@@ -21,6 +21,8 @@
 #define INF "\033[31m"  /* ANSI red for information notices */
 #define RST "\033[0m"   /* ANSI white */
 #define BEG "\033[100D" /* ANSI goto 1st char */
+#define FUNC "\033[35m" /* blue for functions */
+#define RET "\033[33m" /* yellow for return value */
 
 #define ARGUMENT_TYPE_END	0
 #define ARGUMENT_TYPE_INT	1
