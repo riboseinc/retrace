@@ -1,0 +1,57 @@
+{{=[[ ]]=}}
+#include "inspect.h"
+#include "shim.h"
+#include "rpc.h"
+#include <string.h>
+
+[[#functions]]
+
+static struct rtr_call_info*
+get_[[name]]_info(struct rpc_[[name]] *call)
+{
+	struct rtr_call_info *ci;
+	struct rtr_arg_info *args;
+	int i;
+	void *data;
+
+	ci = malloc(sizeof(struct rtr_call_info) + ([[paramcount]] + 1) * sizeof(struct rtr_arg_info));
+	ci->args = args = (struct rtr_arg_info *)&ci[1];
+	data = &call[1];
+
+	ci->name = "[[name]]";
+	ci->ctype = "[[type]]";
+	ci->rpctype = [[rpctypenum]];
+	[[^is_void]]
+	*([[rpctype]]*)&(ci->result) = call->rval;
+	[[/is_void]]
+
+	i = 0;
+	[[#params]]
+	args[i].name = "[[name]]";
+	args[i].ctype = "[[type]]";
+	args[i].rpctype = [[rpctypenum]];
+	[[#is_string]]
+	*([[rpctype]]*)&(args[i].value) = data;
+	data += strlen(data) + 1;
+	[[/is_string]]
+	[[^is_string]]
+	*([[rpctype]]*)&(args[i].value) = call->args.[[name]];
+	[[/is_string]]
+	++i;
+	[[/params]]
+	args[i].name = NULL;
+
+	return ci;
+}
+[[/functions]]
+
+struct rtr_call_info *
+rtr_get_call_info(enum rpc_function_id id, void *call)
+{
+	static struct rtr_call_info *(*fn[])(void *) = {
+		[[#functions]]
+		(struct rtr_call_info *(*)(void *))get_[[name]]_info[[^last]],[[/last]]
+		[[/functions]]
+	};
+	return fn[id](call);
+}

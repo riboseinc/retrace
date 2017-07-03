@@ -1,0 +1,33 @@
+{{=[[ ]]=}}
+#ifndef __RTR_SHIM_H__
+#define __RTR_SHIM_H__
+
+#include "../config.h"
+
+[[#headers]]
+#include <[[header]]>
+[[/headers]]
+
+enum rpc_function_id {
+	[[#functions]]
+	[[enum]],
+	[[/functions]]
+};
+[[#functions]]
+
+struct rpc_[[name]] {
+	[[^is_void]]
+	[[rpctype]] rval;
+	[[/is_void]]
+	struct {
+		[[#params]]
+		[[rpctype]][[spacing]][[name]];
+		[[/params]]
+	} args;
+};
+
+typedef [[type]](*rtr_[[name]]_t)([[#params]][[type]][[spacing]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]]);
+extern rtr_[[name]]_t real_[[name]];
+[[/functions]]
+
+#endif

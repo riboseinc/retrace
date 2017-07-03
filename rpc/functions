@@ -1,0 +1,124 @@
+function closedir int
+parameter in dirp DIR *
+
+function dirfd int
+parameter in dirp DIR *
+
+function fclose int
+parameter in stream FILE *
+
+function fdopendir DIR *
+parameter in fd int
+
+function fileno int
+parameter in stream FILE *
+
+function fopen FILE *
+parameter in path const char *
+parameter in mode const char *
+
+function fprintf int
+parameter in stream FILE *
+parameter in format const char *
+variadic real_vfprintf
+
+function free void
+parameter in ptr void *
+
+function getenv char *
+parameter in name const char *
+
+function getpid pid_t
+
+function _IO_putc int
+parameter in c int
+parameter in stream FILE *
+
+function malloc void *
+parameter in size size_t
+
+function realloc void *
+parameter in ptr void *
+parameter in size size_t
+
+function opendir DIR *
+parameter in dir const char *
+
+function putc int
+parameter in c int
+parameter in stream FILE *
+
+function readdir_r int
+parameter in dirp DIR *
+parameter out entry struct dirent *
+parameter out result struct dirent **
+
+function read ssize_t
+parameter in fd int
+parameter out buf void *
+parameter in count size_t
+
+function sprintf int
+parameter out str char *
+parameter in format const char *
+variadic real_vsprintf
+
+function vsprintf int
+parameter out str char *
+parameter in format const char *
+parameter in ap va_list
+
+function sscanf int
+parameter in str const char *
+parameter in format const char *
+variadic vsscanf
+
+function strcat char *
+parameter inout dest char *
+parameter in src const char *
+
+function strchr char *
+parameter in s const char *
+parameter in c int
+
+function strstr char *
+parameter in haystack const char *
+parameter in needle const char *
+
+function strcmp int
+parameter in s1 const char *
+parameter in s2 const char *
+
+function strcpy char *
+parameter out dest char *
+parameter in src const char *
+
+function strlen size_t
+parameter in s const char *
+
+function tolower int
+parameter in c int
+
+function toupper int
+parameter in c int
+
+function vfprintf int
+parameter in stream FILE *
+parameter in format const char *
+parameter in ap va_list
+
+function vsnprintf int
+parameter out str char *
+parameter in size size_t
+parameter in format const char *
+parameter in ap va_list
+
+function vsscanf int
+parameter in str const char *
+parameter in format const char *
+parameter in ap va_list
+
+function write ssize_t
+parameter in fd int
+parameter in buf const void *
+parameter in count size_t

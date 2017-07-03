@@ -2,6 +2,10 @@ ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS= test tools
 
+if RTR_RPC
+SUBDIRS+= rpc
+endif
+
 lib_LTLIBRARIES= libretrace.la
 libretrace_la_LDFLAGS= -no-undefined -avoid-version
 libretrace_la_CFLAGS= $(AM_CFLAGS) $(LIBSSL_FLAGS)
@@ -77,12 +81,12 @@ libretrace_la_SOURCES+= ssl.c
 libretrace_la_LDFLAGS+= -lssl -lcrypto
 endif
 
-
 retrace: retrace.in
 	@sed -e "s|\@libdir\@|$(libdir)|" retrace.in > $@
 	chmod +x $@
 
 dist_bin_SCRIPTS= retrace
 pkgdata_DATA= retrace.conf.example
+
 EXTRA_DIST= retrace.in autogen.sh retrace.conf.example
 CLEANFILES = $(dist_bin_SCRIPTS)

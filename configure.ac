@@ -296,6 +296,18 @@ if test "x$enable_profiling" = "xyes" ; then
     CFLAGS="$CFLAGS -pg"
 fi
 
+AC_MSG_CHECKING(whether to enable rpc)
+AC_ARG_ENABLE(rpc,
+     AS_HELP_STRING(--enable-rpc, turn on rpc (disabled by default)),
+     [], [enable_rpc=no]
+)
+AC_MSG_RESULT($enable_rpc)
+AM_CONDITIONAL([RTR_RPC], [test "x$enable_rpc" = "xyes"])
+if test "x$enable_rpc" = "xyes" ; then
+    AC_DEFINE(RTR_RPC, [1], [Define to use rpc])
+else
+    AC_DEFINE(RTR_RPC, [0], [Define to use rpc])
+fi
 
-AC_CONFIG_FILES([Makefile test/Makefile tools/Makefile tools/stringinjector/Makefile])
+AC_CONFIG_FILES([Makefile test/Makefile rpc/Makefile tools/Makefile tools/stringinjector/Makefile])
 AC_OUTPUT

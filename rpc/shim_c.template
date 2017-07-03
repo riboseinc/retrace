@@ -1,0 +1,152 @@
+{{=[[ ]]=}}
+#include "config.h"
+#include <dlfcn.h>
+#include <sys/socket.h>
+#include "shim.h"
+#include "rpc.h"
+#include <error.h>
+
+static int g_inrpc;
+
+#ifdef __APPLE__
+struct interpose {
+	const void *replacment;
+	const void *replacee;
+};
+#else
+__attribute__((regparm (3))) extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
+#endif
+
+[[#functions]]
+
+static [[type]]
+struct_rpc_[[name]]_to_args(const struct rpc_[[name]] *p[[#params]][[#out]], [[type]] *[[name]][[/out]][[/params]])
+{
+	return [[^is_void]]p->rval[[/is_void]];
+}
+
+static void
+struct_rpc_[[name]]_send(enum rpc_call_type call_type, const struct rpc_[[name]] *p)
+{
+	int extra_size = 0;
+	struct rpc_call_header header = {call_type, [[enum]]};
+	struct iovec iov[] = {
+		{&header, sizeof(struct rpc_call_header)}
+		, {(void *)p, sizeof(struct rpc_[[name]])}
+		[[#params]]
+		[[#is_string]]
+		, {p->args.[[name]], real_strlen(p->args.[[name]]) + 1}
+		[[/is_string]]
+		[[/params]]
+		[[#is_string]]
+		, {p->rval, real_strlen(p->rval) + 1}
+		[[/is_string]]
+	};
+	struct msghdr msg = {NULL, 0, iov, sizeof(iov) / sizeof(struct iovec), NULL, 0, 0};
+
+	[[#params]]
+	[[/params]]
+
+	rpc_send(&msg);
+}
+
+static struct rpc_[[name]] *
+struct_rpc_[[name]]_recv(int *complete)
+{
+	struct rpc_[[name]] p;
+	struct rpc_redirect_header header;
+	struct iovec iov[] = {
+		{&header, sizeof(struct rpc_redirect_header)},
+		{(void *)&p, sizeof(struct rpc_[[name]])}
+	};
+	struct msghdr msg = {NULL, 0, iov, 2, NULL, 0, 0};
+
+	header.redirect = 0;
+	header.complete = 0;
+
+	rpc_recv(&msg);
+	if (header.redirect) {
+	}
+
+	if (complete)
+		*complete = header.complete;
+
+	return NULL;
+}
+
+[[type]]
+#ifdef __APPLE__
+retrace_impl_[[name]]([[#params]][[type]][[spacing]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
+#else
+([[name]])([[#params]][[type]][[spacing]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
+#endif
+{
+	struct rpc_[[name]] in, *pre, real, *post;
+	int complete;
+	[[#variadic]]
+	va_list ap;
+	[[/variadic]]
+	[[^is_void]]
+	[[type]] rval;
+	[[/is_void]]
+
+	[[#params]]
+	in.args.[[name]] = ([[rpctype]])[[name]];
+	[[/params]]
+
+	struct_rpc_[[name]]_send(RPC_PRECALL, &in);
+	pre = struct_rpc_[[name]]_recv(&complete);
+	if (complete) {
+		[[^is_void]]rval = [[/is_void]]struct_rpc_[[name]]_to_args(pre[[#params]][[#out]], &name[[/out]][[/params]]);
+		real_free(pre);
+		return[[^is_void]] rval[[/is_void]];
+	}
+
+	real = (pre == NULL ? in : *pre);
+	[[^variadic]]
+	[[^is_void]]real.rval = [[/is_void]]real_[[name]]([[#params]]real.args.[[name]][[^last]], [[/last]][[/params]]);
+	[[/variadic]]
+	[[#variadic]]
+	va_start(ap, [[start]]);
+	[[^is_void]]real.rval = [[/is_void]][[va_fn]][[name]]([[#params]]real.args.[[name]], [[/params]]ap);
+	va_end(ap);
+	[[/variadic]]
+
+	struct_rpc_[[name]]_send(RPC_POSTCALL, &in);
+	post = struct_rpc_[[name]]_recv(NULL);
+	[[^is_void]]rval = [[/is_void]]struct_rpc_[[name]]_to_args(post ? post : &real[[#params]][[#out]], &name[[/out]][[/params]]);
+	real_free(pre);
+	real_free(post);
+	return[[^is_void]] rval[[/is_void]];
+}
+
+#ifdef __APPLE__
+static struct interpose _interpose_[[name]] __attribute__((used, section("__DATA,__interpose"))) = {
+	(const void *)(unsigned long)&retrace_impl_[[name]],
+	(const void *)(unsigned long)&[[name]]
+};
+rtr_[[name]]_t real_[[name]] = [[name]];
+#else
+[[type]]
+rtr_fixup_[[name]]([[#params]][[type]][[spacing]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
+{
+	void *fn = _dl_sym(RTLD_NEXT, "[[name]]", rtr_fixup_[[name]]);
+#ifdef HAVE_ATOMIC_BUILTINS
+	__atomic_store_n(&real_[[name]], fn, __ATOMIC_RELAXED);
+#else
+	real_[[name]] = fn;
+#endif
+	[[^variadic]]
+	[[^is_void]]return [[/is_void]]real_[[name]]([[#params]][[name]][[^last]], [[/last]][[/params]]);
+	[[/variadic]]
+	[[#variadic]]
+	va_list ap;
+	va_start(ap, [[start]]);
+	[[^is_void]][[type]] ret = [[/is_void]][[function]]([[#params]][[name]], [[/params]]ap);
+	va_end(ap);
+	return[[^is_void]] ret[[/is_void]];
+	[[/variadic]]
+}
+__attribute__((visibility("hidden"))) rtr_[[name]]_t real_[[name]] = rtr_fixup_[[name]];
+#endif
+[[/functions]]
