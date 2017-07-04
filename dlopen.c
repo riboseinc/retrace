@@ -59,7 +59,6 @@ char *RETRACE_IMPLEMENTATION(dlerror)(void)
 	unsigned int parameter_types[] = {PARAMETER_TYPE_END};
 	char *r = NULL;
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dlerror";
 	event_info.parameter_types = parameter_types;
