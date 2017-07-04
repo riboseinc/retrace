@@ -56,9 +56,8 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 
 	ret = real_read(fd, buf, nbytes);
 
-	if (incompleteio) {
+	if (incompleteio)
 		trace_printf_backtrace();
-	}
 
 	retrace_log_and_redirect_after(&event_info);
 
