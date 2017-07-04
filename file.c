@@ -876,11 +876,11 @@ fcntl_v(int fildes, int cmd, va_list ap)
 #endif
 		r = real_fcntl(fildes, cmd, int_parameter);
 		if (r >= 0) {
-		    di = file_descriptor_get(fildes);
-		    if (di->location != NULL) {
-			    old_location = di->location;
-		    }
-		    file_descriptor_update(r, FILE_DESCRIPTOR_TYPE_FILE, old_location, 0);
+			di = file_descriptor_get(fildes);
+			if (di->location != NULL)
+				old_location = di->location;
+
+			file_descriptor_update(r, FILE_DESCRIPTOR_TYPE_FILE, old_location, 0);
 		}
 		break;
 
