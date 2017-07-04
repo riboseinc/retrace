@@ -35,6 +35,8 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 					  PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&fd, &nbytes, &buf, &nbytes, NULL};
 	ssize_t ret = 0;
+	int incompleteio = 0;
+
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "write";
@@ -44,6 +46,7 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 	event_info.return_value = &ret;
 
 	if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_END)) {
+		incompleteio = 1;
 		nbytes = rtr_get_fuzzing_random() % nbytes;
 		if (nbytes <= 0) {
 			nbytes = 1;
@@ -55,6 +58,10 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_write(fd, buf, nbytes);
+
+	if (incompleteio) {
+		trace_printf_backtrace();
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
