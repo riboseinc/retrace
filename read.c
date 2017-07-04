@@ -43,6 +43,9 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 
 	if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_END)) {
 		nbytes = rtr_get_fuzzing_random() % nbytes;
+		if (nbytes <= 0) {
+			nbytes = 1;
+		}
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 	}
