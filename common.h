@@ -110,12 +110,12 @@ static struct {										\
 #define RETRACE_IMPLEMENTATION(func) retrace_impl_##func
 
 #define RETRACE_REPLACE(func, type, defn, args)				\
-DYLD_INTERPOSE(retrace_impl_##func, func)				\
-rtr_##func##_t real_##func = func;
+rtr_##func##_t real_##func = func;					\
+DYLD_INTERPOSE(retrace_impl_##func, func)
 
 #define RETRACE_REPLACE_V(func, type, defn, last, vfunc, vargs)		\
-DYLD_INTERPOSE(retrace_impl_##func, func)				\
-rtr_##func##_t real_##func = func;
+rtr_##func##_t real_##func = func;					\
+DYLD_INTERPOSE(retrace_impl_##func, func)
 
 #else /* !__APPLE__ */
 
