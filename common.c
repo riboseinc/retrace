@@ -1179,6 +1179,9 @@ void trace_printf_backtrace(void)
 	if (!get_tracing_enabled())
 		return;
 
+	if (!rtr_get_config_single("backtrace", ARGUMENT_TYPE_END))
+		return;
+
 	old_trace_state = trace_disable();
 
 	int i, frames = backtrace(callstack, 128);

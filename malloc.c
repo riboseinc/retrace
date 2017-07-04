@@ -179,6 +179,117 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 
 RETRACE_REPLACE(realloc, void *, (void *ptr, size_t size), (ptr, size))
 
+void *RETRACE_IMPLEMENTATION(memcpy)(void *dest, const void *src, size_t n)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&dest, &src, &n};
+
+	void *p = NULL;
+
+	int overlapped = 0;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "memcpy";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_POINTER;
+	event_info.return_value = &p;
+
+	retrace_log_and_redirect_before(&event_info);
+
+	/* check overlapped memory copying */
+	if (abs(dest - src) < n) {
+		overlapped = 1;
+		event_info.extra_info = "The memory areas must not overlap. It may arise bugs. Please refer the man page.";
+	}
+
+	p = real_memcpy(dest, src, n);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	if (overlapped)
+		trace_printf_backtrace();
+
+	return p;
+}
+
+RETRACE_REPLACE(memcpy, void *, (void *dest, const void *src, size_t n), (dest, src, n))
+
+void *RETRACE_IMPLEMENTATION(memmove)(void *dest, const void *src, size_t n)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&dest, &src, &n};
+
+	void *p = NULL;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "memmove";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_POINTER;
+	event_info.return_value = &p;
+
+	retrace_log_and_redirect_before(&event_info);
+
+	p = real_memmove(dest, src, n);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return p;
+}
+
+RETRACE_REPLACE(memmove, void *, (void *dest, const void *src, size_t n), (dest, src, n))
+
+void RETRACE_IMPLEMENTATION(bcopy)(const void *src, void *dest, size_t n)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&src, &dest, &n};
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "bcopy";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_END;
+
+	retrace_log_and_redirect_before(&event_info);
+
+	real_bcopy(src, dest, n);
+
+	retrace_log_and_redirect_after(&event_info);
+}
+
+RETRACE_REPLACE(bcopy, void, (const void *src, void *dest, size_t n), (src, dest, n))
+
+void *RETRACE_IMPLEMENTATION(memccpy)(void *dest, const void *src, int c, size_t n)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_POINTER,
+		PARAMETER_TYPE_CHAR, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&dest, &src, &c, &n};
+
+	void *p = NULL;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "memccpy";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_POINTER;
+	event_info.return_value = &p;
+
+	retrace_log_and_redirect_before(&event_info);
+
+	p = real_memccpy(dest, src, c, n);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return p;
+}
+
+RETRACE_REPLACE(memccpy, void *, (void *dest, const void *src, int c, size_t n), (dest, src, c, n))
+
 #define RTR_MMAP_MAX_PROT_STRLEN		128
 #define RTR_MMAP_MAX_FLAGS_STRLEN		128
 
