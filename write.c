@@ -37,6 +37,7 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 	size_t  real_nbytes = nbytes;
 	ssize_t ret = 0;
 	int incompleteio = 0;
+	size_t incompleteio_limit = 0;
 
 
 	memset(&event_info, 0, sizeof(event_info));
@@ -46,11 +47,14 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
 
-	if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_END)) {
+	if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &incompleteio_limit)) {
 		incompleteio = 1;
 		real_nbytes = rtr_get_fuzzing_random() % nbytes;
-		if (real_nbytes <= 0) {
-			real_nbytes = 1;
+		if (real_nbytes <= incompleteio_limit) {
+			real_nbytes = incompleteio_limit;
+		}
+		if (real_nbytes > nbytes) {
+			real_nbytes = nbytes;
 		}
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
