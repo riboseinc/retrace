@@ -106,6 +106,7 @@ struct descriptor_info **g_descriptor_list;
 unsigned int g_descriptor_list_size;
 
 static pthread_mutex_t printing_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t logfile_lock = PTHREAD_MUTEX_INITIALIZER;
 static int is_main_thread(void);
 
 static void **
@@ -507,38 +508,51 @@ trace_printf(int hdr, const char *fmt, ...)
 {
 	va_list arglist;
 	int old_trace_state;
-	FILE *output_file = stderr;
-	char *output_file_path;
+	FILE *output_file_current = stderr;
+	static int output_file_flush;
+	static FILE *output_file;
+	static char *output_file_path;
+	static int loaded_config;
 
 	if (!get_tracing_enabled())
 		return;
-	if (rtr_get_config_single("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_END, &output_file_path)) {
-		old_trace_state = trace_disable();
-		if (output_file_path) {
-			FILE *out_file_tmp = real_fopen(output_file_path, "a");
 
-			if (out_file_tmp)
-				output_file = out_file_tmp;
+	pthread_mutex_lock(&logfile_lock);
+	if (!loaded_config) {
+		loaded_config = 1;
+		if (rtr_get_config_single("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END,
+								  &output_file_path, &output_file_flush)) {
+			old_trace_state = trace_disable();
+			if (output_file_path) {
+				FILE *out_file_tmp = fopen(output_file_path, "a");
+
+				if (out_file_tmp)
+					output_file = out_file_tmp;
+			}
+
+			trace_restore(old_trace_state);
 		}
-
-		trace_restore(old_trace_state);
 	}
+	pthread_mutex_unlock(&logfile_lock);
+
+	if (output_file)
+		output_file_current = output_file;
 
 	old_trace_state = trace_disable();
 
 	if (hdr == 1) {
-		real_fprintf(output_file, "(%d) ", real_getpid());
+		real_fprintf(output_file_current, "(%d) ", real_getpid());
 
 		if (!is_main_thread())
-			real_fprintf(output_file, "(thread: %u) ", pthread_self());
+			real_fprintf(output_file_current, "(thread: %u) ", pthread_self());
 	}
 
 	va_start(arglist, fmt);
-	real_vfprintf(output_file, fmt, arglist);
+	real_vfprintf(output_file_current, fmt, arglist);
 	va_end(arglist);
 
-	if (output_file != stderr)
-		real_fclose(output_file);
+	if (output_file_flush)
+		fflush(output_file_current);
 
 	trace_restore(old_trace_state);
 }
