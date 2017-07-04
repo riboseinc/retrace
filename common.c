@@ -524,7 +524,7 @@ trace_printf(int hdr, const char *fmt, ...)
 								  &output_file_path, &output_file_flush)) {
 			old_trace_state = trace_disable();
 			if (output_file_path) {
-				FILE *out_file_tmp = fopen(output_file_path, "a");
+				FILE *out_file_tmp = real_fopen(output_file_path, "a");
 
 				if (out_file_tmp)
 					output_file = out_file_tmp;
