@@ -113,6 +113,8 @@ static struct {										\
 DYLD_INTERPOSE(retrace_impl_##func, func)				\
 rtr_##func##_t real_##func = func;
 
+#define RETRACE_REPLACE_VOID_V RETRACE_REPLACE_V
+
 #define RETRACE_REPLACE_V(func, type, defn, last, vfunc, vargs)		\
 DYLD_INTERPOSE(retrace_impl_##func, func)				\
 rtr_##func##_t real_##func = func;
@@ -159,7 +161,17 @@ type rtr_fixup_##func defn {						\
 	va_end(ap);							\
 	return (ret);							\
 }									\
-rtr_##func##_t real_##func = rtr_fixup_##func;
+RETRACE_INTERNAL rtr_##func##_t real_##func = rtr_fixup_##func;
+
+#define RETRACE_REPLACE_VOID_V(func, type, defn, last, vfunc, vargs)	\
+type rtr_fixup_##func defn {						\
+	RETRACE_FIXUP(func);						\
+	va_list ap;							\
+	va_start(ap, last);						\
+	vfunc vargs;							\
+	va_end(ap);							\
+}									\
+RETRACE_INTERNAL rtr_##func##_t real_##func = rtr_fixup_##func;
 
 #endif /* !__APPLE__ */
 
