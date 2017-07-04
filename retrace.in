@@ -42,7 +42,7 @@ main() {
 		shift 2
 	fi
 
-	if [[ "${RETRACE_CONFIG}" ]]; then
+	if [ "${RETRACE_CONFIG}" ]; then
 		[ ! -f "${RETRACE_CONFIG}" ] && \
 			errx "cannot open '${RETRACE_CONFIG}'"
 	fi
@@ -59,7 +59,7 @@ main() {
 		readonly local envload="RETRACE_CONFIG=${RETRACE_CONFIG} LD_PRELOAD=${output}"
 	fi
 
-	[[ ! "${output}" ]] && \
+	[ ! "${output}" ] && \
 		errx "cannot find '${lib}'"
 
 	[ ! -x "$1" ] && \
