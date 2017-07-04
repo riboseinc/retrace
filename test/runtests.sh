@@ -21,3 +21,4 @@
 ../retrace ./scanf
 ../retrace ./char
 ../retrace ./trace
+../retrace ./log
