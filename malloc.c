@@ -187,7 +187,7 @@ void *RETRACE_IMPLEMENTATION(memcpy)(void *dest, const void *src, size_t n)
 
 	void *p = NULL;
 
-	int use_memmove = 0;
+	int overlapped = 0;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "memcpy";
@@ -200,18 +200,15 @@ void *RETRACE_IMPLEMENTATION(memcpy)(void *dest, const void *src, size_t n)
 
 	/* check overlapped memory copying */
 	if (abs(dest - src) < n) {
-		use_memmove = 1;
-		event_info.extra_info = "redirected : memmove() (overlapped)";
+		overlapped = 1;
+		event_info.extra_info = "The memory areas must not overlap. It may arise bugs. Please refer the man page.";
 	}
 
-	if (!use_memmove)
-		p = real_memcpy(dest, src, n);
-	else
-		p = real_memmove(dest, src, n);
+	p = real_memcpy(dest, src, n);
 
 	retrace_log_and_redirect_after(&event_info);
 
-	if (use_memmove)
+	if (overlapped)
 		trace_printf_backtrace();
 
 	return p;
