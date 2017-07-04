@@ -69,6 +69,7 @@ int RETRACE_IMPLEMENTATION(closedir)(DIR *dirp)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_closedir(dirp);
+	dirp = NULL;
 
 	retrace_log_and_redirect_after(&event_info);
 

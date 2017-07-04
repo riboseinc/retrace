@@ -597,7 +597,7 @@ trace_printf(int hdr, const char *fmt, ...)
 								  &output_file_path, &output_file_flush)) {
 			old_trace_state = trace_disable();
 			if (output_file_path) {
-				FILE *out_file_tmp = fopen(output_file_path, "a");
+				FILE *out_file_tmp = real_fopen(output_file_path, "a");
 
 				if (out_file_tmp)
 					output_file = out_file_tmp;
@@ -1007,6 +1007,22 @@ int rtr_get_config_single(const char *function, ...)
 	return (ret);
 }
 
+static char *
+retrace_strdup(const char *s)
+{
+	size_t len;
+	char *ret;
+
+	len = real_strlen(s);
+
+	ret = (char *) real_malloc(len + 1);
+
+	if (ret)
+		memcpy(ret, s, len + 1);
+
+	return ret;
+}
+
 
 struct descriptor_info *
 descriptor_info_new(int fd, unsigned int type, const char *location, int port)
@@ -1023,7 +1039,7 @@ descriptor_info_new(int fd, unsigned int type, const char *location, int port)
 		di->type = type;
 
 		if (location)
-			di->location = strdup(location);
+			di->location = retrace_strdup(location);
 		else
 			di->location = NULL;
 
@@ -1043,9 +1059,9 @@ descriptor_info_free(struct descriptor_info *di)
 	old_trace_state = trace_disable();
 
 	if (di->location)
-		free(di->location);
+		real_free(di->location);
 
-	free(di);
+	real_free(di);
 
 	trace_restore(old_trace_state);
 }
@@ -1134,9 +1150,9 @@ file_descriptor_update(int fd, unsigned int type, const char *location, int port
 	if (di) {
 		di->type = type;
 		if (di->location) {
-			free(di->location);
+			real_free(di->location);
 		}
-		di->location = strdup (location);
+		di->location = retrace_strdup(location);
 
 		di->port = port;
 	} else {
