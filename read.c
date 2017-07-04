@@ -29,6 +29,8 @@
 ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 {
 	ssize_t ret = 0;
+	int incompleteio = 0;
+
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_MEMORY_BUFFER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&fd, &ret, &buf, &nbytes};
@@ -42,13 +44,20 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 	retrace_log_and_redirect_before(&event_info);
 
 	if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_END)) {
+		incompleteio = 1;
 		nbytes = rtr_get_fuzzing_random() % nbytes;
+		if (nbytes <= 0) {
+			nbytes = 1;
+		}
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 	}
 
 
 	ret = real_read(fd, buf, nbytes);
+
+	if (incompleteio)
+		trace_printf_backtrace();
 
 	retrace_log_and_redirect_after(&event_info);
 
