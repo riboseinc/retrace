@@ -51,6 +51,7 @@
 #include <sys/uio.h>
 #include <sys/utsname.h>
 #include <execinfo.h>
+#include <fcntl.h>
 
 #include "str.h"
 #include "id.h"
@@ -307,6 +308,78 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 	case PARAMETER_TYPE_SSL_WITH_KEY:
 		trace_printf(0, "%p", (*(void **) *value));
 		break;
+
+#if HAVE_STRUCT_FLOCK
+	case PARAMETER_TYPE_STRUCT_FLOCK:
+		trace_printf(1, "struct flock {\n");
+		trace_printf(1, "\tl_start = %zu\n", (*(struct flock **) *value)->l_start);
+		trace_printf(1, "\tl_len = %zu\n", (*(struct flock **) *value)->l_len);
+		trace_printf(1, "\tl_pid = %d\n", (*(struct flock **) *value)->l_pid);
+		trace_printf(1, "\tl_type = %d\n", (*(struct flock **) *value)->l_type);
+		trace_printf(1, "\tl_whence = %d\n", (*(struct flock **) *value)->l_whence);
+		trace_printf(1, "}\n");
+		break;
+#endif
+
+#if HAVE_STRUCT_FSTORE
+	case PARAMETER_TYPE_STRUCT_FSTORE:
+		trace_printf(1, "struct fstore {\n");
+		trace_printf(1, "\tfst_flags = %zu\n", (*(struct fstore **) *value)->fst_flags);
+		trace_printf(1, "\tfst_posmode = %d\n", (*(struct fstore **) *value)->fst_posmode);
+		trace_printf(1, "\tfst_offset = %zu\n", (*(struct fstore **) *value)->fst_offset);
+		trace_printf(1, "\tfst_length = %zu\n", (*(struct fstore **) *value)->fst_length);
+		trace_printf(1, "\tfst_bytesalloc = %zu\n", (*(struct fstore **) *value)->fst_bytesalloc);
+		trace_printf(1, "}\n");
+		break;
+#endif
+
+#if HAVE_STRUCT_FPUNCHHOLE
+	case PARAMETER_TYPE_STRUCT_FPUNCHHOLE:
+		trace_printf(1, "struct fpunchhole {\n");
+		trace_printf(1, "\tfp_flags = %zu\n", (*(struct fpunchhole **) *value)->fp_flags);
+		trace_printf(1, "\tfp_offset = %zu\n", (*(struct fpunchhole **) *value)->fp_offset);
+		trace_printf(1, "\tfp_length = %zu\n", (*(struct fpunchhole **) *value)->fp_length);
+		trace_printf(1, "}\n");
+		break;
+#endif
+
+#if HAVE_STRUCT_RADVISORY
+	case PARAMETER_TYPE_STRUCT_RADVISORY:
+		trace_printf(1, "struct radvisory {\n");
+		trace_printf(1, "\tra_offset = %zu\n", (*(struct radvisory **) *value)->ra_offset);
+		trace_printf(1, "\tra_count = %zu\n", (*(struct radvisory **) *value)->ra_count);
+		trace_printf(1, "}\n");
+		break;
+#endif
+
+#if HAVE_STRUCT_FBOOTSTRAPTRANSFER
+	case PARAMETER_TYPE_STRUCT_FBOOTSTRAPTRANSFER:
+		trace_printf(1, "struct fbootstraptransfer {\n");
+		trace_printf(1, "\tfbt_offset = %zu\n", (*(struct fbootstraptransfer **) *value)->fbt_offset);
+		trace_printf(1, "\tfbt_length = %zu\n", (*(struct fbootstraptransfer **) *value)->fbt_length);
+		trace_printf(1, "\tfbt_buffer = %p\n", (*(struct fbootstraptransfer **) *value)->fbt_buffer);
+		trace_printf(1, "}\n");
+		break;
+#endif
+
+#if HAVE_STRUCT_LOG2PHYS
+	case PARAMETER_TYPE_STRUCT_LOG2PHYS:
+		trace_printf(1, "struct log2phys {\n");
+		trace_printf(1, "\tl2p_flags = %zu\n", (*(struct log2phys **) *value)->l2p_flags);
+		trace_printf(1, "\tl2p_contigbytes = %zu\n", (*(struct log2phys **) *value)->l2p_contigbytes);
+		trace_printf(1, "\tl2p_devoffset = %zu\n", (*(struct log2phys **) *value)->l2p_devoffset);
+		trace_printf(1, "}\n");
+		break;
+#endif
+
+#if HAVE_DECL_F_GETOWN_EX
+	case PARAMETER_TYPE_STRUCT_F_GETOWN_EX:
+		trace_printf(1, "struct f_owner_ex {\n");
+		trace_printf(1, "\ttype = %d\n", (*(struct f_owner_ex **) *value)->type);
+		trace_printf(1, "\tpid = %zu\n", (*(struct f_owner_ex **) *value)->pid);
+		trace_printf(1, "}\n");
+		break;
+#endif
 	}
 
 	/* There's a string following this parameter that expands its meaning */

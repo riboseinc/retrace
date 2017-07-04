@@ -62,6 +62,27 @@
 #define PARAMETER_TYPE_TIMEZONE		22 /* struct timezone* */
 #define PARAMETER_TYPE_SSL		23 /* OpenSSL's SSL* */
 #define PARAMETER_TYPE_SSL_WITH_KEY	24 /* OpenSSL's SSL* but attempt to dump the ssl key */
+#if HAVE_STRUCT_FLOCK
+#define PARAMETER_TYPE_STRUCT_FLOCK 25 /* fcntl's struct flock */
+#endif
+#if HAVE_STRUCT_FSTORE
+#define PARAMETER_TYPE_STRUCT_FSTORE 26 /* fcntl's struct fstore */
+#endif
+#if HAVE_STRUCT_FPUNCHHOLE
+#define PARAMETER_TYPE_STRUCT_FPUNCHHOLE 27 /* fcntl's struct fpunchhole */
+#endif
+#if HAVE_STRUCT_RADVISORY
+#define PARAMETER_TYPE_STRUCT_RADVISORY 28 /* fcntl's struct radvisory */
+#endif
+#if HAVE_STRUCT_FBOOTSTRAPTRANSFER
+#define PARAMETER_TYPE_STRUCT_FBOOTSTRAPTRANSFER 29 /* fcntl's struct fbootstraptransfer */
+#endif
+#if HAVE_STRUCT_LOG2PHYS
+#define PARAMETER_TYPE_STRUCT_LOG2PHYS 30 /* fcntl's struct log2phys */
+#endif
+#if HAVE_DECL_F_GETOWN_EX
+#define PARAMETER_TYPE_STRUCT_F_GETOWN_EX 31 /* fcntl's struct f_owner_ex */
+#endif
 
 #define PARAMETER_FLAG_OUTPUT_VARIABLE		0x40000000 /* This is an output variable, is uninitialized in EVENT_TYPE_BEFORE_CALL */
 #define PARAMETER_FLAG_STRING_NEXT		0x80000000 /* There's a string parameter that describes the string */
