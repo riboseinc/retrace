@@ -466,6 +466,56 @@ RTR_TEST_START(calloc)
 	assert_non_null(p);
 RTR_TEST_END
 
+RTR_TEST_START(memcpy)
+	void *p;
+	unsigned char q[32];
+
+	memset(q, '1', sizeof(q));
+
+	p = malloc(32);
+	assert_non_null(p);
+
+	p = rtr_memcpy(p, q, sizeof(q));
+	assert_non_null(p);
+
+	free(p);
+RTR_TEST_END
+
+RTR_TEST_START(memmove)
+	void *p;
+
+	p = malloc(32);
+
+	memset(p, '1', 32);
+
+	p = rtr_memmove(p, p + 5, 10);
+	assert_non_null(p);
+
+	free(p);
+RTR_TEST_END
+
+RTR_TEST_START(bcopy)
+	unsigned char p[32];
+
+	memset(p, '1', sizeof(p));
+
+	rtr_bcopy(p + 5, p, 10);
+RTR_TEST_END
+
+RTR_TEST_START(memccpy)
+	unsigned char p[32];
+	void *q;
+
+	q = malloc(32);
+	assert_non_null(q);
+
+	memset(p, '0', 16);
+	memset(p, '1', 16);
+
+	q = rtr_memccpy(q, p, '1', sizeof(p));
+	assert_non_null(q);
+RTR_TEST_END
+
 RTR_TEST_START(mmap)
 	void *p;
 
@@ -1066,6 +1116,8 @@ main(void)
 
 		cmocka_unit_test(test_rtr_malloc),   cmocka_unit_test(test_rtr_free),
 		cmocka_unit_test(test_rtr_realloc),  cmocka_unit_test(test_rtr_calloc),
+		cmocka_unit_test(test_rtr_memcpy),   cmocka_unit_test(test_rtr_memmove),
+		cmocka_unit_test(test_rtr_bcopy),    cmocka_unit_test(test_rtr_memccpy),
 		cmocka_unit_test(test_rtr_mmap),     cmocka_unit_test(test_rtr_munmap),
 
 #ifndef __APPLE__
