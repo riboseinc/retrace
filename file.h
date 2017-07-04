@@ -21,6 +21,7 @@ typedef int (*rtr_fputs_t)(const char *s, FILE *stream);
 typedef int (*rtr_fgetc_t)(FILE *stream);
 typedef char*(*rtr_fgets_t)(char *s, int size, FILE *stream);
 typedef void (*rtr_strmode_t)(int mode, char *bp);
+typedef int (*rtr_fcntl_t)(int fildes, int cmd, ...);
 
 RETRACE_DECL(fopen);
 RETRACE_DECL(fclose);
@@ -42,5 +43,6 @@ RETRACE_DECL(fputs);
 RETRACE_DECL(fgetc);
 RETRACE_DECL(fgets);
 RETRACE_DECL(strmode);
+RETRACE_DECL(fcntl);
 
 #endif /* __RETRACE_FILE_H__ */

@@ -141,7 +141,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	case PT_ATTACH:
 		request_str = "PT_ATTACH";
 		break;
-#ifdef HAVE_PTRACE_GETREGS
+#if HAVE_DECL_PTRACE_GETREGS
 	case PTRACE_GETREGS:
 		request_str = "PTRACE_GETREGS";
 		break;
@@ -176,33 +176,33 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	case PTRACE_SETSIGINFO:
 		request_str = "PTRACE_SETSIGINFO";
 		break;
-#ifdef HAVE_PTRACE_GETREGSET
+#if HAVE_DECL_PTRACE_GETREGSET
 	case PTRACE_GETREGSET:
 		request_str = "PTRACE_GETREGSET";
 		break;
 #endif
-#ifdef HAVE_PTRACE_SETREGSET
+#if HAVE_DECL_PTRACE_SETREGSET
 	case PTRACE_SETREGSET:
 		request_str = "PTRACE_SETREGSET";
 		break;
 #endif
-#ifdef HAVE_PTRACE_SEIZE
+#if HAVE_DECL_PTRACE_SEIZE
 	case PTRACE_SEIZE:
 		request_str = "PTRACE_SEIZE";
 		break;
 #endif
-#ifdef HAVE_PTRACE_INTERRUPT
+#if HAVE_DECL_PTRACE_INTERRUPT
 	case PTRACE_INTERRUPT:
 		request_str = "PTRACE_INTERRUPT";
 		break;
 #endif
-#ifdef HAVE_PTRACE_LISTEN
+#if HAVE_DECL_PTRACE_LISTEN
 	case PTRACE_LISTEN:
 		request_str = "PTRACE_LISTEN";
 		break;
 #endif
 
-#ifdef HAVE_PTRACE_PEEKSIGINFO
+#if HAVE_DECL_PTRACE_PEEKSIGINFO
 	case PTRACE_PEEKSIGINFO:
 		request_str = "PTRACE_PEEKSIGINFO";
 		break;

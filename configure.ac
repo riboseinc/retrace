@@ -83,7 +83,7 @@ AM_CONDITIONAL([OPENBSD], [test "x$isopenbsd" = "xyes"])
 
 # MacOS specific configuration
 if test "x$isdarwin" = "xyes"; then
-    CFLAGS="$CFLAGS -mmacosx-version-min=10.12"
+    CFLAGS="$CFLAGS -mmacosx-version-min=10.12 -D_DARWIN_C_SOURCE"
     LDFLAGS="$LDFLAGS -mmacosx-version-min=10.12"
 fi
 
@@ -148,124 +148,41 @@ fi
 
 
 # Check for PTRACE features
-AC_MSG_CHECKING([for PTRACE_GETREGS])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-#include <stdlib.h>
-#include <stddef.h>
-#include <sys/ptrace.h>
-#include <sys/user.h>
-]], [[
-  void *p;
-  long res = ptrace(PTRACE_GETREGS, 0, p, p);
-]])],
-[
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([HAVE_PTRACE_GETREGS], 1, [Define to 1 if you have the PTRACE_GETREGS ptrace request.])
-], [
-AC_MSG_RESULT([no])
-])
+AC_CHECK_DECLS([PTRACE_GETREGS, PTRACE_GETREGSET, PTRACE_SETREGSET], [], [], [#include <sys/ptrace.h.h>])
+AC_CHECK_DECLS([PTRACE_SEIZE], [], [], [#include <sys/ptrace.h.h>])
+AC_CHECK_DECLS([PTRACE_INTERRUPT], [], [], [#include <sys/ptrace.h.h>])
+AC_CHECK_DECLS([PTRACE_LISTEN], [], [], [#include <sys/ptrace.h.h>])
+AC_CHECK_DECLS([PTRACE_PEEKSIGINFO], [], [], [#include <sys/ptrace.h.h>])
 
-AC_MSG_CHECKING([for PTRACE_GETREGSET])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-#include <stdlib.h>
-#include <stddef.h>
-#include <sys/ptrace.h>
-#include <sys/user.h>
-]], [[
-  void *p;
-  long res = ptrace(PTRACE_GETREGSET, 0, p, p);
-]])],
-[
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([HAVE_PTRACE_GETREGSET], 1, [Define to 1 if you have the PTRACE_GETREGSET ptrace request.])
-], [
-AC_MSG_RESULT([no])
-])
-
-AC_MSG_CHECKING([for PTRACE_SETREGSET])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-#include <stdlib.h>
-#include <stddef.h>
-#include <sys/ptrace.h>
-#include <sys/user.h>
-]], [[
-  void *p;
-  long res = ptrace(PTRACE_SETREGSET, 0, p, p);
-]])],
-[
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([HAVE_PTRACE_SETREGSET], 1, [Define to 1 if you have the PTRACE_SETREGSET ptrace request.])
-], [
-AC_MSG_RESULT([no])
-])
-
-AC_MSG_CHECKING([for PTRACE_SEIZE])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-#include <stdlib.h>
-#include <stddef.h>
-#include <sys/ptrace.h>
-#include <sys/user.h>
-]], [[
-  void *p;
-  long res = ptrace(PTRACE_SEIZE, 0, p, p);
-]])],
-[
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([HAVE_PTRACE_SEIZE], 1, [Define to 1 if you have the PTRACE_SEIZE ptrace request.])
-], [
-AC_MSG_RESULT([no])
-])
-
-AC_MSG_CHECKING([for PTRACE_INTERRUPT])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-#include <stdlib.h>
-#include <stddef.h>
-#include <sys/ptrace.h>
-#include <sys/user.h>
-]], [[
-  void *p;
-  long res = ptrace(PTRACE_INTERRUPT, 0, p, p);
-]])],
-[
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([HAVE_PTRACE_INTERRUPT], 1, [Define to 1 if you have the PTRACE_INTERRUPT ptrace request.])
-], [
-AC_MSG_RESULT([no])
-])
-
-AC_MSG_CHECKING([for PTRACE_LISTEN])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-#include <stdlib.h>
-#include <stddef.h>
-#include <sys/ptrace.h>
-#include <sys/user.h>
-]], [[
-  void *p;
-  long res = ptrace(PTRACE_LISTEN, 0, p, p);
-]])],
-[
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([HAVE_PTRACE_LISTEN], 1, [Define to 1 if you have the PTRACE_LISTEN ptrace request.])
-], [
-AC_MSG_RESULT([no])
-])
-
-AC_MSG_CHECKING([for PTRACE_PEEKSIGINFO])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-#include <stdlib.h>
-#include <stddef.h>
-#include <sys/ptrace.h>
-#include <sys/user.h>
-]], [[
-  void *p;
-  long res = ptrace(PTRACE_PEEKSIGINFO, 0, p, p);
-]])],
-[
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([HAVE_PTRACE_PEEKSIGINFO], 1, [Define to 1 if you have the PTRACE_PEEKSIGINFO ptrace request.])
-], [
-AC_MSG_RESULT([no])
-])
+# Check fcntl features
+AC_CHECK_DECLS([F_DUPFD_CLOEXEC], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_SETOWN, F_GETOWN], [], [], [#include <fcntl.h>])
+AC_CHECK_TYPES([struct flock], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_SETLKW], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_GETPATH], , [], [#include <fcntl.h>])
+AC_CHECK_TYPES([struct fstore], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_PREALLOCATE], [], [], [#include <fcntl.h>])
+AC_CHECK_TYPES([struct fpunchhole], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_PUNCHHOLE], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_SETSIZE], [], [], [#include <fcntl.h>])
+AC_CHECK_TYPES([struct radvisory], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_RDADVISE], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_RDAHEAD], [], [], [#include <fcntl.h>])
+AC_CHECK_TYPES([struct fbootstraptransfer], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_READBOOTSTRAP, F_WRITEBOOTSTRAP], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_NOCACHE], [], [], [#include <fcntl.h>])
+AC_CHECK_TYPES([struct log2phys], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_LOG2PHYS, F_LOG2PHYS_EXT], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_FULLFSYNC], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_SETNOSIGPIPE, F_GETNOSIGPIPE], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_OFD_SETLK, F_OFD_SETLKW, F_OFD_GETLK], [], [], [#include <fcntl.h>])
+AC_CHECK_TYPES([struct f_owner_ex], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_GETOWN_EX, F_SETOWN_EX], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_GETSIG, F_SETSIG], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_SETLEASE, F_GETLEASE], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_NOTIFY], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_SETPIPE_SZ, F_GETPIPE_SZ], [], [], [#include <fcntl.h>])
+AC_CHECK_DECLS([F_ADD_SEALS, F_GET_SEALS], [], [], [#include <fcntl.h>])
 
 TESTS_CFLAGS=""
 AC_MSG_CHECKING(whether to run tests)
