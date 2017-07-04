@@ -24,10 +24,15 @@
  */
 
 #include <stdlib.h>
+#include <sys/utsname.h>
 
 int main(void)
 {
-	putenv("RETRACE_TEST=1");
+	struct utsname buf;
+
+	uname(&buf);
+
+	putenv("RETRACE_TEST=teststring");
 	getenv("RETRACE_TEST");
 	unsetenv("RETRACE_TEST");
 

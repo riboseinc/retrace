@@ -30,41 +30,32 @@
 #include "printf.h"
 #include "file.h"
 
-#define __func__ __extension__ __FUNCTION__
-
-static void
-trace(const char *func, bool showfd, int fd, int result,
-	const char *str, const char *fmt, va_list ap)
-{
-	char buf[1024];
-
-	if (str == NULL) {
-		real_vsnprintf(buf, 1024, fmt, ap);
-		str = buf;
-	}
-
-	trace_printf(1, "%s(\"", func);
-	trace_printf_str(fmt);
-	trace_printf(0, "\" > \"");
-	trace_printf_str(str);
-	if (showfd)
-		trace_printf(0, "\")[fd=%d][%d]\n", fd, result);
-	else
-		trace_printf(0, "\")[%d]\n", result);
-}
-
 int
 RETRACE_IMPLEMENTATION(printf)(const char *fmt, ...)
 {
 	int result;
 	va_list ap;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_PRINTF_FORMAT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fmt, &ap};
+
+	va_start(ap, fmt);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "printf";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &result;
+	retrace_log_and_redirect_before(&event_info);
+	va_end(ap);
 
 	va_start(ap, fmt);
 	result = real_vprintf(fmt, ap);
 	va_end(ap);
 
 	va_start(ap, fmt);
-	trace(__func__, false, 0, result, NULL, fmt, ap);
+	retrace_log_and_redirect_after(&event_info);
 	va_end(ap);
 
 	return result;
@@ -77,13 +68,27 @@ RETRACE_IMPLEMENTATION(fprintf)(FILE *stream, const char *fmt, ...)
 {
 	int result;
 	va_list ap;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_PRINTF_FORMAT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&stream, &fmt, &ap};
+
+	va_start(ap, fmt);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "fprintf";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &result;
+	retrace_log_and_redirect_before(&event_info);
+	va_end(ap);
 
 	va_start(ap, fmt);
 	result = real_vfprintf(stream, fmt, ap);
 	va_end(ap);
 
 	va_start(ap, fmt);
-	trace(__func__, true, real_fileno(stream), result, NULL, fmt, ap);
+	retrace_log_and_redirect_after(&event_info);
 	va_end(ap);
 
 	return result;
@@ -96,13 +101,27 @@ RETRACE_IMPLEMENTATION(dprintf)(int fd, const char *fmt, ...)
 {
 	int result;
 	va_list ap;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_PRINTF_FORMAT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &fmt, &ap};
+
+	va_start(ap, fmt);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "dprintf";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &result;
+	retrace_log_and_redirect_before(&event_info);
+	va_end(ap);
 
 	va_start(ap, fmt);
 	result = real_vdprintf(fd, fmt, ap);
 	va_end(ap);
 
 	va_start(ap, fmt);
-	trace(__func__, true, fd, result, NULL, fmt, ap);
+	retrace_log_and_redirect_after(&event_info);
 	va_end(ap);
 
 	return result;
@@ -115,13 +134,27 @@ RETRACE_IMPLEMENTATION(sprintf)(char *str, const char *fmt, ...)
 {
 	int result;
 	va_list ap;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING | PARAMETER_FLAG_OUTPUT_VARIABLE, PARAMETER_TYPE_PRINTF_FORMAT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&str, &fmt, &ap};
+
+	va_start(ap, fmt);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "sprintf";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &result;
+	retrace_log_and_redirect_before(&event_info);
+	va_end(ap);
 
 	va_start(ap, fmt);
 	result = real_vsprintf(str, fmt, ap);
 	va_end(ap);
 
 	va_start(ap, fmt);
-	trace(__func__, false, 0, result, NULL, fmt, ap);
+	retrace_log_and_redirect_after(&event_info);
 	va_end(ap);
 
 	return result;
@@ -134,12 +167,28 @@ RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
 {
 	int result;
 	va_list ap;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING | PARAMETER_FLAG_OUTPUT_VARIABLE, PARAMETER_TYPE_INT, PARAMETER_TYPE_PRINTF_FORMAT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&str, &size, &fmt, &ap};
+
+	va_start(ap, fmt);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "snprintf";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &result;
+	retrace_log_and_redirect_before(&event_info);
+	va_end(ap);
 
 	va_start(ap, fmt);
 	result = real_vsnprintf(str, size, fmt, ap);
 	va_end(ap);
 
-	trace(__func__, false, 0, result, str, fmt, ap);
+	va_start(ap, fmt);
+	retrace_log_and_redirect_after(&event_info);
+	va_end(ap);
 
 	return result;
 }
@@ -151,10 +200,27 @@ RETRACE_IMPLEMENTATION(vprintf)(const char *fmt, va_list ap)
 {
 	int result;
 	va_list ap1;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_PRINTF_FORMAT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fmt, &ap1};
+
+	__va_copy(ap1, ap);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "vprintf";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &result;
+	retrace_log_and_redirect_before(&event_info);
+	va_end(ap1);
 
 	__va_copy(ap1, ap);
 	result = real_vprintf(fmt, ap);
-	trace(__func__, false, 0, result, NULL, fmt, ap1);
+	va_end(ap1);
+
+	__va_copy(ap1, ap);
+	retrace_log_and_redirect_after(&event_info);
 	va_end(ap1);
 
 	return result;
@@ -167,10 +233,27 @@ RETRACE_IMPLEMENTATION(vfprintf)(FILE *stream, const char *fmt, va_list ap)
 {
 	int result;
 	va_list ap1;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_PRINTF_FORMAT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&stream, &fmt, &ap1};
+
+	__va_copy(ap1, ap);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "vfprintf";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &result;
+	retrace_log_and_redirect_before(&event_info);
+	va_end(ap1);
 
 	__va_copy(ap1, ap);
 	result = real_vfprintf(stream, fmt, ap);
-	trace(__func__, true, real_fileno(stream), result, NULL, fmt, ap1);
+	va_end(ap1);
+
+	__va_copy(ap1, ap);
+	retrace_log_and_redirect_after(&event_info);
 	va_end(ap1);
 
 	return result;
@@ -183,10 +266,27 @@ RETRACE_IMPLEMENTATION(vdprintf)(int fd, const char *fmt, va_list ap)
 {
 	int result;
 	va_list ap1;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_PRINTF_FORMAT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &fmt, &ap1};
+
+	__va_copy(ap1, ap);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "vdprintf";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &result;
+	retrace_log_and_redirect_before(&event_info);
+	va_end(ap1);
 
 	__va_copy(ap1, ap);
 	result = real_vdprintf(fd, fmt, ap);
-	trace(__func__, true, fd, result, NULL, fmt, ap1);
+	va_end(ap1);
+
+	__va_copy(ap1, ap);
+	retrace_log_and_redirect_after(&event_info);
 	va_end(ap1);
 
 	return result;
@@ -197,12 +297,29 @@ RETRACE_REPLACE(vdprintf, int, (int fd, const char *fmt, va_list ap), (fd, fmt, 
 int
 RETRACE_IMPLEMENTATION(vsprintf)(char *str, const char *fmt, va_list ap)
 {
-	int result;
+	int result = 0;
 	va_list ap1;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING | PARAMETER_FLAG_OUTPUT_VARIABLE, PARAMETER_TYPE_PRINTF_FORMAT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&str, &fmt, &ap1};
 
 	__va_copy(ap1, ap);
-	result = real_vsprintf(str, fmt, ap);
-	trace(__func__, false, 0, result, NULL, fmt, ap1);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "vsprintf";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &result;
+	retrace_log_and_redirect_before(&event_info);
+	va_end(ap1);
+
+	__va_copy(ap1, ap);
+	result = real_vsprintf(str, fmt, ap1);
+	va_end(ap1);
+
+	__va_copy(ap1, ap);
+	retrace_log_and_redirect_after(&event_info);
 	va_end(ap1);
 
 	return result;
@@ -214,10 +331,29 @@ int
 RETRACE_IMPLEMENTATION(vsnprintf)(char *str, size_t size, const char *fmt, va_list ap)
 {
 	int result;
+	va_list ap1;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING | PARAMETER_FLAG_OUTPUT_VARIABLE, PARAMETER_TYPE_INT, PARAMETER_TYPE_PRINTF_FORMAT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&str, &size, &fmt, &ap1};
 
-	result = real_vsnprintf(str, size, fmt, ap);
+	__va_copy(ap1, ap);
 
-	trace(__func__, false, 0, result, str, fmt, ap);
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "vsnprintf";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &result;
+	retrace_log_and_redirect_before(&event_info);
+	va_end(ap1);
+
+	__va_copy(ap1, ap);
+	result = real_vsnprintf(str, size, fmt, ap1);
+	va_end(ap1);
+
+	__va_copy(ap1, ap);
+	retrace_log_and_redirect_after(&event_info);
+	va_end(ap1);
 
 	return result;
 }

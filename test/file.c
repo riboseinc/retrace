@@ -25,27 +25,49 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 int main(void)
 {
 	FILE *f;
-	char *s = "This is a test string :)";
+	char *s1 = "This is a test string :)";
 	char buf[1024];
+	char carray[] = {'x', 'y', 'z'};
+
+	chmod("retracetest.deleteme123", 777);
+	fchmod(42, 444);
+
+	close(42);
+	dup(42);
+	dup2(42, 43);
+	umask(777);
+
+	mkfifo("/dev/null", 777);
+
+	open("/dev/null", O_APPEND);
 
 	f = fopen("retracetest.deleteme", "w+");
 
 	if (f) {
-		fwrite(s, strlen(s), 1, f);
-		fputs(s,  f);
+		fileno(f);
+		printf("Opened file\n");
+		fwrite(carray, sizeof(char), sizeof(carray), f);
+		fputs(s1,  f);
 		fputc('6', f);
+		putc('6', f);
+
+		fseek(f, 0, SEEK_SET);
 
 		rewind(f);
 
-		fread(buf, strlen(s), 1, f);
+		fread(buf, strlen(s1), 1, f);
 
 		rewind(f);
 
-		fgets(buf, strlen(s), f);
+		fgets(buf, strlen(s1), f);
 		fgetc(f);
 
 		fclose(f);

@@ -28,19 +28,32 @@
 
 ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 {
-	ssize_t ret;
-	struct descriptor_info *di;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+					  PARAMETER_TYPE_MEMORY_BUFFER,
+					  PARAMETER_TYPE_INT,
+					  PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &nbytes, &buf, &nbytes, NULL};
+	ssize_t ret = 0;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "write";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+
+	if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_END)) {
+		nbytes = rtr_get_fuzzing_random() % nbytes;
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+	}
+
+	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_write(fd, buf, nbytes);
 
-	di = file_descriptor_get(fd);
-
-	if (di && di->location)
-		trace_printf(1, "write(%d, %p, %d); [to %s, return: %d]\n", fd, buf, nbytes, di->location, ret);
-	else
-		trace_printf(1, "write(%d, %p, %d); [return: %d]\n", fd, buf, nbytes, ret);
-
-	trace_dump_data(buf, nbytes);
+	retrace_log_and_redirect_after(&event_info);
 
 	return ret;
 }

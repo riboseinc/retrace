@@ -28,11 +28,23 @@
 
 void *RETRACE_IMPLEMENTATION(dlopen)(const char *filename, int flag)
 {
-	void *r;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&filename, &flag};
+	void *r = NULL;
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "dlopen";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
 
 	r = real_dlopen(filename, flag);
 
-	trace_printf(1, "dlopen(\"%s\", %d); [return %p]\n", filename, flag, r);
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -43,11 +55,20 @@ RETRACE_REPLACE(dlopen, void *, (const char *filename, int flag),
 
 char *RETRACE_IMPLEMENTATION(dlerror)(void)
 {
-	char *r;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_END};
+	char *r = NULL;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "dlerror";
+	event_info.parameter_types = parameter_types;
+	event_info.return_value_type = PARAMETER_TYPE_STRING;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
 
 	r = real_dlerror();
 
-	trace_printf(1, "dlerror(); [return: \"%s\"]\n", r);
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -59,11 +80,23 @@ RETRACE_REPLACE(dlerror, char *, (void), ())
 #ifdef HAVE_ATOMIC_BUILTINS
 void *RETRACE_IMPLEMENTATION(dlsym)(void *handle, const char *symbol)
 {
-	void *r;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&handle, &symbol};
+	void *r = NULL;
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "dlsym";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_POINTER;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
 
 	r = real_dlsym(handle, symbol);
 
-	trace_printf(1, "dlsym(%p, \"%s\"); [return: %p]\n", handle, symbol, r);
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -75,9 +108,23 @@ RETRACE_REPLACE(dlsym, void *, (void *handle, const char *symbol),
 
 int RETRACE_IMPLEMENTATION(dlclose)(void *handle)
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&handle};
 	int r;
 
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "dlclose";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
 	r = real_dlclose(handle);
+
+	retrace_log_and_redirect_after(&event_info);
 
 	trace_printf(1, "dlclose(%p); [return: %d]\n", handle, r);
 

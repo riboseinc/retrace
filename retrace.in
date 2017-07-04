@@ -3,123 +3,69 @@
 readonly __progname="$(basename $0)"
 
 errx() {
-    echo -e "${__progname}: $@" >&2
-    exit 1
+	echo "${__progname}: $@" >&2
+	exit 1
 }
 
 usage() {
-    echo "usage: ${__progname} [-f configuration file location] <executable>"
-    exit 1
+	echo "usage: ${__progname} [-f configuration file location] <executable>"
+	exit 1
 }
 
 get_lib_file() {
-    local fname="$1"
+	readonly local fname="$1"
 
-    # check for the local file
-    local path="$fname"
-    if [ -f "$path" ]; then
-        output="$path"
-        return 0
-    fi
+	for path in "${fname}" \
+	    ".libs/${fname}" \
+	    "../.libs/${fname}" \
+	    "@libdir@/${fname}" \
+	    "/usr/lib/${fname}" \
+	    "/usr/lib64/${fname}"; do
+		[ ! -f "${path}" ] && \
+			continue
 
-    # check in autotools generated dir
-    local path=".libs/$fname"
-    if [ -f "$path" ]; then
-        output="$path"
-        return 0
-    fi
+		echo "${path}"
 
-    # check in autotools generated dir
-    local path="../.libs/$fname"
-    if [ -f "$path" ]; then
-        output="$path"
-        return 0
-    fi
+		return 0
+	done
 
-    # check in the PREFIX path
-    local path="@libdir@/$fname"
-    if [ -f "$path" ]; then
-        output="$path"
-        return 0
-    fi
-
-    # check default library path
-    local path="/usr/lib/$fname"
-    if [ -f "$path" ]; then
-        output="$path"
-        return 0
-    fi
-
-    # check default library path
-    local path="/usr/lib64/$fname"
-    if [ -f "$path" ]; then
-        output="$path"
-        return 0
-    fi
-
-    return 1
+	return 1
 }
 
-
 main() {
-    if [ $# -lt 1  ]; then
-        usage
-    fi
+	[ $# -lt 1  ] && \
+		usage
 
-    local cfg_env=""
+	if [ $# -ge 3 -a "$1" = "-f" ]; then
+		local RETRACE_CONFIG="$2"
 
-    # check for -f config
-    if [ $# -ge 3 -a "$1" = "-f" ]; then
-        readonly local config="$2"
+		shift 2
+	fi
 
-        if [ ! -f "${config}" ]; then
-            errx "cannot open '${config}'"
-        fi
+	if [ "${RETRACE_CONFIG}" ]; then
+		[ ! -f "${RETRACE_CONFIG}" ] && \
+			errx "cannot open '${RETRACE_CONFIG}'"
+	fi
 
-        cfg_env="${config}"
+	readonly local libname="libretrace"
 
-        shift 2
+	if $(uname | grep -q ^Darwin); then
+		readonly local lib="${libname}.dylib"
+		readonly local output=$(get_lib_file "${lib}")
+		readonly local envload="RETRACE_CONFIG=${RETRACE_CONFIG} DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES=${output}"
+	else
+		readonly local lib="${libname}.so"
+		readonly local output=$(get_lib_file "${lib}")
+		readonly local envload="RETRACE_CONFIG=${RETRACE_CONFIG} LD_PRELOAD=${output}"
+	fi
 
-    # if env variable present
-    elif [ "${RETRACE_CONFIG}" ]; then
-        readonly local config="${RETRACE_CONFIG}"
+	[ ! "${output}" ] && \
+		errx "cannot find '${lib}'"
 
-        if [ ! -f "${config}" ]; then
-            errx "cannot open '${config}'"
-        fi
-    fi
+	[ ! -x "$1" ] && \
+		errx "cannot execute '$1'"
 
-    # use .dylib extension for MacOS
-    if $(uname | grep -q ^Darwin); then
-        readonly lib="libretrace.dylib"
-
-        get_lib_file "$lib"
-        if [ $? != 0 ]; then
-            errx "Cannot find '${lib}'"
-        fi
-
-        if [ -z "$cfg_env" ]; then
-            DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
-        else
-            # XXX: enabling config causes the test applications crash on MacOS.
-            # disabled config for now
-            # RETRACE_CONFIG="$cfg_env" DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
-            DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES="${output}" "$@"
-        fi
-    else
-        readonly lib="libretrace.so"
-
-        get_lib_file "$lib"
-        if [ $? != 0 ]; then
-            errx "Cannot find '${lib}'"
-        fi
-
-        if [ -z "$cfg_env" ]; then
-            LD_PRELOAD="${output}" "$@"
-        else
-            RETRACE_CONFIG="$cfg_env" LD_PRELOAD="${output}" "$@"
-        fi
-    fi
+	eval "${envload}" "$@"
 }
 
 main "$@"

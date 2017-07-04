@@ -32,10 +32,11 @@ noinst_HEADERS= \
 	sock.h \
 	str.h \
 	trace.h \
-	write.h
+	write.h \
+	log.h
 
 if OPENSSL
-	noinst_HEADERS+= ssl.h
+noinst_HEADERS+= ssl.h
 endif
 
 # include all C files here
@@ -64,10 +65,12 @@ libretrace_la_SOURCES= \
 	str.c \
 	time.c \
 	trace.c \
-	write.c
+	write.c \
+	log.c
 
 if OPENSSL
-	libretrace_la_SOURCES+= ssl.c
+libretrace_la_SOURCES+= ssl.c
+libretrace_la_LDFLAGS+= -lssl -lcrypto
 endif
 
 

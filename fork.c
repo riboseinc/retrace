@@ -28,11 +28,21 @@
 
 pid_t RETRACE_IMPLEMENTATION(fork)(void)
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_END};
 	pid_t p;
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "fork";
+	event_info.parameter_types = parameter_types;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &p;
+	retrace_log_and_redirect_before(&event_info);
 
 	p = real_fork();
 
-	trace_printf(1, "fork(); [%d]\n", p);
+	retrace_log_and_redirect_after(&event_info);
 
 	return p;
 }

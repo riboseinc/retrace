@@ -1,4 +1,4 @@
-AM_CFLAGS = $(TESTS_CFLAGS)
+AM_CFLAGS = $(TESTS_CFLAGS) -g
 
 dist_check_SCRIPTS = runtests.sh
 noinst_PROGRAMS =
@@ -15,7 +15,6 @@ endif
 endif
 
 if ENABLE_TESTS
-noinst_PROGRAMS += id env time fork exit malloc str pipe sock sock_srv file trace pledge scanf dlopen getaddrinfo
+noinst_PROGRAMS += id env time fork exit malloc str pipe sock sock_srv file trace pledge scanf dlopen dir exec printf popen char mmap sbrk getaddrinfo log memcpy
 TESTS += $(dist_check_SCRIPTS)
-
 endif

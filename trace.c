@@ -52,6 +52,7 @@ int RETRACE_IMPLEMENTATION(ptrace)(int request, pid_t pid, void *addr, int data)
 long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 #endif
 {
+	struct rtr_event_info event_info;
 	char *request_str;
 	int r;
 #if defined(__APPLE__) || defined(__linux__)
@@ -67,6 +68,17 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 
 	va_end(arglist);
 #endif
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT | PARAMETER_FLAG_STRING_NEXT, PARAMETER_TYPE_INT, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&request, &request_str, &pid, &addr, &data};
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "ptrace";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
 
 	switch (request) {
 	case PT_TRACE_ME:
@@ -203,7 +215,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 
 	r = real_ptrace(request, pid, addr, data);
 
-	trace_printf(1, "ptrace(\"%s\"(%d), %u, %p, %p) [return: %d];\n", request_str, request, pid, addr, data, r);
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }

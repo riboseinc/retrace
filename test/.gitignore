@@ -21,3 +21,9 @@ test-suite.log
 cmockatest.log
 cmockatest.trs
 retrace.log
+perror
+char
+dir
+exec
+popen
+printf

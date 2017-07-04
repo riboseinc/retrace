@@ -23,24 +23,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "common.h"
-#include "exit.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
 
-void RETRACE_IMPLEMENTATION(exit)(int status)
+int main(void)
 {
-	struct rtr_event_info event_info;
-	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
-	void *parameter_values[] = {&status};
+	errno = EADDRINUSE;
 
+	perror("retrace");
 
-	memset(&event_info, 0, sizeof(event_info));
-	event_info.function_name = "exit";
-	event_info.parameter_types = parameter_types;
-	event_info.parameter_values = parameter_values;
-	event_info.return_value_type = PARAMETER_TYPE_END;
-	retrace_log_and_redirect_before(&event_info);
-
-	real_exit(status);
+	return 0;
 }
-
-RETRACE_REPLACE(exit, void, (int status), (status))

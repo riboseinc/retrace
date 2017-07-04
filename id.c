@@ -30,38 +30,98 @@
 
 int RETRACE_IMPLEMENTATION(setuid)(uid_t uid)
 {
-	trace_printf(1, "setuid(%d);\n", uid);
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&uid};
+	int r;
 
-	return real_setuid(uid);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "setuid";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_setuid(uid);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return (r);
 }
 
 RETRACE_REPLACE(setuid, int, (uid_t uid), (uid))
 
 int RETRACE_IMPLEMENTATION(seteuid)(uid_t uid)
 {
-	trace_printf(1, "seteuid(%d);\n", uid);
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&uid};
+	int r;
 
-	return real_seteuid(uid);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "seteuid";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_seteuid(uid);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return (r);
 }
 
 RETRACE_REPLACE(seteuid, int, (uid_t uid), (uid))
 
 int RETRACE_IMPLEMENTATION(setgid)(gid_t gid)
 {
-	trace_printf(1, "setgid(%d);\n", gid);
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&gid};
+	int r;
 
-	return real_setgid(gid);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "setgid";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_setgid(gid);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return (r);
 }
 
 RETRACE_REPLACE(setgid, int, (gid_t gid), (gid))
 
 gid_t RETRACE_IMPLEMENTATION(getgid)()
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_END};
 	int gid;
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "getgid";
+	event_info.parameter_types = parameter_types;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &gid;
+
+	retrace_log_and_redirect_before(&event_info);
 
 	gid = real_getgid();
 
-	trace_printf(1, "getgid(); [%d]\n", gid);
+	retrace_log_and_redirect_after(&event_info);
 
 	return gid;
 }
@@ -70,11 +130,22 @@ RETRACE_REPLACE(getgid, gid_t, (), ())
 
 gid_t RETRACE_IMPLEMENTATION(getegid)()
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_END};
 	int egid;
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "getegid";
+	event_info.parameter_types = parameter_types;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &egid;
+
+	retrace_log_and_redirect_before(&event_info);
 
 	egid = real_getegid();
 
-	trace_printf(1, "getegid(); [%d]\n", egid);
+	retrace_log_and_redirect_after(&event_info);
 
 	return egid;
 }
@@ -83,6 +154,8 @@ RETRACE_REPLACE(getegid, gid_t, (), ())
 
 uid_t RETRACE_IMPLEMENTATION(getuid)()
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_END};
 	int redirect_id;
 	int uid;
 
@@ -92,9 +165,19 @@ uid_t RETRACE_IMPLEMENTATION(getuid)()
 		return redirect_id;
 	}
 
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "getuid";
+	event_info.parameter_types = parameter_types;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &uid;
+
+	retrace_log_and_redirect_before(&event_info);
+
 	uid = real_getuid();
 
-	trace_printf(1, "getuid(); [%d]\n", uid);
+	retrace_log_and_redirect_after(&event_info);
+
 
 	return uid;
 }
@@ -103,6 +186,8 @@ RETRACE_REPLACE(getuid, uid_t, (), ())
 
 uid_t RETRACE_IMPLEMENTATION(geteuid)()
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_END};
 	int euid;
 	int redirect_id;
 
@@ -112,9 +197,17 @@ uid_t RETRACE_IMPLEMENTATION(geteuid)()
 		return redirect_id;
 	}
 
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "geteuid";
+	event_info.parameter_types = parameter_types;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &euid;
+	retrace_log_and_redirect_before(&event_info);
+
 	euid = real_geteuid();
 
-	trace_printf(1, "geteuid(); [%d]\n", euid);
+	retrace_log_and_redirect_after(&event_info);
 
 	return euid;
 }
@@ -123,11 +216,22 @@ RETRACE_REPLACE(geteuid, uid_t, (), ())
 
 pid_t RETRACE_IMPLEMENTATION(getpid)()
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_END};
 	int pid;
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "getpid";
+	event_info.parameter_types = parameter_types;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &pid;
+
+	retrace_log_and_redirect_before(&event_info);
 
 	pid = real_getpid();
 
-	trace_printf(1, "getpid(); [%d]\n", pid);
+	retrace_log_and_redirect_after(&event_info);
 
 	return pid;
 }
@@ -136,11 +240,22 @@ RETRACE_REPLACE(getpid, pid_t, (), ())
 
 pid_t RETRACE_IMPLEMENTATION(getppid)()
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_END};
 	int ppid;
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "getppid";
+	event_info.parameter_types = parameter_types;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ppid;
+
+	retrace_log_and_redirect_before(&event_info);
 
 	ppid = real_getppid();
 
-	trace_printf(1, "getppid(); [%d]\n", ppid);
+	retrace_log_and_redirect_after(&event_info);
 
 	return ppid;
 }

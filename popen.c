@@ -29,11 +29,23 @@
 
 FILE *RETRACE_IMPLEMENTATION(popen)(const char *command, const char *type)
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING,  PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&command, &type};
 	FILE *ret;
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "popen";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_FILE_STREAM;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_popen(command, type);
 
-	trace_printf(1, "popen(\"%s\", \"%s\"); [%d]\n", command, type, real_fileno(ret));
+	retrace_log_and_redirect_after(&event_info);
 
 	return ret;
 }
@@ -44,11 +56,24 @@ RETRACE_REPLACE(popen, FILE *, (const char *command, const char *type),
 
 int RETRACE_IMPLEMENTATION(pclose)(FILE *stream)
 {
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&stream};
 	int ret;
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "pclose";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_pclose(stream);
 
-	trace_printf(1, "pclose(%d); [%d]\n", real_fileno(stream), ret);
+	stream = NULL;
+	retrace_log_and_redirect_after(&event_info);
 
 	return ret;
 }

@@ -30,37 +30,24 @@
 
 int RETRACE_IMPLEMENTATION(pledge)(const char *promises, const char *paths[])
 {
-	rtr_pledge_t real_pledge;
 	int r;
 	const char **s;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&promises};
 
-	real_pledge = RETRACE_GET_REAL(pledge);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "pledge";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
 
 	r = real_pledge(promises, paths);
 
-	trace_printf(1, "pledge(\"%s\", ", promises);
-
-	if (paths == NULL) {
-		trace_printf(0, "NULL");
-	} else {
-		trace_printf(0, "{");
-
-		s = paths;
-
-		if (*s) {
-			trace_printf(0, "\"%s\"", *s);
-			s++;
-		}
-
-		while (*s) {
-			trace_printf(0, ", \"%s\"", *s);
-			s++;
-		}
-
-		trace_printf(0, "}");
-	}
-
-	trace_printf(0, "); [return %d]\n", r);
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
