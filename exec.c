@@ -30,8 +30,8 @@
 #include <unistd.h>
 
 
-/* Duplicates a string array adding an extra spots,
- * return number of spaces in extra_space
+/* Duplicates a string array adding extra spaces,
+ * returns the new array that must be free'd
  */
 static char **
 duplicate_string_array(const char **array, int extra_space, int *count)
@@ -63,7 +63,7 @@ static char*
 find_environment_var(const char *var)
 {
 	char **s;
-	int len = real_strlen(var);
+	int len;
 
 	len = real_strlen(var);
 
