@@ -1327,7 +1327,7 @@ void trace_printf_backtrace(void)
 		printf("======== begin callstack =========\n");
 		for (i = 2; i < frames; ++i)
 			printf("%s\n", strs[i]);
-		printf("======== end callstack =========%s\n");
+		printf("======== end callstack =========\n");
 		trace_set_color(RST);
 
 		real_free(strs);
