@@ -700,6 +700,7 @@ fcntl_v(int fildes, int cmd, va_list ap)
 	void const *parameter_values_f_owner_ex[] = {&fildes, &cmd, &f_owner_ex_parameter};
 #endif
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fcntl";
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
