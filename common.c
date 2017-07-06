@@ -110,6 +110,27 @@ static pthread_mutex_t printing_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t logfile_lock = PTHREAD_MUTEX_INITIALIZER;
 static int is_main_thread(void);
 
+
+/* Returns time as zero on the first call and in subsequents call
+ * returns the time elapsed since the first called */
+static retrace_get_time(struct timespec *tp)
+{
+	static struct timespec start_time = {0, 0};
+
+	if (start_time.tv_sec == 0 &&
+	    start_time.tv_nsec == 0)
+	{
+		tp->tv_sec = 0;
+		tp->tv_nsec = 0;
+		clock_gettime(CLOCK_MONOTONIC, &start_time);
+	} else {
+
+		clock_gettime(CLOCK_MONOTONIC, tp);
+		tp->tv_sec -= start_time.tv_sec;
+		tp->tv_nsec -= start_time.tv_nsec;
+	}
+}
+
 static void **
 retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, void **value)
 {
@@ -478,6 +499,11 @@ retrace_event(struct rtr_event_info *event_info)
 	if (!get_tracing_enabled())
 		return;
 
+	if (event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
+		retrace_get_time(&event_info->start_time);
+		return;
+	}
+
 	pthread_mutex_lock(&printing_lock);
 
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
@@ -531,6 +557,15 @@ retrace_event(struct rtr_event_info *event_info)
 		if (event_info->event_flags & EVENT_FLAGS_PRINT_RAND_SEED)
 			trace_printf(0, " [fuzzing seed: %u]", g_rand_seed);
 
+		if (event_info->event_type == EVENT_TYPE_AFTER_CALL) {
+			struct timespec end_time;
+			retrace_get_time(&end_time);
+
+			trace_printf(0, " [took: %u.%lusecs]",
+			end_time.tv_sec - event_info->start_time.tv_sec,
+			(end_time.tv_nsec - event_info->start_time.tv_nsec) / 1000000000.0);
+		}
+
 		trace_printf(0, "\n");
 
 		/* Give another pass to dump memory buffers in case we have any */
@@ -554,11 +589,8 @@ retrace_event(struct rtr_event_info *event_info)
 void
 retrace_log_and_redirect_before(struct rtr_event_info *event_info)
 {
-	/* Don't do anything for now */
-#if 0
 	event_info->event_type = EVENT_TYPE_BEFORE_CALL;
 	retrace_event(event_info);
-#endif
 }
 
 void
@@ -614,6 +646,11 @@ trace_printf(int hdr, const char *fmt, ...)
 	old_trace_state = trace_disable();
 
 	if (hdr == 1) {
+		struct timespec ts;
+
+		retrace_get_time (&ts);
+		real_fprintf(output_file_current, "(%u.%lu) ", ts.tv_sec, ts.tv_nsec);
+
 		real_fprintf(output_file_current, "(%d) ", real_getpid());
 
 		if (!is_main_thread())
