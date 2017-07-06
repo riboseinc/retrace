@@ -494,8 +494,12 @@ retrace_dump_parameter(unsigned int type, int flags, void **value)
 void
 retrace_event(struct rtr_event_info *event_info)
 {
+	int olderrno;
+
 	if (!get_tracing_enabled())
 		return;
+
+	olderrno = errno;
 
 	pthread_mutex_lock(&printing_lock);
 
@@ -537,7 +541,6 @@ retrace_event(struct rtr_event_info *event_info)
 		}
 
 		trace_printf(0, ")");
-
 		/* Return value is only valid in EVENT_TYPE_AFTER_CALL */
 		if (event_info->event_type == EVENT_TYPE_AFTER_CALL && event_info->return_value_type != PARAMETER_TYPE_END) {
 			trace_printf(0, " = ");
@@ -569,6 +572,8 @@ retrace_event(struct rtr_event_info *event_info)
 
 		}
 	}
+
+	errno = olderrno;
 
 	pthread_mutex_unlock(&printing_lock);
 }
@@ -664,6 +669,7 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 static void
 trace_set_color(char *color)
 {
+
 	trace_printfv(0, color, "", NULL);
 }
 
