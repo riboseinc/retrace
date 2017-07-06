@@ -13,7 +13,7 @@ usage() {
 }
 
 get_lib_file() {
-	readonly local fname="$1"
+	readonly fname="$1"
 
 	for path in "${fname}" \
 	    ".libs/${fname}" \
@@ -37,7 +37,7 @@ main() {
 		usage
 
 	if [ $# -ge 3 -a "$1" = "-f" ]; then
-		local RETRACE_CONFIG="$2"
+		RETRACE_CONFIG="$2"
 
 		shift 2
 	fi
@@ -47,22 +47,22 @@ main() {
 			errx "cannot open '${RETRACE_CONFIG}'"
 	fi
 
-	readonly local libname="libretrace"
+	readonly libname="libretrace"
 
 	if $(uname | grep -q ^Darwin); then
-		readonly local lib="${libname}.dylib"
-		readonly local output=$(get_lib_file "${lib}")
-		readonly local envload="RETRACE_CONFIG=${RETRACE_CONFIG} DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES=${output}"
+		readonly lib="${libname}.dylib"
+		readonly output=$(get_lib_file "${lib}")
+		readonly envload="RETRACE_CONFIG=${RETRACE_CONFIG} DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES=${output}"
 	else
-		readonly local lib="${libname}.so"
-		readonly local output=$(get_lib_file "${lib}")
-		readonly local envload="RETRACE_CONFIG=${RETRACE_CONFIG} LD_PRELOAD=${output}"
+		readonly lib="${libname}.so"
+		readonly output=$(get_lib_file "${lib}")
+		readonly envload="RETRACE_CONFIG=${RETRACE_CONFIG} LD_PRELOAD=${output}"
 	fi
 
 	[ ! "${output}" ] && \
 		errx "cannot find '${lib}'"
 
-	[ ! -x "$1" ] && \
+	which "$1" >/dev/null 2>&1 || \
 		errx "cannot execute '$1'"
 
 	eval "${envload}" "$@"
