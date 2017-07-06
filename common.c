@@ -541,6 +541,7 @@ retrace_event(struct rtr_event_info *event_info)
 		}
 
 		trace_printf(0, ")");
+
 		/* Return value is only valid in EVENT_TYPE_AFTER_CALL */
 		if (event_info->event_type == EVENT_TYPE_AFTER_CALL && event_info->return_value_type != PARAMETER_TYPE_END) {
 			trace_printf(0, " = ");
@@ -669,7 +670,6 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 static void
 trace_set_color(char *color)
 {
-
 	trace_printfv(0, color, "", NULL);
 }
 
