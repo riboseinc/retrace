@@ -18,10 +18,9 @@ int main(void)
 
 	syslog(LOG_INFO, "Test log %s %d", "string", 42);
 
-	closelog();
-
 	more_tests("vsyslog %d\n", 42);
 
+	closelog();
 
 	return 0;
 }

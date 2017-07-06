@@ -202,7 +202,8 @@ option_to_string(int option, char *buf)
 
 void RETRACE_IMPLEMENTATION(openlog)(const char *ident, int option, int facility)
 {
-	char option_str[OPTION_MAX_BUFFER + 1];
+	char option_buf[OPTION_MAX_BUFFER + 1];
+	char *option_str = option_buf;
 	const char *facility_str = NULL;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING,
@@ -315,7 +316,8 @@ RETRACE_REPLACE(vsyslog, void, (int priority, const char *format, va_list ap), (
 
 int RETRACE_IMPLEMENTATION(setlogmask)(int mask)
 {
-	char mask_str[OPTION_MAX_BUFFER + 1];
+	char mask_buf[OPTION_MAX_BUFFER + 1];
+	char *mask_str = mask_buf;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_INT | PARAMETER_FLAG_STRING_NEXT,
 					  PARAMETER_TYPE_END};

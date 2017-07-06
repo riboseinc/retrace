@@ -45,7 +45,7 @@ void RETRACE_IMPLEMENTATION(exit)(int status)
 
 RETRACE_REPLACE(exit, void, (int status), (status))
 
-#ifdef __linux
+#ifdef __linux__
 int RETRACE_IMPLEMENTATION(on_exit)(void (*function)(int, void *), void *arg)
 {
 	struct rtr_event_info event_info;

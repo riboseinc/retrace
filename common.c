@@ -55,6 +55,7 @@
 #include <arpa/inet.h>
 #include <sys/un.h>
 #include <netdb.h>
+#include <sys/socket.h>
 
 #include "str.h"
 #include "id.h"
@@ -802,11 +803,7 @@ retrace_event(struct rtr_event_info *event_info)
 	}
 
 	old_trace_state = trace_disable();
-
-	old_trace_state = trace_disable();
 	pthread_mutex_lock(&printing_lock);
-	trace_restore(old_trace_state);
-
 	olderrno = errno;
 
 	if (!loaded_config) {
@@ -925,7 +922,6 @@ retrace_event(struct rtr_event_info *event_info)
 
 	errno = olderrno;
 
-	old_trace_state = trace_disable();
 	pthread_mutex_unlock(&printing_lock);
 	trace_restore(old_trace_state);
 }

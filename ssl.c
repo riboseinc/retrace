@@ -32,13 +32,6 @@
 
 #include "ssl.h"
 
-
-typedef size_t (*rtr_SSL_get_client_random_t)(const SSL *ssl, unsigned char *out, size_t outlen);
-typedef size_t (*rtr_SSL_get_server_random_t)(const SSL *ssl, unsigned char *out, size_t outlen);
-typedef size_t (*rtr_SSL_SESSION_get_master_key_t)(const SSL_SESSION *session, unsigned char *out, size_t outlen);
-typedef SSL_SESSION *(*rtr_SSL_get_session_t)(const SSL *ssl);
-
-
 int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
 {
 	int r;
