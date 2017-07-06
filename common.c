@@ -1298,10 +1298,9 @@ void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param)
 	case RTR_FUZZ_TYPE_GARBAGE:
 		len = *((int *) param);
 
-		ret = real_malloc(len + 1);
-		memset(ret, 'A', len / 2);
-		for (i = 0; i < len / 2; i++)
-			ret[len / 2 + i] = '\xEC';
+		ret = real_malloc(len);
+		for (i = 0; i < len; i++)
+			ret[i] = (char) rand() % 0xFF;
 
 		break;
 
