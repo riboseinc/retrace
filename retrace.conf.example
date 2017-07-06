@@ -10,4 +10,4 @@ SSL_get_verify_result,10
 fuzzingseed,1498729252
 memoryfuzzing,0.05
 incompleteio
-forcefollowchildren
+forcefollowexec

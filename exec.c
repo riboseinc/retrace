@@ -82,7 +82,7 @@ inject_retrace_env_vars(const char **env)
 
 	if (follow_children == -1) {
 		follow_children = 0;
-		if (rtr_get_config_single("forcefollowchildren", ARGUMENT_TYPE_END))
+		if (rtr_get_config_single("forcefollowexec", ARGUMENT_TYPE_END))
 			follow_children = 1;
 	}
 
@@ -93,12 +93,18 @@ inject_retrace_env_vars(const char **env)
 #else
 		char *retrace_env_var = "LD_PRELOAD";
 #endif
+		char *retrace_config_var = "RETRACE_CONFIG";
+
 		char *var_to_copy;
 
-		new_env = duplicate_string_array((const char **) env, 1, &size);
+		new_env = duplicate_string_array((const char **) env, 2, &size);
 
 		var_to_copy = find_environment_var(retrace_env_var);
 
+		if (new_env && var_to_copy)
+			new_env[size - 3] = var_to_copy;
+
+		var_to_copy = find_environment_var(retrace_config_var);
 		if (new_env && var_to_copy)
 			new_env[size - 2] = var_to_copy;
 	}
