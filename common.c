@@ -494,8 +494,12 @@ retrace_dump_parameter(unsigned int type, int flags, void **value)
 void
 retrace_event(struct rtr_event_info *event_info)
 {
+	int olderrno;
+
 	if (!get_tracing_enabled())
 		return;
+
+	olderrno = errno;
 
 	pthread_mutex_lock(&printing_lock);
 
@@ -569,6 +573,8 @@ retrace_event(struct rtr_event_info *event_info)
 
 		}
 	}
+
+	errno = olderrno;
 
 	pthread_mutex_unlock(&printing_lock);
 }
