@@ -130,7 +130,7 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 				fuzzing_enabled = 0;
 		}
 
-		if (fuzzing_enabled) {
+		if (fuzzing_enabled && fuzzing_data_len > 0) {
 			if (real_strcmp(fuzzing_type_str, FUZZ_TYPE_BUF_OVERFLOW) == 0)
 				fuzzing_type = RTR_FUZZ_TYPE_BUFOVER;
 			else if (real_strcmp(fuzzing_type_str, FUZZ_TYPE_FORMAT_STR) == 0)
@@ -139,7 +139,8 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 				fuzzing_type = RTR_FUZZ_TYPE_GARBAGE;
 			else
 				fuzzing_enabled = 0;
-		}
+		} else
+			fuzzing_enabled = 0;
 
 		if (fuzzing_enabled) {
 			env = (char *) rtr_get_fuzzing_value(fuzzing_type, (void *) &fuzzing_data_len);
@@ -152,9 +153,6 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 		env = real_getenv(envname);
 
 	retrace_log_and_redirect_after(&event_info);
-
-	if (fuzzing_enabled)
-		trace_printf_backtrace();
 
 	return (env);
 }

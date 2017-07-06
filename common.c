@@ -1268,7 +1268,7 @@ int rtr_check_config_token(const char *token, char *str, const char *sep)
 /* get fuzzing values */
 void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param)
 {
-	unsigned char *ret = NULL;
+	char *ret = NULL;
 	int i, len;
 
 	switch (fuzz_type) {
@@ -1276,7 +1276,7 @@ void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param)
 		len = *((int *) param);
 
 		ret = real_malloc(len + 1);
-		memset(ret, 'a', len);
+		memset(ret, 'A', len);
 		ret[len] = '\0';
 
 		break;
@@ -1298,9 +1298,10 @@ void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param)
 	case RTR_FUZZ_TYPE_GARBAGE:
 		len = *((int *) param);
 
-		ret = real_malloc(len);
-		for (i = 0; i < len; i++)
-			ret[i] = 'a';
+		ret = real_malloc(len + 1);
+		memset(ret, 'A', len / 2);
+		for (i = 0; i < len / 2; i++)
+			ret[len / 2 + i] = '\xEC';
 
 		break;
 
