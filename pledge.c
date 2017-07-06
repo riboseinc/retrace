@@ -42,7 +42,7 @@ int RETRACE_IMPLEMENTATION(pledge)(const char *promises, const char *paths[])
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
-	event_info.return_value = &ret;
+	event_info.return_value = &r;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_pledge(promises, paths);
@@ -52,6 +52,6 @@ int RETRACE_IMPLEMENTATION(pledge)(const char *promises, const char *paths[])
 	return r;
 }
 
-RETRACE_REPLACE(pledge)
+RETRACE_REPLACE(pledge, int, (const char *promises, const char *paths[]), (promises, paths))
 
 #endif /* __OpenBSD */
