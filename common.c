@@ -736,7 +736,9 @@ retrace_dump_parameter(unsigned int type, int flags, void **value)
 		value++;
 		data = *((void **) (*value));
 
-		if (size > 0)
+		if (size == 1) /* Special case for size == 1 */
+			trace_dump_data((*(unsigned char **) *value), nmemb);
+		else if (size > 0)
 			for (i = 0; i < nmemb; i++)
 				trace_dump_data(data + i, size);
 	} else if (type == PARAMETER_TYPE_IOVEC) {
