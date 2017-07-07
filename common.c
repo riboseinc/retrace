@@ -111,7 +111,6 @@ struct descriptor_info **g_descriptor_list;
 unsigned int g_descriptor_list_size;
 
 static pthread_mutex_t printing_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t logfile_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static int output_file_flush;
 static FILE *output_file;
@@ -754,7 +753,9 @@ retrace_event(struct rtr_event_info *event_info)
 		return;
 
 	old_trace_state = trace_disable();
-	pthread_mutex_lock(&logfile_lock);
+	pthread_mutex_lock(&printing_lock);
+	olderrno = errno;
+
 	if (!loaded_config) {
 		loaded_config = 1;
 		if (rtr_get_config_single_internal("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END,
@@ -765,11 +766,6 @@ retrace_event(struct rtr_event_info *event_info)
 			output_file = out_file_tmp;
 		}
 	}
-	pthread_mutex_unlock(&logfile_lock);
-
-	olderrno = errno;
-
-	pthread_mutex_lock(&printing_lock);
 
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		unsigned int *parameter_type;
