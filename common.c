@@ -555,7 +555,7 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		int nfds = (*(int *) *value);
 		value++;
 
-		fd_set *in = (*(fd_set **) *value);
+		fd_set in = (*(fd_set *) *value);
 		value++;
 
 		fd_set *out = (*(fd_set **) *value);
@@ -563,9 +563,8 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		if (out == NULL)
 			break;
 
-		trace_printf(0, "(%s:", set);
 		for (fd = 0; fd < nfds; fd++) {
-			if (FD_ISSET(fd, in)) {
+			if (FD_ISSET(fd, &in)) {
 				trace_printf(0, "%.*s%.*s%d", comma, ",",
 							 FD_ISSET(fd, out) ? 1 : 0, "+", fd);
 
@@ -804,6 +803,7 @@ retrace_event(struct rtr_event_info *event_info)
 		return;
 	}
 
+	old_trace_state = trace_disable();
 	pthread_mutex_lock(&printing_lock);
 	olderrno = errno;
 
@@ -817,11 +817,9 @@ retrace_event(struct rtr_event_info *event_info)
 			output_file = out_file_tmp;
 		}
 
-		if (rtr_get_config_single("showtimestamp", ARGUMENT_TYPE_END))
+		if (rtr_get_config_single_internal("showtimestamp", ARGUMENT_TYPE_END))
 			show_timestamp = 1;
 	}
-
-	old_trace_state = trace_disable();
 
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		unsigned int *parameter_type;
@@ -884,11 +882,9 @@ retrace_event(struct rtr_event_info *event_info)
 			if (!loaded_time_config) {
 				loaded_time_config = 1;
 
-				trace_restore(old_trace_state);
-				if (!rtr_get_config_single("showcalltime", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END,
+				if (!rtr_get_config_single_internal("showcalltime", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END,
 								&timestamp_limit))
 					timestamp_limit = -1;
-				old_trace_state = trace_disable();
 			}
 
 			if (timestamp_limit >= 0) {
@@ -928,7 +924,7 @@ retrace_event(struct rtr_event_info *event_info)
 	errno = olderrno;
 
 	pthread_mutex_unlock(&printing_lock);
-    trace_restore(old_trace_state);
+	trace_restore(old_trace_state);
 }
 
 void
