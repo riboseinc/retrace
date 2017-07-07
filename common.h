@@ -40,6 +40,13 @@
 #define FILE_DESCRIPTOR_TYPE_UDP_SENDMSG	7 /* from sendmsg() over UDP local socket */
 #define FILE_DESCRIPTOR_TYPE_UNIX_BIND		8 /* bind AF_UNIX */
 
+/* fuzzing types */
+enum RTR_FUZZ_TYPE {
+	RTR_FUZZ_TYPE_BUFOVER = 0,			/* buffer overflow */
+	RTR_FUZZ_TYPE_FMTSTR,				/* format string */
+	RTR_FUZZ_TYPE_GARBAGE				/* garbage */
+};
+
 #define PARAMETER_TYPE_END		0
 #define PARAMETER_TYPE_INT		1 /* int */
 #define PARAMETER_TYPE_POINTER		2 /* opaque pointer, we will print the address */
@@ -238,5 +245,11 @@ int rtr_get_fuzzing_random(void);
 
 /* get string from type */
 void rtr_get_type_string(int type, const struct ts_info *ts_info, char *str, size_t size);
+
+/* get configuration token by separator */
+int rtr_check_config_token(const char *token, char *str, const char *sep);
+
+/* get fuzzing values */
+void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param);
 
 #endif /* __RETRACE_COMMON_H__ */
