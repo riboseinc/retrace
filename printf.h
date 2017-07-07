@@ -10,6 +10,7 @@ typedef int (*rtr_vfprintf_t)(FILE *stream, const char *fmt, va_list ap);
 typedef int (*rtr_vdprintf_t)(int fd, const char *fmt, va_list ap);
 typedef int (*rtr_vsprintf_t)(char *str, const char *fmt, va_list ap);
 typedef int (*rtr_vsnprintf_t)(char *buf, size_t size, const char *fmt, va_list ap);
+typedef int (*rtr_puts_t)(const char *str);
 
 RETRACE_DECL(printf);
 RETRACE_DECL(fprintf);
@@ -21,5 +22,7 @@ RETRACE_DECL(vfprintf);
 RETRACE_DECL(vdprintf);
 RETRACE_DECL(vsprintf);
 RETRACE_DECL(vsnprintf);
+RETRACE_DECL(puts);
+
 
 #endif /* __RETRACE_PRINTF_H__ */
