@@ -119,6 +119,7 @@ static FILE *output_file;
 static int is_main_thread(void);
 static void trace_set_color(char *color);
 
+static int rtr_get_config_single_internal(const char *function, ...);
 
 static void trace_printf(int hdr, const char *fmt, ...);
 static void trace_printf_str(const char *string, int maxlength);
@@ -756,7 +757,7 @@ retrace_event(struct rtr_event_info *event_info)
 	pthread_mutex_lock(&logfile_lock);
 	if (!loaded_config) {
 		loaded_config = 1;
-		if (rtr_get_config_single("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END,
+		if (rtr_get_config_single_internal("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END,
 								  &output_file_path, &output_file_flush)) {
 			if (output_file_path) {
 				 out_file_tmp = real_fopen(output_file_path, "a");
@@ -765,7 +766,6 @@ retrace_event(struct rtr_event_info *event_info)
 		}
 	}
 	pthread_mutex_unlock(&logfile_lock);
-	trace_restore(old_trace_state);
 
 	olderrno = errno;
 
@@ -849,6 +849,7 @@ retrace_event(struct rtr_event_info *event_info)
 	errno = olderrno;
 
 	pthread_mutex_unlock(&printing_lock);
+    trace_restore(old_trace_state);
 }
 
 void
@@ -882,9 +883,6 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 	int old_trace_state;
 	FILE *output_file_current = stderr;
 	int is_a_tty = 0;
-
-	if (!get_tracing_enabled())
-		return;
 
 	if (output_file)
 		output_file_current = output_file;
@@ -946,7 +944,7 @@ trace_printf_str(const char *string, int maxlength)
 	char *p;
 	int old_trace_state;
 
-	if (!get_tracing_enabled() || string == NULL || *string == '\0')
+	if (string == NULL || *string == '\0')
 		return;
 
 	old_trace_state = trace_disable();
@@ -994,13 +992,10 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 	int disable = 0;
 	int old_trace_state;
 
-	if (rtr_get_config_single("disabledatadump", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &disable)) {
+	if (rtr_get_config_single_internal("disabledatadump", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &disable)) {
 		if (disable)
 			return;
 	}
-
-	if (!get_tracing_enabled())
-		return;
 
 	old_trace_state = trace_disable();
 
@@ -1215,23 +1210,10 @@ static int
 rtr_parse_config(const struct config_entry **pentry,
 	const char *function, va_list arg_types)
 {
-	int retval, nargs, old_trace_state;
+	int retval, nargs;
 	char *parg;
 	void *pvar;
 	va_list arg_values;
-
-	/*
-	 * If we disabled tracing because we are executing some internal code,
-	 * don't honor any redirections.
-	 */
-	if (!get_tracing_enabled())
-		return 0;
-
-	/*
-	 * Disable tracing so we don't get in loops when the functions we
-	 * called here, call other functions that we have replaced.
-	 */
-	old_trace_state = trace_disable();
 
 	if (*pentry == NULL)
 		*pentry = get_config();
@@ -1274,23 +1256,29 @@ rtr_parse_config(const struct config_entry **pentry,
 	}
 
 	va_end(arg_values);
-	trace_restore(old_trace_state);
 
 	return retval;
 }
 
 int rtr_get_config_multiple(RTR_CONFIG_HANDLE *handle, const char *function, ...)
 {
-	int ret = 0;
+	int old_trace_state, ret = 0;
 	const struct config_entry **config = (const struct config_entry **)handle;
 
 	va_list args;
+
+	if (!get_tracing_enabled())
+		return 0;
+
+	old_trace_state = trace_disable();
 
 	va_start(args, function);
 
 	ret = rtr_parse_config(config, function, args);
 
 	va_end(args);
+
+	trace_restore(old_trace_state);
 
 	if (!ret)
 		*config = NULL;
@@ -1299,6 +1287,27 @@ int rtr_get_config_multiple(RTR_CONFIG_HANDLE *handle, const char *function, ...
 }
 
 int rtr_get_config_single(const char *function, ...)
+{
+	const struct config_entry *config = NULL;
+	va_list args;
+	int ret, old_trace_state;
+
+	if (!get_tracing_enabled())
+		return 0;
+
+	old_trace_state = trace_disable();
+
+	va_start(args, function);
+	ret = rtr_parse_config(&config, function, args);
+	va_end(args);
+
+	trace_restore(old_trace_state);
+
+	return (ret);
+}
+
+static int
+rtr_get_config_single_internal(const char *function, ...)
 {
 	const struct config_entry *config = NULL;
 	va_list args;
@@ -1567,11 +1576,7 @@ trace_printf_backtrace(void)
 	void *callstack[128];
 	int old_trace_state;
 
-	/* check tracing has enabled to avoid infinite loop, because backtrace() uses malloc() function */
-	if (!get_tracing_enabled())
-		return;
-
-	if (!rtr_get_config_single("backtrace", ARGUMENT_TYPE_END))
+	if (!rtr_get_config_single_internal("backtrace", ARGUMENT_TYPE_END))
 		return;
 
 	old_trace_state = trace_disable();
@@ -1597,7 +1602,7 @@ static void
 rtr_init_random(void)
 {
 	if (!g_init_rand) {
-		if (!rtr_get_config_single("fuzzingseed", ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END, &g_rand_seed))
+		if (!rtr_get_config_single_internal("fuzzingseed", ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END, &g_rand_seed))
 			g_rand_seed = time(NULL);
 
 		srand(g_rand_seed);
