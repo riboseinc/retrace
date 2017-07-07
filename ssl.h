@@ -26,8 +26,6 @@ RETRACE_DECL(SSL_connect);
 RETRACE_DECL(SSL_get_verify_result);
 RETRACE_DECL(BIO_ctrl);
 
-void print_ssl_keys(void *ssl);
-
 #endif /* HAVE_OPENSSL_SSL_H */
 
 #endif /* __RETRACE_SSL_H__ */

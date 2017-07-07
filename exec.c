@@ -26,7 +26,92 @@
 #include "common.h"
 #include "exec.h"
 #include "malloc.h"
+#include "str.h"
 #include <unistd.h>
+
+
+/* Duplicates a string array adding extra spaces,
+ * returns the new array that must be free'd
+ */
+static char **
+duplicate_string_array(const char **array, int extra_space, int *count)
+{
+	const char **s;
+	char **ret;
+
+	*count = extra_space + 1;
+
+	if (array)
+		for (s = array; *s; s++)
+			(*count)++;
+
+
+	/* relying in the fact that calloc initializes memory to zero */
+	ret = (char **) real_calloc(*count, sizeof(char *));
+
+	if (ret) {
+		int i;
+
+		for (i = 0; i < (*count) - extra_space; i++)
+			ret[i] = (char *) array[i];
+	}
+
+	return ret;
+}
+
+static char*
+find_environment_var(const char *var)
+{
+	char **s;
+	int len;
+
+	len = real_strlen(var);
+
+	for (s = environ; *s; s++)
+		if (real_strncmp(*s, var, len) == 0)
+			return *s;
+
+	return NULL;
+}
+
+static char**
+inject_retrace_env_vars(const char **env)
+{
+	static int follow_children = -1;
+	char **new_env = NULL;
+
+	if (follow_children == -1) {
+		follow_children = 0;
+		if (rtr_get_config_single("forcefollowexec", ARGUMENT_TYPE_END))
+			follow_children = 1;
+	}
+
+	if (follow_children) {
+		int size;
+#ifdef __APPLE__
+		char *retrace_env_var = "DYLD_INSERT_LIBRARIES";
+#else
+		char *retrace_env_var = "LD_PRELOAD";
+#endif
+		char *retrace_config_var = "RETRACE_CONFIG";
+
+		char *var_to_copy;
+
+		new_env = duplicate_string_array((const char **) env, 2, &size);
+
+		var_to_copy = find_environment_var(retrace_env_var);
+
+		if (new_env && var_to_copy)
+			new_env[size - 3] = var_to_copy;
+
+		var_to_copy = find_environment_var(retrace_config_var);
+		if (new_env && var_to_copy)
+			new_env[size - 2] = var_to_copy;
+	}
+
+	return new_env;
+}
+
 
 int RETRACE_IMPLEMENTATION(system)(const char *command)
 {
@@ -141,9 +226,11 @@ execle_v(const char *path, const char *arg0, va_list ap)
 	int nargs, i, r, old_trace_state;
 	char **args;
 	char **envp;
+	char **new_envp;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&path, &args, &envp};
+	void const *parameter_values[] = {&path, &args, &new_envp};
+	static int follow_children = -1;
 
 	old_trace_state = trace_disable();
 
@@ -155,6 +242,12 @@ execle_v(const char *path, const char *arg0, va_list ap)
 
 	va_end(ap_copy);
 
+	trace_restore(old_trace_state);
+	new_envp = inject_retrace_env_vars((const char **) envp);
+	if (!new_envp)
+		new_envp = (char **) envp;
+	old_trace_state = trace_disable();
+
 	va_copy(ap_copy, ap);
 	args = alloca(nargs * sizeof(void *));
 	args[0] = (char *)arg0;
@@ -162,7 +255,6 @@ execle_v(const char *path, const char *arg0, va_list ap)
 		args[i] = va_arg(ap, char *);
 
 	trace_restore(old_trace_state);
-
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execle";
@@ -175,6 +267,9 @@ execle_v(const char *path, const char *arg0, va_list ap)
 	r = real_execve(path, args, envp);
 
 	retrace_log_and_redirect_after(&event_info);
+
+	if (new_envp && new_envp != envp)
+		real_free(new_envp);
 
 	return (r);
 }
@@ -199,10 +294,15 @@ RETRACE_REPLACE_V(execle, int, (const char *path, const char *arg0, ...), arg0, 
 int RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *const envp[])
 {
 	int r;
+	char **new_envp;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&path, &argv, &envp};
+	void const *parameter_values[] = {&path, &argv, &new_envp};
 
+
+	new_envp = inject_retrace_env_vars((const char **) envp);
+	if (!new_envp)
+		new_envp = (char **) envp;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execve";
@@ -212,9 +312,12 @@ int RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *c
 	event_info.return_value = &r;
 	retrace_log_and_redirect_before(&event_info);
 
-	r = real_execve(path, argv, envp);
+	r = real_execve(path, argv, new_envp);
 
 	retrace_log_and_redirect_after(&event_info);
+
+	if (new_envp && new_envp != envp)
+		real_free(new_envp);
 
 	return (r);
 }
@@ -292,10 +395,14 @@ RETRACE_REPLACE(execvp, int, (const char *file, char *const argv[]), (file, argv
 int RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *const envp[])
 {
 	int r;
+	char **new_envp;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&file, &argv, &envp};
+	void const *parameter_values[] = {&file, &argv, &new_envp};
 
+	new_envp = inject_retrace_env_vars((const char **) envp);
+	if (!new_envp)
+		new_envp = (char **) envp;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execvpe";
@@ -309,6 +416,9 @@ int RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *
 
 	retrace_log_and_redirect_after(&event_info);
 
+	if (new_envp && new_envp != envp)
+		real_free(new_envp);
+
 	return (r);
 }
 
@@ -319,6 +429,7 @@ int RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname,
 		char *const argv[], char *const envp[], int flags)
 {
 	int r;
+	char **new_envp;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
 					  PARAMETER_TYPE_STRING,
@@ -326,8 +437,12 @@ int RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname,
 					  PARAMETER_TYPE_STRING_ARRAY,
 					  PARAMETER_TYPE_INT,
 					  PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&dirfd, &pathname, &argv, &envp, &flags};
+	void const *parameter_values[] = {&dirfd, &pathname, &argv, &new_envp, &flags};
 
+
+	new_envp = inject_retrace_env_vars((const char **) envp);
+	if (!new_envp)
+		new_envp = (char **) envp;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execveat";
@@ -341,6 +456,9 @@ int RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname,
 
 	retrace_log_and_redirect_after(&event_info);
 
+	if (new_envp && new_envp != envp)
+		real_free(new_envp);
+
 	return (r);
 }
 
@@ -353,9 +471,14 @@ RETRACE_REPLACE(execveat, int,
 int RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp[])
 {
 	int r;
+	char **new_envp;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&fd, &argv, &envp};
+	void const *parameter_values[] = {&fd, &argv, &new_envp};
+
+	new_envp = inject_retrace_env_vars((const char **) envp);
+	if (!new_envp)
+		new_envp = (char **) envp;
 
 
 	memset(&event_info, 0, sizeof(event_info));
@@ -369,6 +492,9 @@ int RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp
 	r = real_fexecve(fd, argv, envp);
 
 	retrace_log_and_redirect_after(&event_info);
+
+	if (new_envp && new_envp != envp)
+		real_free(new_envp);
 
 	return r;
 }

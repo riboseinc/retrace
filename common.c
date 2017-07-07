@@ -52,6 +52,10 @@
 #include <sys/utsname.h>
 #include <execinfo.h>
 #include <fcntl.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/un.h>
+#include <netdb.h>
 
 #include "str.h"
 #include "id.h"
@@ -107,10 +111,21 @@ struct descriptor_info **g_descriptor_list;
 unsigned int g_descriptor_list_size;
 
 static pthread_mutex_t printing_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t logfile_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static int show_timestamp;
+static int output_file_flush;
+static FILE *output_file;
+
 static int is_main_thread(void);
 static void trace_set_color(char *color);
 
+static int rtr_get_config_single_internal(const char *function, ...);
+
+static void trace_printf(int hdr, const char *fmt, ...);
+static void trace_printf_str(const char *string, int maxlength);
+static void trace_dump_data(const unsigned char *buf, size_t nbytes);
+static void trace_mode(mode_t mode, char *p);
+static void trace_printf_backtrace(void);
 
 
 /* Returns time as zero on the first call and in subsequents call
@@ -446,6 +461,172 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		trace_printf(1, "}\n");
 		break;
 #endif
+	case PARAMETER_TYPE_PERM:
+	{
+		char perm[10];
+
+		trace_mode(*((mode_t *) *value), perm);
+		trace_printf(0, "%o", *((int *) *value));
+		trace_set_color(INF);
+		trace_printf(0, " [%s]", perm);
+		trace_set_color(VAR);
+
+		break;
+	}
+
+	case PARAMETER_TYPE_STRUCT_STAT:
+	{
+		char perm[10];
+
+		trace_printf(1, "struct stat {\n");
+		trace_printf(1, "\tst_dev = %lu\n", (*(struct stat **) *value)->st_dev);
+		trace_printf(1, "\tst_ino = %i\n", (*(struct stat **) *value)->st_ino);
+		trace_mode((*(struct stat **) *value)->st_mode, perm);
+		trace_printf(1, "\tst_mode = %d [%s]\n", (*(struct stat **) *value)->st_mode, perm);
+		trace_printf(1, "\tst_nlink = %lu\n", (*(struct stat **) *value)->st_nlink);
+		trace_printf(1, "\tst_uid = %d\n", (*(struct stat **) *value)->st_uid);
+		trace_printf(1, "\tst_gid = %d\n", (*(struct stat **) *value)->st_gid);
+		trace_printf(1, "\tst_rdev = %r\n", (*(struct stat **) *value)->st_rdev);
+		trace_printf(1, "\tst_atime = %lu\n", (*(struct stat **) *value)->st_atime);
+		trace_printf(1, "\tst_mtime = %lu\n", (*(struct stat **) *value)->st_mtime);
+		trace_printf(1, "\tst_ctime = %lu\n", (*(struct stat **) *value)->st_ctime);
+		trace_printf(1, "\tst_size = %zu\n", (*(struct stat **) *value)->st_size);
+		trace_printf(1, "\tst_blocks = %lu\n", (*(struct stat **) *value)->st_blocks);
+		trace_printf(1, "\tst_blksize = %lu\n", (*(struct stat **) *value)->st_blksize);
+#if __APPLE__
+		trace_printf(1, "\tst_flags = %d\n", (*(struct stat **) *value)->st_flags);
+		trace_printf(1, "\tst_gen = %d\n", (*(struct stat **) *value)->st_gen);
+#endif
+		trace_printf(1, "}\n");
+
+		break;
+	}
+
+	case PARAMETER_TYPE_STRUCT_SOCKADDR:
+		switch ((*(struct sockaddr **) *value)->sa_family) {
+		case AF_INET:
+			trace_printf(0, "%s:%d[AF_INET]",
+						 inet_ntoa(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_addr),
+						 ntohs(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_port));
+			break;
+
+#ifdef AF_INET6
+		case AF_INET6:
+			trace_printf(0, "[%s]:%d[AF_INET6]",
+						 inet_ntoa(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_addr),
+						 ntohs(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_port));
+			break;
+#endif
+
+		case AF_UNIX:
+			trace_printf(0, "%s[AF_UNIX|AF_LOCAL]", ((struct sockaddr_un *)(*(struct sockaddr **) *value))->sun_path);
+			break;
+
+		default:
+			trace_printf(0, "unssuported sa_family: %d", (*(struct sockaddr **) *value)->sa_family);
+			break;
+		}
+		break;
+
+	case PARAMETER_TYPE_FD_SET:
+	{
+		int fd, comma = 0;
+
+		const char *set = (*(const char **) *value);
+		value++;
+
+		int nfds = (*(int *) *value);
+		value++;
+
+		fd_set *in = (*(fd_set **) *value);
+		value++;
+
+		fd_set *out = (*(fd_set **) *value);
+
+		if (out == NULL)
+			break;
+
+		trace_printf(0, "(%s:", set);
+		for (fd = 0; fd < nfds; fd++) {
+			if (FD_ISSET(fd, in)) {
+				trace_printf(0, "%.*s%.*s%d", comma, ",",
+							 FD_ISSET(fd, out) ? 1 : 0, "+", fd);
+
+				if (comma == 0)
+					comma = 1;
+			}
+		}
+		trace_printf(0, ")");
+
+		break;
+	}
+
+	case PARAMETER_TYPE_STRUCT_HOSTEN:
+	{
+		int i;
+		struct hostent *hent = *(struct hostent **) *value;
+
+		for (i = 0; hent->h_addr_list[i] != NULL; i++) {
+			char ip_addr[INET6_ADDRSTRLEN];
+
+			inet_ntop(hent->h_addrtype, hent->h_addr_list[i], ip_addr, sizeof(ip_addr));
+			trace_printf(0, i > 0 ? ",%s" : "%s", ip_addr);
+		}
+
+		break;
+	}
+
+	case PARAMETER_TYPE_IP_ADDR:
+	{
+		char ip_addr[INET6_ADDRSTRLEN];
+
+		const void *addr = *value;
+		value++;
+
+		int type = *(int *)value;
+
+		inet_ntop(type, addr, ip_addr, sizeof(ip_addr));
+
+		trace_printf(0, "%s", addr);
+
+		break;
+	}
+
+	case PARAMETER_TYPE_STRUCT_ADDRINFO:
+	{
+		struct addrinfo *rp, *result = *(struct addrinfo **)value;
+
+		for (rp = result; rp != NULL; rp = rp->ai_next) {
+			char addr[INET6_ADDRSTRLEN];
+
+			if (rp != result) {
+				trace_printf(0, ",");
+			}
+
+			switch (rp->ai_family) {
+			case AF_INET:
+				inet_ntop(rp->ai_family, &(((struct sockaddr_in *)rp->ai_addr)->sin_addr), addr, sizeof(addr));
+
+				trace_printf(0, "%s", addr);
+				break;
+
+			case AF_INET6:
+				inet_ntop(rp->ai_family, &(((struct sockaddr_in6 *)rp->ai_addr)->sin6_addr), addr, sizeof(addr));
+
+				trace_printf(0, "%s", addr);
+				break;
+
+			default:
+				trace_printf(0, "AI_FAMILY:%d", rp->ai_family);
+				break;
+			}
+		}
+
+		trace_printf(0, "]\n");
+
+		break;
+	}
+
 	}
 
 	trace_set_color(RST);
@@ -460,6 +641,77 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 
 	return value + 1;
 }
+
+#ifdef HAVE_OPENSSL_SSL_H
+static void
+retrace_print_key(const unsigned char *buf, int len)
+{
+	int i;
+	for (i = 0; i < len; i++) {
+		trace_printf(0, "%02X", buf[i]);
+	}
+}
+
+static void
+retrace_print_ssl_keys(void *_ssl)
+{
+	SSL *ssl = (SSL *) _ssl;
+
+	SSL_SESSION *session = NULL;
+	size_t master_key_length = 0;
+	size_t client_random_length = 0;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	unsigned char *client_random;
+	unsigned char *master_key;
+#else
+	unsigned char client_random[SSL3_RANDOM_SIZE];
+	unsigned char master_key[SSL_MAX_MASTER_KEY_LENGTH];
+#endif
+
+	if (ssl) {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+		session = ssl->session;
+
+		if (ssl->s3) {
+			client_random = ssl->s3->client_random;
+			client_random_length = SSL3_RANDOM_SIZE;
+		}
+
+		if (session) {
+			master_key = session->master_key;
+			master_key_length = session->master_key_length;
+		}
+#else
+		rtr_SSL_get_session_t real_SSL_get_session;
+		rtr_SSL_SESSION_get_master_key_t real_SSL_SESSION_get_master_key;
+		rtr_SSL_get_client_random_t real_SSL_get_client_random;
+
+		*(void **) &real_SSL_get_client_random = dlsym(RTLD_DEFAULT, "SSL_get_client_random");
+		*(void **) &real_SSL_SESSION_get_master_key = dlsym(RTLD_DEFAULT, "SSL_SESSION_get_master_key");
+		*(void **) &real_SSL_get_session = dlsym(RTLD_DEFAULT, "SSL_get_session");
+
+		if (real_SSL_get_client_random &&
+		    real_SSL_SESSION_get_master_key &&
+		    real_SSL_get_client_random) {
+			session = real_SSL_get_session (ssl);
+
+			if (session) {
+				master_key_length = real_SSL_SESSION_get_master_key(session, master_key, SSL_MAX_MASTER_KEY_LENGTH);
+				client_random_length = real_SSL_get_client_random(ssl, client_random, SSL3_RANDOM_SIZE);
+			}
+		}
+#endif
+	}
+
+	if (master_key_length > 0 && client_random_length > 0) {
+		trace_printf(0, "\tCLIENT_RANDOM ");
+		retrace_print_key(client_random, client_random_length);
+		trace_printf(0, " ");
+		retrace_print_key(master_key, master_key_length);
+		trace_printf(0, "\n");
+	}
+}
+#endif
 
 void **
 retrace_dump_parameter(unsigned int type, int flags, void **value)
@@ -507,7 +759,7 @@ retrace_dump_parameter(unsigned int type, int flags, void **value)
 		void *ssl = (*(void **) *value);
 
 		if (ssl != NULL)
-			print_ssl_keys(ssl);
+			retrace_print_ssl_keys(ssl);
 #endif /* HAVE_OPENSSL_SSL */
 	}
 
@@ -520,9 +772,16 @@ retrace_event(struct rtr_event_info *event_info)
 {
 	int olderrno;
 
+	int old_trace_state;
+	static char *output_file_path;
+	static int loaded_config;
+	FILE *out_file_tmp = NULL;
+
 	if (!get_tracing_enabled())
 		return;
 
+	old_trace_state = trace_disable();
+	pthread_mutex_lock(&printing_lock);
 	olderrno = errno;
 
 	if (event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
@@ -530,7 +789,19 @@ retrace_event(struct rtr_event_info *event_info)
 		return;
 	}
 
-	pthread_mutex_lock(&printing_lock);
+	if (!loaded_config) {
+		loaded_config = 1;
+		if (rtr_get_config_single_internal("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END,
+								  &output_file_path, &output_file_flush)) {
+			if (output_file_path) {
+				 out_file_tmp = real_fopen(output_file_path, "a");
+			}
+			output_file = out_file_tmp;
+		}
+
+		if (rtr_get_config_single("showtimestamp", ARGUMENT_TYPE_END))
+			show_timestamp = 1;
+	}
 
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		unsigned int *parameter_type;
@@ -587,11 +858,11 @@ retrace_event(struct rtr_event_info *event_info)
 			trace_printf(0, " [fuzzing seed: %u]", g_rand_seed);
 
 		if (event_info->event_type == EVENT_TYPE_AFTER_CALL) {
-			static int loaded_config;
+			static int loaded_time_config;
 			static double timestamp_limit;
 
-			if (!loaded_config) {
-				loaded_config = 1;
+			if (!loaded_time_config) {
+				loaded_time_config = 1;
 
 				if (!rtr_get_config_single("showcalltime", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END,
 								&timestamp_limit))
@@ -628,9 +899,14 @@ retrace_event(struct rtr_event_info *event_info)
 		}
 	}
 
+	if (event_info->event_flags & EVENT_FLAGS_PRINT_BACKTRACE) {
+		trace_printf_backtrace();
+	}
+
 	errno = olderrno;
 
 	pthread_mutex_unlock(&printing_lock);
+    trace_restore(old_trace_state);
 }
 
 void
@@ -655,41 +931,12 @@ struct config_entry {
 };
 SLIST_HEAD(config_head, config_entry);
 
-void
+static void
 trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 {
 	int old_trace_state;
 	FILE *output_file_current = stderr;
-	static int output_file_flush;
-	static FILE *output_file;
-	static char *output_file_path;
-	static int loaded_config;
-	static int show_timestamp;
 	int is_a_tty = 0;
-
-	if (!get_tracing_enabled())
-		return;
-
-	pthread_mutex_lock(&logfile_lock);
-	if (!loaded_config) {
-		loaded_config = 1;
-		if (rtr_get_config_single("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END,
-								  &output_file_path, &output_file_flush)) {
-			old_trace_state = trace_disable();
-			if (output_file_path) {
-				FILE *out_file_tmp = real_fopen(output_file_path, "a");
-
-				if (out_file_tmp)
-					output_file = out_file_tmp;
-			}
-
-			trace_restore(old_trace_state);
-		}
-
-		if (rtr_get_config_single("showtimestamp", ARGUMENT_TYPE_END))
-			show_timestamp = 1;
-	}
-	pthread_mutex_unlock(&logfile_lock);
 
 	if (output_file)
 		output_file_current = output_file;
@@ -736,7 +983,7 @@ trace_set_color(char *color)
 }
 
 
-void
+static void
 trace_printf(int hdr, const char *fmt, ...)
 {
 	va_list arglist;
@@ -746,7 +993,7 @@ trace_printf(int hdr, const char *fmt, ...)
 	va_end(arglist);
 }
 
-void
+static void
 trace_printf_str(const char *string, int maxlength)
 {
 	static const char CR[] = VAR "\\r" RST;
@@ -758,7 +1005,7 @@ trace_printf_str(const char *string, int maxlength)
 	char *p;
 	int old_trace_state;
 
-	if (!get_tracing_enabled() || string == NULL || *string == '\0')
+	if (string == NULL || *string == '\0')
 		return;
 
 	old_trace_state = trace_disable();
@@ -794,7 +1041,7 @@ trace_printf_str(const char *string, int maxlength)
 }
 
 #define DUMP_LINE_SIZE 20
-void
+static void
 trace_dump_data(const unsigned char *buf, size_t nbytes)
 {
 	static const char fmt[] = "\t%07u\t%s | %s\n";
@@ -806,13 +1053,10 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 	int disable = 0;
 	int old_trace_state;
 
-	if (rtr_get_config_single("disabledatadump", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &disable)) {
+	if (rtr_get_config_single_internal("disabledatadump", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &disable)) {
 		if (disable)
 			return;
 	}
-
-	if (!get_tracing_enabled())
-		return;
 
 	old_trace_state = trace_disable();
 
@@ -1027,23 +1271,10 @@ static int
 rtr_parse_config(const struct config_entry **pentry,
 	const char *function, va_list arg_types)
 {
-	int retval, nargs, old_trace_state;
+	int retval, nargs;
 	char *parg;
 	void *pvar;
 	va_list arg_values;
-
-	/*
-	 * If we disabled tracing because we are executing some internal code,
-	 * don't honor any redirections.
-	 */
-	if (!get_tracing_enabled())
-		return 0;
-
-	/*
-	 * Disable tracing so we don't get in loops when the functions we
-	 * called here, call other functions that we have replaced.
-	 */
-	old_trace_state = trace_disable();
 
 	if (*pentry == NULL)
 		*pentry = get_config();
@@ -1086,23 +1317,29 @@ rtr_parse_config(const struct config_entry **pentry,
 	}
 
 	va_end(arg_values);
-	trace_restore(old_trace_state);
 
 	return retval;
 }
 
 int rtr_get_config_multiple(RTR_CONFIG_HANDLE *handle, const char *function, ...)
 {
-	int ret = 0;
+	int old_trace_state, ret = 0;
 	const struct config_entry **config = (const struct config_entry **)handle;
 
 	va_list args;
+
+	if (!get_tracing_enabled())
+		return 0;
+
+	old_trace_state = trace_disable();
 
 	va_start(args, function);
 
 	ret = rtr_parse_config(config, function, args);
 
 	va_end(args);
+
+	trace_restore(old_trace_state);
 
 	if (!ret)
 		*config = NULL;
@@ -1111,6 +1348,27 @@ int rtr_get_config_multiple(RTR_CONFIG_HANDLE *handle, const char *function, ...
 }
 
 int rtr_get_config_single(const char *function, ...)
+{
+	const struct config_entry *config = NULL;
+	va_list args;
+	int ret, old_trace_state;
+
+	if (!get_tracing_enabled())
+		return 0;
+
+	old_trace_state = trace_disable();
+
+	va_start(args, function);
+	ret = rtr_parse_config(&config, function, args);
+	va_end(args);
+
+	trace_restore(old_trace_state);
+
+	return (ret);
+}
+
+static int
+rtr_get_config_single_internal(const char *function, ...)
 {
 	const struct config_entry *config = NULL;
 	va_list args;
@@ -1291,7 +1549,7 @@ file_descriptor_remove(int fd)
 }
 
 /* lightweight copy of strmode() from FreeBSD for displaying mode_t in chmod */
-void
+static void
 trace_mode(mode_t mode, char *p)
 {
 	/* usr */
@@ -1373,16 +1631,13 @@ trace_mode(mode_t mode, char *p)
 }
 
 /* printf backtrace callback */
-void trace_printf_backtrace(void)
+static void
+trace_printf_backtrace(void)
 {
 	void *callstack[128];
 	int old_trace_state;
 
-	/* check tracing has enabled to avoid infinite loop, because backtrace() uses malloc() function */
-	if (!get_tracing_enabled())
-		return;
-
-	if (!rtr_get_config_single("backtrace", ARGUMENT_TYPE_END))
+	if (!rtr_get_config_single_internal("backtrace", ARGUMENT_TYPE_END))
 		return;
 
 	old_trace_state = trace_disable();
@@ -1392,10 +1647,10 @@ void trace_printf_backtrace(void)
 
 	if (strs != NULL) {
 		trace_set_color(INF);
-		printf("======== begin callstack =========\n");
+		trace_printf(1, "======== begin callstack =========\n");
 		for (i = 2; i < frames; ++i)
-			printf("%s\n", strs[i]);
-		printf("======== end callstack =========\n");
+			trace_printf(1, "%s\n", strs[i]);
+		trace_printf(1, "======== end callstack =========\n");
 		trace_set_color(RST);
 
 		real_free(strs);
@@ -1408,7 +1663,7 @@ static void
 rtr_init_random(void)
 {
 	if (!g_init_rand) {
-		if (!rtr_get_config_single("fuzzingseed", ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END, &g_rand_seed))
+		if (!rtr_get_config_single_internal("fuzzingseed", ARGUMENT_TYPE_UINT, ARGUMENT_TYPE_END, &g_rand_seed))
 			g_rand_seed = time(NULL);
 
 		srand(g_rand_seed);
