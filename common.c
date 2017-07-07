@@ -112,6 +112,10 @@ unsigned int g_descriptor_list_size;
 
 static pthread_mutex_t printing_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t logfile_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static int output_file_flush;
+static FILE *output_file;
+
 static int is_main_thread(void);
 static void trace_set_color(char *color);
 
@@ -740,8 +744,28 @@ retrace_event(struct rtr_event_info *event_info)
 {
 	int olderrno;
 
+	int old_trace_state;
+	static char *output_file_path;
+	static int loaded_config;
+	FILE *out_file_tmp = NULL;
+
 	if (!get_tracing_enabled())
 		return;
+
+	old_trace_state = trace_disable();
+	pthread_mutex_lock(&logfile_lock);
+	if (!loaded_config) {
+		loaded_config = 1;
+		if (rtr_get_config_single("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END,
+								  &output_file_path, &output_file_flush)) {
+			if (output_file_path) {
+				 out_file_tmp = real_fopen(output_file_path, "a");
+			}
+			output_file = out_file_tmp;
+		}
+	}
+	pthread_mutex_unlock(&logfile_lock);
+	trace_restore(old_trace_state);
 
 	olderrno = errno;
 
@@ -857,32 +881,10 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 {
 	int old_trace_state;
 	FILE *output_file_current = stderr;
-	static int output_file_flush;
-	static FILE *output_file;
-	static char *output_file_path;
-	static int loaded_config;
 	int is_a_tty = 0;
 
 	if (!get_tracing_enabled())
 		return;
-
-	pthread_mutex_lock(&logfile_lock);
-	if (!loaded_config) {
-		loaded_config = 1;
-		if (rtr_get_config_single("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END,
-								  &output_file_path, &output_file_flush)) {
-			old_trace_state = trace_disable();
-			if (output_file_path) {
-				FILE *out_file_tmp = real_fopen(output_file_path, "a");
-
-				if (out_file_tmp)
-					output_file = out_file_tmp;
-			}
-
-			trace_restore(old_trace_state);
-		}
-	}
-	pthread_mutex_unlock(&logfile_lock);
 
 	if (output_file)
 		output_file_current = output_file;
