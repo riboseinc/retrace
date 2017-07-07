@@ -441,7 +441,10 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		char perm[10];
 
 		trace_mode(*((mode_t *) *value), perm);
-		trace_printf(0, "%o" INF " [%s]", *((int *) *value), perm);
+		trace_printf(0, "%o", *((int *) *value));
+		trace_set_color(INF);
+		trace_printf(0, " [%s]", perm);
+		trace_set_color(VAR);
 
 		break;
 	}
@@ -838,7 +841,7 @@ retrace_event(struct rtr_event_info *event_info)
 		}
 	}
 
-	if (event_info->print_backtrace) {
+	if (event_info->event_flags & EVENT_FLAGS_PRINT_BACKTRACE) {
 		trace_printf_backtrace();
 	}
 

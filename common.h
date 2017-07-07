@@ -109,6 +109,7 @@ enum RTR_FUZZ_TYPE {
 #define EVENT_TYPE_AFTER_CALL		1
 
 #define EVENT_FLAGS_PRINT_RAND_SEED	0x00000001
+#define EVENT_FLAGS_PRINT_BACKTRACE	0x00000002
 
 #define GET_PARAMETER_TYPE(param) (param & ~PARAMETER_FLAGS_ALL)
 #define GET_PARAMETER_FLAGS(param) (param & PARAMETER_FLAGS_ALL)
@@ -126,8 +127,6 @@ struct rtr_event_info {
 
 	unsigned int event_flags;
 	char *extra_info;
-
-    unsigned int print_backtrace;
 };
 
 #define RETRACE_INTERNAL __attribute__((visibility("hidden")))

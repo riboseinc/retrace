@@ -57,15 +57,12 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 			real_nbytes = nbytes;
 		}
 		event_info.extra_info = "[redirected]";
-		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 	}
 
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_write(fd, buf, real_nbytes);
-
-	if (incompleteio)
-		event_info.print_backtrace = 1;
 
 	retrace_log_and_redirect_after(&event_info);
 
