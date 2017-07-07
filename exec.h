@@ -27,4 +27,6 @@ RETRACE_DECL(fexecve);
 #endif
 RETRACE_DECL(system);
 
+extern char **environ;
+
 #endif /* __RETRACE_EXEC_H__ */

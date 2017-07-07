@@ -25,6 +25,7 @@ AC_PREFIX_DEFAULT([/usr])
 AC_SEARCH_LIBS(socket, [socket network])
 AC_SEARCH_LIBS(dlopen, [dl])
 AC_SEARCH_LIBS(inet_aton, [resolv])
+AC_SEARCH_LIBS([pthread_create], [pthread])
 
 # list all used system headers for checking
 AC_CHECK_HEADERS_ONCE(m4_flatten([
