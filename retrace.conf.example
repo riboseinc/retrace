@@ -12,5 +12,3 @@ memoryfuzzing,0.05
 incompleteio
 forcefollowexec
 fuzzing-getenv,FOOBAR,all,GARBAGE,10,1
-showtimestamp
-showcalltime,0.0001

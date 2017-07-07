@@ -127,8 +127,6 @@ struct rtr_event_info {
 
 	unsigned int event_flags;
 	char *extra_info;
-
-	double start_time;
 };
 
 #define RETRACE_INTERNAL __attribute__((visibility("hidden")))
