@@ -780,14 +780,14 @@ retrace_event(struct rtr_event_info *event_info)
 	if (!get_tracing_enabled())
 		return;
 
-	old_trace_state = trace_disable();
-	pthread_mutex_lock(&printing_lock);
-	olderrno = errno;
-
 	if (event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		event_info->start_time = retrace_get_time();
 		return;
 	}
+
+	old_trace_state = trace_disable();
+	pthread_mutex_lock(&printing_lock);
+	olderrno = errno;
 
 	if (!loaded_config) {
 		loaded_config = 1;
