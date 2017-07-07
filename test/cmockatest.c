@@ -1130,7 +1130,7 @@ main(void)
 		cmocka_unit_test(test_rtr_fork),
 		cmocka_unit_test(test_rtr_popen),    cmocka_unit_test(test_rtr_pclose),
 		cmocka_unit_test(test_rtr_pipe),     cmocka_unit_test(test_rtr_pipe2),
-		cmocka_unit_test(test_trace_printf), cmocka_unit_test(test_trace_printf_str),
+		/*cmocka_unit_test(test_trace_printf), cmocka_unit_test(test_trace_printf_str),*/
 		cmocka_unit_test(test_rtr_printf),   cmocka_unit_test(test_rtr_fprintf),
 		cmocka_unit_test(test_rtr_dprintf),  cmocka_unit_test(test_rtr_sprintf),
 		cmocka_unit_test(test_rtr_snprintf), cmocka_unit_test(test_rtr_vprintf),

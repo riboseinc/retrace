@@ -169,7 +169,7 @@ RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
 	if (rtr_get_config_single("SSL_get_verify_result", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 
 		char redirect_str[128];
-		sprintf("redirection in effect: '%i'", redirect_id);
+		snprintf(redirect_str, sizeof(redirect_str), "redirection in effect: '%i'", redirect_id);
 		event_info.extra_info = redirect_str;
 
 		r = redirect_id;

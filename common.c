@@ -569,7 +569,7 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 
 	case PARAMETER_TYPE_STRUCT_ADDRINFO:
 	{
-		struct addrinfo *rp, *result = *(struct addrinfo **)value;
+		struct addrinfo *rp, *result = *((struct addrinfo **)*value);
 
 		for (rp = result; rp != NULL; rp = rp->ai_next) {
 			char addr[INET6_ADDRSTRLEN];
