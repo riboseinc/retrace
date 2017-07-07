@@ -112,6 +112,7 @@ unsigned int g_descriptor_list_size;
 
 static pthread_mutex_t printing_lock = PTHREAD_MUTEX_INITIALIZER;
 
+static int show_timestamp;
 static int output_file_flush;
 static FILE *output_file;
 
@@ -125,6 +126,30 @@ static void trace_printf_str(const char *string, int maxlength);
 static void trace_dump_data(const unsigned char *buf, size_t nbytes);
 static void trace_mode(mode_t mode, char *p);
 static void trace_printf_backtrace(void);
+
+
+/* Returns time as zero on the first call and in subsequents call
+ * returns the time elapsed since the first called */
+static double
+retrace_get_time(void)
+{
+	static float start_time;
+	struct timespec current_time = {0, 0};
+	float ret = 0;
+
+	clock_gettime(CLOCK_MONOTONIC, &current_time);
+
+	if (start_time == 0) {
+		start_time = current_time.tv_sec;
+		start_time += current_time.tv_nsec / 1E9; /* 1 second = 1e9 nano seconds */
+	} else {
+		ret = current_time.tv_sec;
+		ret += current_time.tv_nsec / 1E9; /* 1 second = 1e9 nano seconds */
+		ret -= start_time;
+	}
+
+	return ret;
+}
 
 static void **
 retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, void **value)
@@ -755,6 +780,11 @@ retrace_event(struct rtr_event_info *event_info)
 	if (!get_tracing_enabled())
 		return;
 
+	if (event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
+		event_info->start_time = retrace_get_time();
+		return;
+	}
+
 	old_trace_state = trace_disable();
 	pthread_mutex_lock(&printing_lock);
 	olderrno = errno;
@@ -768,6 +798,9 @@ retrace_event(struct rtr_event_info *event_info)
 			}
 			output_file = out_file_tmp;
 		}
+
+		if (rtr_get_config_single("showtimestamp", ARGUMENT_TYPE_END))
+			show_timestamp = 1;
 	}
 
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
@@ -824,6 +857,31 @@ retrace_event(struct rtr_event_info *event_info)
 		if (event_info->event_flags & EVENT_FLAGS_PRINT_RAND_SEED)
 			trace_printf(0, " [fuzzing seed: %u]", g_rand_seed);
 
+		if (event_info->event_type == EVENT_TYPE_AFTER_CALL) {
+			static int loaded_time_config;
+			static double timestamp_limit;
+
+			if (!loaded_time_config) {
+				loaded_time_config = 1;
+
+				if (!rtr_get_config_single("showcalltime", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END,
+								&timestamp_limit))
+					timestamp_limit = -1;
+			}
+
+			if (timestamp_limit >= 0) {
+				double elapsed_time;
+
+				elapsed_time = retrace_get_time() - event_info->start_time;
+
+				if (elapsed_time >= timestamp_limit) {
+					trace_set_color(INF);
+					trace_printf(0, " [took: %0.5f]", elapsed_time);
+					trace_set_color(RST);
+				}
+			}
+		}
+
 		trace_printf(0, "\n");
 
 		/* Give another pass to dump memory buffers in case we have any */
@@ -854,11 +912,8 @@ retrace_event(struct rtr_event_info *event_info)
 void
 retrace_log_and_redirect_before(struct rtr_event_info *event_info)
 {
-	/* Don't do anything for now */
-#if 0
 	event_info->event_type = EVENT_TYPE_BEFORE_CALL;
 	retrace_event(event_info);
-#endif
 }
 
 void
@@ -893,6 +948,13 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 
 		if (!is_main_thread())
 			real_fprintf(output_file_current, "(thread: %u) ", pthread_self());
+
+		if (show_timestamp) {
+			float current_time;
+
+			current_time = retrace_get_time();
+			real_fprintf(output_file_current, "(%0.5f) ", current_time);
+		}
 	}
 
 	if (color) {
