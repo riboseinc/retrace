@@ -115,22 +115,25 @@ static void trace_set_color(char *color);
 
 /* Returns time as zero on the first call and in subsequents call
  * returns the time elapsed since the first called */
-static retrace_get_time(struct timespec *tp)
+static double
+retrace_get_time(void)
 {
-	static struct timespec start_time = {0, 0};
+	static float start_time;
+	struct timespec current_time = {0, 0};
+	float ret = 0;
 
-	if (start_time.tv_sec == 0 &&
-	    start_time.tv_nsec == 0)
-	{
-		tp->tv_sec = 0;
-		tp->tv_nsec = 0;
-		clock_gettime(CLOCK_MONOTONIC, &start_time);
+	clock_gettime(CLOCK_MONOTONIC, &current_time);
+
+	if (start_time == 0) {
+		start_time = current_time.tv_sec;
+		start_time += current_time.tv_nsec / 1E9; /* 1 second = 1e9 nano seconds */
 	} else {
-
-		clock_gettime(CLOCK_MONOTONIC, tp);
-		tp->tv_sec -= start_time.tv_sec;
-		tp->tv_nsec -= start_time.tv_nsec;
+		ret = current_time.tv_sec;
+		ret += current_time.tv_nsec / 1E9; /* 1 second = 1e9 nano seconds */
+		ret -= start_time;
 	}
+
+	return ret;
 }
 
 static void **
@@ -523,7 +526,7 @@ retrace_event(struct rtr_event_info *event_info)
 	olderrno = errno;
 
 	if (event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
-		retrace_get_time(&event_info->start_time);
+		event_info->start_time = retrace_get_time();
 		return;
 	}
 
@@ -584,12 +587,28 @@ retrace_event(struct rtr_event_info *event_info)
 			trace_printf(0, " [fuzzing seed: %u]", g_rand_seed);
 
 		if (event_info->event_type == EVENT_TYPE_AFTER_CALL) {
-			struct timespec end_time;
-			retrace_get_time(&end_time);
+			static int loaded_config;
+			static double timestamp_limit;
 
-			trace_printf(0, " [took: %u.%lusecs]",
-			end_time.tv_sec - event_info->start_time.tv_sec,
-			(end_time.tv_nsec - event_info->start_time.tv_nsec) / 1000000000.0);
+			if (!loaded_config) {
+				loaded_config = 1;
+
+				if (!rtr_get_config_single("showcalltime", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END,
+								&timestamp_limit))
+					timestamp_limit = -1;
+			}
+
+			if (timestamp_limit >= 0) {
+				double elapsed_time;
+
+				elapsed_time = retrace_get_time() - event_info->start_time;
+
+				if (elapsed_time >= timestamp_limit) {
+					trace_set_color(INF);
+					trace_printf(0, " [took: %0.5f]", elapsed_time);
+					trace_set_color(RST);
+				}
+			}
 		}
 
 		trace_printf(0, "\n");
@@ -645,6 +664,7 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 	static FILE *output_file;
 	static char *output_file_path;
 	static int loaded_config;
+	static int show_timestamp;
 	int is_a_tty = 0;
 
 	if (!get_tracing_enabled())
@@ -665,6 +685,9 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 
 			trace_restore(old_trace_state);
 		}
+
+		if (rtr_get_config_single("showtimestamp", ARGUMENT_TYPE_END))
+			show_timestamp = 1;
 	}
 	pthread_mutex_unlock(&logfile_lock);
 
@@ -674,15 +697,17 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 	old_trace_state = trace_disable();
 
 	if (hdr == 1) {
-		struct timespec ts;
-
-		retrace_get_time (&ts);
-		real_fprintf(output_file_current, "(%u.%lu) ", ts.tv_sec, ts.tv_nsec);
-
 		real_fprintf(output_file_current, "(%d) ", real_getpid());
 
 		if (!is_main_thread())
 			real_fprintf(output_file_current, "(thread: %u) ", pthread_self());
+
+		if (show_timestamp) {
+			float current_time;
+
+			current_time = retrace_get_time();
+			real_fprintf(output_file_current, "(%0.5f) ", current_time);
+		}
 	}
 
 	if (color) {
