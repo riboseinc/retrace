@@ -117,6 +117,8 @@ static int show_timestamp;
 static int output_file_flush;
 static FILE *output_file;
 
+static __thread int indent_level = 0;
+
 static int is_main_thread(void);
 static void trace_set_color(char *color);
 
@@ -799,6 +801,7 @@ retrace_event(struct rtr_event_info *event_info)
 		return;
 
 	if (event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
+		indent_level++;
 		event_info->start_time = retrace_get_time();
 		return;
 	}
@@ -821,6 +824,7 @@ retrace_event(struct rtr_event_info *event_info)
 			show_timestamp = 1;
 	}
 
+
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		unsigned int *parameter_type;
 		void **parameter_value;
@@ -835,6 +839,15 @@ retrace_event(struct rtr_event_info *event_info)
 		else if (event_info->event_type == EVENT_TYPE_AFTER_CALL)
 			trace_printf(1, "<-: ", event_info->function_name);
 #endif
+
+		if (event_info->event_type == EVENT_TYPE_AFTER_CALL) {
+			int i;
+
+			indent_level--;
+
+			for (i = 0; i < indent_level; i++)
+				trace_printf(0, "\t");
+		}
 
 		trace_set_color(FUNC);
 		trace_printf(1, "%s", event_info->function_name);
