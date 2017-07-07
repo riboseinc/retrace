@@ -65,6 +65,7 @@
 #include "env.h"
 #include "dir.h"
 #include "ssl.h"
+#include "rtr-time.h"
 
 /*
  * Global setting, we set this to disable all our
@@ -133,9 +134,11 @@ static void trace_printf_backtrace(void);
 static double
 retrace_get_time(void)
 {
-	static float start_time;
+	static double start_time;
+	double ret = 0;
+
+#ifdef CLOCK_MONOTONIC
 	struct timespec current_time = {0, 0};
-	float ret = 0;
 
 	clock_gettime(CLOCK_MONOTONIC, &current_time);
 
@@ -147,6 +150,20 @@ retrace_get_time(void)
 		ret += current_time.tv_nsec / 1E9; /* 1 second = 1e9 nano seconds */
 		ret -= start_time;
 	}
+#else
+	struct timeval current_time = {0, 0};
+
+	real_gettimeofday(&current_time, NULL);
+
+	if (start_time == 0) {
+		start_time = current_time.tv_sec;
+		start_time += (double) current_time.tv_usec / (double) 1E6; /* 1 second = 1e6 micro seconds */
+	} else {
+		ret = current_time.tv_sec;
+		ret += (double) current_time.tv_usec / (double) 1E6; /* 1 second = 1e6 micro seconds */
+		ret -= start_time;
+	}
+#endif
 
 	return ret;
 }
@@ -787,7 +804,6 @@ retrace_event(struct rtr_event_info *event_info)
 		return;
 	}
 
-	old_trace_state = trace_disable();
 	pthread_mutex_lock(&printing_lock);
 	olderrno = errno;
 
@@ -804,6 +820,8 @@ retrace_event(struct rtr_event_info *event_info)
 		if (rtr_get_config_single("showtimestamp", ARGUMENT_TYPE_END))
 			show_timestamp = 1;
 	}
+
+	old_trace_state = trace_disable();
 
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		unsigned int *parameter_type;
@@ -866,9 +884,11 @@ retrace_event(struct rtr_event_info *event_info)
 			if (!loaded_time_config) {
 				loaded_time_config = 1;
 
+				trace_restore(old_trace_state);
 				if (!rtr_get_config_single("showcalltime", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END,
 								&timestamp_limit))
 					timestamp_limit = -1;
+				old_trace_state = trace_disable();
 			}
 
 			if (timestamp_limit >= 0) {
