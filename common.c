@@ -65,6 +65,7 @@
 #include "env.h"
 #include "dir.h"
 #include "ssl.h"
+#include "rtr-time.h"
 
 /*
  * Global setting, we set this to disable all our
@@ -133,9 +134,11 @@ static void trace_printf_backtrace(void);
 static double
 retrace_get_time(void)
 {
-	static float start_time;
+	static double start_time;
+	double ret = 0;
+
+#ifdef CLOCK_MONOTONIC
 	struct timespec current_time = {0, 0};
-	float ret = 0;
 
 	clock_gettime(CLOCK_MONOTONIC, &current_time);
 
@@ -147,6 +150,20 @@ retrace_get_time(void)
 		ret += current_time.tv_nsec / 1E9; /* 1 second = 1e9 nano seconds */
 		ret -= start_time;
 	}
+#else
+	struct timeval current_time = {0, 0};
+
+	real_gettimeofday(&current_time, NULL);
+
+	if (start_time == 0) {
+		start_time = current_time.tv_sec;
+		start_time += (double) current_time.tv_usec / (double) 1E6; /* 1 second = 1e6 micro seconds */
+	} else {
+		ret = current_time.tv_sec;
+		ret += (double) current_time.tv_usec / (double) 1E6; /* 1 second = 1e6 micro seconds */
+		ret -= start_time;
+	}
+#endif
 
 	return ret;
 }
@@ -538,7 +555,7 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		int nfds = (*(int *) *value);
 		value++;
 
-		fd_set *in = (*(fd_set **) *value);
+		fd_set in = (*(fd_set *) *value);
 		value++;
 
 		fd_set *out = (*(fd_set **) *value);
@@ -546,9 +563,8 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		if (out == NULL)
 			break;
 
-		trace_printf(0, "(%s:", set);
 		for (fd = 0; fd < nfds; fd++) {
-			if (FD_ISSET(fd, in)) {
+			if (FD_ISSET(fd, &in)) {
 				trace_printf(0, "%.*s%.*s%d", comma, ",",
 							 FD_ISSET(fd, out) ? 1 : 0, "+", fd);
 
@@ -801,7 +817,7 @@ retrace_event(struct rtr_event_info *event_info)
 			output_file = out_file_tmp;
 		}
 
-		if (rtr_get_config_single("showtimestamp", ARGUMENT_TYPE_END))
+		if (rtr_get_config_single_internal("showtimestamp", ARGUMENT_TYPE_END))
 			show_timestamp = 1;
 	}
 
@@ -866,7 +882,7 @@ retrace_event(struct rtr_event_info *event_info)
 			if (!loaded_time_config) {
 				loaded_time_config = 1;
 
-				if (!rtr_get_config_single("showcalltime", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END,
+				if (!rtr_get_config_single_internal("showcalltime", ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END,
 								&timestamp_limit))
 					timestamp_limit = -1;
 			}
@@ -908,7 +924,7 @@ retrace_event(struct rtr_event_info *event_info)
 	errno = olderrno;
 
 	pthread_mutex_unlock(&printing_lock);
-    trace_restore(old_trace_state);
+	trace_restore(old_trace_state);
 }
 
 void

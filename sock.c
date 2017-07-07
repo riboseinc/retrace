@@ -434,8 +434,8 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
 					  PARAMETER_TYPE_POINTER,
-					  PARAMETER_TYPE_INT,
 					  PARAMETER_TYPE_IOVEC,
+					  PARAMETER_TYPE_INT,
 					  PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&sockfd, &msg, &msg->msg_iovlen, &msg->msg_iov, &flags};
 

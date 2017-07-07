@@ -43,15 +43,16 @@ RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 	int ret;
 
 	char str_timeout[128];
-
+	const char *read_str = "read";
+	const char *write_str = "write";
+	const char *except_str = "except";
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FD_SET, PARAMETER_TYPE_FD_SET, PARAMETER_TYPE_FD_SET, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {
-			&"read", &nfds, &inr, &readfds,
-			&"write", &nfds, &inw, &writefds,
-			&"except", &nfds, &inx, &exceptfds
+			&read_str, &nfds, &inr, &readfds,
+			&write_str, &nfds, &inw, &writefds,
+			&except_str, &nfds, &inx, &exceptfds
 	};
-
 
 	memset(&event_info, 0, sizeof(event_info));
 
