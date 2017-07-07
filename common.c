@@ -1582,10 +1582,10 @@ trace_printf_backtrace(void)
 
 	if (strs != NULL) {
 		trace_set_color(INF);
-		printf("======== begin callstack =========\n");
+		trace_printf(1, "======== begin callstack =========\n");
 		for (i = 2; i < frames; ++i)
-			printf("%s\n", strs[i]);
-		printf("======== end callstack =========\n");
+			trace_printf(1, "%s\n", strs[i]);
+		trace_printf(1, "======== end callstack =========\n");
 		trace_set_color(RST);
 
 		real_free(strs);
