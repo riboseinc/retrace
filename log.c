@@ -144,10 +144,9 @@ priority_to_string(int level)
 	return str;
 }
 
-static const char *
-levelmask_to_string(int mask)
+static void
+levelmask_to_string(int mask, char *buf)
 {
-	static __thread char buf[OPTION_MAX_BUFFER + 1];
 	int space_used = 0;
 
 	if (mask & LOG_MASK(LOG_EMERG))
@@ -173,16 +172,13 @@ levelmask_to_string(int mask)
 
 	if (mask & LOG_MASK(LOG_DEBUG))
 		space_used += real_snprintf(buf + space_used, OPTION_MAX_BUFFER - space_used, "LOG_DEBUG|");
-
-	return buf;
 }
 
 #define OPTION_MAX_BUFFER 128
 
-static const char *
-option_to_string(int option)
+static void
+option_to_string(int option, char *buf)
 {
-	static __thread char buf[OPTION_MAX_BUFFER + 1];
 	int space_used = 0;
 
 	if (option & LOG_CONS)
@@ -202,13 +198,11 @@ option_to_string(int option)
 
 	if (option & LOG_PID)
 		space_used += real_snprintf(buf + space_used, OPTION_MAX_BUFFER - space_used, "LOG_PID|");
-
-	return buf;
 }
 
 void RETRACE_IMPLEMENTATION(openlog)(const char *ident, int option, int facility)
 {
-	const char *option_str = NULL;
+	char option_str[OPTION_MAX_BUFFER + 1];
 	const char *facility_str = NULL;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING,
@@ -218,7 +212,7 @@ void RETRACE_IMPLEMENTATION(openlog)(const char *ident, int option, int facility
 	void *parameter_values[] = {&ident, &option, &option_str, &facility, &facility_str};
 
 	facility_str = facility_to_string(facility);
-	option_str = option_to_string(option);
+	option_to_string(option, option_str);
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "openlog";
@@ -321,14 +315,14 @@ RETRACE_REPLACE(vsyslog, void, (int priority, const char *format, va_list ap), (
 
 int RETRACE_IMPLEMENTATION(setlogmask)(int mask)
 {
-	const char *mask_str = NULL;
+	char mask_str[OPTION_MAX_BUFFER + 1];
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_INT | PARAMETER_FLAG_STRING_NEXT,
 					  PARAMETER_TYPE_END};
 	void *parameter_values[] = {&mask, &mask_str};
 	int r;
 
-	mask_str = levelmask_to_string(mask);
+	levelmask_to_string(mask, mask_str);
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "setlogmask";

@@ -50,7 +50,6 @@
 #include <dirent.h>
 #include <sys/uio.h>
 #include <sys/utsname.h>
-#include <execinfo.h>
 #include <fcntl.h>
 
 #include "str.h"
@@ -495,13 +494,16 @@ void
 retrace_event(struct rtr_event_info *event_info)
 {
 	int olderrno;
+	int old_trace_state;
 
 	if (!get_tracing_enabled())
 		return;
 
 	olderrno = errno;
 
+	old_trace_state = trace_disable();
 	pthread_mutex_lock(&printing_lock);
+	trace_restore(old_trace_state);
 
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		unsigned int *parameter_type;
@@ -576,7 +578,9 @@ retrace_event(struct rtr_event_info *event_info)
 
 	errno = olderrno;
 
+	old_trace_state = trace_disable();
 	pthread_mutex_unlock(&printing_lock);
+	trace_restore(old_trace_state);
 }
 
 void
@@ -618,7 +622,10 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 	if (!get_tracing_enabled())
 		return;
 
+	old_trace_state = trace_disable();
 	pthread_mutex_lock(&logfile_lock);
+	trace_restore(old_trace_state);
+
 	if (!loaded_config) {
 		loaded_config = 1;
 		if (rtr_get_config_single("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END,
@@ -634,7 +641,9 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 			trace_restore(old_trace_state);
 		}
 	}
+	old_trace_state = trace_disable();
 	pthread_mutex_unlock(&logfile_lock);
+	trace_restore(old_trace_state);
 
 	if (output_file)
 		output_file_current = output_file;

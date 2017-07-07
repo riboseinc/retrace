@@ -36,7 +36,7 @@ void test2(int status, void *p)
 int main(void)
 {
 	atexit(test1);
-#ifndef __APPLE__
+#ifdef __linux
 	on_exit(test2, (void *)0xdeadbeef);
 #endif
 	exit(42);

@@ -297,8 +297,10 @@ static const struct ts_info mmap_prot_ts[] = {
 	{PROT_READ, "PROT_READ"},
 	{PROT_WRITE, "PROT_WRITE"},
 	{PROT_EXEC, "PROT_EXEC"},
-#ifndef __APPLE__
+#ifdef PROT_GROWSDOWN
 	{PROT_GROWSDOWN, "PROT_GROWSDOWN"},
+#endif
+#ifdef PROT_GROWSUP
 	{PROT_GROWSUP, "PROT_GROWSUP"},
 #endif
 	{-1, NULL}
@@ -394,7 +396,6 @@ int RETRACE_IMPLEMENTATION(munmap)(void *addr, size_t length)
 RETRACE_REPLACE(munmap, int, (void *addr, size_t length), (addr, length))
 
 #ifndef __APPLE__
-
 int RETRACE_IMPLEMENTATION(brk)(void *addr)
 {
 	struct rtr_event_info event_info;
@@ -438,7 +439,11 @@ int RETRACE_IMPLEMENTATION(brk)(void *addr)
 
 RETRACE_REPLACE(brk, int, (void *addr), (addr))
 
+#if __OpenBSD__
+void *RETRACE_IMPLEMENTATION(sbrk)(int increment)
+#else
 void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
+#endif
 {
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
@@ -479,6 +484,10 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 	return p;
 }
 
+#if __OpenBSD__
+RETRACE_REPLACE(sbrk, void *, (long int increment), (increment))
+#else
 RETRACE_REPLACE(sbrk, void *, (intptr_t increment), (increment))
+#endif
 
 #endif
