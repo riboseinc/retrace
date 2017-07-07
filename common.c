@@ -56,7 +56,6 @@
 #include <sys/un.h>
 #include <netdb.h>
 #include <sys/socket.h>
-#include <execinfo.h>
 
 #include "str.h"
 #include "id.h"
