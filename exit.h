@@ -5,7 +5,7 @@ typedef void (*rtr_exit_t)(int status) __attribute__((noreturn));
 typedef int (*rtr_atexit_t)(void (*function)(void));
 typedef int (*rtr_on_exit_t)(void (*function)(int, void *), void *arg);
 typedef void (*rtr__exit_t)(int status);
-typedef int (*rtr___cxa_atexit_t)(void (*function)(void));
+typedef int (*rtr___cxa_atexit_t)(void (*function)(void), void *p1, void *p2);
 
 RETRACE_DECL(exit);
 RETRACE_DECL(atexit);

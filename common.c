@@ -109,6 +109,8 @@ unsigned int g_descriptor_list_size;
 static pthread_mutex_t printing_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t logfile_lock = PTHREAD_MUTEX_INITIALIZER;
 static int is_main_thread(void);
+static void trace_set_color(char *color);
+
 
 
 /* Returns time as zero on the first call and in subsequents call
@@ -134,7 +136,7 @@ static retrace_get_time(struct timespec *tp)
 static void **
 retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, void **value)
 {
-	trace_printf(0, VAR);
+	trace_set_color(VAR);
 
 	switch (type) {
 	case PARAMETER_TYPE_INT:
@@ -206,15 +208,21 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		if (dirp)
 			fd = real_dirfd(dirp);
 
-		trace_printf(0, "%p" RST INF " [fd %d]" RST VAR, dirfd, fd);
+		trace_printf(0, "%p", dirfd);
+		trace_set_color(INF);
+		trace_printf(0, " [fd %d]", fd);
+		trace_set_color(VAR);
 
 		if (fd > 0) {
 			struct descriptor_info *di;
 
 			di = file_descriptor_get(fd);
 
-			if (di && di->location)
-				trace_printf(0, RST INF " [%s]" RST VAR, di->location);
+			if (di && di->location) {
+				trace_set_color(INF);
+				trace_printf(0, " [%s]", di->location);
+				trace_set_color(VAR);
+			}
 		}
 
 		break;
@@ -230,12 +238,18 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		if (stream)
 			fd = real_fileno(stream);
 
-		trace_printf(0, "%p" RST INF " [fd %d]" RST VAR, stream, fd);
+		trace_printf(0, "%p", stream);
+		trace_set_color(INF);
+		trace_printf(0, " [fd %d]", fd);
+		trace_set_color(VAR);
 
 		if (fd > 0) {
 			di = file_descriptor_get(fd);
-			if (di && di->location)
-				trace_printf(0, RST INF " [%s]" RST VAR, di->location);
+			if (di && di->location) {
+				trace_set_color(INF);
+				trace_printf(0, " [%s]", di->location);
+				trace_set_color(VAR);
+			}
 		}
 
 		break;
@@ -249,8 +263,11 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 
 		if (event_type != EVENT_TYPE_BEFORE_CALL || (flags & PARAMETER_FLAG_OUTPUT_VARIABLE)) {
 			di = file_descriptor_get(fd);
-			if (di && di->location)
-				trace_printf(0, RST INF " [%s]" RST VAR, di->location);
+			if (di && di->location) {
+				trace_set_color(INF);
+				trace_printf(0, " [%s]", di->location);
+				trace_set_color(VAR);
+			}
 		}
 
 
@@ -428,12 +445,14 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 #endif
 	}
 
-	trace_printf(0, RST);
+	trace_set_color(RST);
 
 	/* There's a string following this parameter that expands its meaning */
 	if ((flags & PARAMETER_FLAG_STRING_NEXT) == PARAMETER_FLAG_STRING_NEXT) {
 		value++;
-		trace_printf(0, INF " [%s]" RST, (*(char **) *value));
+		trace_set_color(INF);
+		trace_printf(0, " [%s]", (*(char **) *value));
+		trace_set_color(RST);
 	}
 
 	return value + 1;
@@ -496,8 +515,12 @@ retrace_dump_parameter(unsigned int type, int flags, void **value)
 void
 retrace_event(struct rtr_event_info *event_info)
 {
+	int olderrno;
+
 	if (!get_tracing_enabled())
 		return;
+
+	olderrno = errno;
 
 	if (event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		retrace_get_time(&event_info->start_time);
@@ -521,7 +544,10 @@ retrace_event(struct rtr_event_info *event_info)
 			trace_printf(1, "<-: ", event_info->function_name);
 #endif
 
-		trace_printf(1, FUNC "%s" RST "(", event_info->function_name);
+		trace_set_color(FUNC);
+		trace_printf(1, "%s", event_info->function_name);
+		trace_set_color(RST);
+		trace_printf(0, "(");
 
 		while (GET_PARAMETER_TYPE(*parameter_type) != PARAMETER_TYPE_END) {
 
@@ -583,6 +609,8 @@ retrace_event(struct rtr_event_info *event_info)
 		}
 	}
 
+	errno = olderrno;
+
 	pthread_mutex_unlock(&printing_lock);
 }
 
@@ -609,15 +637,15 @@ struct config_entry {
 SLIST_HEAD(config_head, config_entry);
 
 void
-trace_printf(int hdr, const char *fmt, ...)
+trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 {
-	va_list arglist;
 	int old_trace_state;
 	FILE *output_file_current = stderr;
 	static int output_file_flush;
 	static FILE *output_file;
 	static char *output_file_path;
 	static int loaded_config;
+	int is_a_tty = 0;
 
 	if (!get_tracing_enabled())
 		return;
@@ -657,14 +685,40 @@ trace_printf(int hdr, const char *fmt, ...)
 			real_fprintf(output_file_current, "(thread: %u) ", pthread_self());
 	}
 
-	va_start(arglist, fmt);
-	real_vfprintf(output_file_current, fmt, arglist);
-	va_end(arglist);
+	if (color) {
+		int fd;
+
+		fd = real_fileno(output_file_current);
+		is_a_tty = isatty(fd);
+
+		if (is_a_tty)
+			real_fputs(color, output_file_current);
+	}
+
+	if (arglist)
+		real_vfprintf(output_file_current, fmt, arglist);
 
 	if (output_file_flush)
 		fflush(output_file_current);
 
 	trace_restore(old_trace_state);
+}
+
+static void
+trace_set_color(char *color)
+{
+	trace_printfv(0, color, "", NULL);
+}
+
+
+void
+trace_printf(int hdr, const char *fmt, ...)
+{
+	va_list arglist;
+
+	va_start(arglist, fmt);
+	trace_printfv(hdr, NULL, fmt, arglist);
+	va_end(arglist);
 }
 
 void
@@ -1312,10 +1366,12 @@ void trace_printf_backtrace(void)
 	char **strs = backtrace_symbols(callstack, frames);
 
 	if (strs != NULL) {
-		printf("%s======== begin callstack =========\n", INF);
+		trace_set_color(INF);
+		printf("======== begin callstack =========\n");
 		for (i = 2; i < frames; ++i)
 			printf("%s\n", strs[i]);
-		printf("======== end callstack =========%s\n", RST);
+		printf("======== end callstack =========\n");
+		trace_set_color(RST);
 
 		real_free(strs);
 	}

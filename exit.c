@@ -70,7 +70,7 @@ int RETRACE_IMPLEMENTATION(on_exit)(void (*function)(int, void *), void *arg)
 
 RETRACE_REPLACE(on_exit, int, (void (*function)(int, void *), void *arg), (function, arg))
 
-int RETRACE_IMPLEMENTATION(__cxa_atexit)(void (*function)(void))
+int RETRACE_IMPLEMENTATION(__cxa_atexit)(void (*function)(void), void *p1, void *p2)
 {
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
@@ -85,14 +85,14 @@ int RETRACE_IMPLEMENTATION(__cxa_atexit)(void (*function)(void))
 	event_info.return_value = &r;
 	retrace_log_and_redirect_before(&event_info);
 
-	r = real___cxa_atexit(function);
+	r = real___cxa_atexit(function, p1, p2);
 
 	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
 
-RETRACE_REPLACE(__cxa_atexit, int, (void (*function)(void)), (function))
+RETRACE_REPLACE(__cxa_atexit, int, (void (*function)(void), void *p1, void *p2), (function, p1, p2))
 #endif
 
 int RETRACE_IMPLEMENTATION(atexit)(void (*function)(void))
