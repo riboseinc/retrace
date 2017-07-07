@@ -65,7 +65,7 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 		p = real_malloc(bytes);
 
 	if (redirect) {
-		trace_printf_backtrace();
+		event_info.print_backtrace = 1;
 	}
 
 	retrace_log_and_redirect_after(&event_info);
@@ -130,7 +130,7 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 	retrace_log_and_redirect_after(&event_info);
 
 	if (redirect)
-		trace_printf_backtrace();
+		event_info.print_backtrace = 1;
 
 	return p;
 }
@@ -172,7 +172,7 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 	retrace_log_and_redirect_after(&event_info);
 
 	if (redirect)
-		trace_printf_backtrace();
+		event_info.print_backtrace = 1;
 
 	return p;
 }
@@ -209,7 +209,7 @@ void *RETRACE_IMPLEMENTATION(memcpy)(void *dest, const void *src, size_t n)
 	retrace_log_and_redirect_after(&event_info);
 
 	if (overlapped)
-		trace_printf_backtrace();
+		event_info.print_backtrace = 1;
 
 	return p;
 }
@@ -360,7 +360,7 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 	retrace_log_and_redirect_after(&event_info);
 
 	if (redirect)
-		trace_printf_backtrace();
+		event_info.print_backtrace = 1;
 
 	return p;
 }
@@ -431,7 +431,7 @@ int RETRACE_IMPLEMENTATION(brk)(void *addr)
 	retrace_log_and_redirect_after(&event_info);
 
 	if (redirect)
-		trace_printf_backtrace();
+		event_info.print_backtrace = 1;
 
 	return ret;
 }
@@ -474,7 +474,7 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 	retrace_log_and_redirect_after(&event_info);
 
 	if (redirect)
-		trace_printf_backtrace();
+		event_info.print_backtrace = 1;
 
 	return p;
 }

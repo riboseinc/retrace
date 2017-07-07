@@ -154,17 +154,12 @@ RETRACE_REPLACE(getegid, gid_t, (), ())
 
 uid_t RETRACE_IMPLEMENTATION(getuid)()
 {
+	char extra_info_buf[128];
+
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_END};
 	int redirect_id;
-	int uid;
-
-	if (rtr_get_config_single("getuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
-		trace_printf(1, "getuid(); [redirection in effect: '%i']\n", redirect_id);
-
-		return redirect_id;
-	}
-
+	uid_t uid;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getuid";
@@ -174,10 +169,15 @@ uid_t RETRACE_IMPLEMENTATION(getuid)()
 
 	retrace_log_and_redirect_before(&event_info);
 
-	uid = real_getuid();
+	if (rtr_get_config_single("getuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
+		sprintf(extra_info_buf, "redirection in effect: '%i'", redirect_id);
+		event_info.extra_info = extra_info_buf;
+		uid = (uid_t) redirect_id;
+	} else {
+		uid = real_getuid();
+	}
 
 	retrace_log_and_redirect_after(&event_info);
-
 
 	return uid;
 }
@@ -186,17 +186,12 @@ RETRACE_REPLACE(getuid, uid_t, (), ())
 
 uid_t RETRACE_IMPLEMENTATION(geteuid)()
 {
+	char extra_info_buf[128];
+
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_END};
-	int euid;
-	int redirect_id;
-
-	if (rtr_get_config_single("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
-		trace_printf(1, "geteuid(); [redirection in effect: '%i']\n", redirect_id);
-
-		return redirect_id;
-	}
-
+	uid_t euid;
+	uid_t redirect_id;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "geteuid";
@@ -205,7 +200,13 @@ uid_t RETRACE_IMPLEMENTATION(geteuid)()
 	event_info.return_value = &euid;
 	retrace_log_and_redirect_before(&event_info);
 
-	euid = real_geteuid();
+	if (rtr_get_config_single("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
+		sprintf(extra_info_buf, "redirection in effect: '%i'", redirect_id);
+		event_info.extra_info = extra_info_buf;
+		euid = (uid_t) redirect_id;
+	} else {
+		euid = real_geteuid();
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 

@@ -93,6 +93,13 @@ enum RTR_FUZZ_TYPE {
 #if HAVE_DECL_F_GETOWN_EX
 #define PARAMETER_TYPE_STRUCT_F_GETOWN_EX 31 /* fcntl's struct f_owner_ex */
 #endif
+#define PARAMETER_TYPE_PERM  32 /* write permission  */
+#define PARAMETER_TYPE_STRUCT_STAT 33 /* struct stat */
+#define PARAMETER_TYPE_STRUCT_SOCKADDR	35 /* struct sockaddr */
+#define PARAMETER_TYPE_FD_SET	36 /* fd_set: char **set, int *nfds, fd_set **in, fd_set **out */
+#define PARAMETER_TYPE_STRUCT_HOSTEN	37 /* struct hosten */
+#define PARAMETER_TYPE_IP_ADDR	38 /* ip addr: void **addr, int *type */
+#define PARAMETER_TYPE_STRUCT_ADDRINFO	39 /* struct addrinfo */
 
 #define PARAMETER_FLAG_OUTPUT_VARIABLE		0x40000000 /* This is an output variable, is uninitialized in EVENT_TYPE_BEFORE_CALL */
 #define PARAMETER_FLAG_STRING_NEXT		0x80000000 /* There's a string parameter that describes the string */
@@ -119,6 +126,8 @@ struct rtr_event_info {
 
 	unsigned int event_flags;
 	char *extra_info;
+
+    unsigned int print_backtrace;
 };
 
 #define RETRACE_INTERNAL __attribute__((visibility("hidden")))
@@ -217,12 +226,6 @@ struct ts_info {
 	int type;
 	const char *str;
 };
-
-void trace_printf(int hdr, const char *fmt, ...);
-void trace_printf_str(const char *string, int maxlength);
-void trace_dump_data(const unsigned char *buf, size_t nbytes);
-void trace_mode(mode_t mode, char *p);
-void trace_printf_backtrace(void);
 
 typedef const void *RTR_CONFIG_HANDLE;
 

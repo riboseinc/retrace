@@ -35,27 +35,6 @@ copy_fd_set(fd_set *dest, const fd_set *src)
 		FD_ZERO(dest);
 }
 
-static void
-print_fds(const char *set, int nfds, fd_set *in, fd_set *out)
-{
-	int fd, comma = 0;
-
-	if (out == NULL)
-		return;
-
-	trace_printf(0, "(%s:", set);
-	for (fd = 0; fd < nfds; fd++) {
-		if (FD_ISSET(fd, in)) {
-			trace_printf(0, "%.*s%.*s%d", comma, ",",
-			    FD_ISSET(fd, out) ? 1 : 0, "+", fd);
-
-			if (comma == 0)
-				comma = 1;
-		}
-	}
-	trace_printf(0, ")");
-}
-
 int
 RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 			fd_set *exceptfds, struct timeval *timeout)
@@ -63,22 +42,41 @@ RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 	fd_set inr, inw, inx;
 	int ret;
 
+	char str_timeout[128];
+
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FD_SET, PARAMETER_TYPE_FD_SET, PARAMETER_TYPE_FD_SET, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {
+			&"read", &nfds, &inr, &readfds,
+			&"write", &nfds, &inw, &writefds,
+			&"except", &nfds, &inx, &exceptfds
+	};
+
+
+	memset(&event_info, 0, sizeof(event_info));
+
+	event_info.function_name = "select";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.return_value = &ret;
+
+	retrace_log_and_redirect_before(&event_info);
+
 	copy_fd_set(&inr, readfds);
 	copy_fd_set(&inw, writefds);
 	copy_fd_set(&inx, exceptfds);
 
 	ret = real_select(nfds, readfds, writefds, exceptfds, timeout);
 
-	if (timeout != NULL)
-		trace_printf(1, "select (timeout: %lds %ldus) [=%d]",
-		    timeout->tv_sec, timeout->tv_usec, ret);
-	else
-		trace_printf(1, "select (no timeout)[=%d]", ret);
+	if (timeout != NULL) {
+		sprintf(str_timeout, "timeout: %lds %ldus", timeout->tv_sec, timeout->tv_usec);
+		event_info.extra_info = str_timeout;
+	} else {
+		event_info.extra_info = "no timeout";
+	}
 
-	print_fds("read", nfds, &inr, readfds);
-	print_fds("write", nfds, &inr, writefds);
-	print_fds("except", nfds, &inr, exceptfds);
-	trace_printf(0, "\n");
+	retrace_log_and_redirect_after(&event_info);
 
 	return (ret);
 }
