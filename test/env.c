@@ -29,13 +29,15 @@
 int main(void)
 {
 	struct utsname buf;
+	int i;
 
 	uname(&buf);
-
 	putenv("RETRACE_TEST=teststring");
-	getenv("RETRACE_TEST");
+
+	for (i = 0; i < 100; i++)
+		getenv("RETRACE_TEST");
+
 	unsetenv("RETRACE_TEST");
 
 	return 0;
 }
-

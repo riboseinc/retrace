@@ -28,6 +28,9 @@
 #endif
 
 #include "common.h"
+#include "str.h"
+#include "printf.h"
+
 #include "env.h"
 
 int RETRACE_IMPLEMENTATION(unsetenv)(const char *name)
@@ -80,6 +83,10 @@ int RETRACE_IMPLEMENTATION(putenv)(char *string)
 
 RETRACE_REPLACE(putenv, int, (char *string), (string))
 
+#define FUZZ_TYPE_BUF_OVERFLOW			"BUFFER_OVERFLOW"
+#define FUZZ_TYPE_FORMAT_STR			"FORMAT_STRING"
+#define FUZZ_TYPE_USE_GARBAGE			"GARBAGE"
+
 char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 {
 	struct rtr_event_info event_info;
@@ -87,6 +94,13 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 	void const *parameter_values[] = {&envname};
 	char *env = NULL;
 
+	char *enabled_vars = NULL;
+	char *excluded_vars = NULL;
+	char *fuzzing_type_str = NULL;
+	int fuzzing_data_len = 0;
+	double fail_chance;
+
+	int fuzzing_enabled = 0;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getenv";
@@ -97,7 +111,46 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 
 	retrace_log_and_redirect_before(&event_info);
 
-	env = real_getenv(envname);
+	if (rtr_get_config_single("fuzzing-getenv", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_STRING,
+		ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT, ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END,
+		&enabled_vars, &excluded_vars, &fuzzing_type_str, &fuzzing_data_len, &fail_chance) &&
+		rtr_get_fuzzing_flag(fail_chance)) {
+		int fuzzing_type;
+
+		/* check fail flag has set */
+		if (fail_chance) {
+			/* check list of enabled vars */
+			if (real_strcasecmp(enabled_vars, "all") == 0)
+				fuzzing_enabled = 1;
+			else
+				fuzzing_enabled = rtr_check_config_token(envname, enabled_vars, "| \t");
+
+			/* check list of excludin list */
+			if (fuzzing_enabled && rtr_check_config_token(envname, excluded_vars, "| \t"))
+				fuzzing_enabled = 0;
+		}
+
+		if (fuzzing_enabled && fuzzing_data_len > 0) {
+			if (real_strcmp(fuzzing_type_str, FUZZ_TYPE_BUF_OVERFLOW) == 0)
+				fuzzing_type = RTR_FUZZ_TYPE_BUFOVER;
+			else if (real_strcmp(fuzzing_type_str, FUZZ_TYPE_FORMAT_STR) == 0)
+				fuzzing_type = RTR_FUZZ_TYPE_FMTSTR;
+			else if (real_strcmp(fuzzing_type_str, FUZZ_TYPE_USE_GARBAGE) == 0)
+				fuzzing_type = RTR_FUZZ_TYPE_GARBAGE;
+			else
+				fuzzing_enabled = 0;
+		} else
+			fuzzing_enabled = 0;
+
+		if (fuzzing_enabled) {
+			env = (char *) rtr_get_fuzzing_value(fuzzing_type, (void *) &fuzzing_data_len);
+			event_info.extra_info = "[redirected]";
+			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		}
+	}
+
+	if (!fuzzing_enabled)
+		env = real_getenv(envname);
 
 	retrace_log_and_redirect_after(&event_info);
 

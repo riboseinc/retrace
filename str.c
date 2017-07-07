@@ -229,6 +229,31 @@ char *RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
 
 RETRACE_REPLACE(strcpy, char *, (char *s1, const char *s2), (s1, s2))
 
+int RETRACE_IMPLEMENTATION(strcasecmp)(const char *s1, const char *s2)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&s1, &s2};
+
+	int ret;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "strcasecmp";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	retrace_log_and_redirect_before(&event_info);
+
+	ret = real_strcasecmp(s1, s2);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return (ret);
+}
+
+RETRACE_REPLACE(strcasecmp, int, (const char *s1, const char *s2), (s1, s2))
+
 char *RETRACE_IMPLEMENTATION(strchr)(const char *s, int c)
 {
 	char *result = NULL;
@@ -253,3 +278,28 @@ char *RETRACE_IMPLEMENTATION(strchr)(const char *s, int c)
 }
 
 RETRACE_REPLACE(strchr, char *, (const char *s, int c), (s, c))
+
+char *RETRACE_IMPLEMENTATION(strtok)(char *str, const char *delim)
+{
+	char *result = NULL;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&str, &delim};
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "strtok";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_STRING;
+	event_info.return_value = &result;
+	retrace_log_and_redirect_before(&event_info);
+
+	result = real_strtok(str, delim);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return (result);
+}
+
+RETRACE_REPLACE(strtok, char *, (char *str, const char *delim), (str, delim))

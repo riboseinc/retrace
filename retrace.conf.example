@@ -10,5 +10,6 @@ SSL_get_verify_result,10
 fuzzingseed,1498729252
 memoryfuzzing,0.05
 incompleteio
+fuzzing-getenv,FOOBAR,all,GARBAGE,10,1
 showtimestamp
 showcalltime,0.0001

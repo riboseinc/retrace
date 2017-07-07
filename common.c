@@ -1465,3 +1465,72 @@ rtr_get_type_string(int type, const struct ts_info *ts_info, char *str, size_t s
 		str_len += real_strlen(p->str);
 	}
 }
+
+/* get configuration token by separator */
+int rtr_check_config_token(const char *token, char *str, const char *sep)
+{
+	char *p, *q;
+
+	p = real_malloc(real_strlen(str) + 1);
+	if (!p)
+		return 0;
+
+	real_strcpy(p, str);
+	p[real_strlen(str)] = '\0';
+
+	q = real_strtok(p, sep);
+	while (q != NULL) {
+		if (real_strcmp(token, q) == 0)
+			return 1;
+
+		q = real_strtok(NULL, sep);
+	}
+
+	return 0;
+}
+
+/* get fuzzing values */
+void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param)
+{
+	char *ret = NULL;
+	int i, len;
+
+	switch (fuzz_type) {
+	case RTR_FUZZ_TYPE_BUFOVER:
+		len = *((int *) param);
+
+		ret = real_malloc(len + 1);
+		memset(ret, 'A', len);
+		ret[len] = '\0';
+
+		break;
+
+	case RTR_FUZZ_TYPE_FMTSTR:
+		len = *((int *) param);
+
+		ret = real_malloc(len + 1);
+		for (i = 0; i < len; i++) {
+			char c = (i % 2) ? '%' : 's';
+
+			ret[i] = c;
+		}
+
+		ret[len] = '\0';
+
+		break;
+
+	case RTR_FUZZ_TYPE_GARBAGE:
+		len = *((int *) param);
+
+		ret = real_malloc(len);
+		for (i = 0; i < len; i++)
+			ret[i] = (char) rand() % 0xFF;
+
+		break;
+
+	default:
+		break;
+	}
+
+	return (void *) ret;
+}
