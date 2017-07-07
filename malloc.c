@@ -58,15 +58,11 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 		errno = ENOMEM;
 		redirect = 1;
 		event_info.extra_info = "redirected : NULL";
-		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 	}
 
 	if (!redirect)
 		p = real_malloc(bytes);
-
-	if (redirect) {
-		trace_printf_backtrace();
-	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -121,16 +117,13 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 		errno = ENOMEM;
 		redirect = 1;
 		event_info.extra_info = "redirected : NULL";
-		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 	}
 
 	if (!redirect)
 		p = real_calloc(nmemb, size);
 
 	retrace_log_and_redirect_after(&event_info);
-
-	if (redirect)
-		trace_printf_backtrace();
 
 	return p;
 }
@@ -163,16 +156,13 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 		errno = ENOMEM;
 		redirect = 1;
 		event_info.extra_info = "redirected : NULL";
-		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 	}
 
 	if (!redirect)
 		p = real_realloc(ptr, size);
 
 	retrace_log_and_redirect_after(&event_info);
-
-	if (redirect)
-		trace_printf_backtrace();
 
 	return p;
 }
@@ -202,14 +192,12 @@ void *RETRACE_IMPLEMENTATION(memcpy)(void *dest, const void *src, size_t n)
 	if (abs(dest - src) < n) {
 		overlapped = 1;
 		event_info.extra_info = "The memory areas must not overlap. It may arise bugs. Please refer the man page.";
+		event_info.event_flags = EVENT_FLAGS_PRINT_BACKTRACE;
 	}
 
 	p = real_memcpy(dest, src, n);
 
 	retrace_log_and_redirect_after(&event_info);
-
-	if (overlapped)
-		trace_printf_backtrace();
 
 	return p;
 }
@@ -351,16 +339,13 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 		errno = ENOMEM;
 		redirect = 1;
 		event_info.extra_info = "redirected : (void *) -1";
-		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 	}
 
 	if (!redirect)
 		p = real_mmap(addr, length, prot, flags, fd, offset);
 
 	retrace_log_and_redirect_after(&event_info);
-
-	if (redirect)
-		trace_printf_backtrace();
 
 	return p;
 }
@@ -422,16 +407,13 @@ int RETRACE_IMPLEMENTATION(brk)(void *addr)
 		errno = ENOMEM;
 		redirect = 1;
 		event_info.extra_info = "redirected : -1";
-		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 	}
 
 	if (!redirect)
 		ret = real_brk(addr);
 
 	retrace_log_and_redirect_after(&event_info);
-
-	if (redirect)
-		trace_printf_backtrace();
 
 	return ret;
 }
@@ -465,16 +447,13 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 		errno = ENOMEM;
 		redirect = 1;
 		event_info.extra_info = "redirected : (void *) -1";
-		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 	}
 
 	if (!redirect)
 		p = real_sbrk(increment);
 
 	retrace_log_and_redirect_after(&event_info);
-
-	if (redirect)
-		trace_printf_backtrace();
 
 	return p;
 }

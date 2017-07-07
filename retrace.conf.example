@@ -11,3 +11,4 @@ fuzzingseed,1498729252
 memoryfuzzing,0.05
 incompleteio
 forcefollowexec
+fuzzing-getenv,FOOBAR,all,GARBAGE,10,1

@@ -71,8 +71,9 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 #ifdef __linux__
 	const struct sockaddr *address = _address.__sockaddr__;
 #endif
-	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&fd, &address, &len};
+	const struct sockaddr *remote_addr = address;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_STRUCT_SOCKADDR, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &remote_addr, &len};
 	int ret;
 
 
@@ -89,8 +90,6 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 
 	if (address->sa_family == AF_INET) {
 		struct sockaddr_in *dst_addr = (struct sockaddr_in *) address;
-
-		struct sockaddr_in *remote_addr;
 		const char *remote_ipaddr;
 		int remote_port;
 
@@ -139,19 +138,20 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 			}
 		}
 
-		/* set remote address info */
-		remote_addr = enabled_redirect ? &redirect_addr : (struct sockaddr_in *) address;
-		remote_ipaddr = inet_ntoa(remote_addr->sin_addr);
-		remote_port = ntohs(remote_addr->sin_port);
+		if (enabled_redirect) {
+			event_info.extra_info = "redirected";
+			remote_addr = (struct sockaddr *) &redirect_addr;
+		}
+
+		remote_ipaddr = inet_ntoa(((struct sockaddr_in *)remote_addr)->sin_addr);
+		remote_port = ntohs(((struct sockaddr_in *)remote_addr)->sin_port);
 
 		/* connect to remote */
-		ret = real_connect(fd, (struct sockaddr *) remote_addr, sizeof(struct sockaddr_in));
+		ret = real_connect(fd, remote_addr, sizeof(struct sockaddr_in));
 		if (ret == 0)
 			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, remote_ipaddr, remote_port);
 
-		trace_printf(1, "connect(%d, %s:%d%s); [%d](AF_INET)\n",
-		    fd, remote_ipaddr, remote_port,
-		    enabled_redirect ? " [redirected]" : "", ret);
+		retrace_log_and_redirect_after(&event_info);
 
 		return ret;
 	} else if (address->sa_family == AF_UNIX) {
@@ -163,7 +163,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 		if (ret == 0)
 			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_UNIX_DOMAIN, sun_path, -1);
 
-		trace_printf(1, "connect(%d, \"%s\", ); [%d](AF_UNIX|AF_LOCAL)\n", fd, sun_path, ret);
+		retrace_log_and_redirect_after(&event_info);
 
 		return ret;
 	}
@@ -500,31 +500,40 @@ RETRACE_REPLACE(recv, ssize_t,
 ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int flags,
 	struct sockaddr *src_addr, socklen_t *addrlen)
 {
-	int recv_len;
+	ssize_t recv_len = 0;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types_full[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+										   PARAMETER_TYPE_MEMORY_BUFFER,
+										   PARAMETER_TYPE_INT,
+										   PARAMETER_TYPE_INT,
+										   PARAMETER_TYPE_STRUCT_SOCKADDR,
+										   PARAMETER_TYPE_END};
+	void const *parameter_values_full[] = {&sockfd, &recv_len, &buf, &len, &flags, &src_addr};
+
+	unsigned int parameter_types_short[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+										   PARAMETER_TYPE_MEMORY_BUFFER,
+										   PARAMETER_TYPE_INT,
+										   PARAMETER_TYPE_INT,
+										   PARAMETER_TYPE_END};
+	void const *parameter_values_short[] = {&sockfd, &recv_len, &buf, &len, &flags};
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "recvfrom";
+	if (src_addr) {
+		event_info.parameter_types = parameter_types_full;
+		event_info.parameter_values = (void **) parameter_values_full;
+	} else {
+		event_info.parameter_types = parameter_types_short;
+		event_info.parameter_values = (void **) parameter_values_short;
+	}
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &recv_len;
+
+	retrace_log_and_redirect_before(&event_info);
 
 	recv_len = real_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
-	if (src_addr) {
-		if (src_addr->sa_family == AF_INET) {
-			struct sockaddr_in *in_addr = (struct sockaddr_in *)src_addr;
-			const char *src_ipaddr = inet_ntoa(in_addr->sin_addr);
-			int src_port = ntohs(in_addr->sin_port);
 
-			trace_printf(1, "recvfrom(%d, %p, %d, %d, %s:%d[AF_INET]), [return: %d]\n",
-				sockfd, buf, len, flags, src_ipaddr, src_port, recv_len);
-		} else if (src_addr->sa_family == AF_UNIX) {
-			struct sockaddr_un *un_addr = (struct sockaddr_un *)src_addr;
-			const char *src_path = un_addr->sun_path;
-
-			trace_printf(1, "recvfrom(%d, %p, %d, %d, %s[AF_UNIX|AF_LOCAL]), [return: %d]\n",
-				sockfd, buf, len, flags, src_path, recv_len);
-		}
-	} else
-		trace_printf(1, "recvfrom(%d, %p, %d, %d), [return: %d]\n",
-			sockfd, buf, len, flags, recv_len);
-
-	/* dump sending data */
-	if (recv_len > 0)
-		trace_dump_data((unsigned char *)buf, recv_len);
+	retrace_log_and_redirect_after(&event_info);
 
 	return recv_len;
 }
@@ -537,18 +546,27 @@ RETRACE_REPLACE(recvfrom, ssize_t,
 
 ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flags)
 {
-	int i, recv_len;
+	ssize_t recv_len = 0;
+
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+									  PARAMETER_TYPE_IOVEC,
+									  PARAMETER_TYPE_INT,
+									  PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&sockfd, &msg->msg_iovlen, &msg->msg_iov, &flags};
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "recvmsg";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &recv_len;
+
+	retrace_log_and_redirect_before(&event_info);
 
 	recv_len = real_recvmsg(sockfd, msg, flags);
-	trace_printf(1, "recvmsg(%d, %p, %d) [return:%d]\n", sockfd, msg, flags, recv_len);
 
-	/* dump message data */
-	for (i = 0; i < msg->msg_iovlen; i++) {
-		struct iovec *msg_iov = &msg->msg_iov[i];
-
-		if (msg_iov->iov_len > 0)
-			trace_dump_data((unsigned char *) msg_iov->iov_base, msg_iov->iov_len);
-	}
+	retrace_log_and_redirect_after(&event_info);
 
 	return recv_len;
 }

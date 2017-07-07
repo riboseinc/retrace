@@ -38,35 +38,32 @@
 
 int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 {
-	char perm[10];
+	struct rtr_event_info event_info;
+	unsigned int parameter_types_short[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
+	void const *parameter_values_short[] = {&path, &buf};
+
+	unsigned int parameter_types_full[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRUCT_STAT, PARAMETER_TYPE_END};
+	void const *parameter_values_full[] = {&path, &buf};
+
 	int r;
 
-	trace_printf(1, "stat(\"%s\", buf);\n", path);
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "stat";
+	event_info.parameter_types = parameter_types_short;
+	event_info.parameter_values = (void **) parameter_values_short;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+
+	retrace_log_and_redirect_before(&event_info);
 
 	r = real_stat(path, buf);
 
 	if (r == 0) {
-		trace_printf(1, "struct stat {\n");
-		trace_printf(1, "\tst_dev = %lu\n", buf->st_dev);
-		trace_printf(1, "\tst_ino = %i\n", buf->st_ino);
-		trace_mode(buf->st_mode, perm);
-		trace_printf(1, "\tst_mode = %d [%s]\n", buf->st_mode, perm);
-		trace_printf(1, "\tst_nlink = %lu\n", buf->st_nlink);
-		trace_printf(1, "\tst_uid = %d\n", buf->st_uid);
-		trace_printf(1, "\tst_gid = %d\n", buf->st_gid);
-		trace_printf(1, "\tst_rdev = %r\n", buf->st_rdev);
-		trace_printf(1, "\tst_atime = %lu\n", buf->st_atime);
-		trace_printf(1, "\tst_mtime = %lu\n", buf->st_mtime);
-		trace_printf(1, "\tst_ctime = %lu\n", buf->st_ctime);
-		trace_printf(1, "\tst_size = %zu\n", buf->st_size);
-		trace_printf(1, "\tst_blocks = %lu\n", buf->st_blocks);
-		trace_printf(1, "\tst_blksize = %lu\n", buf->st_blksize);
-#if __APPLE__
-		trace_printf(1, "\tst_flags = %d\n", buf->st_flags);
-		trace_printf(1, "\tst_gen = %d\n", buf->st_gen);
-#endif
-		trace_printf(1, "}\n");
+		event_info.parameter_types = parameter_types_full;
+		event_info.parameter_values = (void **) parameter_values_full;
 	}
+
+	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -75,15 +72,10 @@ RETRACE_REPLACE(stat, int, (const char *path, struct stat *buf), (path, buf))
 
 int RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode)
 {
-	char perm[10];
-	char *perm_p = &perm[0];
 	struct rtr_event_info event_info;
-	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_INT_OCTAL | PARAMETER_FLAG_STRING_NEXT, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&path, &mode, &perm_p};
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_PERM, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&path, &mode};
 	int r;
-
-	trace_mode(mode, perm);
-
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "chmod";
@@ -104,15 +96,10 @@ RETRACE_REPLACE(chmod, int, (const char *path, mode_t mode), (path, mode))
 
 int RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
 {
-	char perm[10];
-	char *perm_p = &perm[0];
 	struct rtr_event_info event_info;
-	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_INT_OCTAL | PARAMETER_FLAG_STRING_NEXT, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&fd, &mode, &perm_p};
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_PERM, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &mode};
 	int r;
-
-	trace_mode(mode, perm);
-
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fchmod";
@@ -625,6 +612,8 @@ RETRACE_REPLACE(strmode, void, (int mode, char *bp), (mode, bp))
 static int
 fcntl_v(int fildes, int cmd, va_list ap)
 {
+	char extra_info_buf[128];
+
 	int r;
 	int int_parameter = 0;
 #if HAVE_STRUCT_FLOCK
@@ -700,6 +689,7 @@ fcntl_v(int fildes, int cmd, va_list ap)
 	void const *parameter_values_f_owner_ex[] = {&fildes, &cmd, &f_owner_ex_parameter};
 #endif
 
+	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fcntl";
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
@@ -878,10 +868,10 @@ fcntl_v(int fildes, int cmd, va_list ap)
 	default:
 		event_info.parameter_types = parameter_types_maybe;
 		event_info.parameter_values = (void **) parameter_values_maybe;
+		sprintf(extra_info_buf, "Unsupported fcntl command: %d", cmd);
+		event_info.extra_info = extra_info_buf;
 
 		maybe_parameter = va_arg(ap, void *);
-
-		trace_printf(1, "Unsupported fcntl command: %d", cmd);
 	}
 
 	retrace_log_and_redirect_before(&event_info);

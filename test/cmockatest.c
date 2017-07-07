@@ -296,6 +296,9 @@ RTR_TEST_END
 RTR_TEST_START(strcmp)
 RTR_TEST_END
 
+RTR_TEST_START(strcasecmp)
+RTR_TEST_END
+
 RTR_TEST_START(strncmp)
 RTR_TEST_END
 
@@ -1109,7 +1112,7 @@ main(void)
 		cmocka_unit_test(test_rtr_strncpy),  cmocka_unit_test(test_rtr_strcat),
 		cmocka_unit_test(test_rtr_strncat),  cmocka_unit_test(test_rtr_strcmp),
 		cmocka_unit_test(test_rtr_strncmp),  cmocka_unit_test(test_rtr_strstr),
-		cmocka_unit_test(test_rtr_strchr),
+		cmocka_unit_test(test_rtr_strchr),   cmocka_unit_test(test_rtr_strcasecmp),
 		cmocka_unit_test(test_rtr_strlen),   cmocka_unit_test(test_rtr_ctime),
 		cmocka_unit_test(test_rtr_ctime_r),  cmocka_unit_test(test_rtr_read),
 		cmocka_unit_test(test_rtr_write),

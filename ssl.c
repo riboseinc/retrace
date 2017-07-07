@@ -39,75 +39,6 @@ typedef size_t (*rtr_SSL_SESSION_get_master_key_t)(const SSL_SESSION *session, u
 typedef SSL_SESSION *(*rtr_SSL_get_session_t)(const SSL *ssl);
 
 
-static void
-print_key(const unsigned char *buf, int len)
-{
-	int i;
-	for (i = 0; i < len; i++) {
-		trace_printf(0, "%02X", buf[i]);
-	}
-}
-
-void
-print_ssl_keys(void *_ssl)
-{
-	SSL *ssl = (SSL *) _ssl;
-
-	SSL_SESSION *session = NULL;
-	size_t master_key_length = 0;
-	size_t client_random_length = 0;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-	unsigned char *client_random;
-	unsigned char *master_key;
-#else
-	unsigned char client_random[SSL3_RANDOM_SIZE];
-	unsigned char master_key[SSL_MAX_MASTER_KEY_LENGTH];
-#endif
-
-	if (ssl) {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-		session = ssl->session;
-
-		if (ssl->s3) {
-			client_random = ssl->s3->client_random;
-			client_random_length = SSL3_RANDOM_SIZE;
-		}
-
-		if (session) {
-			master_key = session->master_key;
-			master_key_length = session->master_key_length;
-		}
-#else
-		rtr_SSL_get_session_t real_SSL_get_session;
-		rtr_SSL_SESSION_get_master_key_t real_SSL_SESSION_get_master_key;
-		rtr_SSL_get_client_random_t real_SSL_get_client_random;
-
-		*(void **) &real_SSL_get_client_random = dlsym(RTLD_DEFAULT, "SSL_get_client_random");
-		*(void **) &real_SSL_SESSION_get_master_key = dlsym(RTLD_DEFAULT, "SSL_SESSION_get_master_key");
-		*(void **) &real_SSL_get_session = dlsym(RTLD_DEFAULT, "SSL_get_session");
-
-		if (real_SSL_get_client_random &&
-		    real_SSL_SESSION_get_master_key &&
-		    real_SSL_get_client_random) {
-			session = real_SSL_get_session (ssl);
-
-			if (session) {
-				master_key_length = real_SSL_SESSION_get_master_key(session, master_key, SSL_MAX_MASTER_KEY_LENGTH);
-				client_random_length = real_SSL_get_client_random(ssl, client_random, SSL3_RANDOM_SIZE);
-			}
-		}
-#endif
-	}
-
-	if (master_key_length > 0 && client_random_length > 0) {
-		trace_printf(0, "\tCLIENT_RANDOM ");
-		print_key(client_random, client_random_length);
-		trace_printf(0, " ");
-		print_key(master_key, master_key_length);
-		trace_printf(0, "\n");
-	}
-}
-
 int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
 {
 	int r;
@@ -233,16 +164,16 @@ RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
 	event_info.return_value = &r;
 	retrace_log_and_redirect_before(&event_info);
 
+	r = real_SSL_get_verify_result(ssl);
+
 	if (rtr_get_config_single("SSL_get_verify_result", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 
-		r = real_SSL_get_verify_result(ssl);
+		char redirect_str[128];
+		sprintf("redirection in effect: '%i'", redirect_id);
+		event_info.extra_info = redirect_str;
 
-		trace_printf(1, "SSL_get_verify_result(%p); [redirection in effect: '%i']\n", ssl, redirect_id);
-
-		return redirect_id;
+		r = redirect_id;
 	}
-
-	r = real_SSL_get_verify_result(ssl);
 
 	retrace_log_and_redirect_after(&event_info);
 

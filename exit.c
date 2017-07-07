@@ -23,6 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+
 #include "common.h"
 #include "exit.h"
 
@@ -31,7 +32,6 @@ void RETRACE_IMPLEMENTATION(exit)(int status)
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void *parameter_values[] = {&status};
-
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "exit";
@@ -44,3 +44,96 @@ void RETRACE_IMPLEMENTATION(exit)(int status)
 }
 
 RETRACE_REPLACE(exit, void, (int status), (status))
+
+#ifndef __APPLE__
+int RETRACE_IMPLEMENTATION(on_exit)(void (*function)(int, void *), void *arg)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&function, &arg};
+	int r = 0;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "on_exit";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_on_exit(function, arg);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return r;
+}
+
+RETRACE_REPLACE(on_exit, int, (void (*function)(int, void *), void *arg), (function, arg))
+
+int RETRACE_IMPLEMENTATION(__cxa_atexit)(void (*function)(void), void *p1, void *p2)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&function};
+	int r;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "atexit";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real___cxa_atexit(function, p1, p2);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return r;
+}
+
+RETRACE_REPLACE(__cxa_atexit, int, (void (*function)(void), void *p1, void *p2), (function, p1, p2))
+#endif
+
+int RETRACE_IMPLEMENTATION(atexit)(void (*function)(void))
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&function};
+	int r;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "atexit";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_atexit(function);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return r;
+}
+
+RETRACE_REPLACE(atexit, int, (void (*function)(void)), (function))
+
+
+void RETRACE_IMPLEMENTATION(_exit)(int status)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&status};
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "_exit";
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_END;
+	retrace_log_and_redirect_before(&event_info);
+
+	real__exit(status);
+}
+
+RETRACE_REPLACE(_exit, void, (int status), (status))

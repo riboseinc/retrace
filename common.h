@@ -40,6 +40,13 @@
 #define FILE_DESCRIPTOR_TYPE_UDP_SENDMSG	7 /* from sendmsg() over UDP local socket */
 #define FILE_DESCRIPTOR_TYPE_UNIX_BIND		8 /* bind AF_UNIX */
 
+/* fuzzing types */
+enum RTR_FUZZ_TYPE {
+	RTR_FUZZ_TYPE_BUFOVER = 0,			/* buffer overflow */
+	RTR_FUZZ_TYPE_FMTSTR,				/* format string */
+	RTR_FUZZ_TYPE_GARBAGE				/* garbage */
+};
+
 #define PARAMETER_TYPE_END		0
 #define PARAMETER_TYPE_INT		1 /* int */
 #define PARAMETER_TYPE_POINTER		2 /* opaque pointer, we will print the address */
@@ -86,6 +93,13 @@
 #if HAVE_DECL_F_GETOWN_EX
 #define PARAMETER_TYPE_STRUCT_F_GETOWN_EX 31 /* fcntl's struct f_owner_ex */
 #endif
+#define PARAMETER_TYPE_PERM  32 /* write permission  */
+#define PARAMETER_TYPE_STRUCT_STAT 33 /* struct stat */
+#define PARAMETER_TYPE_STRUCT_SOCKADDR	35 /* struct sockaddr */
+#define PARAMETER_TYPE_FD_SET	36 /* fd_set: char **set, int *nfds, fd_set **in, fd_set **out */
+#define PARAMETER_TYPE_STRUCT_HOSTEN	37 /* struct hosten */
+#define PARAMETER_TYPE_IP_ADDR	38 /* ip addr: void **addr, int *type */
+#define PARAMETER_TYPE_STRUCT_ADDRINFO	39 /* struct addrinfo */
 
 #define PARAMETER_FLAG_OUTPUT_VARIABLE		0x40000000 /* This is an output variable, is uninitialized in EVENT_TYPE_BEFORE_CALL */
 #define PARAMETER_FLAG_STRING_NEXT		0x80000000 /* There's a string parameter that describes the string */
@@ -95,6 +109,7 @@
 #define EVENT_TYPE_AFTER_CALL		1
 
 #define EVENT_FLAGS_PRINT_RAND_SEED	0x00000001
+#define EVENT_FLAGS_PRINT_BACKTRACE	0x00000002
 
 #define GET_PARAMETER_TYPE(param) (param & ~PARAMETER_FLAGS_ALL)
 #define GET_PARAMETER_FLAGS(param) (param & PARAMETER_FLAGS_ALL)
@@ -211,12 +226,6 @@ struct ts_info {
 	const char *str;
 };
 
-void trace_printf(int hdr, const char *fmt, ...);
-void trace_printf_str(const char *string, int maxlength);
-void trace_dump_data(const unsigned char *buf, size_t nbytes);
-void trace_mode(mode_t mode, char *p);
-void trace_printf_backtrace(void);
-
 typedef const void *RTR_CONFIG_HANDLE;
 
 int rtr_get_config_multiple(RTR_CONFIG_HANDLE *config, const char *function, ...);
@@ -238,5 +247,11 @@ int rtr_get_fuzzing_random(void);
 
 /* get string from type */
 void rtr_get_type_string(int type, const struct ts_info *ts_info, char *str, size_t size);
+
+/* get configuration token by separator */
+int rtr_check_config_token(const char *token, char *str, const char *sep);
+
+/* get fuzzing values */
+void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param);
 
 #endif /* __RETRACE_COMMON_H__ */

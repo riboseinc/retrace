@@ -126,8 +126,6 @@ int RETRACE_IMPLEMENTATION(dlclose)(void *handle)
 
 	retrace_log_and_redirect_after(&event_info);
 
-	trace_printf(1, "dlclose(%p); [return: %d]\n", handle, r);
-
 	return r;
 }
 
