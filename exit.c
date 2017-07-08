@@ -45,7 +45,7 @@ void RETRACE_IMPLEMENTATION(exit)(int status)
 
 RETRACE_REPLACE(exit, void, (int status), (status))
 
-#ifndef __APPLE__
+#ifdef __linux__
 int RETRACE_IMPLEMENTATION(on_exit)(void (*function)(int, void *), void *arg)
 {
 	struct rtr_event_info event_info;
@@ -95,6 +95,7 @@ int RETRACE_IMPLEMENTATION(__cxa_atexit)(void (*function)(void), void *p1, void 
 RETRACE_REPLACE(__cxa_atexit, int, (void (*function)(void), void *p1, void *p2), (function, p1, p2))
 #endif
 
+#ifndef __OpenBSD__
 int RETRACE_IMPLEMENTATION(atexit)(void (*function)(void))
 {
 	struct rtr_event_info event_info;
@@ -118,6 +119,7 @@ int RETRACE_IMPLEMENTATION(atexit)(void (*function)(void))
 }
 
 RETRACE_REPLACE(atexit, int, (void (*function)(void)), (function))
+#endif
 
 
 void RETRACE_IMPLEMENTATION(_exit)(int status)

@@ -50,12 +50,12 @@
 #include <dirent.h>
 #include <sys/uio.h>
 #include <sys/utsname.h>
-#include <execinfo.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/un.h>
 #include <netdb.h>
+#include <sys/socket.h>
 
 #include "str.h"
 #include "id.h"
@@ -789,7 +789,6 @@ void
 retrace_event(struct rtr_event_info *event_info)
 {
 	int olderrno;
-
 	int old_trace_state;
 	static char *output_file_path;
 	static int loaded_config;
