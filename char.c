@@ -48,13 +48,17 @@ RETRACE_IMPLEMENTATION(putc)(int c, FILE *stream)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "putc";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_putc(c, stream);
+	if (r == EOF)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -76,13 +80,17 @@ RETRACE_IMPLEMENTATION(_IO_putc)(int c, FILE *stream)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "_IO_putc";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real__IO_putc(c, stream);
+	if (r == EOF)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -104,10 +112,12 @@ RETRACE_IMPLEMENTATION(toupper)(int c)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "toupper";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_toupper(c);
@@ -131,10 +141,12 @@ RETRACE_IMPLEMENTATION(tolower)(int c)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "tolower";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_tolower(c);

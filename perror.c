@@ -35,9 +35,11 @@ void RETRACE_IMPLEMENTATION(perror)(const char *s)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "perror";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	real_perror(s);

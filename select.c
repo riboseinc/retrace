@@ -61,6 +61,7 @@ RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -76,6 +77,9 @@ RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 	} else {
 		event_info.extra_info = "no timeout";
 	}
+
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 

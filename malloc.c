@@ -45,10 +45,12 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "malloc";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &p;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -59,10 +61,14 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 		redirect = 1;
 		event_info.extra_info = "redirected : NULL";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 	}
 
-	if (!redirect)
+	if (!redirect) {
 		p = real_malloc(bytes);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -79,9 +85,11 @@ void RETRACE_IMPLEMENTATION(free)(void *mem)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "free";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -104,10 +112,12 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "calloc";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &p;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -118,10 +128,14 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 		redirect = 1;
 		event_info.extra_info = "redirected : NULL";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 	}
 
-	if (!redirect)
+	if (!redirect) {
 		p = real_calloc(nmemb, size);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -143,10 +157,12 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "realloc";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &p;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -157,10 +173,14 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 		redirect = 1;
 		event_info.extra_info = "redirected : NULL";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 	}
 
-	if (!redirect)
+	if (!redirect) {
 		p = real_realloc(ptr, size);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -181,10 +201,12 @@ void *RETRACE_IMPLEMENTATION(memcpy)(void *dest, const void *src, size_t n)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "memcpy";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &p;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -196,6 +218,8 @@ void *RETRACE_IMPLEMENTATION(memcpy)(void *dest, const void *src, size_t n)
 	}
 
 	p = real_memcpy(dest, src, n);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -214,10 +238,12 @@ void *RETRACE_IMPLEMENTATION(memmove)(void *dest, const void *src, size_t n)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "memmove";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &p;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -238,9 +264,11 @@ void RETRACE_IMPLEMENTATION(bcopy)(const void *src, void *dest, size_t n)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "bcopy";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -262,10 +290,12 @@ void *RETRACE_IMPLEMENTATION(memccpy)(void *dest, const void *src, int c, size_t
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "memccpy";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &p;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -327,10 +357,12 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "mmap";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &p;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -342,10 +374,14 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 		redirect = 1;
 		event_info.extra_info = "redirected : (void *) -1";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 	}
 
-	if (!redirect)
+	if (!redirect) {
 		p = real_mmap(addr, length, prot, flags, fd, offset);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -364,14 +400,18 @@ int RETRACE_IMPLEMENTATION(munmap)(void *addr, size_t length)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "munmap";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_munmap(addr, length);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -399,10 +439,12 @@ int RETRACE_IMPLEMENTATION(brk)(void *addr)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "brk";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -414,10 +456,14 @@ int RETRACE_IMPLEMENTATION(brk)(void *addr)
 		redirect = 1;
 		event_info.extra_info = "redirected : -1";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 	}
 
-	if (!redirect)
+	if (!redirect) {
 		ret = real_brk((void *) addr);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -443,10 +489,12 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sbrk";
+	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &p;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -458,10 +506,14 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 		redirect = 1;
 		event_info.extra_info = "redirected : (void *) -1";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 	}
 
-	if (!redirect)
+	if (!redirect) {
 		p = real_sbrk(increment);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 

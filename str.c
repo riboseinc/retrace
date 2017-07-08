@@ -35,14 +35,14 @@ char *RETRACE_IMPLEMENTATION(strstr)(const char *s1, const char *s2)
 	void const *parameter_values[] = {&s1, &s2};
 	char *result = NULL;
 
-
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strstr";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_STRING;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	result = real_strstr(s1, s2);
@@ -64,10 +64,12 @@ size_t RETRACE_IMPLEMENTATION(strlen)(const char *s)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strlen";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &len;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	len = real_strlen(s);
@@ -89,10 +91,12 @@ int RETRACE_IMPLEMENTATION(strncmp)(const char *s1, const char *s2, size_t n)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strncmp";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	result = real_strncmp(s1, s2, n);
@@ -114,10 +118,12 @@ int RETRACE_IMPLEMENTATION(strcmp)(const char *s1, const char *s2)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strcmp";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	result = real_strcmp(s1, s2);
@@ -139,10 +145,12 @@ char *RETRACE_IMPLEMENTATION(strncpy)(char *s1, const char *s2, size_t n)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strncpy";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_STRING;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	result = real_strncpy(s1, s2, n);
@@ -164,10 +172,12 @@ char *RETRACE_IMPLEMENTATION(strcat)(char *s1, const char *s2)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strcat";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_STRING;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	result = real_strcat(s1, s2);
@@ -189,10 +199,12 @@ char *RETRACE_IMPLEMENTATION(strncat)(char *s1, const char *s2, size_t n)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strncat";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_STRING;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	result = real_strncat(s1, s2, n);
@@ -214,10 +226,12 @@ char *RETRACE_IMPLEMENTATION(strcpy)(char *s1, const char *s2)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strcpy";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_STRING;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	result = real_strcpy(s1, s2);
@@ -239,10 +253,12 @@ int RETRACE_IMPLEMENTATION(strcasecmp)(const char *s1, const char *s2)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strcasecmp";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_strcasecmp(s1, s2);
@@ -264,10 +280,12 @@ char *RETRACE_IMPLEMENTATION(strchr)(const char *s, int c)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strchr";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_STRING;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	result = real_strchr(s, c);
@@ -289,10 +307,12 @@ char *RETRACE_IMPLEMENTATION(strtok)(char *str, const char *delim)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strtok";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_STRING;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	result = real_strtok(str, delim);

@@ -182,6 +182,28 @@ These two options will cause a timestamp (since the beginning of the
 tracing) to be shown and the time a call took if it's bigger than
 the specified time in float seconds.
 
+## Logging
+
+``` sh
+logging-global,LOG_GROUP_FILE|LOG_GROUP_MEM,RTR_LOG_LEVEL_ALL
+logging-excluded-funcs,free|memcpy|malloc
+logging-allowed-funcs,strlen
+stacktrace-groups,LOG_GROUP_MEM
+stacktrace-disabled-funcs,calloc
+```
+
+These options will enable or disable logging options by group or level.
+The each group, level or function may be combined by '|' character.
+
+logging-global,[logging group],[logging level]
+	groups: LOG_GROUP_ALL,LOG_GROUP_MEM,LOG_GROUP_FILE,LOG_GROUP_NET,LOG_GROUP_SYS,
+		LOG_GROUP_STR,LOG_GROUP_SSL,LOG_GROUP_PROC
+	levels: LOG_LEVEL_ALL,LOG_LEVEL_NOR,LOG_LEVEL_ERR,LOG_LEVEL_FUZZ,LOG_LEVEL_REDIRECT
+
+logging-excluded-funcs,[functions list]
+logging-allowed-funcs,[functions list]
+stacktrace-groups,[logging groups]
+stacktrace-disabled-funcs,[functions list]
 
 # Status
 

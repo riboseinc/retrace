@@ -36,13 +36,17 @@ void *RETRACE_IMPLEMENTATION(dlopen)(const char *filename, int flag)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dlopen";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_dlopen(filename, flag);
+	if (!r)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -61,9 +65,11 @@ char *RETRACE_IMPLEMENTATION(dlerror)(void)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dlerror";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_STRING;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_dlerror();
@@ -88,13 +94,17 @@ void *RETRACE_IMPLEMENTATION(dlsym)(void *handle, const char *symbol)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dlsym";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_dlsym(handle, symbol);
+	if (!r)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -116,15 +126,19 @@ int RETRACE_IMPLEMENTATION(dlclose)(void *handle)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dlclose";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_dlclose(handle);
 
 	retrace_log_and_redirect_after(&event_info);
+	if (!r)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	return r;
 }

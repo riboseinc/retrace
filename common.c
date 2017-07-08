@@ -56,6 +56,7 @@
 #include <sys/un.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <execinfo.h>
 
 #include "str.h"
 #include "id.h"
@@ -102,6 +103,8 @@ static pthread_once_t tracing_key_once = PTHREAD_ONCE_INIT;
 static int g_init_rand;
 static unsigned int g_rand_seed;
 
+static rtr_logging_config_t g_logging_config;
+
 /*
  * Global list of file descriptors so we can track
  * their usage across different functions
@@ -128,6 +131,7 @@ static void trace_dump_data(const unsigned char *buf, size_t nbytes);
 static void trace_mode(mode_t mode, char *p);
 static void trace_printf_backtrace(void);
 
+static int rtr_check_logging_config(struct rtr_event_info *event_info, int stack_trace);
 
 /* Returns time as zero on the first call and in subsequents call
  * returns the time elapsed since the first called */
@@ -823,6 +827,13 @@ retrace_event(struct rtr_event_info *event_info)
 			show_timestamp = 1;
 	}
 
+	if (!rtr_check_logging_config(event_info, 0)) {
+		pthread_mutex_unlock(&printing_lock);
+		trace_restore(old_trace_state);
+
+		return;
+	}
+
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		unsigned int *parameter_type;
 		void **parameter_value;
@@ -910,16 +921,15 @@ retrace_event(struct rtr_event_info *event_info)
 			parameter_value = event_info->parameter_values;
 
 			while (GET_PARAMETER_TYPE(*parameter_type) != PARAMETER_TYPE_END) {
-
 				parameter_value = retrace_dump_parameter(GET_PARAMETER_TYPE(*parameter_type), 0, parameter_value);
-
 				parameter_type++;
 			}
 
 		}
 	}
 
-	if (event_info->event_flags & EVENT_FLAGS_PRINT_BACKTRACE) {
+	if ((event_info->event_flags & EVENT_FLAGS_PRINT_BACKTRACE) &&
+		(rtr_check_logging_config(event_info, 1))) {
 		trace_printf_backtrace();
 	}
 
@@ -1652,7 +1662,7 @@ trace_mode(mode_t mode, char *p)
 
 /* printf backtrace callback */
 static void
-trace_printf_backtrace(void)
+trace_printf_backtrace()
 {
 	void *callstack[128];
 	int old_trace_state;
@@ -1742,9 +1752,12 @@ rtr_get_type_string(int type, const struct ts_info *ts_info, char *str, size_t s
 }
 
 /* get configuration token by separator */
-int rtr_check_config_token(const char *token, char *str, const char *sep)
+int rtr_check_config_token(const char *token, char *str, const char *sep, int *reverse)
 {
 	char *p, *q;
+
+	/* init reverse flag */
+	*reverse = 0;
 
 	p = real_malloc(real_strlen(str) + 1);
 	if (!p)
@@ -1755,7 +1768,11 @@ int rtr_check_config_token(const char *token, char *str, const char *sep)
 
 	q = real_strtok(p, sep);
 	while (q != NULL) {
-		if (real_strcmp(token, q) == 0)
+		/* check logical NOT operator '!' */
+		if (q[0] == '!')
+			*reverse = 1;
+
+		if (real_strcmp(token, (*reverse == 0) ? q : q + 1) == 0)
 			return 1;
 
 		q = real_strtok(NULL, sep);
@@ -1808,4 +1825,166 @@ void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param)
 	}
 
 	return (void *) ret;
+}
+
+/* parse global options */
+static const char *rtr_logging_groups[] = {
+	"LOG_GROUP_MEM",
+	"LOG_GROUP_FILE",
+	"LOG_GROUP_NET",
+	"LOG_GROUP_SYS",
+	"LOG_GROUP_STR",
+	"LOG_GROUP_SSL",
+	"LOG_GROUP_PROC",
+	NULL
+};
+
+static const char *rtr_logging_levels[] = {
+	"LOG_LELEL_NOR",
+	"LOG_LEVEL_ERR",
+	"LOG_LEVEL_FUZZ",
+	"LOG_LEVEL_REDIRECT",
+	NULL
+};
+
+/* parse logging options */
+static void parse_logging_options(int opt_type, char *opt_str)
+{
+	int i;
+	char sep[] = "| \t";
+
+	int reverse = 0;
+
+	if (opt_type == RTR_LOG_OPT_GRP || opt_type == RTR_LOG_OPT_STRACE) {
+		int opt_val = 0;
+
+		for (i = 0; rtr_logging_groups[i] != NULL; i++) {
+			if (rtr_check_config_token(rtr_logging_groups[i], opt_str, sep, &reverse)) {
+				int bit_val = (i == 0) ? 0x01 : i * 2;
+
+				if (!reverse)
+					opt_val |= bit_val;
+				else
+					opt_val &= !bit_val;
+			}
+		}
+
+		if (opt_type == RTR_LOG_OPT_GRP)
+			g_logging_config.group_bitwise = opt_val;
+		else
+			g_logging_config.stracing_group_bitwise = opt_val;
+
+		return;
+	}
+
+	if (opt_type == RTR_LOG_OPT_LEVEL) {
+		for (i = 0; rtr_logging_levels[i] != NULL; i++) {
+			if (rtr_check_config_token(rtr_logging_levels[i], opt_str, sep, &reverse)) {
+				int bit_val = (i == 0) ? 0x01 : i * 2;
+
+				if (!reverse)
+					g_logging_config.level_bitwise |= bit_val;
+				else
+					g_logging_config.level_bitwise &= !bit_val;
+			}
+		}
+	}
+}
+
+/* initialize logging configuration */
+static void rtr_init_logging_config(void)
+{
+	char *logging_grps;
+	char *logging_types;
+
+	if (g_logging_config.init_flag)
+		return;
+
+	memset(&g_logging_config, 0, sizeof(g_logging_config));
+
+	/* read global configuration */
+	if (rtr_get_config_single_internal("logging-global", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_END,
+		&logging_grps, &logging_types)) {
+		parse_logging_options(RTR_LOG_OPT_GRP, logging_grps);
+		parse_logging_options(RTR_LOG_OPT_LEVEL, logging_types);
+	}
+
+	/* get allowed and excluded function list */
+	rtr_get_config_single_internal("logging-allowed-funcs", ARGUMENT_TYPE_STRING,
+		ARGUMENT_TYPE_END, &g_logging_config.allowed_funcs);
+
+	rtr_get_config_single_internal("logging-excluded-funcs", ARGUMENT_TYPE_STRING,
+		ARGUMENT_TYPE_END, &g_logging_config.disabled_funcs);
+
+	if (rtr_get_config_single_internal("stacktrace-groups", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_END,
+		&logging_grps, &logging_types))
+		parse_logging_options(RTR_LOG_OPT_STRACE, logging_grps);
+
+	rtr_get_config_single_internal("stacktrace-disabled-funcs", ARGUMENT_TYPE_STRING,
+		ARGUMENT_TYPE_END, &g_logging_config.stracing_disabled_funcs);
+
+	/* if global options are missing, then set group and level to all */
+	if (g_logging_config.group_bitwise == 0)
+		g_logging_config.group_bitwise = RTR_FUNC_GRP_ALL;
+
+	if (g_logging_config.level_bitwise == 0)
+		g_logging_config.level_bitwise = RTR_LOG_LEVEL_ALL;
+
+	/* if stacktracing options are missing, then set group to all */
+	if (g_logging_config.stracing_group_bitwise == 0)
+		g_logging_config.stracing_group_bitwise = RTR_FUNC_GRP_ALL;
+
+	/* set init flag */
+	g_logging_config.init_flag = 1;
+}
+
+/* check if event info will be logged by logging configuration */
+static int rtr_check_logging_config(struct rtr_event_info *event_info, int stack_trace)
+{
+	int reverse = 0;
+	char sep[] = "| \t";
+
+	/* check init status of logging config and init if not */
+	if (!g_logging_config.init_flag)
+		rtr_init_logging_config();
+
+	if (stack_trace) {
+		/* check excluded list */
+		if (g_logging_config.stracing_disabled_funcs &&
+			rtr_check_config_token(event_info->function_name, g_logging_config.stracing_disabled_funcs, sep, &reverse) &&
+			!reverse)
+			return 0;
+
+		if ((event_info->function_group & g_logging_config.stracing_group_bitwise) == 0x00)
+			return 0;
+
+		return 1;
+	}
+
+	/* check fuzzing or redirection is applied */
+	if ((event_info->logging_level & RTR_LOG_LEVEL_FUZZ) ||
+		(event_info->logging_level & RTR_LOG_LEVEL_REDIRECT))
+		return 1;
+
+	/* check the function is in allowed list */
+	if (g_logging_config.allowed_funcs &&
+		rtr_check_config_token(event_info->function_name, g_logging_config.allowed_funcs, sep, &reverse) &&
+		!reverse)
+		return 1;
+
+	/* check the function is in excluded list */
+	if (g_logging_config.disabled_funcs &&
+		rtr_check_config_token(event_info->function_name, g_logging_config.disabled_funcs, sep, &reverse) &&
+		!reverse)
+		return 0;
+
+	/* check global option */
+	if ((event_info->function_group & g_logging_config.group_bitwise) == 0x00)
+		return 0;
+
+	/* check logging level */
+	if ((event_info->logging_level & g_logging_config.level_bitwise) == 0x00)
+		return 0;
+
+	return 1;
 }

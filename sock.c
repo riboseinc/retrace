@@ -40,17 +40,19 @@ int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
 	void const *parameter_values[] = {&domain, &type, &protocol};
 	int sock;
 
-
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "socket";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &sock;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	sock = real_socket(domain, type, protocol);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -76,13 +78,14 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 	void const *parameter_values[] = {&fd, &remote_addr, &len};
 	int ret;
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "connect";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	if (!get_tracing_enabled())
@@ -151,6 +154,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 		if (ret == 0)
 			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, remote_ipaddr, remote_port);
 
+		event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
 		retrace_log_and_redirect_after(&event_info);
 
 		return ret;
@@ -163,14 +167,19 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 		if (ret == 0)
 			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_UNIX_DOMAIN, sun_path, -1);
 
+		event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
 		retrace_log_and_redirect_after(&event_info);
 
 		return ret;
 	}
 
+	ret = real_connect(fd, address, len);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+
 	retrace_log_and_redirect_after(&event_info);
 
-	return real_connect(fd, address, len);
+	return ret;
 }
 
 #ifdef __linux__
@@ -199,13 +208,17 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "bind";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_bind(fd, address, len);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	if (ret == 0) {
 		if (address->sa_family == AF_INET) {
@@ -258,13 +271,14 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 	struct sockaddr_in local_addr;
 	socklen_t local_len = 0;
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "accept";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_FILE_DESCRIPTOR;
 	event_info.return_value = &clnt_fd;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	/* If we are tracking this descriptor and is a IPV4 server, try to gets
@@ -278,6 +292,8 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 	}
 
 	clnt_fd = real_accept(fd, address, len);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	/* get descriptor info */
 	di = file_descriptor_get(fd);
@@ -322,13 +338,17 @@ int RETRACE_IMPLEMENTATION(setsockopt)(int fd, int level, int optname, const voi
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "setsockopt";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_setsockopt(fd, level, optname, optval, optlen);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -351,13 +371,17 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "send";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_send(sockfd, buf, len, flags);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -386,13 +410,17 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sendto";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	if (dest_addr) {
 		if (dest_addr->sa_family == AF_INET) {
@@ -442,13 +470,17 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sendmsg";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_sendmsg(sockfd, msg, flags);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	/* update descriptor info */
 	di = file_descriptor_get(sockfd);
@@ -479,13 +511,17 @@ ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flag
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "recv";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &recv_len;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	recv_len = real_recv(sockfd, buf, len, flags);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -528,10 +564,13 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 	}
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &recv_len;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
 	recv_len = real_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -561,10 +600,13 @@ ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flag
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &recv_len;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
 	recv_len = real_recvmsg(sockfd, msg, flags);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 

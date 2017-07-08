@@ -33,16 +33,19 @@ char *RETRACE_IMPLEMENTATION(ctime_r)(const time_t *timep, char *buf)
 	void const *parameter_values[] = {&timep, &buf};
 	char *r = NULL;
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "ctime_r";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_STRING;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_ctime_r(timep, buf);
+	if (!r)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -58,16 +61,19 @@ char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 	void const *parameter_values[] = {&timep};
 	char *r;
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "ctime";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_ctime(timep);
+	if (!r)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -98,16 +104,19 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz
 	tz = (struct timezone *)tzp;
 #endif
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "gettimeofday";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_gettimeofday(tv, tz);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 

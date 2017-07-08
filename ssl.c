@@ -42,13 +42,17 @@ int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_write";
+	event_info.function_group = RTR_FUNC_GRP_SSL;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_SSL_write(ssl, buf, num);
+	if (r <= 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -69,13 +73,17 @@ int RETRACE_IMPLEMENTATION(SSL_read)(SSL *ssl, void *buf, int num)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_read";
+	event_info.function_group = RTR_FUNC_GRP_SSL;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_SSL_read(ssl, buf, num);
+	if (r <= 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -96,13 +104,17 @@ int RETRACE_IMPLEMENTATION(SSL_connect)(SSL *ssl)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_connect";
+	event_info.function_group = RTR_FUNC_GRP_SSL;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_SSL_connect(ssl);
+	if (r <= 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -123,13 +135,17 @@ int RETRACE_IMPLEMENTATION(SSL_accept)(SSL *ssl)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_accept";
+	event_info.function_group = RTR_FUNC_GRP_SSL;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_SSL_accept(ssl);
+	if (r <= 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -151,19 +167,24 @@ RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_get_verify_result";
+	event_info.function_group = RTR_FUNC_GRP_SSL;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_SSL_get_verify_result(ssl);
+	if (r != X509_V_OK)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	if (rtr_get_config_single("SSL_get_verify_result", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 
 		char redirect_str[128];
 		snprintf(redirect_str, sizeof(redirect_str), "redirection in effect: '%i'", redirect_id);
 		event_info.extra_info = redirect_str;
+		event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
 
 		r = redirect_id;
 	}
@@ -504,14 +525,15 @@ long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "BIO_ctrl";
+	event_info.function_group = RTR_FUNC_GRP_SSL;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_BIO_ctrl(bp, cmd, larg, parg);
-
 	if (cmd == BIO_C_DO_STATE_MACHINE) {
 		if (get_tracing_enabled()) {
 			int old_trace_state;
@@ -526,7 +548,6 @@ long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 	}
 
 	retrace_log_and_redirect_after(&event_info);
-
 
 	return (r);
 }
