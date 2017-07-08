@@ -217,9 +217,11 @@ void RETRACE_IMPLEMENTATION(openlog)(const char *ident, int option, int facility
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "openlog";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	real_openlog(ident, option, facility);
@@ -245,9 +247,11 @@ void RETRACE_IMPLEMENTATION(syslog)(int priority, const char *format, ...)
 	va_start(ap, format);
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "syslog";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap);
 
@@ -269,8 +273,10 @@ void RETRACE_IMPLEMENTATION(closelog)(void)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "closelog";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	real_closelog();
@@ -298,9 +304,11 @@ void RETRACE_IMPLEMENTATION(vsyslog)(int priority, const char *format, va_list a
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vsyslog";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	real_vsyslog(priority, format, ap);
@@ -328,10 +336,12 @@ int RETRACE_IMPLEMENTATION(setlogmask)(int mask)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "setlogmask";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_setlogmask(mask);

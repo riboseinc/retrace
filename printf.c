@@ -43,16 +43,21 @@ RETRACE_IMPLEMENTATION(printf)(const char *fmt, ...)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "printf";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap);
 
 	va_start(ap, fmt);
 	result = real_vprintf(fmt, ap);
 	va_end(ap);
+
+	if (result < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	va_start(ap, fmt);
 	retrace_log_and_redirect_after(&event_info);
@@ -76,16 +81,21 @@ RETRACE_IMPLEMENTATION(fprintf)(FILE *stream, const char *fmt, ...)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fprintf";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap);
 
 	va_start(ap, fmt);
 	result = real_vfprintf(stream, fmt, ap);
 	va_end(ap);
+
+	if (result < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	va_start(ap, fmt);
 	retrace_log_and_redirect_after(&event_info);
@@ -109,16 +119,21 @@ RETRACE_IMPLEMENTATION(dprintf)(int fd, const char *fmt, ...)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dprintf";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap);
 
 	va_start(ap, fmt);
 	result = real_vdprintf(fd, fmt, ap);
 	va_end(ap);
+
+	if (result < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	va_start(ap, fmt);
 	retrace_log_and_redirect_after(&event_info);
@@ -142,16 +157,21 @@ RETRACE_IMPLEMENTATION(sprintf)(char *str, const char *fmt, ...)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sprintf";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap);
 
 	va_start(ap, fmt);
 	result = real_vsprintf(str, fmt, ap);
 	va_end(ap);
+
+	if (result < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	va_start(ap, fmt);
 	retrace_log_and_redirect_after(&event_info);
@@ -175,16 +195,21 @@ RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "snprintf";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap);
 
 	va_start(ap, fmt);
 	result = real_vsnprintf(str, size, fmt, ap);
 	va_end(ap);
+
+	if (result < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	va_start(ap, fmt);
 	retrace_log_and_redirect_after(&event_info);
@@ -208,16 +233,21 @@ RETRACE_IMPLEMENTATION(vprintf)(const char *fmt, va_list ap)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vprintf";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
 	result = real_vprintf(fmt, ap);
 	va_end(ap1);
+
+	if (result < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	__va_copy(ap1, ap);
 	retrace_log_and_redirect_after(&event_info);
@@ -241,16 +271,21 @@ RETRACE_IMPLEMENTATION(vfprintf)(FILE *stream, const char *fmt, va_list ap)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vfprintf";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
 	result = real_vfprintf(stream, fmt, ap);
 	va_end(ap1);
+
+	if (result < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	__va_copy(ap1, ap);
 	retrace_log_and_redirect_after(&event_info);
@@ -274,16 +309,21 @@ RETRACE_IMPLEMENTATION(vdprintf)(int fd, const char *fmt, va_list ap)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vdprintf";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
 	result = real_vdprintf(fd, fmt, ap);
 	va_end(ap1);
+
+	if (result < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	__va_copy(ap1, ap);
 	retrace_log_and_redirect_after(&event_info);
@@ -307,16 +347,21 @@ RETRACE_IMPLEMENTATION(vsprintf)(char *str, const char *fmt, va_list ap)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vsprintf";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
 	result = real_vsprintf(str, fmt, ap1);
 	va_end(ap1);
+
+	if (result < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	__va_copy(ap1, ap);
 	retrace_log_and_redirect_after(&event_info);
@@ -340,16 +385,21 @@ RETRACE_IMPLEMENTATION(vsnprintf)(char *str, size_t size, const char *fmt, va_li
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vsnprintf";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
 	result = real_vsnprintf(str, size, fmt, ap1);
 	va_end(ap1);
+
+	if (result < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	__va_copy(ap1, ap);
 	retrace_log_and_redirect_after(&event_info);

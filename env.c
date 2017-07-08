@@ -40,16 +40,19 @@ int RETRACE_IMPLEMENTATION(unsetenv)(const char *name)
 	void const *parameter_values[] = {&name};
 	int r;
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "unsetenv";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_unsetenv(name);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -65,16 +68,19 @@ int RETRACE_IMPLEMENTATION(putenv)(char *string)
 	void const *parameter_values[] = {&string};
 	int r;
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "putenv";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_putenv(string);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -104,11 +110,12 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getenv";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_STRING;
 	event_info.return_value = &env;
-
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	if (rtr_get_config_single("fuzzing-getenv", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_STRING,
@@ -116,6 +123,9 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 		&enabled_vars, &excluded_vars, &fuzzing_type_str, &fuzzing_data_len, &fail_chance) &&
 		rtr_get_fuzzing_flag(fail_chance)) {
 		int fuzzing_type;
+		int reverse;
+
+		char sep[] = "| \t";
 
 		/* check fail flag has set */
 		if (fail_chance) {
@@ -123,10 +133,10 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 			if (real_strcasecmp(enabled_vars, "all") == 0)
 				fuzzing_enabled = 1;
 			else
-				fuzzing_enabled = rtr_check_config_token(envname, enabled_vars, "| \t");
+				fuzzing_enabled = rtr_check_config_token(envname, enabled_vars, sep, &reverse);
 
 			/* check list of excludin list */
-			if (fuzzing_enabled && rtr_check_config_token(envname, excluded_vars, "| \t"))
+			if (fuzzing_enabled && rtr_check_config_token(envname, excluded_vars, sep, &reverse))
 				fuzzing_enabled = 0;
 		}
 
@@ -146,11 +156,15 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 			env = (char *) rtr_get_fuzzing_value(fuzzing_type, (void *) &fuzzing_data_len);
 			event_info.extra_info = "[redirected]";
 			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 		}
 	}
 
-	if (!fuzzing_enabled)
+	if (!fuzzing_enabled) {
 		env = real_getenv(envname);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -170,13 +184,17 @@ int RETRACE_IMPLEMENTATION(uname)(struct utsname *buf)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "uname";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_uname(buf);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
