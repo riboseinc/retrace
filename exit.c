@@ -38,6 +38,7 @@ void RETRACE_IMPLEMENTATION(exit)(int status)
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	retrace_log_and_redirect_before(&event_info);
 
 	real_exit(status);
@@ -133,6 +134,7 @@ void RETRACE_IMPLEMENTATION(_exit)(int status)
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	retrace_log_and_redirect_before(&event_info);
 
 	real__exit(status);

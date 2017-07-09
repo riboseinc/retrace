@@ -108,8 +108,9 @@ enum RTR_FUZZ_TYPE {
 #define EVENT_TYPE_BEFORE_CALL		0
 #define EVENT_TYPE_AFTER_CALL		1
 
-#define EVENT_FLAGS_PRINT_RAND_SEED	0x00000001
-#define EVENT_FLAGS_PRINT_BACKTRACE	0x00000002
+#define EVENT_FLAGS_PRINT_RAND_SEED	0x00000001  /* Print random seed */
+#define EVENT_FLAGS_PRINT_BACKTRACE	0x00000002  /* Print backtrace */
+#define EVENT_FLAGS_PRINT_BEFORE	0x00000004  /* Print this BEFORE the call, as the function might not return (i.e. exit) */
 
 #define GET_PARAMETER_TYPE(param) (param & ~PARAMETER_FLAGS_ALL)
 #define GET_PARAMETER_FLAGS(param) (param & PARAMETER_FLAGS_ALL)

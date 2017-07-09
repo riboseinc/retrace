@@ -127,6 +127,7 @@ int RETRACE_IMPLEMENTATION(system)(const char *command)
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_system(command);
@@ -169,6 +170,7 @@ execl_v(const char *path, const char *arg0, va_list ap)
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execv(path, args);
@@ -207,6 +209,7 @@ int RETRACE_IMPLEMENTATION(execv)(const char *path, char *const argv[])
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execv(path, argv);
@@ -262,6 +265,7 @@ execle_v(const char *path, const char *arg0, va_list ap)
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execve(path, args, envp);
@@ -310,6 +314,7 @@ int RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *c
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execve(path, argv, new_envp);
@@ -379,6 +384,7 @@ int RETRACE_IMPLEMENTATION(execvp)(const char *file, char *const argv[])
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execvp(file, argv);
@@ -410,6 +416,7 @@ int RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execvpe(file, argv, envp);
@@ -450,6 +457,7 @@ int RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname,
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execveat(dirfd, pathname, argv, envp, flags);
@@ -487,6 +495,7 @@ int RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fexecve(fd, argv, envp);
