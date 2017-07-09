@@ -799,7 +799,10 @@ retrace_event(struct rtr_event_info *event_info)
 
 	if (event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		event_info->start_time = retrace_get_time();
-		return;
+
+		/* Don't log any call on before unless explicitly asked too */
+		if (!(event_info->event_flags & EVENT_FLAGS_PRINT_BEFORE))
+			return;
 	}
 
 	old_trace_state = trace_disable();
