@@ -44,7 +44,7 @@ $ ./retrace -f examples/id-redirection/get-both-redirect.conf examples/id-redire
 (44893) geteuid() = 0 [redirection in effect: '0']
 (44893) printf("got full root! uid=%d euid=%d\n" -> "got full root! uid=0 euid=0\n", ) = 28
 got full root! uid=0 euid=0
-$ 
+$
 ```
 
 To show `getuid()` redirection in action on macOS (copy `id` to `/tmp` to bypass SIP):
@@ -67,7 +67,7 @@ $ ./retrace -f examples/id-redirection/get-l33t-redirect.conf /tmp/id
 (45047) getuid() = 1337 [redirection in effect: '1337']
 (45047) geteuid() = 1337 [redirection in effect: '1337']
 uid=1337 gid=20(staff) groups=20(staff),401(com.apple.sharepoint.group.1),12(everyone),61(localaccounts),79(_appserverusr),80(admin),81(_appserveradm),98(_lpadmin),501(access_bpf),701(com.apple.sharepoint.group.3),33(_appstore),100(_lpoperator),204(_developer),395(com.apple.access_ftp),398(com.apple.access_screensharing),399(com.apple.access_ssh)
-$ 
+$
 ```
 
 ## Try it out yourself!
