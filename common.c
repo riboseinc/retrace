@@ -1802,7 +1802,7 @@ void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param)
 
 		ret = real_malloc(len + 1);
 		for (i = 0; i < len; i++) {
-			char c = (i % 2) ? '%' : 's';
+			char c = (i % 2) ? 's' : '%';
 
 			ret[i] = c;
 		}
