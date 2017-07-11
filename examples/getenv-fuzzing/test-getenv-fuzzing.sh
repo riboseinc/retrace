@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# only tested on macOS!
+# only tested on macOS and Ubuntu
 
 readonly getenv="getenv"
 readonly src="${getenv}.c"
@@ -34,7 +34,7 @@ if [ ! -f "${pwd}/${bofconf}" ]; then
 	echo "cannot open '${pwd}/${bofconf}'"
 	exit 1
 fi
-"${retrace}" -f "${pwd}/${bofconf}" "${pwd}/${getenv}" 2>&1 | egrep "FOOBAR|./retrace"
+"${retrace}" -f "${pwd}/${bofconf}" "${pwd}/${getenv}" 2>&1 | egrep "FOOBAR|./retrace|fault"
 echo
 
 readonly fmtconf="getenvfmt-retrace.conf"
@@ -43,7 +43,7 @@ if [ ! -f "${pwd}/${fmtconf}" ]; then
 	echo "cannot open '${pwd}/${fmtconf}'"
 	exit 1
 fi
-"${retrace}" -f "${pwd}/${fmtconf}" "${pwd}/${getenv}" 2>&1 | egrep "FOOBAR|./retrace"
+"${retrace}" -f "${pwd}/${fmtconf}" "${pwd}/${getenv}" 2>&1 | egrep "FOOBAR|./retrace|fault"
 echo
 
 readonly fmtbofconf="getenvfmtbof-retrace.conf"
@@ -52,4 +52,4 @@ if [ ! -f "${pwd}/${fmtbofconf}" ]; then
 	echo "cannot open '${pwd}/${fmtbofconf}'"
 	exit 1
 fi
-"${retrace}" -f "${pwd}/${fmtbofconf}" "${pwd}/${getenv}" 2>&1 | egrep "FOOBAR|./retrace"
+"${retrace}" -f "${pwd}/${fmtbofconf}" "${pwd}/${getenv}" 2>&1 | egrep "FOOBAR|./retrace|fault"
