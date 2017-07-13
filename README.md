@@ -205,6 +205,19 @@ logging-allowed-funcs,[functions list]
 stacktrace-groups,[logging groups]
 stacktrace-disabled-funcs,[functions list]
 
+# macOS System Integrity Protection
+
+We use the DYLD_INSERT_LIBRARIES enviroment variable to insert `retrace` into binaries. Starting on Mac OS X El Capitan Apple removes
+the DYLD_INSERT_LIBRARIES variable for the enviroment for binaries in system directories. This means you can't trace system binaries
+using `retrace` by default. You can disable this behaviour by running `csrutil disable` and rebooting.
+
+
+# Feedback
+
+`retrace` is under heavy development and we are always looking to implement new and useful features that allows debugging and reverse engineering programs in new and interesting ways.
+
+Please send feedback and improvement suggestion either as github issues or to retrace@ribose.com
+
 # Status
 
 [![Travis CI Build Status](https://travis-ci.org/riboseinc/retrace.svg?branch=master)](https://travis-ci.org/riboseinc/retrace)
