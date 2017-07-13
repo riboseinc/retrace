@@ -123,13 +123,18 @@ int RETRACE_IMPLEMENTATION(system)(const char *command)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "system";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_system(command);
+	if (r != 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -165,13 +170,18 @@ execl_v(const char *path, const char *arg0, va_list ap)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execl";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execv(path, args);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -203,13 +213,18 @@ int RETRACE_IMPLEMENTATION(execv)(const char *path, char *const argv[])
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execv";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execv(path, argv);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -258,13 +273,18 @@ execle_v(const char *path, const char *arg0, va_list ap)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execle";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execve(path, args, envp);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -306,13 +326,18 @@ int RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *c
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execve";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execve(path, argv, new_envp);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -375,13 +400,18 @@ int RETRACE_IMPLEMENTATION(execvp)(const char *file, char *const argv[])
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execvp";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execvp(file, argv);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -406,13 +436,18 @@ int RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execvpe";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execvpe(file, argv, envp);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -446,13 +481,18 @@ int RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname,
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execveat";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_execveat(dirfd, pathname, argv, envp, flags);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -483,13 +523,18 @@ int RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fexecve";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fexecve(fd, argv, envp);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 

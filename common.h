@@ -14,6 +14,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 
 #define MAXLEN		40
 
@@ -108,8 +109,9 @@ enum RTR_FUZZ_TYPE {
 #define EVENT_TYPE_BEFORE_CALL		0
 #define EVENT_TYPE_AFTER_CALL		1
 
-#define EVENT_FLAGS_PRINT_RAND_SEED	0x00000001
-#define EVENT_FLAGS_PRINT_BACKTRACE	0x00000002
+#define EVENT_FLAGS_PRINT_RAND_SEED	0x00000001  /* Print random seed */
+#define EVENT_FLAGS_PRINT_BACKTRACE	0x00000002  /* Print backtrace */
+#define EVENT_FLAGS_PRINT_BEFORE	0x00000004  /* Print this BEFORE the call, as the function might not return (i.e. exit) */
 
 #define GET_PARAMETER_TYPE(param) (param & ~PARAMETER_FLAGS_ALL)
 #define GET_PARAMETER_FLAGS(param) (param & PARAMETER_FLAGS_ALL)
@@ -118,6 +120,7 @@ struct rtr_event_info {
 	unsigned int event_type;
 
 	char *function_name;
+	int function_group;
 
 	unsigned int *parameter_types;
 	void **parameter_values;
@@ -129,6 +132,7 @@ struct rtr_event_info {
 	char *extra_info;
 
 	double start_time;
+	int logging_level;
 };
 
 #define RETRACE_INTERNAL __attribute__((visibility("hidden")))
@@ -251,9 +255,45 @@ int rtr_get_fuzzing_random(void);
 void rtr_get_type_string(int type, const struct ts_info *ts_info, char *str, size_t size);
 
 /* get configuration token by separator */
-int rtr_check_config_token(const char *token, char *str, const char *sep);
+int rtr_check_config_token(const char *token, char *str, const char *sep, int *reverse);
 
 /* get fuzzing values */
 void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param);
+
+/* retrace logging configuration option type */
+#define RTR_LOG_OPT_GRP				0
+#define RTR_LOG_OPT_LEVEL			1
+#define RTR_LOG_OPT_STRACE			2
+
+/* retrace logging configuration groups */
+#define	RTR_FUNC_GRP_MEM			0x01
+#define	RTR_FUNC_GRP_FILE			0x02
+#define	RTR_FUNC_GRP_NET			0x04
+#define	RTR_FUNC_GRP_SYS			0x08
+#define	RTR_FUNC_GRP_STR			0x10
+#define RTR_FUNC_GRP_SSL			0x20
+#define RTR_FUNC_GRP_PROC			0x40
+#define	RTR_FUNC_GRP_ALL			0xFF
+
+/* retrace logging configuration levels  */
+#define	RTR_LOG_LEVEL_NOR			0x01
+#define	RTR_LOG_LEVEL_ERR			0x02
+#define RTR_LOG_LEVEL_FUZZ			0x04
+#define	RTR_LOG_LEVEL_REDIRECT			0x08
+#define	RTR_LOG_LEVEL_ALL			0xFF
+
+/* retrace looging configuration structure */
+typedef struct _rtr_logging_config {
+	int init_flag;
+
+	int group_bitwise;
+	int level_bitwise;
+
+	char *allowed_funcs;
+	char *disabled_funcs;
+
+	int stracing_group_bitwise;
+	char *stracing_disabled_funcs;
+} rtr_logging_config_t;
 
 #endif /* __RETRACE_COMMON_H__ */

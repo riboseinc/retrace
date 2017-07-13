@@ -38,13 +38,17 @@ int RETRACE_IMPLEMENTATION(setuid)(uid_t uid)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "setuid";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_setuid(uid);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -63,13 +67,17 @@ int RETRACE_IMPLEMENTATION(seteuid)(uid_t uid)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "seteuid";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_seteuid(uid);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -88,14 +96,18 @@ int RETRACE_IMPLEMENTATION(setgid)(gid_t gid)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "setgid";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_setgid(gid);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -113,9 +125,11 @@ gid_t RETRACE_IMPLEMENTATION(getgid)()
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getgid";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &gid;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -137,9 +151,11 @@ gid_t RETRACE_IMPLEMENTATION(getegid)()
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getegid";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &egid;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -163,19 +179,21 @@ uid_t RETRACE_IMPLEMENTATION(getuid)()
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getuid";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &uid;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
 	if (rtr_get_config_single("getuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 		sprintf(extra_info_buf, "redirection in effect: '%i'", redirect_id);
 		event_info.extra_info = extra_info_buf;
+		event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
 		uid = (uid_t) redirect_id;
-	} else {
+	} else
 		uid = real_getuid();
-	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -195,18 +213,20 @@ uid_t RETRACE_IMPLEMENTATION(geteuid)()
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "geteuid";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &euid;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	if (rtr_get_config_single("geteuid", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 		sprintf(extra_info_buf, "redirection in effect: '%i'", redirect_id);
 		event_info.extra_info = extra_info_buf;
+		event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
 		euid = (uid_t) redirect_id;
-	} else {
+	} else
 		euid = real_geteuid();
-	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -224,9 +244,11 @@ pid_t RETRACE_IMPLEMENTATION(getpid)()
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getpid";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &pid;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -248,9 +270,11 @@ pid_t RETRACE_IMPLEMENTATION(getppid)()
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getppid";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ppid;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 

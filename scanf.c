@@ -46,16 +46,21 @@ RETRACE_IMPLEMENTATION(scanf)(const char *format, ...)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "scanf";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap);
 
 	va_start(ap, format);
 	result = real_vscanf(format, ap);
 	va_end(ap);
+
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	va_start(ap, format);
 	retrace_log_and_redirect_after(&event_info);
@@ -81,16 +86,21 @@ RETRACE_IMPLEMENTATION(fscanf)(FILE *stream, const char *format, ...)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fscanf";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap);
 
 	va_start(ap, format);
 	result = real_vfscanf(stream, format, ap);
 	va_end(ap);
+
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	va_start(ap, format);
 	retrace_log_and_redirect_after(&event_info);
@@ -116,16 +126,21 @@ RETRACE_IMPLEMENTATION(sscanf)(const char *str, const char *format, ...)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sscanf";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap);
 
 	va_start(ap, format);
 	result = real_vsscanf(str, format, ap);
 	va_end(ap);
+
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	va_start(ap, format);
 	retrace_log_and_redirect_after(&event_info);
@@ -149,16 +164,21 @@ RETRACE_IMPLEMENTATION(vscanf)(const char *format, va_list ap)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vscanf";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
 	result = real_vscanf(format, ap);
 	va_end(ap1);
+
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	__va_copy(ap1, ap);
 	retrace_log_and_redirect_after(&event_info);
@@ -182,16 +202,21 @@ RETRACE_IMPLEMENTATION(vsscanf)(const char *str, const char *format, va_list ap)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vsscanf";
+	event_info.function_group = RTR_FUNC_GRP_STR;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
 	result = real_vsscanf(str, format, ap);
 	va_end(ap1);
+
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	__va_copy(ap1, ap);
 	retrace_log_and_redirect_after(&event_info);
@@ -217,16 +242,21 @@ RETRACE_IMPLEMENTATION(vfscanf)(FILE *stream, const char *format, va_list ap)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vfscanf";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &result;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap1);
 
 	__va_copy(ap1, ap);
 	result = real_vfscanf(stream, format, ap);
 	va_end(ap1);
+
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	__va_copy(ap1, ap);
 	retrace_log_and_redirect_after(&event_info);

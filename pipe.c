@@ -40,13 +40,17 @@ int RETRACE_IMPLEMENTATION(pipe)(int pipefd[2])
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "pipe";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_pipe(pipefd);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -71,13 +75,17 @@ int RETRACE_IMPLEMENTATION(pipe2)(int pipefd[2], int flags)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "pipe2";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_pipe2(pipefd, flags);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 

@@ -38,17 +38,20 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyname)(const char *name)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "gethostbyname";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &hent;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
 	hent = real_gethostbyname(name);
 	if (hent) {
 		event_info.return_value_type = PARAMETER_TYPE_STRUCT_HOSTEN;
-	}
+	} else
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -68,17 +71,20 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyaddr)(const void *addr, socklen_
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "gethostbyaddr";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &hent;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
 	hent = real_gethostbyaddr(addr, len, type);
 	if (hent) {
 		event_info.return_value_type = PARAMETER_TYPE_STRUCT_HOSTEN;
-	}
+	} else
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -97,8 +103,10 @@ void RETRACE_IMPLEMENTATION(sethostent)(int stayopen)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sethostent";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -119,8 +127,10 @@ void RETRACE_IMPLEMENTATION(endhostent)(void)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "endhostent";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -143,17 +153,20 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostent)(void)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "gethostent";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &hent;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
 	hent = real_gethostent();
 	if (hent) {
 		event_info.return_value_type = PARAMETER_TYPE_STRUCT_HOSTEN;
-	}
+	} else
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -173,17 +186,20 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyname2)(const char *name, int af)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "gethostbyname2";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_POINTER;
 	event_info.return_value = &hent;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
 	hent = real_gethostbyname2(name, af);
 	if (hent) {
 		event_info.return_value_type = PARAMETER_TYPE_STRUCT_HOSTEN;
-	}
+	} else
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -205,10 +221,12 @@ int RETRACE_IMPLEMENTATION(getaddrinfo)(const char *node, const char *service,
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getaddrinfo";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -216,7 +234,8 @@ int RETRACE_IMPLEMENTATION(getaddrinfo)(const char *node, const char *service,
 	if (ret == 0) {
 		event_info.return_value_type = PARAMETER_TYPE_STRUCT_ADDRINFO;
 		event_info.return_value = res;
-	}
+	} else
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -237,8 +256,10 @@ void RETRACE_IMPLEMENTATION(freeaddrinfo)(struct addrinfo *res)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "freeaddrinfo";
+	event_info.function_group = RTR_FUNC_GRP_NET;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 

@@ -9,8 +9,16 @@ disabledatadump,1
 SSL_get_verify_result,10
 fuzzingseed,1498729252
 memoryfuzzing,0.05
-incompleteio
+incompleteio,10
 forcefollowexec
 fuzzing-getenv,FOOBAR,all,GARBAGE,10,1
 showtimestamp
 showcalltime,0.0001
+########## logging options ###########
+logging-global,LOG_GROUP_FILE|LOG_GROUP_MEM,RTR_LOG_LEVEL_ALL
+logging-excluded-funcs,free|memcpy|malloc
+logging-allowed-funcs,strlen
+stacktrace-groups,LOG_GROUP_MEM
+memoryfuzzing,0.05
+backtrace
+#######################################

@@ -218,7 +218,6 @@ using `retrace` by default. You can disable this behaviour by running `csrutil d
 
 Please send feedback and improvement suggestion either as github issues or to retrace@ribose.com
 
-
 # Status
 
 [![Travis CI Build Status](https://travis-ci.org/riboseinc/retrace.svg?branch=master)](https://travis-ci.org/riboseinc/retrace)

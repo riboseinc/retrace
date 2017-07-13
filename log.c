@@ -144,10 +144,9 @@ priority_to_string(int level)
 	return str;
 }
 
-static const char *
-levelmask_to_string(int mask)
+static void
+levelmask_to_string(int mask, char *buf)
 {
-	static __thread char buf[OPTION_MAX_BUFFER + 1];
 	int space_used = 0;
 
 	if (mask & LOG_MASK(LOG_EMERG))
@@ -173,16 +172,13 @@ levelmask_to_string(int mask)
 
 	if (mask & LOG_MASK(LOG_DEBUG))
 		space_used += real_snprintf(buf + space_used, OPTION_MAX_BUFFER - space_used, "LOG_DEBUG|");
-
-	return buf;
 }
 
 #define OPTION_MAX_BUFFER 128
 
-static const char *
-option_to_string(int option)
+static void
+option_to_string(int option, char *buf)
 {
-	static __thread char buf[OPTION_MAX_BUFFER + 1];
 	int space_used = 0;
 
 	if (option & LOG_CONS)
@@ -202,13 +198,12 @@ option_to_string(int option)
 
 	if (option & LOG_PID)
 		space_used += real_snprintf(buf + space_used, OPTION_MAX_BUFFER - space_used, "LOG_PID|");
-
-	return buf;
 }
 
 void RETRACE_IMPLEMENTATION(openlog)(const char *ident, int option, int facility)
 {
-	const char *option_str = NULL;
+	char option_buf[OPTION_MAX_BUFFER + 1];
+	char *option_str = option_buf;
 	const char *facility_str = NULL;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING,
@@ -218,13 +213,15 @@ void RETRACE_IMPLEMENTATION(openlog)(const char *ident, int option, int facility
 	void *parameter_values[] = {&ident, &option, &option_str, &facility, &facility_str};
 
 	facility_str = facility_to_string(facility);
-	option_str = option_to_string(option);
+	option_to_string(option, option_str);
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "openlog";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	real_openlog(ident, option, facility);
@@ -250,9 +247,11 @@ void RETRACE_IMPLEMENTATION(syslog)(int priority, const char *format, ...)
 	va_start(ap, format);
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "syslog";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 	va_end(ap);
 
@@ -274,8 +273,10 @@ void RETRACE_IMPLEMENTATION(closelog)(void)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "closelog";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	real_closelog();
@@ -303,9 +304,11 @@ void RETRACE_IMPLEMENTATION(vsyslog)(int priority, const char *format, va_list a
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "vsyslog";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	real_vsyslog(priority, format, ap);
@@ -321,21 +324,24 @@ RETRACE_REPLACE(vsyslog, void, (int priority, const char *format, va_list ap), (
 
 int RETRACE_IMPLEMENTATION(setlogmask)(int mask)
 {
-	const char *mask_str = NULL;
+	char mask_buf[OPTION_MAX_BUFFER + 1];
+	char *mask_str = mask_buf;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_INT | PARAMETER_FLAG_STRING_NEXT,
 					  PARAMETER_TYPE_END};
 	void *parameter_values[] = {&mask, &mask_str};
 	int r;
 
-	mask_str = levelmask_to_string(mask);
+	levelmask_to_string(mask, mask_str);
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "setlogmask";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_setlogmask(mask);

@@ -35,12 +35,16 @@ pid_t RETRACE_IMPLEMENTATION(fork)(void)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fork";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
 	event_info.parameter_types = parameter_types;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &p;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	p = real_fork();
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 

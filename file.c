@@ -53,6 +53,7 @@ int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 	event_info.parameter_values = (void **) parameter_values_short;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -61,7 +62,8 @@ int RETRACE_IMPLEMENTATION(stat)(const char *path, struct stat *buf)
 	if (r == 0) {
 		event_info.parameter_types = parameter_types_full;
 		event_info.parameter_values = (void **) parameter_values_full;
-	}
+	} else
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -79,13 +81,17 @@ int RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "chmod";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_chmod(path, mode);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -103,13 +109,17 @@ int RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fchmod";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fchmod(fd, mode);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -128,13 +138,17 @@ int RETRACE_IMPLEMENTATION(fileno)(FILE *stream)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fileno";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &fd;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	fd = real_fileno(stream);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -163,13 +177,17 @@ int RETRACE_IMPLEMENTATION(fseek)(FILE *stream, long offset, int whence)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fseek";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fseek(stream, offset, whence);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -192,13 +210,17 @@ int RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fclose";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fclose(stream);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -224,10 +246,12 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fopen";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_FILE_STREAM;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	if (get_tracing_enabled() && file) {
@@ -249,6 +273,7 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 				did_redirect = 1;
 
 				ret = real_fopen(redirect_file, mode);
+				event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
 
 				break;
 			}
@@ -267,6 +292,9 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 			fd, FILE_DESCRIPTOR_TYPE_FILE, file, 0);
 	}
 
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+
 	retrace_log_and_redirect_after(&event_info);
 
 	return ret;
@@ -284,13 +312,17 @@ int RETRACE_IMPLEMENTATION(close)(int fd)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "close";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_close(fd);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -311,13 +343,17 @@ int RETRACE_IMPLEMENTATION(dup)(int oldfd)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dup";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_FILE_DESCRIPTOR;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_dup(oldfd);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -336,13 +372,17 @@ int RETRACE_IMPLEMENTATION(dup2)(int oldfd, int newfd)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dup2";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_dup2(oldfd, newfd);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -361,10 +401,12 @@ mode_t RETRACE_IMPLEMENTATION(umask)(mode_t mask)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "umask";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &old_mask;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	old_mask = real_umask(mask);
@@ -386,13 +428,17 @@ int RETRACE_IMPLEMENTATION(mkfifo)(const char *pathname, mode_t mode)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "mkfifo";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_mkfifo(pathname, mode);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -426,10 +472,12 @@ open_v(const char *pathname, int flags, va_list ap)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "open";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 
@@ -437,6 +485,9 @@ open_v(const char *pathname, int flags, va_list ap)
 		r = real_open(pathname, flags, mode);
 	else
 		r =  real_open(pathname, flags);
+
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	if (r > 0) {
 		file_descriptor_update(
@@ -473,13 +524,17 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fwrite";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fwrite(ptr, size, nmemb, stream);
+	if (r < size * nmemb)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -498,13 +553,17 @@ size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE 
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fread";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fread(ptr, size, nmemb, stream);
+	if (r < size * nmemb)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -523,13 +582,17 @@ int RETRACE_IMPLEMENTATION(fputc)(int c, FILE *stream)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fputc";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fputc(c, stream);
+	if (r == EOF)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -548,13 +611,17 @@ int RETRACE_IMPLEMENTATION(fputs)(const char *s, FILE *stream)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fputs";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fputs(s, stream);
+	if (r == EOF)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -573,13 +640,17 @@ int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fgetc";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fgetc(stream);
+	if (r == EOF)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -597,9 +668,11 @@ void RETRACE_IMPLEMENTATION(strmode)(int mode, char *bp)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strmode";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	real_strmode(mode, bp);
@@ -691,8 +764,10 @@ fcntl_v(int fildes, int cmd, va_list ap)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fcntl";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
 	switch (cmd) {
 	// (int) arg
@@ -1025,6 +1100,8 @@ fcntl_v(int fildes, int cmd, va_list ap)
 		break;
 	}
 
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 

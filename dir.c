@@ -33,16 +33,19 @@ DIR *RETRACE_IMPLEMENTATION(opendir)(const char *dirname)
 	void const *parameter_values[] = {&dirname};
 	DIR *dirp = NULL;
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "opendir";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_DIR;
 	event_info.return_value = &dirp;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	dirp = real_opendir(dirname);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -62,14 +65,17 @@ int RETRACE_IMPLEMENTATION(closedir)(DIR *dirp)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "closedir";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_closedir(dirp);
-	dirp = NULL;
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -89,13 +95,17 @@ DIR *RETRACE_IMPLEMENTATION(fdopendir)(int fd)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fdopendir";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_DIR;
 	event_info.return_value = &dirp;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	dirp = real_fdopendir(fd);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -115,13 +125,17 @@ int RETRACE_IMPLEMENTATION(readdir_r)(DIR *dirp, struct dirent *entry, struct di
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "readdir_r";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_readdir_r(dirp, entry, result);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -143,13 +157,17 @@ long RETRACE_IMPLEMENTATION(telldir)(DIR *dirp)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "telldir";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &offset;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	offset = real_telldir(dirp);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -168,9 +186,11 @@ void RETRACE_IMPLEMENTATION(seekdir)(DIR *dirp, long loc)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "seekdir";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	real_seekdir(dirp, loc);
@@ -190,9 +210,11 @@ void RETRACE_IMPLEMENTATION(rewinddir)(DIR *dirp)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "rewinddir";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	real_rewinddir(dirp);
@@ -213,14 +235,18 @@ int RETRACE_IMPLEMENTATION(dirfd)(DIR *dirp)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "dirfd";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &dir_fd;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
 	/* get dir fd */
 	dir_fd = real_dirfd(dirp);
+	if (errno)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 

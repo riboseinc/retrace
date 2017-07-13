@@ -21,7 +21,7 @@ int main(void)
 
 	execvp("/bin/shouldntexitinanysystem", args);
 
-#ifndef __APPLE__
+#ifdef __linux__
 	execvpe("/bin/shouldntexitinanysystem", args, env);
 
 	fexecve(1, args, env);
