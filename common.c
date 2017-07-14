@@ -140,7 +140,7 @@ retrace_get_time(void)
 	static double start_time;
 	double ret = 0;
 
-#ifdef CLOCK_MONOTONIC
+#if defined(CLOCK_MONOTONIC) && defined(__x86_64__)
 	struct timespec current_time = {0, 0};
 
 	clock_gettime(CLOCK_MONOTONIC, &current_time);
