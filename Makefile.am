@@ -33,7 +33,8 @@ noinst_HEADERS= \
 	str.h \
 	trace.h \
 	write.h \
-	log.h
+	log.h \
+	temp.h
 
 if OPENSSL
 noinst_HEADERS+= ssl.h
@@ -66,7 +67,8 @@ libretrace_la_SOURCES= \
 	time.c \
 	trace.c \
 	write.c \
-	log.c
+	log.c \
+	temp.c
 
 if OPENSSL
 libretrace_la_SOURCES+= ssl.c

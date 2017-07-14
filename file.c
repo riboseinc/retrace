@@ -207,7 +207,6 @@ int RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
 	if (stream)
 		fd = real_fileno(stream);
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fclose";
 	event_info.function_group = RTR_FUNC_GRP_FILE;

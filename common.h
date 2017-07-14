@@ -273,7 +273,9 @@ void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param);
 #define	RTR_FUNC_GRP_STR			0x10
 #define RTR_FUNC_GRP_SSL			0x20
 #define RTR_FUNC_GRP_PROC			0x40
+#define RTR_FUNC_GRP_TEMP                       0x80
 #define	RTR_FUNC_GRP_ALL			0xFF
+
 
 /* retrace logging configuration levels  */
 #define	RTR_LOG_LEVEL_NOR			0x01
