@@ -1360,6 +1360,12 @@ int rtr_get_config_multiple(RTR_CONFIG_HANDLE *handle, const char *function, ...
 	if (!get_tracing_enabled())
 		return 0;
 
+	if (*config == NULL)
+		return 0;
+
+	if (*config  == RTR_CONFIG_START)
+		*config = NULL;
+
 	old_trace_state = trace_disable();
 
 	va_start(args, function);

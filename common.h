@@ -233,6 +233,7 @@ struct ts_info {
 };
 
 typedef const void *RTR_CONFIG_HANDLE;
+#define RTR_CONFIG_START ((void *) 0x1)
 
 int rtr_get_config_multiple(RTR_CONFIG_HANDLE *config, const char *function, ...);
 int rtr_get_config_single(const char *function, ...);
