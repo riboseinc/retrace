@@ -664,7 +664,6 @@ void RETRACE_IMPLEMENTATION(strmode)(int mode, char *bp)
 	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&mode, &bp};
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "strmode";
 	event_info.function_group = RTR_FUNC_GRP_FILE;
@@ -1120,3 +1119,133 @@ int RETRACE_IMPLEMENTATION(fcntl)(int fildes, int cmd, ...)
 }
 
 RETRACE_REPLACE_V(fcntl, int, (int fildes, int cmd, ...), cmd, fcntl_v, (fildes, cmd, ap))
+
+int RETRACE_IMPLEMENTATION(fgetpos)(FILE *stream, fpos_t *pos)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&stream, &pos};
+	int ret;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "fgetpos";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+	retrace_log_and_redirect_before(&event_info);
+
+	ret = real_fgetpos(stream, pos);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return ret;
+}
+
+RETRACE_REPLACE(fgetpos, int, (FILE *stream, fpos_t *pos), (stream, pos))
+
+
+int RETRACE_IMPLEMENTATION(fsetpos)(FILE *stream, const fpos_t *pos)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&stream, &pos};
+	int ret;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "fsetpos";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+	retrace_log_and_redirect_before(&event_info);
+
+	ret = real_fsetpos(stream, pos);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return ret;
+}
+
+RETRACE_REPLACE(fsetpos, int, (FILE *stream, const fpos_t *pos), (stream, pos))
+
+long RETRACE_IMPLEMENTATION(ftell)(FILE *stream)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&stream};
+	long ret;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "ftell";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+	retrace_log_and_redirect_before(&event_info);
+
+	ret = real_ftell(stream);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return ret;
+}
+
+RETRACE_REPLACE(ftell, long, (FILE *stream), (stream))
+
+
+void RETRACE_IMPLEMENTATION(rewind)(FILE *stream)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&stream};
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "rewind";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_END;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+	retrace_log_and_redirect_before(&event_info);
+
+	real_rewind(stream);
+
+	retrace_log_and_redirect_after(&event_info);
+}
+
+RETRACE_REPLACE(rewind, void, (FILE *stream), (stream))
+
+
+int RETRACE_IMPLEMENTATION(feof)(FILE *stream)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&stream};
+	int ret;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "feof";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+	retrace_log_and_redirect_before(&event_info);
+
+	ret = real_feof(stream);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return ret;
+}
+
+RETRACE_REPLACE(feof, int, (FILE *stream), (stream))
+
