@@ -30,15 +30,14 @@
 #include <string.h>
 #include <netinet/in.h>
 
-
-#define RETRACE_MAX_IP_ADDR_LEN 15
-
 int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
 {
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_INT, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&domain, &type, &protocol};
 	int sock;
+
+	int err = 0;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "socket";
@@ -50,9 +49,18 @@ int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	sock = real_socket(domain, type, protocol);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		errno = err;
+		sock = -1;
+	} else {
+		sock = real_socket(domain, type, protocol);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -78,6 +86,9 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 	void const *parameter_values[] = {&fd, &remote_addr, &len};
 	int ret;
 
+	int err;
+	int fuzzing_enabled = 0;
+
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "connect";
 	event_info.function_group = RTR_FUNC_GRP_NET;
@@ -91,91 +102,104 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 	if (!get_tracing_enabled())
 		return real_connect(fd, address, len);
 
-	if (address->sa_family == AF_INET) {
-		struct sockaddr_in *dst_addr = (struct sockaddr_in *) address;
-		const char *remote_ipaddr;
-		int remote_port;
+	/* check fuzzing config */
+	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
-		struct sockaddr_in redirect_addr;
-		int enabled_redirect = 0;
+		errno = err;
+		fuzzing_enabled = 1;
+		ret = -1;
+	} else {
+		if (address->sa_family == AF_INET) {
+			struct sockaddr_in *dst_addr = (struct sockaddr_in *) address;
+			const char *remote_ipaddr;
+			int remote_port;
 
-		RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
+			struct sockaddr_in redirect_addr;
+			int enabled_redirect = 0;
 
-		/* get IP address and port number to connect */
-		const char *dst_ipaddr = inet_ntoa(dst_addr->sin_addr);
-		int dst_port = ntohs(dst_addr->sin_port);
+			RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
 
-		/* get configuration for redirection */
-		while (1) {
-			char *match_ipaddr = NULL;
-			int match_port;
+			/* get IP address and port number to connect */
+			const char *dst_ipaddr = inet_ntoa(dst_addr->sin_addr);
+			int dst_port = ntohs(dst_addr->sin_port);
 
-			char *redirect_ipaddr = NULL;
-			int redirect_port;
+			/* get configuration for redirection */
+			while (1) {
+				char *match_ipaddr = NULL;
+				int match_port;
 
-			/* get redirect info from configuration file */
-			if (rtr_get_config_multiple(&config, "connect",
-					ARGUMENT_TYPE_STRING,
-					ARGUMENT_TYPE_INT,
-					ARGUMENT_TYPE_STRING,
-					ARGUMENT_TYPE_INT,
-					ARGUMENT_TYPE_END,
-					&match_ipaddr,
-					&match_port,
-					&redirect_ipaddr,
-					&redirect_port) == 0)
-				break;
+				char *redirect_ipaddr = NULL;
+				int redirect_port;
 
-			/* check if IP address and port number is matched */
-			if (real_strcmp(match_ipaddr, dst_ipaddr) == 0 && match_port == dst_port) {
-				/* set redirect address info */
-				memset(&redirect_addr, 0, sizeof(redirect_addr));
+				/* get redirect info from configuration file */
+				if (rtr_get_config_multiple(&config, "connect",
+						ARGUMENT_TYPE_STRING,
+						ARGUMENT_TYPE_INT,
+						ARGUMENT_TYPE_STRING,
+						ARGUMENT_TYPE_INT,
+						ARGUMENT_TYPE_END,
+						&match_ipaddr,
+						&match_port,
+						&redirect_ipaddr,
+						&redirect_port) == 0)
+					break;
 
-				redirect_addr.sin_family = AF_INET;
-				redirect_addr.sin_addr.s_addr = inet_addr(redirect_ipaddr);
-				redirect_addr.sin_port = htons(redirect_port);
+				/* check if IP address and port number is matched */
+				if (real_strcmp(match_ipaddr, dst_ipaddr) == 0 && match_port == dst_port) {
+					/* set redirect address info */
+					memset(&redirect_addr, 0, sizeof(redirect_addr));
 
-				/* set redirect flag */
-				enabled_redirect = 1;
-				break;
+					redirect_addr.sin_family = AF_INET;
+					redirect_addr.sin_addr.s_addr = inet_addr(redirect_ipaddr);
+					redirect_addr.sin_port = htons(redirect_port);
+
+					/* set redirect flag */
+					enabled_redirect = 1;
+					break;
+				}
 			}
+
+			if (enabled_redirect) {
+				event_info.extra_info = "redirected";
+				remote_addr = (struct sockaddr *) &redirect_addr;
+			}
+
+			remote_ipaddr = inet_ntoa(((struct sockaddr_in *)remote_addr)->sin_addr);
+			remote_port = ntohs(((struct sockaddr_in *)remote_addr)->sin_port);
+
+			/* connect to remote */
+			ret = real_connect(fd, remote_addr, sizeof(struct sockaddr_in));
+			if (ret == 0)
+				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, remote_ipaddr, remote_port);
+
+			event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
+			retrace_log_and_redirect_after(&event_info);
+
+			return ret;
+		} else if (address->sa_family == AF_UNIX) {
+			struct sockaddr_un *un_addr = (struct sockaddr_un *) address;
+			const char *sun_path = un_addr->sun_path;
+
+			/* connect to local */
+			ret = real_connect(fd, (struct sockaddr *) un_addr, sizeof(struct sockaddr_un));
+			if (ret == 0)
+				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_UNIX_DOMAIN, sun_path, -1);
+
+			event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
+			retrace_log_and_redirect_after(&event_info);
+
+			return ret;
 		}
-
-		if (enabled_redirect) {
-			event_info.extra_info = "redirected";
-			remote_addr = (struct sockaddr *) &redirect_addr;
-		}
-
-		remote_ipaddr = inet_ntoa(((struct sockaddr_in *)remote_addr)->sin_addr);
-		remote_port = ntohs(((struct sockaddr_in *)remote_addr)->sin_port);
-
-		/* connect to remote */
-		ret = real_connect(fd, remote_addr, sizeof(struct sockaddr_in));
-		if (ret == 0)
-			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, remote_ipaddr, remote_port);
-
-		event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
-		retrace_log_and_redirect_after(&event_info);
-
-		return ret;
-	} else if (address->sa_family == AF_UNIX) {
-		struct sockaddr_un *un_addr = (struct sockaddr_un *) address;
-		const char *sun_path = un_addr->sun_path;
-
-		/* connect to local */
-		ret = real_connect(fd, (struct sockaddr *) un_addr, sizeof(struct sockaddr_un));
-		if (ret == 0)
-			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_UNIX_DOMAIN, sun_path, -1);
-
-		event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
-		retrace_log_and_redirect_after(&event_info);
-
-		return ret;
 	}
 
-	ret = real_connect(fd, address, len);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (!fuzzing_enabled) {
+		ret = real_connect(fd, address, len);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -205,6 +229,7 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&fd, &address, &len};
 
+	int err;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "bind";
@@ -216,23 +241,32 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	ret = real_bind(fd, address, len);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
-	if (ret == 0) {
-		if (address->sa_family == AF_INET) {
-			struct sockaddr_in *bind_addr = (struct sockaddr_in *) address;
+		errno = err;
+		ret = -1;
+	} else {
+		ret = real_bind(fd, address, len);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
-			const char *bind_ipaddr = inet_ntoa(bind_addr->sin_addr);
-			int bind_port = ntohs(bind_addr->sin_port);
+		if (ret == 0) {
+			if (address->sa_family == AF_INET) {
+				struct sockaddr_in *bind_addr = (struct sockaddr_in *) address;
 
-			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_BIND, bind_ipaddr, bind_port);
-		} else if (address->sa_family == AF_UNIX) {
-			struct sockaddr_un *un_addr = (struct sockaddr_un *) address;
-			const char *sun_path = un_addr->sun_path;
+				const char *bind_ipaddr = inet_ntoa(bind_addr->sin_addr);
+				int bind_port = ntohs(bind_addr->sin_port);
 
-			file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_UNIX_BIND, sun_path, -1);
+				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_BIND, bind_ipaddr, bind_port);
+			} else if (address->sa_family == AF_UNIX) {
+				struct sockaddr_un *un_addr = (struct sockaddr_un *) address;
+				const char *sun_path = un_addr->sun_path;
+
+				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_UNIX_BIND, sun_path, -1);
+			}
 		}
 	}
 
@@ -271,6 +305,8 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 	struct sockaddr_in local_addr;
 	socklen_t local_len = 0;
 
+	int err;
+
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "accept";
 	event_info.function_group = RTR_FUNC_GRP_NET;
@@ -281,30 +317,40 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	/* If we are tracking this descriptor and is a IPV4 server, try to gets
-	 * the client address, even if the caller isn't interested on it
-	 */
-	di = file_descriptor_get(fd);
-	if (di && di->type == FILE_DESCRIPTOR_TYPE_IPV4_BIND && address == NULL) {
-		address = (struct sockaddr *) &local_addr;
-		local_len = sizeof(struct sockaddr_in);
-		len = &local_len;
-	}
+	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
-	clnt_fd = real_accept(fd, address, len);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+		errno = err;
+		clnt_fd = -1;
+	} else {
+		/* If we are tracking this descriptor and is a IPV4 server, try to gets
+		 * the client address, even if the caller isn't interested on it
+		 */
+		di = file_descriptor_get(fd);
+		if (di && di->type == FILE_DESCRIPTOR_TYPE_IPV4_BIND && address == NULL) {
+			address = (struct sockaddr *) &local_addr;
+			local_len = sizeof(struct sockaddr_in);
+			len = &local_len;
+		}
 
-	/* get descriptor info */
-	di = file_descriptor_get(fd);
-	if (di && di->type == FILE_DESCRIPTOR_TYPE_IPV4_BIND) {
-		struct sockaddr_in *clnt_addr = (struct sockaddr_in *) address;
-		if (clnt_fd > 0) {
-			const char *clnt_ipaddr = inet_ntoa(clnt_addr->sin_addr);
-			int clnt_port = ntohs(clnt_addr->sin_port);
+		clnt_fd = real_accept(fd, address, len);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
-			/* add file descriptor for client socket */
-			file_descriptor_update(clnt_fd, FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT, clnt_ipaddr, clnt_port);
+		/* get descriptor info */
+		di = file_descriptor_get(fd);
+		if (di && di->type == FILE_DESCRIPTOR_TYPE_IPV4_BIND) {
+			struct sockaddr_in *clnt_addr = (struct sockaddr_in *) address;
+
+			if (clnt_fd > 0) {
+				const char *clnt_ipaddr = inet_ntoa(clnt_addr->sin_addr);
+				int clnt_port = ntohs(clnt_addr->sin_port);
+
+				/* add file descriptor for client socket */
+				file_descriptor_update(clnt_fd, FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT, clnt_ipaddr, clnt_port);
+			}
 		}
 	}
 
@@ -368,6 +414,7 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_MEMORY_BUFFER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&sockfd, &len, &buf, &len, &flags};
 
+	int err;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "send";
@@ -379,9 +426,18 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	ret = real_send(sockfd, buf, len, flags);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		errno = err;
+		ret = -1;
+	} else {
+		ret = real_send(sockfd, buf, len, flags);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -407,6 +463,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 					  PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&sockfd, &len, &buf, &len, &flags, &dest_addr, &addrlen};
 
+	int err;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sendto";
@@ -418,29 +475,38 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	ret = real_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
-	if (dest_addr) {
-		if (dest_addr->sa_family == AF_INET) {
-			struct sockaddr_in *in_addr = (struct sockaddr_in *)dest_addr;
+		errno = err;
+		ret = -1;
+	} else {
+		ret = real_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
-			const char *remote_addr = inet_ntoa(in_addr->sin_addr);
-			int remote_port = ntohs(in_addr->sin_port);
+		if (dest_addr) {
+			if (dest_addr->sa_family == AF_INET) {
+				struct sockaddr_in *in_addr = (struct sockaddr_in *)dest_addr;
 
-			/* update descriptor info */
-			di = file_descriptor_get(sockfd);
-			if (!di && ret > 0)
-				file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_addr, remote_port);
-		} else if (dest_addr->sa_family == AF_UNIX) {
-			struct sockaddr_un *un_addr = (struct sockaddr_un *)dest_addr;
-			const char *remote_path = un_addr->sun_path;
+				const char *remote_addr = inet_ntoa(in_addr->sin_addr);
+				int remote_port = ntohs(in_addr->sin_port);
 
-			/* update descriptor info */
-			di = file_descriptor_get(sockfd);
-			if (!di && ret > 0)
-				file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_path, -1);
+				/* update descriptor info */
+				di = file_descriptor_get(sockfd);
+				if (!di && ret > 0)
+					file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_addr, remote_port);
+			} else if (dest_addr->sa_family == AF_UNIX) {
+				struct sockaddr_un *un_addr = (struct sockaddr_un *)dest_addr;
+				const char *remote_path = un_addr->sun_path;
+
+				/* update descriptor info */
+				di = file_descriptor_get(sockfd);
+				if (!di && ret > 0)
+					file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_path, -1);
+			}
 		}
 	}
 
@@ -467,6 +533,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 					  PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&sockfd, &msg, &msg->msg_iovlen, &msg->msg_iov, &flags};
 
+	int err;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sendmsg";
@@ -478,14 +545,23 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	ret = real_sendmsg(sockfd, msg, flags);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
-	/* update descriptor info */
-	di = file_descriptor_get(sockfd);
-	if (!di && msg->msg_name)
-		file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDMSG, (char *)msg->msg_name, -1);
+		errno = err;
+		ret = -1;
+	} else {
+		ret = real_sendmsg(sockfd, msg, flags);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+
+		/* update descriptor info */
+		di = file_descriptor_get(sockfd);
+		if (!di && msg->msg_name)
+			file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDMSG, (char *)msg->msg_name, -1);
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -508,6 +584,7 @@ ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flag
 					  PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&sockfd, &recv_len, &buf, &len, &flags};
 
+	int err;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "recv";
@@ -519,9 +596,18 @@ ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flag
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	recv_len = real_recv(sockfd, buf, len, flags);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		errno = err;
+		recv_len = -1;
+	} else {
+		recv_len = real_recv(sockfd, buf, len, flags);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -539,19 +625,21 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 	ssize_t recv_len = 0;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types_full[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
-										   PARAMETER_TYPE_MEMORY_BUFFER,
-										   PARAMETER_TYPE_INT,
-										   PARAMETER_TYPE_INT,
-										   PARAMETER_TYPE_STRUCT_SOCKADDR,
-										   PARAMETER_TYPE_END};
+						PARAMETER_TYPE_MEMORY_BUFFER,
+						PARAMETER_TYPE_INT,
+						PARAMETER_TYPE_INT,
+						PARAMETER_TYPE_STRUCT_SOCKADDR,
+						PARAMETER_TYPE_END};
 	void const *parameter_values_full[] = {&sockfd, &recv_len, &buf, &len, &flags, &src_addr};
 
 	unsigned int parameter_types_short[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
-										   PARAMETER_TYPE_MEMORY_BUFFER,
-										   PARAMETER_TYPE_INT,
-										   PARAMETER_TYPE_INT,
-										   PARAMETER_TYPE_END};
+						PARAMETER_TYPE_MEMORY_BUFFER,
+						PARAMETER_TYPE_INT,
+						PARAMETER_TYPE_INT,
+						PARAMETER_TYPE_END};
 	void const *parameter_values_short[] = {&sockfd, &recv_len, &buf, &len, &flags};
+
+	int err;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "recvfrom";
@@ -568,9 +656,18 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 
 	retrace_log_and_redirect_before(&event_info);
 
-	recv_len = real_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		errno = err;
+		recv_len = -1;
+	} else {
+		recv_len = real_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -589,10 +686,12 @@ ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flag
 
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
-									  PARAMETER_TYPE_IOVEC,
-									  PARAMETER_TYPE_INT,
-									  PARAMETER_TYPE_END};
+						PARAMETER_TYPE_IOVEC,
+						PARAMETER_TYPE_INT,
+						PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&sockfd, &msg->msg_iovlen, &msg->msg_iov, &flags};
+
+	int err;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "recvmsg";
@@ -605,9 +704,18 @@ ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flag
 
 	retrace_log_and_redirect_before(&event_info);
 
-	recv_len = real_recvmsg(sockfd, msg, flags);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		errno = err;
+		recv_len = -1;
+	} else {
+		recv_len = real_recvmsg(sockfd, msg, flags);
+		if (errno)
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 

@@ -393,30 +393,6 @@ void *RETRACE_IMPLEMENTATION(memccpy)(void *dest, const void *src, int c, size_t
 
 RETRACE_REPLACE(memccpy, void *, (void *dest, const void *src, int c, size_t n), (dest, src, c, n))
 
-#define RTR_MMAP_MAX_PROT_STRLEN		128
-#define RTR_MMAP_MAX_FLAGS_STRLEN		128
-
-static const struct ts_info mmap_prot_ts[] = {
-	{PROT_READ, "PROT_READ"},
-	{PROT_WRITE, "PROT_WRITE"},
-	{PROT_EXEC, "PROT_EXEC"},
-#ifdef PROT_GROWSDOWN
-	{PROT_GROWSDOWN, "PROT_GROWSDOWN"},
-#endif
-#ifdef PROT_GROWSUP
-	{PROT_GROWSUP, "PROT_GROWSUP"},
-#endif
-	{-1, NULL}
-};
-
-static const struct ts_info mmap_flags_ts[] = {
-	{MAP_SHARED, "MAP_SHARED"},
-	{MAP_PRIVATE, "MAP_PRIVATE"},
-	{MAP_FIXED, "MAP_FIXED"},
-	{MAP_ANONYMOUS, "MAP_ANONYMOUS"},
-	{-1, NULL}
-};
-
 void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flags,
 	int fd, off_t offset)
 {
@@ -429,16 +405,6 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 
 	double fail_chance = 0;
 	int redirect = 0;
-
-	char prot_str[RTR_MMAP_MAX_PROT_STRLEN + 1];
-	char flags_str[RTR_MMAP_MAX_FLAGS_STRLEN + 1];
-
-	/* get description for protection of mapping */
-	rtr_get_type_string(prot, mmap_prot_ts, prot_str, sizeof(prot_str));
-	if (real_strlen(prot_str) == 0)
-		real_strcpy(prot_str, "PROT_NONE");
-
-	rtr_get_type_string(flags, mmap_flags_ts, flags_str, sizeof(flags_str));
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "mmap";
