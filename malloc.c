@@ -31,6 +31,70 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/queue.h>
+#include <assert.h>
+#include <pthread.h>
+
+#define BLKSZ 65536
+#define ALIGNSZ (32 / 8)
+#define MAPSZ (BLKSZ / ALIGNSZ / 8)
+
+struct map {
+	SLIST_ENTRY(map) next;
+	unsigned long int address;
+	char map[MAPSZ];
+};
+
+SLIST_HEAD(maplist, map);
+
+static int map_bit(const void *p, int set)
+{
+	static struct maplist maps = SLIST_HEAD_INITIALIZER(maps);
+	static pthread_mutex_t maps_mutex = PTHREAD_MUTEX_INITIALIZER;
+	struct map *map, *prev;
+	unsigned long int address;
+	unsigned int offset, bit;
+	int old, mask;
+
+	address = p - NULL;
+	assert(address % ALIGNSZ == 0);
+
+	pthread_mutex_lock(&maps_mutex);
+
+	prev = NULL;
+	SLIST_FOREACH(map, &maps, next) {
+		if (map->address > address)
+			break;
+		prev = map;
+	}
+
+	if (prev != NULL && prev->address + BLKSZ > address)
+		map = prev;
+	else {
+		map = real_malloc(sizeof(struct map));
+		memset(map, 0, sizeof(struct map));
+		map->address = address - address % BLKSZ;
+		if (prev == NULL)
+			SLIST_INSERT_HEAD(&maps, map, next);
+		else
+			SLIST_INSERT_AFTER(prev, map, next);
+	}
+
+	bit = (address % BLKSZ) / ALIGNSZ;
+	offset = bit >> 3;
+	bit = bit & 0x7;
+	mask = 1 << bit;
+	old = (map->map[offset] & mask) >> bit;
+
+	if (set == 0)
+		map->map[offset] &= ~mask;
+	else
+		map->map[offset] |= mask;
+
+	pthread_mutex_unlock(&maps_mutex);
+
+	return old;
+}
 
 void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 {
@@ -70,6 +134,9 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
+	if (p != NULL)
+		map_bit(p, 1);
+
 	retrace_log_and_redirect_after(&event_info);
 
 	return p;
@@ -90,6 +157,11 @@ void RETRACE_IMPLEMENTATION(free)(void *mem)
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+
+	if (mem != NULL && map_bit(mem, 0) != 1) {
+		event_info.extra_info = "Bad free (possibly already free)";
+		event_info.event_flags |= EVENT_FLAGS_PRINT_BEFORE;
+	}
 
 	retrace_log_and_redirect_before(&event_info);
 
@@ -137,6 +209,9 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
+	if (p != NULL)
+		map_bit(p, 1);
+
 	retrace_log_and_redirect_after(&event_info);
 
 	return p;
@@ -154,6 +229,13 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 
 	double fail_chance;
 	int redirect = 0;
+
+	if (ptr != NULL) {
+		if (map_bit(ptr, 0) != 1) {
+			event_info.extra_info = "Bad realloc (possibly already free)";
+			event_info.event_flags |= EVENT_FLAGS_PRINT_BEFORE;
+		}
+	}
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "realloc";
@@ -181,6 +263,9 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
+
+	if (p != NULL)
+		map_bit(p, 1);
 
 	retrace_log_and_redirect_after(&event_info);
 
