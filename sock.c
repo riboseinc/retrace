@@ -99,7 +99,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 		struct sockaddr_in redirect_addr;
 		int enabled_redirect = 0;
 
-		RTR_CONFIG_HANDLE config = NULL;
+		RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
 
 		/* get IP address and port number to connect */
 		const char *dst_ipaddr = inet_ntoa(dst_addr->sin_addr);

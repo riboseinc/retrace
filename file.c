@@ -255,7 +255,7 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 	retrace_log_and_redirect_before(&event_info);
 
 	if (get_tracing_enabled() && file) {
-		RTR_CONFIG_HANDLE config = NULL;
+		RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
 
 		while (1) {
 			int r;
