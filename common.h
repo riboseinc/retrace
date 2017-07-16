@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <sys/time.h>
+#include <sys/queue.h>
 
 #include <dlfcn.h>
 #include <dirent.h>
@@ -218,6 +219,7 @@ RETRACE_INTERNAL rtr_##func##_t real_##func = rtr_fixup_##func;
 #endif /* !__APPLE__ */
 
 struct descriptor_info {
+	SLIST_ENTRY(descriptor_info) next;
 	int fd;
 	unsigned int type;
 	char *location; /* File name or address */

@@ -637,6 +637,11 @@ RTR_TEST_START(pipe2)
 	test_pipe_common(ret, pipefd);
 RTR_TEST_END
 
+/*
+ * TODO: unit test static functions
+ *
+ * trace_printf and trace_printf_str are static in common.c
+ *
 static void
 test_trace_printf(void **state)
 {
@@ -701,6 +706,67 @@ test_trace_printf_str(void **state)
 	assert_int_equal(strlen(buf), MAXLEN + sizeof(snip) - 1);
 	assert_int_equal(strncmp(s, buf, MAXLEN), 0);
 	assert_string_equal(buf+MAXLEN, snip);
+}
+ *
+ */
+
+static void
+test_fdlist(void **state)
+{
+	struct descriptor_info *(*file_descriptor_get)(int fd);
+	void (*file_descriptor_update)(int fd, unsigned int type,
+	    const char *location, int port);
+	void (*file_descriptor_remove)(int fd);
+	struct descriptor_info *p;
+	int i;
+
+	file_descriptor_get = dlsym(handle, "file_descriptor_get");
+	file_descriptor_update = dlsym(handle, "file_descriptor_update");
+	file_descriptor_remove = dlsym(handle, "file_descriptor_remove");
+
+	assert_null(file_descriptor_get(42));
+
+	file_descriptor_update(42, 6502, "forty two", 451);
+	p = file_descriptor_get(42);
+	assert_non_null(p);
+	assert_int_equal(p->fd, 42);
+	assert_int_equal(p->type, 6502);
+	assert_string_equal(p->location, "forty two");
+	assert_int_equal(p->port, 451);
+
+	file_descriptor_update(42, 6503, "forty three", 450);
+	p = file_descriptor_get(42);
+	assert_non_null(p);
+	assert_int_equal(p->fd, 42);
+	assert_int_equal(p->type, 6503);
+	assert_string_equal(p->location, "forty three");
+	assert_int_equal(p->port, 450);
+
+	file_descriptor_remove(42);
+	assert_null(file_descriptor_get(42));
+
+	for (i = 0; i < 1000; i++)
+		file_descriptor_update(i, i+1, "test", i+2);
+
+	for (i = 0; i < 1000; i++)
+		file_descriptor_update(i, i+3, "test", i+4);
+
+	for (i = 0; i < 1000; i++) {
+		p = file_descriptor_get(i);
+		assert_non_null(p);
+		assert_int_equal(p->fd, i);
+		assert_int_equal(p->type, i+3);
+		assert_int_equal(p->port, i+4);
+	}
+
+	file_descriptor_remove(500);
+	assert_null(file_descriptor_get(500));
+
+	for (i = 999; i >= 0; i--) {
+		file_descriptor_remove(i);
+		assert_null(file_descriptor_get(i));
+	}
+	file_descriptor_remove(10001);
 }
 
 RTR_TEST_START(printf)
@@ -924,33 +990,29 @@ RTR_TEST_START(vsnprintf)
 RTR_TEST_END
 
 RTR_TEST_START(scanf)
-    /* XXX: TEST DISABLED
-	FILE *oldstdin1, *oldstdin2;
 	char buf1[100], buf2[100];
-	int fd1[2], fd2[2];
-	int r1, r2;
+	int fd[2];
+	int r1, r2, old_fd0;
 
-	pipe(fd1);
-	oldstdin1 = stdin;
-	stdin = fdopen(fd1[0], "r");
-	write(fd1[1], "string123 ", strlen("string123 "));
+	old_fd0 = dup(0);
+
+	pipe(fd);
+	dup2(fd[0], 0);
+
+	write(fd[1], "string123 ", strlen("string123 "));
 	r1 = scanf("%s", buf1);
-	fclose(stdin);
-	stdin = oldstdin1;
-	close(fd1[1]);
-
-	pipe(fd2);
-	oldstdin2 = stdin;
-	stdin = fdopen(fd2[0], "r");
-	write(fd2[1], "string123 ", strlen("string123 "));
+	write(fd[1], "string123 ", strlen("string123 "));
 	r2 = rtr_scanf("%s", buf2);
-	fclose(stdin);
-	stdin = oldstdin2;
-	close(fd2[1]);
+
+	dup2(old_fd0, 0);
+
+	close(old_fd0);
+	close(fd[0]);
+	close(fd[1]);
 
 	assert_true(r1 > 0 && r1 == r2);
+	assert_string_equal(buf1, "string123");
 	assert_string_equal(buf1, buf2);
-    */
 RTR_TEST_END
 
 RTR_TEST_START(fscanf)
@@ -997,33 +1059,29 @@ to_vscanf(rtr_vscanf_t fn, const char *fmt, ...)
 }
 
 RTR_TEST_START(vscanf)
-    /* XXX: TEST DISABLED
-	FILE *oldstdin1, *oldstdin2;
 	char buf1[100], buf2[100];
-	int fd1[2], fd2[2];
-	int r1, r2;
+	int fd[2];
+	int r1, r2, old_fd0;
 
-	pipe(fd1);
-	oldstdin1 = stdin;
-	stdin = fdopen(fd1[0], "r");
-	write(fd1[1], "string123 ", strlen("string123 "));
-	r1 = to_vscanf(vscanf, "%s", (char *)&buf1);
-	fclose(stdin);
-	stdin = oldstdin1;
-	close(fd1[1]);
+	old_fd0 = dup(0);
 
-	pipe(fd2);
-	oldstdin2 = stdin;
-	stdin = fdopen(fd2[0], "r");
-	write(fd2[1], "string123 ", strlen("string123 "));
-	r2 = to_vscanf(rtr_vscanf, "%s", (char *)&buf2);
-	fclose(stdin);
-	stdin = oldstdin2;
-	close(fd2[1]);
+	pipe(fd);
+	dup2(fd[0], 0);
+
+	write(fd[1], "string123 ", strlen("string123 "));
+	r1 = to_vscanf(vscanf, "%s", buf1);
+	write(fd[1], "string123 ", strlen("string123 "));
+	r2 = to_vscanf(rtr_vscanf, "%s", buf2);
+
+	dup2(old_fd0, 0);
+
+	close(old_fd0);
+	close(fd[0]);
+	close(fd[1]);
 
 	assert_true(r1 > 0 && r1 == r2);
+	assert_string_equal(buf1, "string123");
 	assert_string_equal(buf1, buf2);
-    */
 RTR_TEST_END
 
 int
@@ -1131,6 +1189,7 @@ main(void)
 		cmocka_unit_test(test_rtr_popen),    cmocka_unit_test(test_rtr_pclose),
 		cmocka_unit_test(test_rtr_pipe),     cmocka_unit_test(test_rtr_pipe2),
 		/*cmocka_unit_test(test_trace_printf), cmocka_unit_test(test_trace_printf_str),*/
+		cmocka_unit_test(test_fdlist),
 		cmocka_unit_test(test_rtr_printf),   cmocka_unit_test(test_rtr_fprintf),
 		cmocka_unit_test(test_rtr_dprintf),  cmocka_unit_test(test_rtr_sprintf),
 		cmocka_unit_test(test_rtr_snprintf), cmocka_unit_test(test_rtr_vprintf),
