@@ -24,6 +24,8 @@
  */
 
 #include "common.h"
+#include "netfuzz.h"
+
 #include "rtr-netdb.h"
 
 #include <arpa/inet.h>
@@ -49,7 +51,7 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyname)(const char *name)
 
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_GETHOSTNAME, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -93,7 +95,7 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyaddr)(const void *addr, socklen_
 
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_GETHOSTADDR, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -254,7 +256,7 @@ int RETRACE_IMPLEMENTATION(getaddrinfo)(const char *node, const char *service,
 
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_GETADDRINFO, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;

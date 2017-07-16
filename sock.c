@@ -26,6 +26,7 @@
 #include "common.h"
 #include "str.h"
 #include "malloc.h"
+#include "netfuzz.h"
 #include "sock.h"
 #include <string.h>
 #include <netinet/in.h>
@@ -49,7 +50,7 @@ int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_SOCKET, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -103,7 +104,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 		return real_connect(fd, address, len);
 
 	/* check fuzzing config */
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_CONNECT, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -241,7 +242,7 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_BIND, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -317,7 +318,7 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_ACCEPT, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -426,7 +427,7 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_SEND, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -475,7 +476,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_SENDTO, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -545,7 +546,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_SENDMSG, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -596,7 +597,7 @@ ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flag
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_RECV, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -656,7 +657,7 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_RECVFROM, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -704,7 +705,7 @@ ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flag
 
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(event_info.function_name, &err)) {
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_RECVMSG, &err)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;

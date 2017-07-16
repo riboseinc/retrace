@@ -34,6 +34,7 @@ noinst_HEADERS= \
 	trace.h \
 	write.h \
 	log.h \
+	netfuzz.h \
 	temp.h
 
 if OPENSSL
@@ -68,6 +69,7 @@ libretrace_la_SOURCES= \
 	trace.c \
 	write.c \
 	log.c \
+	netfuzz.c \
 	temp.c
 
 if OPENSSL
