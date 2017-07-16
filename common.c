@@ -1230,10 +1230,8 @@ get_config_file()
 
 static const struct config_entry *
 get_config() {
-	static struct config_head empty_config
-	    = SLIST_HEAD_INITIALIZER(empty_config);
-	static struct config_head *pconfig;
-	struct config_head *plist;
+	static struct config_entry *pconfig, config_end;
+	struct config_head config;
 	struct config_entry *pentry, *ptail;
 	FILE *config_file;
 	char *buf = NULL, *p;
@@ -1241,59 +1239,66 @@ get_config() {
 	ssize_t sz;
 
 	if (pconfig != NULL)
-		return (SLIST_FIRST(pconfig));
+		return pconfig;
 
 	config_file = get_config_file();
 	if (config_file == NULL) {
-		pconfig = &empty_config;
-		return NULL;
+		pconfig = &config_end;
+		return pconfig;
 	}
 
-	for (plist = real_malloc(sizeof(struct config_head)); plist;) {
+	SLIST_INIT(&config);
+	for (ptail = NULL; ptail != &config_end; ptail = pentry) {
+
 		sz = getline(&buf, &buflen, config_file);
-		if (sz <= 0) {	/* done reading config */
-			pconfig = plist;
-			plist = NULL;
-			break;
+
+		if (sz > 0 && buf[sz - 1] == '\n')
+			--sz;
+
+		if (sz == 0)
+			continue;
+
+		pentry = NULL;
+		if (sz == -1 && errno == 0)
+			pentry = &config_end;
+
+		if (sz > 0) {
+			pentry = real_malloc(sizeof(struct config_entry) +
+			    sz + 1);
+
+			if (pentry != NULL) {
+				pentry->line = (char *)&pentry[1];
+				real_strncpy(pentry->line, buf, sz);
+				pentry->nargs = 0;
+				for (p = real_strchr(pentry->line, ','); p;
+				    p = real_strchr(++p, ',')) {
+					*p = '\0';
+					++pentry->nargs;
+				}
+			}
 		}
 
-		pentry = real_malloc(sizeof(struct config_entry));
-		if (pentry == NULL)
-			break;
+		if (pentry == NULL) {
+			while (!SLIST_EMPTY(&config)) {
+				pentry = SLIST_FIRST(&config);
+				SLIST_REMOVE_HEAD(&config, next);
+				real_free(pentry);
+			}
+			pentry = &config_end;
+		}
 
-		if (SLIST_EMPTY(plist))
-			SLIST_INSERT_HEAD(plist, pentry, next);
+		if (SLIST_EMPTY(&config))
+			SLIST_INSERT_HEAD(&config, pentry, next);
 		else
 			SLIST_INSERT_AFTER(ptail, pentry, next);
-
-		pentry->line =
-		    strndup(buf, buf[sz - 1] == '\n' ? sz - 1 : sz);
-		if (pentry->line == NULL)
-			break;
-
-		pentry->nargs = 0;
-		for (p = real_strchr(pentry->line, ','); p; p = real_strchr(++p, ',')) {
-			*p = '\0';
-			++pentry->nargs;
-		}
-
-		ptail = pentry;
 	}
 
 	real_free(buf);
 	real_fclose(config_file);
-	if (plist != NULL) {  /* partially read config */
-		while (!SLIST_EMPTY(plist)) {
-			pentry = SLIST_FIRST(plist);
-			SLIST_REMOVE_HEAD(plist, next);
-			real_free(pentry->line);
-			real_free(pentry);
-		}
-		real_free(plist);
-		pconfig = &empty_config;
-	}
 
-	return (SLIST_FIRST(pconfig));
+	pconfig = SLIST_FIRST(&config);
+
+	return pconfig;
 }
 
 static int
@@ -1318,7 +1323,7 @@ rtr_parse_config(const struct config_entry **pentry,
 		++nargs;
 
 	retval = 0;
-	while (*pentry != NULL && retval == 0) {
+	while ((*pentry)->line != NULL && retval == 0) {
 		if (real_strcmp(function, (*pentry)->line) == 0
 		    && (*pentry)->nargs == nargs) {
 			parg = (*pentry)->line; /* points to func name */
@@ -1342,7 +1347,7 @@ rtr_parse_config(const struct config_entry **pentry,
 			}
 			retval = 1;
 		}
-		(*pentry) = SLIST_NEXT(*pentry, next);
+		*pentry = SLIST_NEXT(*pentry, next);
 	}
 
 	va_end(arg_values);
@@ -1359,12 +1364,6 @@ int rtr_get_config_multiple(RTR_CONFIG_HANDLE *handle, const char *function, ...
 
 	if (!get_tracing_enabled())
 		return 0;
-
-	if (*config == NULL)
-		return 0;
-
-	if (*config  == RTR_CONFIG_START)
-		*config = NULL;
 
 	old_trace_state = trace_disable();
 
