@@ -35,21 +35,23 @@ static rtr_netfuzz_config_t g_netfuzz_config;
 struct {
 	enum RTR_NET_FUNC_ID id;
 	const char *name;
+	int fuzzing_set;
 } rtr_net_funcs[] = {
-	{NET_FUNC_ID_SOCKET,	"socket"},
-	{NET_FUNC_ID_CONNECT,	"connect"},
-	{NET_FUNC_ID_BIND,	"bind"},
-	{NET_FUNC_ID_LISTEN,	"listen"},
-	{NET_FUNC_ID_ACCEPT,	"accept"},
-	{NET_FUNC_ID_SEND,	"send"},
-	{NET_FUNC_ID_RECV,	"recv"},
-	{NET_FUNC_ID_SENDTO,	"sendto"},
-	{NET_FUNC_ID_RECVFROM,	"recvfrom"},
-	{NET_FUNC_ID_SENDMSG,	"sendmsg"},
-	{NET_FUNC_ID_RECVMSG,	"recvmsg"},
-	{NET_FUNC_ID_GETHOSTNAME, "gethostbyname"},
-	{NET_FUNC_ID_GETHOSTADDR, "getaddrbyname"},
-	{NET_FUNC_ID_GETADDRINFO, "getaddrinfo"},
+	{NET_FUNC_ID_SOCKET, "socket", NET_FUZZ_TYPE_NOMEM | NET_FUZZ_TYPE_LIMIT},
+	{NET_FUNC_ID_CONNECT, "connect", NET_FUZZ_TYPE_INUSE | NET_FUZZ_TYPE_UNREACH | NET_FUZZ_TYPE_TIMEOUT},
+	{NET_FUNC_ID_BIND, "bind", NET_FUZZ_TYPE_INUSE},
+	{NET_FUNC_ID_LISTEN, "listen", NET_FUZZ_TYPE_INUSE},
+	{NET_FUNC_ID_ACCEPT, "accept", NET_FUZZ_TYPE_LIMIT | NET_FUZZ_TYPE_NOMEM},
+	{NET_FUNC_ID_SEND, "send", NET_FUZZ_TYPE_RESET | NET_FUZZ_TYPE_NOMEM},
+	{NET_FUNC_ID_RECV, "recv", NET_FUZZ_TYPE_REFUSE | NET_FUZZ_TYPE_NOMEM},
+	{NET_FUNC_ID_SENDTO, "sendto", NET_FUZZ_TYPE_RESET | NET_FUZZ_TYPE_NOMEM},
+	{NET_FUNC_ID_RECVFROM, "recvfrom", NET_FUZZ_TYPE_REFUSE | NET_FUZZ_TYPE_NOMEM},
+	{NET_FUNC_ID_SENDMSG, "sendmsg", NET_FUZZ_TYPE_RESET | NET_FUZZ_TYPE_NOMEM},
+	{NET_FUNC_ID_RECVMSG, "recvmsg", NET_FUZZ_TYPE_REFUSE | NET_FUZZ_TYPE_NOMEM},
+	{NET_FUNC_ID_GETHOSTNAME, "gethostbyname", NET_FUZZ_TYPE_HOST_NOT_FOUND | NET_FUZZ_TYPE_TRY_AGAIN},
+	{NET_FUNC_ID_GETHOSTADDR, "getaddrbyname", NET_FUZZ_TYPE_HOST_NOT_FOUND | NET_FUZZ_TYPE_TRY_AGAIN},
+	{NET_FUNC_ID_GETADDRINFO, "getaddrinfo", NET_FUZZ_TYPE_HOST_NOT_FOUND | NET_FUZZ_TYPE_TRY_AGAIN |
+					NET_FUZZ_TYPE_NOMEM},
 	{NET_FUNC_ID_MAX, NULL}
 };
 
@@ -78,6 +80,7 @@ static void init_netfuzz_config(void)
 
 	while (1) {
 		char *func_name = NULL;
+		int fuzz_set;
 		char *fuzz_type_str = NULL;
 		double fuzz_rate;
 
@@ -91,6 +94,7 @@ static void init_netfuzz_config(void)
 		for (i = 0; rtr_net_funcs[i].name != NULL; i++) {
 			if (real_strcmp(func_name, rtr_net_funcs[i].name) == 0) {
 				func_id = rtr_net_funcs[i].id;
+				fuzz_set = rtr_net_funcs[i].fuzzing_set;
 				break;
 			}
 		}
@@ -105,7 +109,7 @@ static void init_netfuzz_config(void)
 		}
 
 		/* set fuzzing value */
-		if (func_id != NET_FUNC_ID_MAX && fuzz_type != NET_FUZZ_TYPE_END) {
+		if (func_id != NET_FUNC_ID_MAX && (fuzz_type & fuzz_set)) {
 			g_netfuzz_config.fuzz_types[func_id] = fuzz_type;
 			g_netfuzz_config.fuzz_err[func_id] = fuzz_err;
 			g_netfuzz_config.fuzz_rates[func_id] = fuzz_rate;
@@ -121,63 +125,14 @@ static void init_netfuzz_config(void)
 /* get network fuzzing error value */
 int rtr_get_net_fuzzing(enum RTR_NET_FUNC_ID func_id, int *err_val)
 {
-	int fuzz_typeset;
 	int matched = 0;
-
-	/* check function ID */
-	if (func_id >= NET_FUNC_ID_MAX)
-		return 0;
 
 	/* init fuzzing config */
 	if (!g_netfuzz_config.init_flag)
 		init_netfuzz_config();
 
-	/* set possible fuzzing types for each function */
-	switch (func_id) {
-	case NET_FUNC_ID_SOCKET:
-	case NET_FUNC_ID_ACCEPT:
-		fuzz_typeset = NET_FUZZ_TYPE_LIMIT | NET_FUZZ_TYPE_NOMEM;
-		break;
-
-	case NET_FUNC_ID_CONNECT:
-		fuzz_typeset = NET_FUZZ_TYPE_INUSE | NET_FUZZ_TYPE_UNREACH |
-			NET_FUZZ_TYPE_TIMEOUT;
-		break;
-
-	case NET_FUNC_ID_BIND:
-	case NET_FUNC_ID_LISTEN:
-		fuzz_typeset = NET_FUZZ_TYPE_INUSE;
-		break;
-
-	case NET_FUNC_ID_SEND:
-	case NET_FUNC_ID_SENDTO:
-	case NET_FUNC_ID_SENDMSG:
-		fuzz_typeset = NET_FUZZ_TYPE_RESET | NET_FUZZ_TYPE_NOMEM;
-		break;
-
-	case NET_FUNC_ID_RECV:
-	case NET_FUNC_ID_RECVFROM:
-	case NET_FUNC_ID_RECVMSG:
-		fuzz_typeset = NET_FUZZ_TYPE_REFUSE | NET_FUZZ_TYPE_NOMEM;
-		break;
-
-	case NET_FUNC_ID_GETHOSTNAME:
-	case NET_FUNC_ID_GETHOSTADDR:
-		fuzz_typeset = NET_FUZZ_TYPE_HOST_NOT_FOUND | NET_FUZZ_TYPE_TRY_AGAIN;
-		break;
-
-	case NET_FUNC_ID_GETADDRINFO:
-		fuzz_typeset = NET_FUZZ_TYPE_HOST_NOT_FOUND | NET_FUZZ_TYPE_TRY_AGAIN |
-			NET_FUZZ_TYPE_NOMEM;
-		break;
-
-	default:
-		break;
-	}
-
 	/* get socket function and fuzzing type from configuration */
-	if (rtr_get_fuzzing_flag(g_netfuzz_config.fuzz_rates[func_id]) &&
-		(g_netfuzz_config.fuzz_types[func_id] & fuzz_typeset)) {
+	if (rtr_get_fuzzing_flag(g_netfuzz_config.fuzz_rates[func_id])) {
 		/* set matching flag */
 		matched = 1;
 

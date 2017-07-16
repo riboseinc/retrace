@@ -51,19 +51,21 @@ int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_get_net_fuzzing(NET_FUNC_ID_SOCKET, &err)) {
-		event_info.extra_info = "[redirected]";
-		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
-		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+	if (get_tracing_enabled()) {
+		if (rtr_get_net_fuzzing(NET_FUNC_ID_SOCKET, &err)) {
+			event_info.extra_info = "[redirected]";
+			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
-		errno = err;
-		sock = -1;
-	} else {
-		sock = real_socket(domain, type, protocol);
-		if (sock > 0)
-			file_descriptor_update(sock, FILE_DESCRIPTOR_TYPE_SOCK, "socket");
-		else
-			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+			errno = err;
+			sock = -1;
+		} else {
+			sock = real_socket(domain, type, protocol);
+			if (sock > 0)
+				file_descriptor_update(sock, FILE_DESCRIPTOR_TYPE_SOCK, "socket");
+			else
+				event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+		}
 	}
 
 	retrace_log_and_redirect_after(&event_info);

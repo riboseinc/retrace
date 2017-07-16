@@ -35,7 +35,7 @@ enum RTR_NET_FUNC_ID {
 #define NET_FUZZ_TYPE_REFUSE		0x0040
 #define NET_FUZZ_TYPE_HOST_NOT_FOUND	0x0080
 #define NET_FUZZ_TYPE_TRY_AGAIN		0x0100
-#define NET_FUZZ_TYPE_END		0xFFFF
+#define NET_FUZZ_TYPE_END		0x0000
 
 /* network fuzzing structure */
 typedef struct _rtr_netfuzz_config {

@@ -1441,7 +1441,6 @@ file_descriptor_update(int fd, unsigned int type, const char *location)
 	pinfo->type = type;
 	pinfo->location = (char *)&pinfo[1];
 	real_strcpy(pinfo->location, location);
-	pinfo->port = port;
 
 	SLIST_INSERT_HEAD(&g_fdlist, pinfo, next);
 }
