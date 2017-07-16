@@ -26,6 +26,7 @@
 #include "common.h"
 #include "str.h"
 #include "malloc.h"
+#include "printf.h"
 #include "netfuzz.h"
 #include "sock.h"
 #include <string.h>
@@ -59,7 +60,9 @@ int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
 		sock = -1;
 	} else {
 		sock = real_socket(domain, type, protocol);
-		if (errno)
+		if (sock > 0)
+			file_descriptor_update(sock, FILE_DESCRIPTOR_TYPE_SOCK, "socket");
+		else
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
@@ -113,27 +116,39 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 		fuzzing_enabled = 1;
 		ret = -1;
 	} else {
-		if (address->sa_family == AF_INET) {
-			struct sockaddr_in *dst_addr = (struct sockaddr_in *) address;
-			const char *remote_ipaddr;
+		char location[128];
+
+		if (address->sa_family == AF_INET || address->sa_family == AF_INET6) {
+			char remote_ipaddr[INET6_ADDRSTRLEN];
 			int remote_port;
 
-			struct sockaddr_in redirect_addr;
+			char dst_ipaddr[INET6_ADDRSTRLEN];
+			int dst_port;
+
+			struct sockaddr redirect_addr;
+
+			char *redirect_ipaddr = NULL;
+			int redirect_port;
+
 			int enabled_redirect = 0;
 
 			RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
 
 			/* get IP address and port number to connect */
-			const char *dst_ipaddr = inet_ntoa(dst_addr->sin_addr);
-			int dst_port = ntohs(dst_addr->sin_port);
+			if (address->sa_family == AF_INET) {
+				inet_ntop(address->sa_family, &(((struct sockaddr_in *) address)->sin_addr),
+					dst_ipaddr, INET_ADDRSTRLEN);
+				dst_port = ntohs(((struct sockaddr_in *) address)->sin_port);
+			} else {
+				inet_ntop(address->sa_family, &(((struct sockaddr_in6 *) address)->sin6_addr),
+					dst_ipaddr, INET6_ADDRSTRLEN);
+				dst_port = ntohs(((struct sockaddr_in6 *) address)->sin6_port);
+			}
 
 			/* get configuration for redirection */
 			while (1) {
 				char *match_ipaddr = NULL;
 				int match_port;
-
-				char *redirect_ipaddr = NULL;
-				int redirect_port;
 
 				/* get redirect info from configuration file */
 				if (rtr_get_config_multiple(&config, "connect",
@@ -153,9 +168,16 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 					/* set redirect address info */
 					memset(&redirect_addr, 0, sizeof(redirect_addr));
 
-					redirect_addr.sin_family = AF_INET;
-					redirect_addr.sin_addr.s_addr = inet_addr(redirect_ipaddr);
-					redirect_addr.sin_port = htons(redirect_port);
+					redirect_addr.sa_family = address->sa_family;
+					if (redirect_addr.sa_family == AF_INET) {
+						inet_pton(redirect_addr.sa_family, redirect_ipaddr,
+							&(((struct sockaddr_in *) &redirect_addr)->sin_addr));
+						((struct sockaddr_in *) &redirect_addr)->sin_port = htons(redirect_port);
+					} else {
+						inet_pton(redirect_addr.sa_family, redirect_ipaddr,
+							&(((struct sockaddr_in6 *) &redirect_addr)->sin6_addr));
+						((struct sockaddr_in6 *) &redirect_addr)->sin6_port = htons(redirect_port);
+					}
 
 					/* set redirect flag */
 					enabled_redirect = 1;
@@ -165,16 +187,18 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 
 			if (enabled_redirect) {
 				event_info.extra_info = "redirected";
-				remote_addr = (struct sockaddr *) &redirect_addr;
+				remote_addr = &redirect_addr;
 			}
 
-			remote_ipaddr = inet_ntoa(((struct sockaddr_in *)remote_addr)->sin_addr);
-			remote_port = ntohs(((struct sockaddr_in *)remote_addr)->sin_port);
-
 			/* connect to remote */
-			ret = real_connect(fd, remote_addr, sizeof(struct sockaddr_in));
-			if (ret == 0)
-				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_CONNECT, remote_ipaddr, remote_port);
+			ret = real_connect(fd, remote_addr, len);
+			if (ret == 0) {
+				real_snprintf(location, sizeof(location), "connected[%s:%d]",
+					enabled_redirect ? redirect_ipaddr : dst_ipaddr,
+					enabled_redirect ? redirect_port : dst_port);
+
+				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_SOCK, location);
+			}
 
 			event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
 			retrace_log_and_redirect_after(&event_info);
@@ -186,8 +210,10 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 
 			/* connect to local */
 			ret = real_connect(fd, (struct sockaddr *) un_addr, sizeof(struct sockaddr_un));
-			if (ret == 0)
-				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_UNIX_DOMAIN, sun_path, -1);
+			if (ret == 0) {
+				real_snprintf(location, sizeof(location), "connected[%s]", sun_path);
+				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_SOCK, sun_path);
+			}
 
 			event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
 			retrace_log_and_redirect_after(&event_info);
@@ -250,6 +276,8 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 		errno = err;
 		ret = -1;
 	} else {
+		char location[128];
+
 		ret = real_bind(fd, address, len);
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
@@ -261,12 +289,14 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 				const char *bind_ipaddr = inet_ntoa(bind_addr->sin_addr);
 				int bind_port = ntohs(bind_addr->sin_port);
 
-				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_IPV4_BIND, bind_ipaddr, bind_port);
+				real_snprintf(location, sizeof(location), "bind[%s:%d]", bind_ipaddr, bind_port);
+				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_SOCK, location);
 			} else if (address->sa_family == AF_UNIX) {
 				struct sockaddr_un *un_addr = (struct sockaddr_un *) address;
 				const char *sun_path = un_addr->sun_path;
 
-				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_UNIX_BIND, sun_path, -1);
+				real_snprintf(location, sizeof(location), "bind[%s]", sun_path);
+				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_SOCK, location);
 			}
 		}
 	}
@@ -326,33 +356,41 @@ int RETRACE_IMPLEMENTATION(accept)(int fd, struct sockaddr *address, socklen_t *
 		errno = err;
 		clnt_fd = -1;
 	} else {
-		/* If we are tracking this descriptor and is a IPV4 server, try to gets
-		 * the client address, even if the caller isn't interested on it
-		 */
-		di = file_descriptor_get(fd);
-		if (di && di->type == FILE_DESCRIPTOR_TYPE_IPV4_BIND && address == NULL) {
-			address = (struct sockaddr *) &local_addr;
-			local_len = sizeof(struct sockaddr_in);
-			len = &local_len;
-		}
+		char location[128];
+		char ipaddr[INET6_ADDRSTRLEN];
+
+		memset(location, 0, sizeof(location));
 
 		clnt_fd = real_accept(fd, address, len);
-		if (errno)
-			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+		if (clnt_fd > 0) {
+			switch (address->sa_family) {
+			case AF_INET:
+				inet_ntop(AF_INET, &(((struct sockaddr_in *) address)->sin_addr), ipaddr, INET_ADDRSTRLEN);
+				real_snprintf(location, sizeof(location), "%s:%d", ipaddr,
+					ntohs(((struct sockaddr_in *) address)->sin_port));
 
-		/* get descriptor info */
-		di = file_descriptor_get(fd);
-		if (di && di->type == FILE_DESCRIPTOR_TYPE_IPV4_BIND) {
-			struct sockaddr_in *clnt_addr = (struct sockaddr_in *) address;
+				break;
 
-			if (clnt_fd > 0) {
-				const char *clnt_ipaddr = inet_ntoa(clnt_addr->sin_addr);
-				int clnt_port = ntohs(clnt_addr->sin_port);
+			case AF_INET6:
+				inet_ntop(AF_INET6, &(((struct sockaddr_in6 *) address)->sin6_addr), ipaddr, INET6_ADDRSTRLEN);
+				real_snprintf(location, sizeof(location), "%s:%d", ipaddr,
+					ntohs(((struct sockaddr_in6 *) address)->sin6_port));
 
-				/* add file descriptor for client socket */
-				file_descriptor_update(clnt_fd, FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT, clnt_ipaddr, clnt_port);
+				break;
+
+			case AF_UNIX:
+				real_strcpy(location, ((struct sockaddr_un *) address)->sun_path);
+
+				break;
+
+			default:
+				real_strcpy(location, "Unknown");
+				break;
 			}
-		}
+
+			file_descriptor_update(clnt_fd, FILE_DESCRIPTOR_TYPE_SOCK, location);
+		} else
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
 	retrace_log_and_redirect_after(&event_info);
@@ -487,28 +525,6 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 		ret = real_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-
-		if (dest_addr) {
-			if (dest_addr->sa_family == AF_INET) {
-				struct sockaddr_in *in_addr = (struct sockaddr_in *)dest_addr;
-
-				const char *remote_addr = inet_ntoa(in_addr->sin_addr);
-				int remote_port = ntohs(in_addr->sin_port);
-
-				/* update descriptor info */
-				di = file_descriptor_get(sockfd);
-				if (!di && ret > 0)
-					file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_addr, remote_port);
-			} else if (dest_addr->sa_family == AF_UNIX) {
-				struct sockaddr_un *un_addr = (struct sockaddr_un *)dest_addr;
-				const char *remote_path = un_addr->sun_path;
-
-				/* update descriptor info */
-				di = file_descriptor_get(sockfd);
-				if (!di && ret > 0)
-					file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDTO, remote_path, -1);
-			}
-		}
 	}
 
 	retrace_log_and_redirect_after(&event_info);
@@ -557,11 +573,6 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 		ret = real_sendmsg(sockfd, msg, flags);
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-
-		/* update descriptor info */
-		di = file_descriptor_get(sockfd);
-		if (!di && msg->msg_name)
-			file_descriptor_update(sockfd, FILE_DESCRIPTOR_TYPE_UDP_SENDMSG, (char *)msg->msg_name, -1);
 	}
 
 	retrace_log_and_redirect_after(&event_info);

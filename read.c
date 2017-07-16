@@ -61,7 +61,6 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 	}
 
-
 	ret = real_read(fd, buf, real_nbytes);
 	if (errno)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;

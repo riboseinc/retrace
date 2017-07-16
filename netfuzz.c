@@ -76,8 +76,6 @@ static void init_netfuzz_config(void)
 {
 	RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
 
-	real_fprintf(stderr, "initializing\n");
-
 	while (1) {
 		char *func_name = NULL;
 		char *fuzz_type_str = NULL;

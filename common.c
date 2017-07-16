@@ -1425,7 +1425,7 @@ file_descriptor_get(int fd)
 }
 
 void
-file_descriptor_update(int fd, unsigned int type, const char *location, int port)
+file_descriptor_update(int fd, unsigned int type, const char *location)
 {
 	struct descriptor_info *pinfo;
 

@@ -288,7 +288,7 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 		fd = real_fileno(ret);
 
 		file_descriptor_update(
-			fd, FILE_DESCRIPTOR_TYPE_FILE, file, 0);
+			fd, FILE_DESCRIPTOR_TYPE_FILE, file);
 	}
 
 	if (errno)
@@ -490,7 +490,7 @@ open_v(const char *pathname, int flags, va_list ap)
 
 	if (r > 0) {
 		file_descriptor_update(
-			r, FILE_DESCRIPTOR_TYPE_FILE, pathname, 0);
+			r, FILE_DESCRIPTOR_TYPE_FILE, pathname);
 	}
 
 	retrace_log_and_redirect_after(&event_info);
@@ -961,7 +961,7 @@ fcntl_v(int fildes, int cmd, va_list ap)
 			if (di->location != NULL)
 				old_location = di->location;
 
-			file_descriptor_update(r, FILE_DESCRIPTOR_TYPE_FILE, old_location, 0);
+			file_descriptor_update(r, di->type, old_location);
 		}
 		break;
 
