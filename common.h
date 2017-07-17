@@ -34,13 +34,7 @@
 
 #define FILE_DESCRIPTOR_TYPE_UNKNOWN		0
 #define FILE_DESCRIPTOR_TYPE_FILE		1 /* from open() */
-#define FILE_DESCRIPTOR_TYPE_IPV4_CONNECT	2 /* from connect() using AF_INET */
-#define FILE_DESCRIPTOR_TYPE_IPV4_BIND		3 /* from bind() */
-#define FILE_DESCRIPTOR_TYPE_IPV4_ACCEPT	4 /* from accept() */
-#define FILE_DESCRIPTOR_TYPE_UNIX_DOMAIN	5 /* from connect() using AF_UNIX */
-#define FILE_DESCRIPTOR_TYPE_UDP_SENDTO		6 /* from sendto() over UDP */
-#define FILE_DESCRIPTOR_TYPE_UDP_SENDMSG	7 /* from sendmsg() over UDP local socket */
-#define FILE_DESCRIPTOR_TYPE_UNIX_BIND		8 /* bind AF_UNIX */
+#define FILE_DESCRIPTOR_TYPE_SOCK		2 /* from socket() */
 
 /* fuzzing types */
 enum RTR_FUZZ_TYPE {
@@ -223,16 +217,10 @@ struct descriptor_info {
 	int fd;
 	unsigned int type;
 	char *location; /* File name or address */
-	int port;
 };
 
 void retrace_log_and_redirect_before(struct rtr_event_info *event_info);
 void retrace_log_and_redirect_after(struct rtr_event_info *event_info);
-
-struct ts_info {
-	int type;
-	const char *str;
-};
 
 typedef const void *RTR_CONFIG_HANDLE;
 #define RTR_CONFIG_START NULL
@@ -246,16 +234,13 @@ int trace_disable();
 void trace_restore(int oldstate);
 
 /* Descriptor tracking */
-void file_descriptor_update(int fd, unsigned int type, const char *location, int port);
+void file_descriptor_update(int fd, unsigned int type, const char *location);
 struct descriptor_info *file_descriptor_get(int fd);
 void file_descriptor_remove(int fd);
 
 /* get fuzzing flag by caculating fail status randomly */
 int rtr_get_fuzzing_flag(double fail_rate);
 int rtr_get_fuzzing_random(void);
-
-/* get string from type */
-void rtr_get_type_string(int type, const struct ts_info *ts_info, char *str, size_t size);
 
 /* get configuration token by separator */
 int rtr_check_config_token(const char *token, char *str, const char *sep, int *reverse);

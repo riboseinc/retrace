@@ -104,7 +104,7 @@ int RETRACE_IMPLEMENTATION(mkstemp)(char *template)
 	ret = real_mkstemp(template);
 
 	if (ret > 0)
-		file_descriptor_update(ret, FILE_DESCRIPTOR_TYPE_FILE, template, 0);
+		file_descriptor_update(ret, FILE_DESCRIPTOR_TYPE_FILE, template);
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -133,7 +133,7 @@ int RETRACE_IMPLEMENTATION(mkstemps)(char *template, int suffixlen)
 
 	ret = real_mkstemps(template, suffixlen);
 	if (ret > 0)
-		file_descriptor_update(ret, FILE_DESCRIPTOR_TYPE_FILE, template, 0);
+		file_descriptor_update(ret, FILE_DESCRIPTOR_TYPE_FILE, template);
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -162,7 +162,7 @@ int RETRACE_IMPLEMENTATION(mkostemp)(char *template, int flags)
 
 	ret = real_mkostemp(template, flags);
 	if (ret > 0)
-		file_descriptor_update(ret, FILE_DESCRIPTOR_TYPE_FILE, template, 0);
+		file_descriptor_update(ret, FILE_DESCRIPTOR_TYPE_FILE, template);
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -191,7 +191,7 @@ int RETRACE_IMPLEMENTATION(mkostemps)(char *template, int suffixlen, int flags)
 
 	ret = real_mkostemps(template, suffixlen, flags);
 	if (ret > 0)
-		file_descriptor_update(ret, FILE_DESCRIPTOR_TYPE_FILE, template, 0);
+		file_descriptor_update(ret, FILE_DESCRIPTOR_TYPE_FILE, template);
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -250,7 +250,7 @@ FILE *RETRACE_IMPLEMENTATION(tmpfile)(void)
 		fd = real_fileno(ret);
 
 	if (fd > 0)
-		file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_FILE, "tmpfile() file", 0);
+		file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_FILE, "tmpfile() file");
 
 	retrace_log_and_redirect_after(&event_info);
 

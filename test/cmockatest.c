@@ -715,7 +715,7 @@ test_fdlist(void **state)
 {
 	struct descriptor_info *(*file_descriptor_get)(int fd);
 	void (*file_descriptor_update)(int fd, unsigned int type,
-	    const char *location, int port);
+	    const char *location);
 	void (*file_descriptor_remove)(int fd);
 	struct descriptor_info *p;
 	int i;
@@ -726,37 +726,34 @@ test_fdlist(void **state)
 
 	assert_null(file_descriptor_get(42));
 
-	file_descriptor_update(42, 6502, "forty two", 451);
+	file_descriptor_update(42, 6502, "forty two");
 	p = file_descriptor_get(42);
 	assert_non_null(p);
 	assert_int_equal(p->fd, 42);
 	assert_int_equal(p->type, 6502);
 	assert_string_equal(p->location, "forty two");
-	assert_int_equal(p->port, 451);
 
-	file_descriptor_update(42, 6503, "forty three", 450);
+	file_descriptor_update(42, 6503, "forty three");
 	p = file_descriptor_get(42);
 	assert_non_null(p);
 	assert_int_equal(p->fd, 42);
 	assert_int_equal(p->type, 6503);
 	assert_string_equal(p->location, "forty three");
-	assert_int_equal(p->port, 450);
 
 	file_descriptor_remove(42);
 	assert_null(file_descriptor_get(42));
 
 	for (i = 0; i < 1000; i++)
-		file_descriptor_update(i, i+1, "test", i+2);
+		file_descriptor_update(i, i+1, "test");
 
 	for (i = 0; i < 1000; i++)
-		file_descriptor_update(i, i+3, "test", i+4);
+		file_descriptor_update(i, i+3, "test");
 
 	for (i = 0; i < 1000; i++) {
 		p = file_descriptor_get(i);
 		assert_non_null(p);
 		assert_int_equal(p->fd, i);
 		assert_int_equal(p->type, i+3);
-		assert_int_equal(p->port, i+4);
 	}
 
 	file_descriptor_remove(500);

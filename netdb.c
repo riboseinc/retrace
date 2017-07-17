@@ -24,6 +24,8 @@
  */
 
 #include "common.h"
+#include "netfuzz.h"
+
 #include "rtr-netdb.h"
 
 #include <arpa/inet.h>
@@ -36,6 +38,8 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyname)(const char *name)
 	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&name};
 
+	int err;
+
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "gethostbyname";
 	event_info.function_group = RTR_FUNC_GRP_NET;
@@ -47,11 +51,20 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyname)(const char *name)
 
 	retrace_log_and_redirect_before(&event_info);
 
-	hent = real_gethostbyname(name);
-	if (hent) {
-		event_info.return_value_type = PARAMETER_TYPE_STRUCT_HOSTEN;
-	} else
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_GETHOSTNAME, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		h_errno = err;
+		hent = NULL;
+	} else {
+		hent = real_gethostbyname(name);
+		if (hent)
+			event_info.return_value_type = PARAMETER_TYPE_STRUCT_HOSTEN;
+		else
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -69,6 +82,8 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyaddr)(const void *addr, socklen_
 	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&addr};
 
+	int err;
+
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "gethostbyaddr";
 	event_info.function_group = RTR_FUNC_GRP_NET;
@@ -80,11 +95,20 @@ struct hostent *RETRACE_IMPLEMENTATION(gethostbyaddr)(const void *addr, socklen_
 
 	retrace_log_and_redirect_before(&event_info);
 
-	hent = real_gethostbyaddr(addr, len, type);
-	if (hent) {
-		event_info.return_value_type = PARAMETER_TYPE_STRUCT_HOSTEN;
-	} else
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_GETHOSTADDR, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		h_errno = err;
+		hent = NULL;
+	} else {
+		hent = real_gethostbyaddr(addr, len, type);
+		if (hent)
+			event_info.return_value_type = PARAMETER_TYPE_STRUCT_HOSTEN;
+		else
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -219,6 +243,8 @@ int RETRACE_IMPLEMENTATION(getaddrinfo)(const char *node, const char *service,
 	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRUCT_ADDRINFO, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&node, &service, &hints, res};
 
+	int err;
+
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "getaddrinfo";
 	event_info.function_group = RTR_FUNC_GRP_NET;
@@ -230,12 +256,25 @@ int RETRACE_IMPLEMENTATION(getaddrinfo)(const char *node, const char *service,
 
 	retrace_log_and_redirect_before(&event_info);
 
-	ret = real_getaddrinfo(node, service, hints, res);
-	if (ret == 0) {
-		event_info.return_value_type = PARAMETER_TYPE_STRUCT_ADDRINFO;
-		event_info.return_value = res;
-	} else
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	if (rtr_get_net_fuzzing(NET_FUNC_ID_GETADDRINFO, &err)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		if (err == HOST_NOT_FOUND)
+			ret = EAI_NODATA;
+		else if (err == TRY_AGAIN)
+			ret = EAI_AGAIN;
+		else
+			ret = EAI_MEMORY;
+	} else {
+		ret = real_getaddrinfo(node, service, hints, res);
+		if (ret == 0) {
+			event_info.return_value_type = PARAMETER_TYPE_STRUCT_ADDRINFO;
+			event_info.return_value = res;
+		} else
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 

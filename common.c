@@ -1343,6 +1343,7 @@ rtr_parse_config(const struct config_entry **pentry,
 					break;
 				}
 			}
+
 			retval = 1;
 		}
 		*pentry = SLIST_NEXT(*pentry, next);
@@ -1366,9 +1367,7 @@ int rtr_get_config_multiple(RTR_CONFIG_HANDLE *handle, const char *function, ...
 	old_trace_state = trace_disable();
 
 	va_start(args, function);
-
 	ret = rtr_parse_config(config, function, args);
-
 	va_end(args);
 
 	trace_restore(old_trace_state);
@@ -1426,7 +1425,7 @@ file_descriptor_get(int fd)
 }
 
 void
-file_descriptor_update(int fd, unsigned int type, const char *location, int port)
+file_descriptor_update(int fd, unsigned int type, const char *location)
 {
 	struct descriptor_info *pinfo;
 
@@ -1442,7 +1441,6 @@ file_descriptor_update(int fd, unsigned int type, const char *location, int port
 	pinfo->type = type;
 	pinfo->location = (char *)&pinfo[1];
 	real_strcpy(pinfo->location, location);
-	pinfo->port = port;
 
 	SLIST_INSERT_HEAD(&g_fdlist, pinfo, next);
 }
@@ -1604,33 +1602,6 @@ rtr_get_fuzzing_random(void)
 	rtr_init_random();
 
 	return rand();
-}
-
-/* get string from type value */
-void
-rtr_get_type_string(int type, const struct ts_info *ts_info, char *str, size_t size)
-{
-	const struct ts_info *p;
-	size_t str_len = 0;
-
-	/* init result string */
-	memset(str, 0, size);
-
-	for (p = ts_info; p->str != NULL; p++) {
-		if ((p->type & type) != p->type)
-			continue;
-
-		if ((str_len + real_strlen(p->str) + 2) > size)
-			break;
-
-		if (str_len > 0) {
-			real_strcat(str + str_len, "|");
-			str_len++;
-		}
-
-		real_strcpy(str + str_len, p->str);
-		str_len += real_strlen(p->str);
-	}
 }
 
 /* get configuration token by separator */
