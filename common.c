@@ -107,11 +107,9 @@ static rtr_logging_config_t g_logging_config;
 /*
  * Global list of file descriptors so we can track
  * their usage across different functions
- *
  */
-#define DESCRIPTOR_LIST_INITIAL_SIZE 8
-struct descriptor_info **g_descriptor_list;
-unsigned int g_descriptor_list_size;
+SLIST_HEAD(fdlist_head, descriptor_info) g_fdlist =
+	SLIST_HEAD_INITIALIZER(g_fdlist);
 
 static pthread_mutex_t printing_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -1415,134 +1413,14 @@ rtr_get_config_single_internal(const char *function, ...)
 	return (ret);
 }
 
-static char *
-retrace_strdup(const char *s)
-{
-	size_t len;
-	char *ret;
-
-	len = real_strlen(s);
-
-	ret = (char *) real_malloc(len + 1);
-
-	if (ret)
-		memcpy(ret, s, len + 1);
-
-	return ret;
-}
-
-
-struct descriptor_info *
-descriptor_info_new(int fd, unsigned int type, const char *location, int port)
-{
-	int old_trace_state;
-	struct descriptor_info *di;
-
-	old_trace_state = trace_disable();
-
-	di = (struct descriptor_info *) real_malloc(sizeof(struct descriptor_info));
-
-	if (di) {
-		di->fd = fd;
-		di->type = type;
-
-		if (location)
-			di->location = retrace_strdup(location);
-		else
-			di->location = NULL;
-
-		di->port = port;
-	}
-
-	trace_restore(old_trace_state);
-
-	return di;
-}
-
-void
-descriptor_info_free(struct descriptor_info *di)
-{
-	int old_trace_state;
-
-	old_trace_state = trace_disable();
-
-	if (di->location)
-		real_free(di->location);
-
-	real_free(di);
-
-	trace_restore(old_trace_state);
-}
-
-void
-file_descriptor_add(int fd, unsigned int type, const char *location, int port)
-{
-	int free_spot = -1;
-	unsigned int i = 0;
-	int old_trace_state;
-	struct descriptor_info *di;
-
-	old_trace_state = trace_disable();
-
-	di = descriptor_info_new(fd, type, location, port);
-
-	if (!di) {
-		trace_restore(old_trace_state);
-		return;
-	}
-
-	if (g_descriptor_list == NULL) {
-		g_descriptor_list_size = DESCRIPTOR_LIST_INITIAL_SIZE;
-		g_descriptor_list = (struct descriptor_info **)real_malloc(
-		  DESCRIPTOR_LIST_INITIAL_SIZE * sizeof(struct descriptor_info *));
-
-		memset(g_descriptor_list,
-		   0,
-		   DESCRIPTOR_LIST_INITIAL_SIZE * sizeof(struct descriptor_info *));
-	}
-
-	for (i = 0; i < g_descriptor_list_size; i++) {
-		if (g_descriptor_list[i] == NULL) {
-			free_spot = i;
-			break;
-		}
-	}
-
-	if (free_spot == -1) {
-		/* If we don't have any free spots double the list size */
-		int new_size = g_descriptor_list_size * 2;
-
-		g_descriptor_list = (struct descriptor_info **)realloc(
-		  g_descriptor_list, new_size * sizeof(struct descriptor_info *));
-
-		if (g_descriptor_list) {
-			/* clear the new spots we added */
-			memset(g_descriptor_list + g_descriptor_list_size,
-			       0,
-			       (new_size - g_descriptor_list_size) * sizeof(struct descriptor_info *));
-
-			/* Insert at the end of old list */
-			free_spot = g_descriptor_list_size;
-
-			g_descriptor_list_size = new_size;
-		}
-	}
-
-	if (free_spot != -1)
-		g_descriptor_list[free_spot] = di;
-
-	trace_restore(old_trace_state);
-}
-
 struct descriptor_info *
 file_descriptor_get(int fd)
 {
-	unsigned int i;
+	struct descriptor_info *pinfo;
 
-	for (i = 0; i < g_descriptor_list_size; i++) {
-		if (g_descriptor_list[i] && g_descriptor_list[i]->fd == fd)
-			return g_descriptor_list[i];
-	}
+	SLIST_FOREACH(pinfo, &g_fdlist, next)
+		if (pinfo->fd == fd)
+			return pinfo;
 
 	return NULL;
 }
@@ -1550,35 +1428,35 @@ file_descriptor_get(int fd)
 void
 file_descriptor_update(int fd, unsigned int type, const char *location, int port)
 {
-	struct descriptor_info *di;
+	struct descriptor_info *pinfo;
 
-	di = file_descriptor_get(fd);
+	file_descriptor_remove(fd);
 
-	/* If found, update */
-	if (di) {
-		di->type = type;
-		if (di->location) {
-			real_free(di->location);
-		}
-		di->location = retrace_strdup(location);
+	pinfo = real_malloc(sizeof(struct descriptor_info) +
+	    real_strlen(location) + 1);
 
-		di->port = port;
-	} else {
-		/* If not found, add it */
-		file_descriptor_add(fd, type, location, port);
-	}
+	if (pinfo == NULL)
+		return;
+
+	pinfo->fd = fd;
+	pinfo->type = type;
+	pinfo->location = (char *)&pinfo[1];
+	real_strcpy(pinfo->location, location);
+	pinfo->port = port;
+
+	SLIST_INSERT_HEAD(&g_fdlist, pinfo, next);
 }
 
 void
 file_descriptor_remove(int fd)
 {
-	unsigned int i;
+	struct descriptor_info *pinfo;
 
-	for (i = 0; i < g_descriptor_list_size; i++) {
-		if (g_descriptor_list[i] && g_descriptor_list[i]->fd == fd) {
-			descriptor_info_free(g_descriptor_list[i]);
-			g_descriptor_list[i] = NULL;
-		}
+	pinfo = file_descriptor_get(fd);
+
+	if (pinfo) {
+		SLIST_REMOVE(&g_fdlist, pinfo, descriptor_info, next);
+		real_free(pinfo);
 	}
 }
 
