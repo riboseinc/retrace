@@ -8,7 +8,7 @@ logtofile,retrace.log
 disabledatadump,1
 SSL_get_verify_result,10
 fuzzingseed,1498729252
-memoryfuzzing,0.05
+;memoryfuzzing,0.05
 incompleteio,10
 forcefollowexec
 fuzzing-getenv,FOOBAR,all,GARBAGE,10,1
@@ -19,6 +19,13 @@ logging-global,LOG_GROUP_FILE|LOG_GROUP_MEM,LOG_LEVEL_ALL
 logging-excluded-funcs,free|memcpy|malloc
 logging-allowed-funcs,strlen
 stacktrace-groups,LOG_GROUP_MEM
-memoryfuzzing,0.05
+;memoryfuzzing,0.05
 backtrace
 #######################################
+config-test
+config-test1,five,6,7.0
+
+config-test2,forty,2
+config-test2,ninety,9
+config-test3
+config-test2,seventy,6
