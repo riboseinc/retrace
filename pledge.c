@@ -36,6 +36,8 @@ int RETRACE_IMPLEMENTATION(pledge)(const char *promises, const char *paths[])
 	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&promises};
 
+	/* Load our config file before we pledge() and give up our right to do so */
+	rtr_get_config_single("dummy");
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "pledge";

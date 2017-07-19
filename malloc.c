@@ -54,7 +54,12 @@ static int map_bit(const void *p, int set)
 	struct map *map, *prev;
 	unsigned long int address;
 	unsigned int offset, bit;
-	int old, mask;
+	int old, mask, old_trace_state;
+
+	if (!get_tracing_enabled())
+		return 0;
+
+	old_trace_state = trace_disable();
 
 	address = p - NULL;
 	assert(address % ALIGNSZ == 0);
@@ -90,6 +95,8 @@ static int map_bit(const void *p, int set)
 		map->map[offset] &= ~mask;
 	else
 		map->map[offset] |= mask;
+
+	trace_restore(old_trace_state);
 
 	pthread_mutex_unlock(&maps_mutex);
 
