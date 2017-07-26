@@ -419,7 +419,7 @@ int RETRACE_IMPLEMENTATION(puts)(const char *str)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "puts";
-	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.function_group = RTR_FUNC_GRP_SYS;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
