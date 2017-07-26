@@ -12,41 +12,18 @@ enum rpc_call_type {
 	RPC_POSTCALL
 };
 
-enum rpc_type {
-	RPC_VOID,
-	RPC_PTR,
-	RPC_INT,
-	RPC_UINT,
-	RPC_STR
+struct rpc_control_header {
+	pid_t pid;
+	pthread_t tid;
 };
 
-enum rpc_inout {
-	RPC_INPARAM,
-	RPC_OUTPARAM,
-	RPC_INOUTPARAM
-};
-
-union rpc_value {
-	void *ptr;
-	int sint;
-	size_t size_t;
-	ssize_t ssize_t;
-	const char *str;
-	pid_t pid_t;
-};
-
-struct rpc_call_header {
+struct call_header {
 	enum rpc_call_type call_type;
 	enum rpc_function_id function_id;
 };
 
-struct rpc_redirect_header {
-	int redirect;
-	int complete;
-};
+int rpc_sockfd(void);
 
-void rpc_send(struct msghdr *msg);
-void rpc_recv(struct msghdr *msg);
+int do_rpc(struct msghdr *send_msg, struct msghdr *recv_msg);
 
 #endif
-

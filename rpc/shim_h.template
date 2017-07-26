@@ -4,9 +4,9 @@
 
 #include "../config.h"
 
-[[#headers]]
-#include <[[header]]>
-[[/headers]]
+#include <dirent.h>
+#include <stdio.h>
+#include <sys/types.h>
 
 enum rpc_function_id {
 	[[#functions]]
@@ -15,19 +15,58 @@ enum rpc_function_id {
 };
 [[#functions]]
 
-struct rpc_[[name]] {
-	[[^is_void]]
-	[[rpctype]] rval;
-	[[/is_void]]
+struct precall_[[fname]] {
+	[[#num_params]]
 	struct {
 		[[#params]]
-		[[rpctype]][[spacing]][[name]];
+		[[cpre]][[pname]];
 		[[/params]]
 	} args;
+	[[/num_params]]
+	[[^num_params]]
+	char unused;
+	[[/num_params]]
 };
 
-typedef [[type]](*rtr_[[name]]_t)([[#params]][[type]][[spacing]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]]);
-extern rtr_[[name]]_t real_[[name]];
+struct postcall_[[fname]] {
+	[[#post]]
+	[[cpost]]result;
+	[[/post]]
+	int _errno;
+	[[#num_params]]
+	struct {
+		[[#params]]
+		[[cpost]][[pname]];
+		[[/params]]
+	} args;
+	[[/num_params]]
+};
+
+struct precall_redirect_[[fname]] {
+	struct precall_[[fname]] *precall_redirect;
+	struct postcall_[[fname]] *postcall_redirect;
+};
+
+typedef [[ctype]](*rtr_[[fname]]_t)([[#params]][[ctype]][[pname]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]]);
+extern rtr_[[fname]]_t real_[[fname]];
 [[/functions]]
+
+union rpc_precall {
+	[[#functions]]
+	struct precall_[[fname]] precall_[[fname]];
+	[[/functions]]
+};
+
+union rpc_postcall {
+	[[#functions]]
+	struct postcall_[[fname]] postcall_[[fname]];
+	[[/functions]]
+};
+
+union rpc_precall_redirect {
+	[[#functions]]
+	struct precall_redirect_[[fname]] precall_redirect_[[fname]];
+	[[/functions]]
+};
 
 #endif

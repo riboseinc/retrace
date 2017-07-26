@@ -2,11 +2,14 @@
 #include "config.h"
 #include <dlfcn.h>
 #include <sys/socket.h>
+#include <error.h>
+#include <errno.h>
+#include <string.h>
+#include <stdarg.h>
+
 #include "shim.h"
 #include "rpc.h"
-#include <error.h>
-
-static int g_inrpc;
+#include "fixups.h"
 
 #ifdef __APPLE__
 struct interpose {
@@ -14,139 +17,238 @@ struct interpose {
 	const void *replacee;
 };
 #else
-__attribute__((regparm (3))) extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
+__attribute__((regparm (3))) extern void *_dl_sym(void *handle,
+	const char *symbol, const void *rtraddr);
 #endif
 
+#define C_cstring_TO_RPC_buffer(r, c) (r.address = (void *)c)
+#define C_cstring_TO_RPC_pvoid(r, c) (r = (void *)c)
+#define C_cstring_TO_RPC_string(r, c) (r = (char *)c)
+#define C_dir_TO_RPC_dir(r, c) do {					\
+	r.address = c;							\
+	r.fd = c ? real_dirfd(c) : -1;					\
+	} while (0)
+#define C_dir_TO_RPC_pvoid(r, c) (r = c)
+#define C_dirent_TO_RPC_pvoid(r, c) (r = c)
+#define C_dirent_TO_RPC_buffer(r, c) (r.address = c)
+#define C_file_TO_RPC_file(r, c) do {					\
+	r.address = c;							\
+	r.fd = c ? real_fileno(c) : -1;					\
+	} while (0)
+#define C_file_TO_RPC_pvoid(r, c) (r = (void *)c)
+#define C_int_TO_RPC_char(r, c) (r = c)
+#define C_int_TO_RPC_int(r, c) (r = c)
+#define C_pcvoid_TO_RPC_buffer(r, c) (r.address = (void *)c)
+#define C_pcvoid_TO_RPC_pvoid(r, c) (r = (void *)c)
+#define C_pdirent_TO_RPC_pvoid(r, c) (r = c)
+#define C_pid_t_TO_RPC_pid_t(r, c) (r = c)
+#define C_pvoid_TO_RPC_buffer(r, c) (r.address = c)
+#define C_pvoid_TO_RPC_pvoid(r, c) (r = c)
+#define C_size_t_TO_RPC_size_t(r, c) (r = c)
+#define C_ssize_t_TO_RPC_ssize_t(r, c) (r = c)
+#define C_string_TO_RPC_buffer(r, c) (r.address = c)
+#define C_string_TO_RPC_pvoid(r, c) (r = c)
+#define C_string_TO_RPC_string(r, c) (r = c)
+#define C_va_list_TO_RPC_pvoid(r, c) (r = c)
+
+#define RPC_buffer_TO_C_cstring(c, r) (c = r.address)
+#define RPC_buffer_TO_C_dirent(c, r) (c = r.address)
+#define RPC_buffer_TO_C_pcvoid(c, r) (c = r.address)
+#define RPC_buffer_TO_C_pvoid(c, r) (c = r.address)
+#define RPC_buffer_TO_C_string(c, r) (c = r.address)
+#define RPC_char_TO_C_int(c, r) (c = r)
+#define RPC_dir_TO_C_dir(c, r) (c = r.address)
+#define RPC_file_TO_C_file(c, r) (c = r.address)
+#define RPC_int_TO_C_int(c, r) (c = r)
+#define RPC_pid_t_TO_C_pid_t(c, r) (c = r)
+#define RPC_pvoid_TO_C_cstring(c, r) (c = r)
+#define RPC_pvoid_TO_C_dir(c, r) (c = r)
+#define RPC_pvoid_TO_C_dirent(c, r) (c = r)
+#define RPC_pvoid_TO_C_file(c, r) (c = r)
+#define RPC_pvoid_TO_C_pcvoid(c, r) (c = r)
+#define RPC_pvoid_TO_C_pdirent(c, r) (c = r)
+#define RPC_pvoid_TO_C_pvoid(c, r) (c = r)
+#define RPC_pvoid_TO_C_string(c, r) (c = r)
+#define RPC_pvoid_TO_C_va_list(c, r) (c = r)
+#define RPC_size_t_TO_C_size_t(c, r) (c = r)
+#define RPC_ssize_t_TO_C_ssize_t(c, r) (c = r)
+#define RPC_string_TO_C_cstring(c, r) (c = r)
+#define RPC_string_TO_C_string(c, r) (c = r)
+
+#define IOVEC_buffer(p) {p.address, p.len}
+#define IOVEC_char IOVEC_none
+#define IOVEC_dir IOVEC_none
+#define IOVEC_file IOVEC_none
+#define IOVEC_int IOVEC_none
+#define IOVEC_pid_t IOVEC_none
+#define IOVEC_pvoid IOVEC_none
+#define IOVEC_size_t IOVEC_none
+#define IOVEC_ssize_t IOVEC_none
+#define IOVEC_string(p) {p, p ? real_strlen(p) + 1 : 0}
+#define IOVEC_none(p) {0, 0}
 [[#functions]]
 
-static [[type]]
-struct_rpc_[[name]]_to_args(const struct rpc_[[name]] *p[[#params]][[#out]], [[type]] *[[name]][[/out]][[/params]])
+static struct precall_redirect_[[fname]] *
+precall_redirect_[[fname]](const struct precall_[[fname]] *in, struct precall_redirect_[[fname]] *redirect)
 {
-	return [[^is_void]]p->rval[[/is_void]];
-}
-
-static void
-struct_rpc_[[name]]_send(enum rpc_call_type call_type, const struct rpc_[[name]] *p)
-{
-	int extra_size = 0;
-	struct rpc_call_header header = {call_type, [[enum]]};
-	struct iovec iov[] = {
-		{&header, sizeof(struct rpc_call_header)}
-		, {(void *)p, sizeof(struct rpc_[[name]])}
+	struct call_header call_header = {RPC_PRECALL, [[enum]]};
+	struct iovec send_iov[] = {
+		{&call_header, sizeof(struct call_header)}
+		, {(void *)in, sizeof(struct precall_[[fname]])}
 		[[#params]]
-		[[#is_string]]
-		, {p->args.[[name]], real_strlen(p->args.[[name]]) + 1}
-		[[/is_string]]
+		, IOVEC_[[pre]](in->args.[[pname]])
 		[[/params]]
-		[[#is_string]]
-		, {p->rval, real_strlen(p->rval) + 1}
-		[[/is_string]]
 	};
-	struct msghdr msg = {NULL, 0, iov, sizeof(iov) / sizeof(struct iovec), NULL, 0, 0};
+	struct iovec recv_iov[] = {
+		{redirect, sizeof(struct precall_redirect_[[fname]])}
+	};
+	struct msghdr send_msg = {NULL, 0, send_iov, 2 + [[num_params]][[^num_params]]0[[/num_params]], NULL, 0, 0};
+	struct msghdr recv_msg = {NULL, 0, recv_iov, 1, NULL, 0, 0};
 
-	[[#params]]
-	[[/params]]
+	if (!do_rpc(&send_msg, &recv_msg))
+		return NULL;
 
-	rpc_send(&msg);
+	return redirect;
 }
 
-static struct rpc_[[name]] *
-struct_rpc_[[name]]_recv(int *complete)
+static struct postcall_[[fname]] **
+postcall_redirect_[[fname]](const struct postcall_[[fname]] *real, struct postcall_[[fname]] **post)
 {
-	struct rpc_[[name]] p;
-	struct rpc_redirect_header header;
-	struct iovec iov[] = {
-		{&header, sizeof(struct rpc_redirect_header)},
-		{(void *)&p, sizeof(struct rpc_[[name]])}
+	struct call_header call_header = {RPC_POSTCALL, [[enum]]};
+	struct iovec send_iov[] = {
+		{&call_header, sizeof(struct call_header)}
+		, {(void *)real, sizeof(struct postcall_[[fname]])}
+		[[#params]]
+		, IOVEC_[[post]](real->args.[[pname]])
+		[[/params]]
+		[[#post]]
+		, IOVEC_[[post]](real->result)
+		[[/post]]
 	};
-	struct msghdr msg = {NULL, 0, iov, 2, NULL, 0, 0};
+	struct iovec recv_iov[] = {
+		{post, sizeof(post)}
+	};
+	struct msghdr send_msg = {NULL, 0, send_iov, 2 + [[num_params]][[^num_params]]0[[/num_params]][[#post]] + 1[[/post]], NULL, 0, 0};
+	struct msghdr recv_msg = {NULL, 0, recv_iov, 1, NULL, 0, 0};
 
-	header.redirect = 0;
-	header.complete = 0;
+	if (!do_rpc(&send_msg, &recv_msg))
+		return NULL;
 
-	rpc_recv(&msg);
-	if (header.redirect) {
-	}
-
-	if (complete)
-		*complete = header.complete;
-
-	return NULL;
+	return post;
 }
 
-[[type]]
+[[ctype]]
 #ifdef __APPLE__
-retrace_impl_[[name]]([[#params]][[type]][[spacing]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
+retrace_impl_[[fname]]([[#params]][[ctype]][[pname]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
 #else
-([[name]])([[#params]][[type]][[spacing]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
+([[fname]])([[#params]][[ctype]][[pname]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
 #endif
 {
-	struct rpc_[[name]] in, *pre, real, *post;
-	int complete;
+	struct precall_[[fname]] in, *pre;
+	struct postcall_[[fname]] real, *post = NULL;
+	struct precall_redirect_[[fname]] redirect;
+	int _errno;
 	[[#variadic]]
 	va_list ap;
 	[[/variadic]]
-	[[^is_void]]
-	[[type]] rval;
-	[[/is_void]]
+	[[#post]]
+	[[ctype]]_result;
+	[[/post]]
 
 	[[#params]]
-	in.args.[[name]] = ([[rpctype]])[[name]];
+	C_[[type]]_TO_RPC_[[pre]](in.args.[[pname]], [[pname]]);
+	[[/params]]
+	[[#params]]
+	[[#prefixup]]
+	precall_[[fname]]_[[pname]]_fixup(&in);
+	[[/prefixup]]
 	[[/params]]
 
-	struct_rpc_[[name]]_send(RPC_PRECALL, &in);
-	pre = struct_rpc_[[name]]_recv(&complete);
-	if (complete) {
-		[[^is_void]]rval = [[/is_void]]struct_rpc_[[name]]_to_args(pre[[#params]][[#out]], &name[[/out]][[/params]]);
-		real_free(pre);
-		return[[^is_void]] rval[[/is_void]];
-	}
+	_errno = errno;
 
-	real = (pre == NULL ? in : *pre);
-	[[^variadic]]
-	[[^is_void]]real.rval = [[/is_void]]real_[[name]]([[#params]]real.args.[[name]][[^last]], [[/last]][[/params]]);
-	[[/variadic]]
+	real_memset(&redirect, 0, sizeof(redirect));
+	precall_redirect_[[fname]](&in, &redirect);
+
+	pre = redirect.precall_redirect;
+	if (pre) {
+		[[#params]]
+		RPC_[[pre]]_TO_C_[[type]]([[pname]], pre->args.[[pname]]);
+		[[/params]]
+	}
+	errno = _errno;
+
 	[[#variadic]]
-	va_start(ap, [[start]]);
-	[[^is_void]]real.rval = [[/is_void]][[va_fn]][[name]]([[#params]]real.args.[[name]], [[/params]]ap);
+	va_start(ap, [[last_param]]);
+	[[#post]]_result = [[/post]][[variadic]]([[#params]][[pname]], [[/params]]ap);
 	va_end(ap);
 	[[/variadic]]
+	[[^variadic]]
+	[[#post]]_result = [[/post]]real_[[fname]]([[#params]][[pname]][[^last]], [[/last]][[/params]]);
+	[[/variadic]]
 
-	struct_rpc_[[name]]_send(RPC_POSTCALL, &in);
-	post = struct_rpc_[[name]]_recv(NULL);
-	[[^is_void]]rval = [[/is_void]]struct_rpc_[[name]]_to_args(post ? post : &real[[#params]][[#out]], &name[[/out]][[/params]]);
+	real._errno = errno;
+	[[#params]]
+	C_[[type]]_TO_RPC_[[post]](real.args.[[pname]], [[pname]]);
+	[[/params]]
+	[[#post]]
+	C_[[type]]_TO_RPC_[[post]](real.result, _result);
+	[[/post]]
+
+	[[#params]]
+	[[#postfixup]]
+	postcall_[[fname]]_[[pname]]_fixup(&real);
+	[[/postfixup]]
+	[[/params]]
+	[[#fixup]]
+	postcall_[[fname]]_fixup(&real);
+	[[/fixup]]
+
+	postcall_redirect_[[fname]](&real, &post);
+
+	if (post) {
+		[[#params]]
+		RPC_[[post]]_TO_C_[[type]]([[pname]], post->args.[[pname]]);
+		[[/params]]
+		[[#post]]
+		RPC_[[post]]_TO_C_[[type]](_result, post->result);
+		[[/post]]
+	}
+
+	errno = (post == NULL ? real._errno : post->_errno);
+
 	real_free(pre);
 	real_free(post);
-	return[[^is_void]] rval[[/is_void]];
+
+	return[[#post]] _result[[/post]];
 }
 
 #ifdef __APPLE__
-static struct interpose _interpose_[[name]] __attribute__((used, section("__DATA,__interpose"))) = {
-	(const void *)(unsigned long)&retrace_impl_[[name]],
-	(const void *)(unsigned long)&[[name]]
+static struct interpose _interpose_[[fname]] __attribute__((used, section("__DATA,__interpose"))) = {
+	(const void *)(unsigned long)&retrace_impl_[[fname]],
+	(const void *)(unsigned long)&[[fname]]
 };
-rtr_[[name]]_t real_[[name]] = [[name]];
+rtr_[[fname]]_t real_[[fname]] = [[fname]];
 #else
-[[type]]
-rtr_fixup_[[name]]([[#params]][[type]][[spacing]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
+[[ctype]]
+rtr_fixup_[[fname]]([[#params]][[ctype]][[pname]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
 {
-	void *fn = _dl_sym(RTLD_NEXT, "[[name]]", rtr_fixup_[[name]]);
+	void *fn = _dl_sym(RTLD_NEXT, "[[fname]]", rtr_fixup_[[fname]]);
 #ifdef HAVE_ATOMIC_BUILTINS
-	__atomic_store_n(&real_[[name]], fn, __ATOMIC_RELAXED);
+	__atomic_store_n(&real_[[fname]], fn, __ATOMIC_RELAXED);
 #else
-	real_[[name]] = fn;
+	real_[[fname]] = fn;
 #endif
 	[[^variadic]]
-	[[^is_void]]return [[/is_void]]real_[[name]]([[#params]][[name]][[^last]], [[/last]][[/params]]);
+	[[#post]]return [[/post]]real_[[fname]]([[#params]][[pname]][[^last]], [[/last]][[/params]]);
 	[[/variadic]]
 	[[#variadic]]
 	va_list ap;
-	va_start(ap, [[start]]);
-	[[^is_void]][[type]] ret = [[/is_void]][[function]]([[#params]][[name]], [[/params]]ap);
+	va_start(ap, [[last_param]]);
+	[[#post]][[ctype]]ret = [[/post]][[variadic]]([[#params]][[pname]], [[/params]]ap);
 	va_end(ap);
-	return[[^is_void]] ret[[/is_void]];
+	return[[#post]] ret[[/post]];
 	[[/variadic]]
 }
-__attribute__((visibility("hidden"))) rtr_[[name]]_t real_[[name]] = rtr_fixup_[[name]];
+__attribute__((visibility("hidden"))) rtr_[[fname]]_t real_[[fname]] = rtr_fixup_[[fname]];
 #endif
 [[/functions]]

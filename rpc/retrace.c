@@ -1,109 +1,39 @@
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <error.h>
-#include <string.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/wait.h>
+/*
+ * Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
-#include "rpc.h"
-#include "inspect.h"
+#include "../config.h"
 
-static int g_sockfd;
+#include "frontend.h"
 
 int main(int argc, char **argv)
 {
-	char **exec_args;
-	int i, pid, t;
-	char buf[100];
-	int sv[2];
-	int n;
-	struct rpc_redirect_header rh;
-	struct rtr_call_info *info;
-	struct rtr_arg_info *parg;
+	struct retrace_handle *trace_handle;
 
-	if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sv))
-		error(1, 0, "Unable to create socketpair.");
+	trace_handle = retrace_start(&argv[1]);
 
-	pid = fork();
-	if (pid == 0) {
-		/* make a copy of args for execv */
-		exec_args = alloca(argc * sizeof(char *));
-		for (i = 1; i < argc; i++)
-			exec_args[i-1] = argv[i];
-		exec_args[i] = NULL;
+	retrace_trace(trace_handle);
 
-		close(sv[0]);
-
-		sprintf(buf, "%d", sv[1]);
-		setenv("RTR_SOCKFD", buf, 1);
-		putenv("LD_PRELOAD=.libs/libretracerpc.so");
-
-		execv(exec_args[0], exec_args);
-		error(1, 0, "exec failed %d %s", errno, strerror(errno));
-	} else {
-		g_sockfd = sv[0];
-		close(sv[1]);
-
-		if (recv(g_sockfd, buf, 100, 0) == 0)
-			error(1, 0, "Failed to trace program");
-
-		if (memcmp(buf, rpc_version, 32) != 0)
-			error(1, 0, "Version mismatch");
-
-		for (;;) {
-			if (recv(g_sockfd, buf, 100, 0) == 0) {
-				waitpid(pid, NULL, 0);
-				break;
-			}
-			if (((struct rpc_call_header *)buf)->call_type == RPC_POSTCALL) {
-				info = rtr_get_call_info(((struct rpc_call_header *)buf)->function_id, buf + sizeof(struct rpc_call_header));
-				printf("%s(", info->name);
-				for (parg = info->args; parg->name; ++parg) {
-					switch (parg->rpctype) {
-					case RPC_INT:
-						printf("%d", parg->value);
-						break;
-					case RPC_UINT:
-						printf("%u", parg->value);
-						break;
-					case RPC_PTR:
-						printf("%p", parg->value);
-						break;
-					case RPC_STR:
-						printf("\"%s\"", parg->value);
-						break;
-					}
-					if (parg[1].name)
-						printf(", ");
-				}
-				printf(") = ");
-				switch (info->rpctype) {
-				case RPC_VOID:
-					printf("void\n");
-					break;
-				case RPC_INT:
-					printf("%d\n", info->result);
-					break;
-				case RPC_UINT:
-					printf("%u\n", info->result);
-					break;
-				case RPC_PTR:
-					printf("%p\n", info->result);
-					break;
-				case RPC_STR:
-					printf("\"%s\"\n", info->result);
-					break;
-				}
-				free(info);
-			}
-			((struct rpc_redirect_header *)buf)->complete = 0;
-			((struct rpc_redirect_header *)buf)->redirect = 0;
-			send(g_sockfd, buf, sizeof(struct rpc_redirect_header), 0);
-		}
-	}
+	retrace_close(trace_handle);
 }
-

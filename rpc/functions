@@ -1,124 +1,144 @@
+function getenv string
+parameter name string
+
 function closedir int
-parameter in dirp DIR *
+parameter dirp dir dir pvoid
 
 function dirfd int
-parameter in dirp DIR *
+parameter dirp dir
 
 function fclose int
-parameter in stream FILE *
+parameter stream file file pvoid
 
-function fdopendir DIR *
-parameter in fd int
+function fdopendir dir
+parameter fd int
 
 function fileno int
-parameter in stream FILE *
+parameter stream file
 
-function fopen FILE *
-parameter in path const char *
-parameter in mode const char *
+function fopen file
+parameter path cstring string
+parameter mode cstring string
 
 function fprintf int
-parameter in stream FILE *
-parameter in format const char *
+parameter stream file
+parameter format cstring string
 variadic real_vfprintf
 
 function free void
-parameter in ptr void *
-
-function getenv char *
-parameter in name const char *
+parameter ptr pvoid
 
 function getpid pid_t
 
 function _IO_putc int
-parameter in c int
-parameter in stream FILE *
+parameter c int char
+parameter stream file
 
-function malloc void *
-parameter in size size_t
+function malloc pvoid
+parameter size size_t
 
-function realloc void *
-parameter in ptr void *
-parameter in size size_t
+function realloc pvoid
+parameter ptr pvoid
+parameter size size_t
 
-function opendir DIR *
-parameter in dir const char *
+function opendir dir
+parameter dir cstring string
 
 function putc int
-parameter in c int
-parameter in stream FILE *
+parameter c int char
+parameter stream file
 
 function readdir_r int
-parameter in dirp DIR *
-parameter out entry struct dirent *
-parameter out result struct dirent **
+parameter dirp dir
+parameter entry dirent pvoid buffer
+parameter result pdirent pvoid
 
 function read ssize_t
-parameter in fd int
-parameter out buf void *
-parameter in count size_t
+parameter fd int
+parameter buf pvoid pvoid buffer
+parameter count size_t
 
 function sprintf int
-parameter out str char *
-parameter in format const char *
+parameter str string pvoid string
+parameter format cstring string
 variadic real_vsprintf
 
 function vsprintf int
-parameter out str char *
-parameter in format const char *
-parameter in ap va_list
+parameter str string pvoid string
+parameter format cstring string
+parameter ap va_list pvoid
 
 function sscanf int
-parameter in str const char *
-parameter in format const char *
-variadic vsscanf
+parameter str cstring string
+parameter format cstring string
+variadic real_vsscanf
 
-function strcat char *
-parameter inout dest char *
-parameter in src const char *
+function strcat string
+parameter dest string
+parameter src cstring string
 
-function strchr char *
-parameter in s const char *
-parameter in c int
+function strchr string
+parameter s cstring string
+parameter c int char
 
-function strstr char *
-parameter in haystack const char *
-parameter in needle const char *
+function strstr string
+parameter haystack cstring string
+parameter needle cstring string
 
 function strcmp int
-parameter in s1 const char *
-parameter in s2 const char *
+parameter s1 cstring string
+parameter s2 cstring string
 
-function strcpy char *
-parameter out dest char *
-parameter in src const char *
+function strcpy string
+parameter dest string pvoid string
+parameter src cstring string
+
+function strncpy string buffer
+parameter dest string pvoid buffer
+parameter src cstring buffer
+parameter n size_t
 
 function strlen size_t
-parameter in s const char *
+parameter s cstring string
 
-function tolower int
-parameter in c int
+function tolower int char
+parameter c int char
 
-function toupper int
-parameter in c int
+function toupper int char
+parameter c int char
 
 function vfprintf int
-parameter in stream FILE *
-parameter in format const char *
-parameter in ap va_list
+parameter stream file
+parameter format cstring string
+parameter ap va_list pvoid
 
 function vsnprintf int
-parameter out str char *
-parameter in size size_t
-parameter in format const char *
-parameter in ap va_list
+parameter str string pvoid string
+parameter size size_t
+parameter format cstring string
+parameter ap va_list pvoid
 
 function vsscanf int
-parameter in str const char *
-parameter in format const char *
-parameter in ap va_list
+parameter str cstring string
+parameter format cstring string
+parameter ap va_list pvoid
 
 function write ssize_t
-parameter in fd int
-parameter in buf const void *
-parameter in count size_t
+parameter fd int
+parameter buf pcvoid buffer
+parameter count size_t
+
+function memmove pvoid
+parameter dest pvoid pvoid buffer
+parameter src pcvoid buffer
+parameter n size_t
+
+function memcpy pvoid
+parameter dest pvoid pvoid buffer
+parameter src pcvoid buffer
+parameter n size_t
+
+function memset pvoid
+parameter s pvoid
+parameter c int char
+parameter n size_t
