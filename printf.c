@@ -409,3 +409,29 @@ RETRACE_IMPLEMENTATION(vsnprintf)(char *str, size_t size, const char *fmt, va_li
 }
 
 RETRACE_REPLACE(vsnprintf, int, (char *str, size_t size, const char *fmt, va_list ap), (str, size, fmt, ap))
+
+int RETRACE_IMPLEMENTATION(puts)(const char *str)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
+	void *parameter_values[] = {&str};
+	int ret;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "puts";
+	event_info.function_group = RTR_FUNC_GRP_SYS;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+	retrace_log_and_redirect_before(&event_info);
+
+	ret = real_puts(str);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return ret;
+}
+
+RETRACE_REPLACE(puts, int, (const char *str), (str))
