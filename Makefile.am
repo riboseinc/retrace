@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS= test
+SUBDIRS= test tools
 
 lib_LTLIBRARIES= libretrace.la
 libretrace_la_LDFLAGS= -no-undefined -avoid-version
