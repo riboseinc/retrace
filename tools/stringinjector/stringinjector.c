@@ -415,7 +415,7 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
 
 	/* parse count */
 	count = strtol(count_str, NULL, 10);
-	if (count < LONG_MIN || count > LONG_MAX) {
+	if (count == LONG_MIN || count == LONG_MAX) {
 		fprintf(stderr, "Invalid count value(%s)\n", count_str);
 		return;
 	}
