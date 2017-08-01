@@ -20,7 +20,7 @@ LT_INIT
 AC_ENABLE_SHARED
 AC_ENABLE_STATIC(no)
 
-AC_PREFIX_DEFAULT([/usr])
+AC_PREFIX_DEFAULT([/usr/local])
 
 AC_SEARCH_LIBS(socket, [socket network])
 AC_SEARCH_LIBS(dlopen, [dl])
