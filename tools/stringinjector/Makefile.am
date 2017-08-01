@@ -1,3 +1,3 @@
 
-bin_PROGRAMS = stringinjector
-stringinjector_SOURCES = stringinjector.c
+bin_PROGRAMS = stringinject
+stringinject_SOURCES = stringinjector.c
