@@ -63,8 +63,8 @@ static void print_help(void)
 		"[options]:\n"
 		"\tType1: [input file] [output file template] -h [position]\n"
 		"\tType2: [input file] [output file template] -h [position1,position2]\n"
-		"\tType3: [input file] [output file template] -f [position] [count]\n"
-		"\tType4: [input file] [output file template] -o [position] [len]\n"
+		"\tType3: [input file] [output file] -f [position] [count]\n"
+		"\tType4: [input file] [output file] -o [position] [len]\n"
 		"\tType5: [input file] [output file template] -i [position] [file which has inject lines]\n");
 
 	exit(1);
