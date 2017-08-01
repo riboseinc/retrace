@@ -214,19 +214,46 @@ static void write_dst_file(FILE *fp, void *buffer, size_t size)
 }
 
 /*
- * inject buffer
+ * inject single hex
  */
 
-static void inject_buffer(FILE *fp, void *buffer, size_t buffer_len, off_t offset, void *inject_buffer, size_t inject_len)
+static void inject_single_hex(FILE *fp, void *buffer, size_t buffer_len, off_t offset, char inject)
 {
 	/* write offset bytes */
-	write_dst_file(fp, buffer, offset);
+	if (offset > 0)
+		write_dst_file(fp, buffer, offset);
 
 	/* inject hex value */
-	write_dst_file(fp, inject_buffer, inject_len);
+	write_dst_file(fp, &inject, 1);
 
 	/* write remain bytes */
-	write_dst_file(fp, buffer + offset, buffer_len - offset);
+	if ((buffer_len - offset - 1) > 0)
+		write_dst_file(fp, buffer + offset + 1, buffer_len - offset - 1);
+}
+
+/*
+ * inject multiple hex values
+ */
+
+static void inject_multiple_hex(FILE *src_fp, FILE *dst_fp, void *buffer, size_t read_total, size_t read_len,
+	void *inject, size_t inject_len, off_t pos)
+{
+	size_t offset = read_len - (read_total - pos);
+
+	/* write offset bytes */
+	if (offset > 0)
+		write_dst_file(dst_fp, buffer, offset);
+
+	/* write inject buffer */
+	write_dst_file(dst_fp, inject, inject_len);
+
+	/* write remain data */
+	if (read_len - offset > inject_len)
+		write_dst_file(dst_fp, buffer + offset + inject_len, read_len - offset - inject_len);
+	else {
+		/* seek file position */
+		fseek(src_fp, inject_len - (read_total - pos), SEEK_CUR);
+	}
 }
 
 /*
@@ -273,15 +300,13 @@ static void str_inject_func_t1(const char *src_fpath, const char *dst_fpath_temp
 			read_bytes = fread(buffer, 1, MAX_BUF_LEN, fp);
 
 			read_total += read_bytes;
-			if (read_total < pos || inject_completed) {
+			if (read_total <= pos || inject_completed) {
 				write_dst_file(dst_fp, buffer, read_bytes);
 			} else {
-				char inject[2];
 				off_t offset = read_bytes - (read_total - pos);
 
 				/* inject single hex value */
-				inject[0] = i;
-				inject_buffer(dst_fp, buffer, read_bytes, offset, inject, 1);
+				inject_single_hex(dst_fp, buffer, read_bytes, offset, i);
 
 				/* set flag for inject completion */
 				inject_completed = 1;
@@ -342,13 +367,11 @@ static void str_inject_func_t2(const char *src_fpath, const char *dst_fpath_temp
 				size_t read_bytes;
 				unsigned char buffer[MAX_BUF_LEN];
 
-				char inject[2];
-
 				/* read buffer from file */
 				read_bytes = fread(buffer, 1, MAX_BUF_LEN, fp);
 
 				read_total += read_bytes;
-				if (read_total < pos1 || inject_completed2 || (inject_completed1 && read_total < pos2)) {
+				if (read_total <= pos1 || inject_completed2 || (inject_completed1 && read_total <= pos2)) {
 					write_dst_file(dst_fp, buffer, read_bytes);
 				} else if (!inject_completed1 && (read_total > pos1 && read_total > pos2)) {
 					off_t offset1, offset2;
@@ -357,12 +380,10 @@ static void str_inject_func_t2(const char *src_fpath, const char *dst_fpath_temp
 					offset2 = read_bytes - (read_total - pos2);
 
 					/* inject hex value into position 1 */
-					inject[0] = i;
-					inject_buffer(dst_fp, buffer, offset2, offset1, inject, 1);
+					inject_single_hex(dst_fp, buffer, offset2, offset1, i);
 
 					/* inject hex value into position 2 */
-					inject[0] = j;
-					inject_buffer(dst_fp, buffer + offset2, read_bytes - offset2, 0, inject, 1);
+					inject_single_hex(dst_fp, buffer + offset2, read_bytes - offset2, 0, j);
 
 					inject_completed2 = 1;
 				} else {
@@ -372,8 +393,7 @@ static void str_inject_func_t2(const char *src_fpath, const char *dst_fpath_temp
 					offset = read_bytes - (read_total - pos);
 
 					/* inject hex value into position */
-					inject[0] = (read_total > pos2) ? j : i;
-					inject_buffer(dst_fp, buffer, read_bytes, offset, inject, 1);
+					inject_single_hex(dst_fp, buffer, read_bytes, offset, (read_total > pos2) ? j : i);
 
 					if (read_total > pos2)
 						inject_completed2 = 1;
@@ -404,10 +424,15 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
 	FILE *fp, *dst_fp;
 	off_t pos;
 
+	off_t src_fsize;
+
 	size_t read_total = 0;
 	int inject_completed = 0;
 
-	int count;
+	char *inject;
+	int i, count;
+
+	size_t total_inject_bytes = 0;
 
 	/* parse position param */
 	if (parse_position_param(pos_str, src_fpath, &pos) != 0)
@@ -420,10 +445,31 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
 		return;
 	}
 
+	total_inject_bytes = inject_format ? count * 2 : count;
+
+	src_fsize = get_fsize(src_fpath);
+	if (src_fsize < (pos + total_inject_bytes))
+		total_inject_bytes = src_fsize - pos;
+
+	/* set inject string */
+	inject = (char *) malloc(total_inject_bytes + 1);
+	if (!inject) {
+		fprintf(stderr, "Out of memory!\n");
+		return;
+	}
+
+	for (i = 0; i < total_inject_bytes; i++) {
+		if (inject_format)
+			inject[i] = i % 2 ? 's' : '%';
+		else
+			inject[i] = INJECT_STR_CHAR;
+	}
+
 	/* open source file */
 	fp = open_file(src_fpath, 1);
 	if (!fp) {
 		fprintf(stderr, "Couln't open file '%s'\n", src_fpath);
+		free(inject);
 		return;
 	}
 
@@ -431,6 +477,7 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
 	dst_fp = open_file(dst_fpath, 0);
 	if (!dst_fp) {
 		fclose(fp);
+		free(inject);
 		return;
 	}
 
@@ -442,39 +489,16 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
 		read_bytes = fread(buffer, 1, MAX_BUF_LEN, fp);
 
 		read_total += read_bytes;
-		if (read_total < pos || inject_completed) {
+		if (read_total <= pos || inject_completed) {
 			write_dst_file(dst_fp, buffer, read_bytes);
 		} else {
-			char *inject;
-			int i;
-
-			off_t offset = read_bytes - (read_total - pos);
-
-			/* set inject string */
-			if (inject_format) {
-				inject = (char *) malloc(count * 2 + 1);
-				if (!inject)
-					break;
-
-				for (i = 0; i < count; i++)
-					strncpy(&inject[i * 2], "%s", 2);
-			} else {
-				inject = (char *) malloc(count + 1);
-				if (!inject)
-					break;
-
-				for (i = 0; i < count; i++)
-					inject[i] = INJECT_STR_CHAR;
-			}
-
-			/* inject single hex value */
-			inject_buffer(dst_fp, buffer, read_bytes, offset, inject, inject_format ? 2 * count : count);
-
-			/* set flag for inject completion */
-			inject_completed = 1;
+			/* inject multiple hex values */
+			inject_multiple_hex(fp, dst_fp, buffer, read_total, read_bytes, inject, total_inject_bytes, pos);
 
 			/* free inject buffer */
 			free(inject);
+
+			inject_completed = 1;
 		}
 
 	}
@@ -498,6 +522,8 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 	char inject_line[MAX_LINE_LEN + 1];
 	int inject_fcount = 0;
 
+	off_t src_fsize;
+
 	/* parse position param */
 	if (parse_position_param(pos_str, src_fpath, &pos) != 0)
 		return;
@@ -508,6 +534,8 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 		fprintf(stderr, "Couln't open file '%s'\n", src_fpath);
 		return;
 	}
+
+	src_fsize = get_fsize(src_fpath);
 
 	/* open file which has inject lines */
 	inject_fp = open_file(inject_fpath, 1);
@@ -525,6 +553,8 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 		size_t read_total = 0;
 		int inject_completed = 0;
 
+		size_t inject_len;
+
 		/* remove end line */
 		if (strstr(inject_line, "/r/n"))
 			inject_line[strlen(inject_line) - 2] = '\0';
@@ -532,8 +562,12 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 			inject_line[strlen(inject_line) - 1] = '\0';
 
 		/* check line length */
-		if (strlen(inject_line) == 0)
+		inject_len = strlen(inject_line);
+		if (inject_len == 0)
 			continue;
+
+		if (src_fsize < (pos + inject_len))
+			inject_len = src_fsize - pos;
 
 		/* open destination file */
 		snprintf(dst_fpath, sizeof(dst_fpath), "%s.%d", dst_fpath_templ, inject_fcount);
@@ -551,15 +585,12 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 			read_bytes = fread(buffer, 1, MAX_BUF_LEN, fp);
 
 			read_total += read_bytes;
-			if (read_total < pos || inject_completed) {
+			if (read_total <= pos || inject_completed) {
 				write_dst_file(dst_fp, buffer, read_bytes);
 			} else {
-				off_t offset = read_bytes - (read_total - pos);
+				/* inject multiple hex values */
+				inject_multiple_hex(fp, dst_fp, buffer, read_total, read_bytes, inject_line, inject_len, pos);
 
-				/* inject single hex value */
-				inject_buffer(dst_fp, buffer, read_bytes, offset, inject_line, strlen(inject_line));
-
-				/* set flag for inject completion */
 				inject_completed = 1;
 			}
 		}
