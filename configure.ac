@@ -297,5 +297,5 @@ if test "x$enable_profiling" = "xyes" ; then
 fi
 
 
-AC_CONFIG_FILES([Makefile test/Makefile])
+AC_CONFIG_FILES([Makefile test/Makefile tools/Makefile tools/stringinjector/Makefile])
 AC_OUTPUT
