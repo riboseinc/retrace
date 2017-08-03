@@ -44,6 +44,10 @@
 #include <lwp.h>
 #endif
 
+#if __OpenBSD__
+#include <amd64/spinlock.h>
+#endif
+
 #include <stdarg.h>
 #include <errno.h>
 #include <sys/queue.h>
@@ -96,8 +100,22 @@
 #define RTR_TRACE_DISABLED 2
 
 static int g_enable_tracing = RTR_TRACE_ENABLED;
+
+#ifdef __OpenBSD__
+/* This is only used in OpenBSD for now */
+#define RETRACE_MAX_THREAD 512
+
+struct thread_storage {
+	pthread_t thread_id;
+	int value;
+};
+
+_atomic_lock_t enabled_lock = _ATOMIC_LOCK_UNLOCKED;
+
+static struct thread_storage g_enable_tracing_array[RETRACE_MAX_THREAD];
+#else
 static pthread_key_t g_enable_tracing_key = -1;
-static pthread_once_t tracing_key_once = PTHREAD_ONCE_INIT;
+#endif
 
 static int g_init_rand;
 static unsigned int g_rand_seed;
@@ -129,6 +147,7 @@ static void trace_mode(mode_t mode, char *p);
 static void trace_printf_backtrace(void);
 
 static int rtr_check_logging_config(struct rtr_event_info *event_info, int stack_trace);
+static void initialize_tracing_key(void);
 
 /* Returns time as zero on the first call and in subsequents call
  * returns the time elapsed since the first called */
@@ -1121,7 +1140,19 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 static void
 initialize_tracing_key(void)
 {
+#ifndef __OpenBSD__
 	pthread_key_create(&g_enable_tracing_key, NULL);
+#endif
+}
+
+static void
+retrace_init_tracing_key(void)
+{
+#ifndef __OpenBSD__
+	static pthread_once_t tracing_key_once = PTHREAD_ONCE_INIT;
+
+	pthread_once(&tracing_key_once, initialize_tracing_key);
+#endif
 }
 
 static int
@@ -1136,17 +1167,82 @@ is_main_thread(void)
 #endif
 }
 
+static int
+get_tracing_state_thread()
+{
+#ifdef __OpenBSD__
+	int i;
+	int last_zero = -1;
+	int retval = -1;
+
+	while (_atomic_lock(&enabled_lock))
+		sched_yield();
+
+	for (i = 0; i < RETRACE_MAX_THREAD; i++) {
+		if (g_enable_tracing_array[i].thread_id == pthread_self()) {
+			retval = g_enable_tracing_array[i].value;
+			break;
+		} else if (last_zero == -1 && g_enable_tracing_array[i].thread_id == 0)
+			last_zero = i;
+	}
+
+	if (retval == -1 && last_zero != -1) {
+		g_enable_tracing_array[last_zero].thread_id = pthread_self();
+		g_enable_tracing_array[last_zero].value = RTR_TRACE_ENABLED;
+
+		retval = g_enable_tracing_array[last_zero].value;
+	}
+
+	enabled_lock = _ATOMIC_LOCK_UNLOCKED;
+
+	return retval == -1 ? RTR_TRACE_DISABLED : retval;
+
+#else
+	if (pthread_getspecific(g_enable_tracing_key) == NULL)
+		pthread_setspecific(g_enable_tracing_key, (void *) (size_t) RTR_TRACE_ENABLED);
+
+	return (int)(size_t) pthread_getspecific(g_enable_tracing_key);
+#endif
+}
+
+static void
+set_tracing_state_thread(int state)
+{
+#ifdef __OpenBSD__
+	int i;
+	int last_zero = -1;
+	int found = 0;
+
+	while (_atomic_lock(&enabled_lock))
+		sched_yield();
+
+	for (i = 0; i < RETRACE_MAX_THREAD; i++) {
+		if (g_enable_tracing_array[i].thread_id == pthread_self()) {
+			g_enable_tracing_array[i].value = state;
+			found = 1;
+			break;
+		} else if (last_zero == -1 && g_enable_tracing_array[i].thread_id == 0)
+			last_zero = i;
+	}
+
+	if (!found && last_zero != -1) {
+		g_enable_tracing_array[last_zero].thread_id = pthread_self();
+		g_enable_tracing_array[last_zero].value = state;
+	}
+
+	enabled_lock = _ATOMIC_LOCK_UNLOCKED;
+#else
+	pthread_setspecific(g_enable_tracing_key, state);
+#endif
+}
+
 int
 get_tracing_state()
 {
 	if (!is_main_thread()) {
-		pthread_once(&tracing_key_once, initialize_tracing_key);
+		retrace_init_tracing_key();
 
-		if (pthread_getspecific(g_enable_tracing_key) == NULL) {
-			pthread_setspecific(g_enable_tracing_key , (void *) (size_t) RTR_TRACE_ENABLED);
-		}
-
-		return (int)(size_t) pthread_getspecific(g_enable_tracing_key);
+		return get_tracing_state_thread();
 	}
 
 	return g_enable_tracing;
@@ -1164,7 +1260,7 @@ trace_restore(int old_state)
 	if (is_main_thread()) {
 		g_enable_tracing = old_state;
         } else {
-                pthread_setspecific(g_enable_tracing_key , (void *) (size_t) old_state);
+		set_tracing_state_thread(old_state);
         }
 }
 
