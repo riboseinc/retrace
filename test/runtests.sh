@@ -1,5 +1,6 @@
 #!/bin/sh
 
+../retrace ./exec
 ../retrace ./env
 ../retrace ./exit
 ../retrace ./file
@@ -23,4 +24,3 @@
 ../retrace ./trace
 ../retrace ./log
 ../retrace -f ../retrace.conf.example ./config
-../retrace ./exec
