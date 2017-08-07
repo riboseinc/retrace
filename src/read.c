@@ -24,6 +24,8 @@
  */
 
 #include "common.h"
+#include "strinject.h"
+
 #include "read.h"
 
 ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
@@ -64,6 +66,13 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 	ret = real_read(fd, buf, real_nbytes);
 	if (errno)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	else {
+		if (rtr_str_inject(STRINJECT_FUNC_READ, buf, ret)) {
+			event_info.extra_info = "[redirected]";
+			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+		}
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 

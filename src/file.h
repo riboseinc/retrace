@@ -18,6 +18,7 @@ typedef size_t (*rtr_fread_t)(void *ptr, size_t size, size_t nmemb, FILE *stream
 typedef size_t (*rtr_fwrite_t)(const void *ptr, size_t size, size_t nmemb, FILE *stream);
 typedef int (*rtr_fputc_t)(int c, FILE *stream);
 typedef int (*rtr_fputs_t)(const char *s, FILE *stream);
+typedef char * (*rtr_fgets_t)(char *s, int size, FILE *stream);
 typedef int (*rtr_fgetc_t)(FILE *stream);
 typedef char*(*rtr_fgets_t)(char *s, int size, FILE *stream);
 typedef void (*rtr_strmode_t)(int mode, char *bp);
@@ -46,6 +47,7 @@ RETRACE_DECL(fread);
 RETRACE_DECL(fwrite);
 RETRACE_DECL(fputc);
 RETRACE_DECL(fputs);
+RETRACE_DECL(fgets);
 RETRACE_DECL(fgetc);
 RETRACE_DECL(fgets);
 RETRACE_DECL(strmode);

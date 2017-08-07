@@ -24,6 +24,7 @@
  */
 
 #include "common.h"
+#include "strinject.h"
 #include "write.h"
 
 ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
@@ -39,6 +40,7 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 	int incompleteio = 0;
 	size_t incompleteio_limit = 0;
 
+	int redirected = 0;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "write";
@@ -58,6 +60,12 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 		if (real_nbytes > nbytes) {
 			real_nbytes = nbytes;
 		}
+
+		redirected = 1;
+	} else if (rtr_str_inject(STRINJECT_FUNC_WRITE, (void *) buf, nbytes))
+		redirected = 1;
+
+	if (redirected) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
