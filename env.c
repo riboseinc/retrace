@@ -24,6 +24,7 @@
  */
 
 #ifdef __FreeBSD__
+#include <errno.h>
 #define _KERNEL
 #endif
 

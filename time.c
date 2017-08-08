@@ -124,7 +124,7 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz
 }
 
 #if defined(__APPLE__) || defined(__NetBSD__)
-RETRACE_REPLACE(gettimeofday, int, (struct timeval *tv, void *tzp), (tv, tsp))
+RETRACE_REPLACE(gettimeofday, int, (struct timeval *tv, void *tzp), (tv, tzp))
 #else
 RETRACE_REPLACE(gettimeofday, int, (struct timeval *tv, struct timezone *tz), (tv, tz))
 #endif

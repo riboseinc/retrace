@@ -1,5 +1,6 @@
 #!/bin/sh
 
+../retrace ./exec
 ../retrace ./env
 ../retrace ./exit
 ../retrace ./file

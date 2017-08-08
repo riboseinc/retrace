@@ -262,7 +262,11 @@ int RETRACE_IMPLEMENTATION(getaddrinfo)(const char *node, const char *service,
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
 		if (err == HOST_NOT_FOUND)
+#ifdef EAI_NODATA
 			ret = EAI_NODATA;
+#else
+			ret = EAI_NONAME;
+#endif
 		else if (err == TRY_AGAIN)
 			ret = EAI_AGAIN;
 		else
