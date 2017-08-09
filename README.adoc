@@ -87,7 +87,7 @@ Challenge rewards are given according to the CVE CVSS score of the entry:
 
 * Critical: 1 grand prize of $1,000
 * High: 2 prizes of $500
-* Medium: 5 prizes of $200
+* Medium: 3 prizes of $200
 * Low: a public name mention, the journey is the reward!
 
 The `retrace` team will decide among all submissions of the same class (e.g., Medium, High), which discovered bugs would receive what prize, according to criteria derived from the following angles:
@@ -132,7 +132,7 @@ The challenger should write code that improves retrace (library or CLI) to do so
 
 * Best Improvement Winner: 1 grand prize of $1,000
 * Runner-Ups: 2 prizes of $500
-* Commendable: 4 prizes of $50 each
+* Commendable: 3 prizes of $50 each
 * Worthy: incorporation into the `retrace` repo with a public name mention.
 
 === Submitting To The Improvement Challenge
