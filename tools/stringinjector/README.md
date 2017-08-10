@@ -1,6 +1,6 @@
 # Description
 
-A 'stringinjector' tool written in C as part of retrace. For now it's a standalone tool but will be integrated in retrace at a later stage.
+A 'stringinject' tool written in C as part of retrace. For now it's a standalone tool but will be integrated in retrace at a later stage.
 
 Stringinjector inserts strings and/or replaces bytes in ascii and binary files. As the files can be ascii in nature (XML, JSON etc) or binary (think ELF) it needs to be able to write both. It needs to be fast as some files can be several megabytes big.
 
@@ -18,11 +18,11 @@ Take an existing file, go to 1 specific position (POS A) and insert a single hex
 
 argument: -h hex
 
-file.ascii content: AAAABBBBCCCCDDDDEEEEFFFF
+file.ascii content: AABBCCDDEEFF
 
 ``` sh
-         CMD   INFILE     OUT_TEMPLATE   ARG POS
-command: ./cmd file.ascii file.ascii.out -h  5
+         CMD            INFILE     OUT_TEMPLATE   ARG POS
+command: ./stringinject file.ascii file.ascii.out -h  4
 ```
 
 generates 255 files where each file has the 5th character replaced with a single hex 0x00-0xff:
@@ -58,11 +58,11 @@ Take an existing file, go to 2 specific positions (POS A and POS B) and insert a
 
 argument: -h hex
 
-file.ascii content: AAAABBBBCCCCDDDDEEEEFFFF
+file.ascii content: AABBCCDDEEFF
 
 ``` sh
-         CMD   INFILE     OUT_TEMPLATE   ARG POS
-command: ./cmd file.ascii file.ascii.out -h  5,7
+         CMD            INFILE     OUT_TEMPLATE   ARG POS
+command: ./stringinject file.ascii file.ascii.out -h  4,6
 ```
 
 generates 65025 files where each file has the 5th character replaced with a single hex 0x00-0xff and the 7th character replaced with a single hex 0x00-0xff:
@@ -101,11 +101,11 @@ Take an existing file, go to 1 specific position (POS A) and generate a N (based
 
 argument: -f format string
 
-file.ascii content: AAAABBBBCCCCDDDDEEEEFFFF
+file.ascii content: AABBCCDDEEFF
 
 ``` sh
-         CMD   INFILE     OUT_TEMPLATE   ARG POS COUNT
-command: ./cmd file.ascii file.ascii.out -f  5   2
+         CMD            INFILE     OUT_TEMPLATE   ARG POS COUNT REPLACE
+command: ./stringinject file.ascii file.ascii.out -f  4   2     [-r]
 ```
 
 generates 1 file with a 4 byte format string (4 bytes = '%s%s' = count 2) inserted in the file 'file.ascii' at position 5
@@ -120,6 +120,8 @@ file.ascii.out.0
 
 remarks: count is the number of format specifiers injected
 
+Note: If '-r' option was given, then just replace file contents.
+
 ---
 
 # Type 4
@@ -128,11 +130,11 @@ Take an existing file, go to 1 specific position (POS A) and generate a N (based
 
 argument: -o overflow
 
-file.ascii content: AAAABBBBCCCCDDDDEEEEFFFF
+file.ascii content: AABBCCDDEEFF
 
 ``` sh
-         CMD   INFILE     OUT_TEMPLATE   ARG POS LEN
-command: ./cmd file.ascii file.ascii.out -o  5   2
+         CMD            INFILE     OUT_TEMPLATE   ARG POS LEN REPLACE
+command: ./stringinject file.ascii file.ascii.out -o  4   2   [-r]
 ```
 
 generates 1 file with a 2 byte string consisting of 'AA' / '\x41\x41' inserted in the file 'file.ascii' at position 5
@@ -145,6 +147,8 @@ file.ascii.out.0
 00000000 41 41 42 42 41 41 41 4143 43 44 44 45 45 46 46|AABBAACCDDEEFF|
 ```
 
+Note: If '-r' option was given, then just replace file contents.
+
 ---
 
 # Type 5
@@ -153,11 +157,11 @@ Take an existing file, go to 1 specific position (POS A) and insert a string fro
 
 argument:-i insert strings read in from a file
 
-file.ascii content: AAAABBBBCCCCDDDDEEEEFFFF
+file.ascii content: AABBCCDDEEFF
 
 ``` sh
-         CMD   INFILE     OUT_TEMPLATE   ARG POS FILE
-command: ./cmd file.ascii file.ascii.out -i  5   file.insert.txt
+         CMD            INFILE     OUT_TEMPLATE   ARG POS FILE            REPLACE
+command: ./stringinject file.ascii file.ascii.out -i  4   file.insert.txt [-r]
 ```
 
 The inserted file can have several lines ending with a linebreak \n:
@@ -174,3 +178,5 @@ file.ascii.out.n line n
 Remarks: this functionality is to safely insert command injection strings e.g.: `id` $(id) etc without having to worry about the shell
 executing these strings locally which would normally happen if you'd provide these strings as arguments to the program without escaping.
 ```
+
+Note: If '-r' option was given, then just replace file contents.
