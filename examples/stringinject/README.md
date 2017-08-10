@@ -44,7 +44,7 @@ send|recv|read|write
 ```
 stringinject,INJECT_SINGLE_HEX,[function name list],[hex value:offset],[injection rate]
 ```
-The hex value may be 0x00 ~ 0xFF or RANDOM.
+The hex value may be 0x00 ~ 0xFF or RANDOM(0x00 ~ 0xFF) or ASCII(0x00 ~ 0x7F)
 The offset may be integer or RANDOM.
 
 ## Injection of format string
