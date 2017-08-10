@@ -162,14 +162,14 @@ static int parse_inject_param(enum RTR_STRINJECT_TYPE type, const char *param, s
 	switch (type) {
 	case STRINJECT_TYPE_HEX:
 		if (real_strcmp(param_val, "RANDOM") == 0)
-			((char *) val)[0] = rand() % 0xff;
+			((char *) val)[0] = rand() % 0x100;
 		else if (real_strcmp(param_val, "ASCII") == 0)
-			((char *) val)[0] = rand() % 0x7f;
+			((char *) val)[0] = rand() % 0x80;
 		else if (real_strncmp(param_val, "0x", 2) == 0) {
 			unsigned long hex_val;
 
 			hex_val = strtol(param_val + 2, NULL, 16);
-			if (hex_val > 0x7f)
+			if (hex_val > 0xff)
 				return -1;
 
 			((char *) val)[0] = (char) hex_val;
