@@ -142,10 +142,8 @@ Submission is through GitHub Pull Requests to the https://github.com/riboseinc/r
 * Your sample code *MUST* be in form of a PR.
 * The PR title *MUST* start with "Retrace Improvement Challenge Submission: " with a brief description of improvement following that.
 * The PR description must contain the following paragraph:
-  +
-++++
-I confirm that this submission does not infringe upon any intellectual property rights of any third party, and I have full rights to grant any rights and licenses of this work. I hereby assign the retrace project and its successors, a royalty-free, irrevocable, worldwide, non-exclusive, perpetual right and license to use, distribute, reproduce, modify and prepare derivative works of this submission, to perform and display publicly this submission, and to practice inventions in or associated with this submission, with (for each of the foregoing) full rights to authorize others to do the same.
-++++
+
+> I confirm that this submission does not infringe upon any intellectual property rights of any third party, and I have full rights to grant any rights and licenses of this work. I hereby assign the retrace project and its successors, a royalty-free, irrevocable, worldwide, non-exclusive, perpetual right and license to use, distribute, reproduce, modify and prepare derivative works of this submission, to perform and display publicly this submission, and to practice inventions in or associated with this submission, with (for each of the foregoing) full rights to authorize others to do the same.
 
 ## The Usage Challenge
 
@@ -173,7 +171,7 @@ Your submission will be judged on how useful it is to the `retrace` target audie
 
 ### Submitting To The Usage Challenge
 
-Submission is through GitHub Pull Requests to the https://github.com/riboseinc/retrace[`retrace` git repo].
+Submission is through GitHub Pull Requests to the [`retrace` git repo](https://github.com/riboseinc/retrace).
 
 * Your sample code must be in form of a PR to the `/examples` directory, with a unique directory path in form of `/examples/{your-github-handle}/{your-entry-name}`.
 * The PR title *MUST* start with "Retrace Usage Challenge Submission: " with a brief description of usage following that.
@@ -183,7 +181,7 @@ Submission is through GitHub Pull Requests to the https://github.com/riboseinc/r
 
 ## Who is Ribose?
 
-We are https://www.ribose.com[Ribose], the secure sharing company. We believe privacy and security form the foundation of liberty.
+We are [Ribose](https://www.ribose.com), the secure sharing company. We believe privacy and security form the foundation of liberty.
 
 Our goal is to empower individuals and organizations alike to freely communicate and achieve productivity for the greater good, through our deep security and technology expertise, creating highly-secure products validated to the world’s most stringent requirements and regulations.
 
@@ -418,5 +416,5 @@ and useful features that allows debugging and reverse engineering programs in
 new and interesting ways.
 
 Please send feedback and improvement suggestions either as GitHub issues or to
-retrace@ribose.com.
+[retrace@ribose.com](mailto:retrace@ribose.com).
 
