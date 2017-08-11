@@ -309,5 +309,5 @@ else
     AC_DEFINE(RTR_RPC, [0], [Define to use rpc])
 fi
 
-AC_CONFIG_FILES([Makefile test/Makefile rpc/Makefile tools/Makefile tools/stringinjector/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile test/Makefile rpc/Makefile tools/Makefile tools/stringinjector/Makefile])
 AC_OUTPUT
