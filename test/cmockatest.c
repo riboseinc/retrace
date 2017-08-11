@@ -1220,7 +1220,7 @@ main(void)
 		cmocka_unit_test(test_rtr_getaddrinfo),      cmocka_unit_test(test_rtr_freeaddrinfo)
 	};
 
-	handle = dlopen("../.libs/libretrace.so", RTLD_LAZY);
+	handle = dlopen("../src/.libs/libretrace.so", RTLD_LAZY);
 	if (!handle) {
 		fputs(dlerror(), stderr);
 		return 1;
