@@ -63,9 +63,9 @@ static void print_help(void)
 		"[options]:\n"
 		"\tType1: [input file] [output file template] -h [position]\n"
 		"\tType2: [input file] [output file template] -h [position1,position2]\n"
-		"\tType3: [input file] [output file] -f [position] [count]\n"
-		"\tType4: [input file] [output file] -o [position] [len]\n"
-		"\tType5: [input file] [output file template] -i [position] [file which has inject lines]\n");
+		"\tType3: [input file] [output file] -f [position] [count] [-r]\n"
+		"\tType4: [input file] [output file] -o [position] [len] [-r]\n"
+		"\tType5: [input file] [output file template] -i [position] [file which has inject lines] [-r]\n");
 
 	exit(1);
 }
@@ -227,7 +227,7 @@ static void inject_single_hex(FILE *fp, void *buffer, size_t buffer_len, off_t o
 	write_dst_file(fp, &inject, 1);
 
 	/* write remain bytes */
-	if ((buffer_len - offset - 1) > 0)
+	if (buffer_len - offset - 1 > 0)
 		write_dst_file(fp, buffer + offset + 1, buffer_len - offset - 1);
 }
 
@@ -236,7 +236,7 @@ static void inject_single_hex(FILE *fp, void *buffer, size_t buffer_len, off_t o
  */
 
 static void inject_multiple_hex(FILE *src_fp, FILE *dst_fp, void *buffer, size_t read_total, size_t read_len,
-	void *inject, size_t inject_len, off_t pos)
+	void *inject, size_t inject_len, off_t pos, int replace)
 {
 	size_t offset = read_len - (read_total - pos);
 
@@ -248,12 +248,15 @@ static void inject_multiple_hex(FILE *src_fp, FILE *dst_fp, void *buffer, size_t
 	write_dst_file(dst_fp, inject, inject_len);
 
 	/* write remain data */
-	if (read_len - offset > inject_len)
-		write_dst_file(dst_fp, buffer + offset + inject_len, read_len - offset - inject_len);
-	else {
-		/* seek file position */
-		fseek(src_fp, inject_len - (read_total - pos), SEEK_CUR);
-	}
+	if (replace) {
+		if (read_len - offset > inject_len)
+			write_dst_file(dst_fp, buffer + offset + inject_len, read_len - offset - inject_len);
+		else {
+			/* seek file position */
+			fseek(src_fp, inject_len - (read_total - pos), SEEK_CUR);
+		}
+	} else
+		write_dst_file(dst_fp, buffer + offset, read_len - offset);
 }
 
 /*
@@ -294,7 +297,7 @@ static void str_inject_func_t1(const char *src_fpath, const char *dst_fpath_temp
 
 		while (!feof(fp)) {
 			size_t read_bytes;
-			unsigned char buffer[MAX_BUF_LEN];
+			char buffer[MAX_BUF_LEN];
 
 			/* read buffer from file */
 			read_bytes = fread(buffer, 1, MAX_BUF_LEN, fp);
@@ -365,7 +368,7 @@ static void str_inject_func_t2(const char *src_fpath, const char *dst_fpath_temp
 
 			while (!feof(fp)) {
 				size_t read_bytes;
-				unsigned char buffer[MAX_BUF_LEN];
+				char buffer[MAX_BUF_LEN];
 
 				/* read buffer from file */
 				read_bytes = fread(buffer, 1, MAX_BUF_LEN, fp);
@@ -419,7 +422,7 @@ static void str_inject_func_t2(const char *src_fpath, const char *dst_fpath_temp
  */
 
 static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, const char *pos_str,
-	const char *count_str, int inject_format)
+	const char *count_str, int inject_format, int replace)
 {
 	FILE *fp, *dst_fp;
 	off_t pos;
@@ -448,7 +451,7 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
 	total_inject_bytes = inject_format ? count * 2 : count;
 
 	src_fsize = get_fsize(src_fpath);
-	if (src_fsize < (pos + total_inject_bytes))
+	if (replace && src_fsize < (pos + total_inject_bytes))
 		total_inject_bytes = src_fsize - pos;
 
 	/* set inject string */
@@ -483,7 +486,7 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
 
 	while (!feof(fp)) {
 		size_t read_bytes;
-		unsigned char buffer[MAX_BUF_LEN];
+		char buffer[MAX_BUF_LEN];
 
 		/* read buffer from file */
 		read_bytes = fread(buffer, 1, MAX_BUF_LEN, fp);
@@ -493,14 +496,14 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
 			write_dst_file(dst_fp, buffer, read_bytes);
 		} else {
 			/* inject multiple hex values */
-			inject_multiple_hex(fp, dst_fp, buffer, read_total, read_bytes, inject, total_inject_bytes, pos);
+			inject_multiple_hex(fp, dst_fp, buffer, read_total, read_bytes,
+				inject, total_inject_bytes, pos, replace);
 
 			/* free inject buffer */
 			free(inject);
 
 			inject_completed = 1;
 		}
-
 	}
 
 	/* close destination file */
@@ -514,7 +517,8 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
  * inject each line from given file
  */
 
-static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_templ, const char *pos_str, const char *inject_fpath)
+static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_templ, const char *pos_str,
+	const char *inject_fpath, int replace)
 {
 	FILE *fp, *inject_fp;
 	off_t pos;
@@ -558,7 +562,7 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 		/* remove end line */
 		if (strstr(inject_line, "/r/n"))
 			inject_line[strlen(inject_line) - 2] = '\0';
-		else
+		else if (inject_line[strlen(inject_line) - 1] == '\n')
 			inject_line[strlen(inject_line) - 1] = '\0';
 
 		/* check line length */
@@ -566,7 +570,7 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 		if (inject_len == 0)
 			continue;
 
-		if (src_fsize < (pos + inject_len))
+		if (replace && src_fsize < (pos + inject_len))
 			inject_len = src_fsize - pos;
 
 		/* open destination file */
@@ -579,7 +583,7 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 
 		while (!feof(fp)) {
 			size_t read_bytes;
-			unsigned char buffer[MAX_BUF_LEN];
+			char buffer[MAX_BUF_LEN];
 
 			/* read buffer from file */
 			read_bytes = fread(buffer, 1, MAX_BUF_LEN, fp);
@@ -589,7 +593,7 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 				write_dst_file(dst_fp, buffer, read_bytes);
 			} else {
 				/* inject multiple hex values */
-				inject_multiple_hex(fp, dst_fp, buffer, read_total, read_bytes, inject_line, inject_len, pos);
+				inject_multiple_hex(fp, dst_fp, buffer, read_total, read_bytes, inject_line, inject_len, pos, replace);
 
 				inject_completed = 1;
 			}
@@ -616,17 +620,21 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 int main(int argc, char *argv[])
 {
 	enum STR_INJECT_TYPE inject_type = STR_INJECT_TYPE_UNKNOWN;
+	int replace = 0;
 
 	/* check argument */
 	if (argc == 5 && strcmp(argv[3], "-h") == 0) {
 		inject_type = strchr(argv[4], ',') ? STR_INJECT_TYPE_2 : STR_INJECT_TYPE_1;
-	} else if (argc == 6) {
+	} else if (argc == 6 || argc == 7) {
 		if (strcmp(argv[3], "-f") == 0)
 			inject_type = STR_INJECT_TYPE_3;
 		else if (strcmp(argv[3], "-o") == 0)
 			inject_type = STR_INJECT_TYPE_4;
 		else if (strcmp(argv[3], "-i") == 0)
 			inject_type = STR_INJECT_TYPE_5;
+
+		if (argc == 7 && strcmp(argv[6], "-r") == 0)
+			replace = 1;
 	} else {
 		fprintf(stderr, "Invalid options.\n");
 		print_help();
@@ -648,15 +656,15 @@ int main(int argc, char *argv[])
 		break;
 
 	case STR_INJECT_TYPE_3:
-		str_inject_func_t34(argv[1], argv[2], argv[4], argv[5], 1);
+		str_inject_func_t34(argv[1], argv[2], argv[4], argv[5], 1, replace);
 		break;
 
 	case STR_INJECT_TYPE_4:
-		str_inject_func_t34(argv[1], argv[2], argv[4], argv[5], 0);
+		str_inject_func_t34(argv[1], argv[2], argv[4], argv[5], 0, replace);
 		break;
 
 	case STR_INJECT_TYPE_5:
-		str_inject_func_t5(argv[1], argv[2], argv[4], argv[5]);
+		str_inject_func_t5(argv[1], argv[2], argv[4], argv[5], replace);
 		break;
 
 	default:

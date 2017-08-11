@@ -30,6 +30,8 @@
 #include <string.h>
 
 #include "file.h"
+#include "strinject.h"
+
 #include "str.h"
 
 #ifdef __FreeBSD__
@@ -531,6 +533,12 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
+	if (rtr_str_inject(STRINJECT_FUNC_FWRITE, (void *) ptr, size * nmemb)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+	}
+
 	r = real_fwrite(ptr, size, nmemb, stream);
 	if (r < size * nmemb)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
@@ -563,6 +571,12 @@ size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE 
 	r = real_fread(ptr, size, nmemb, stream);
 	if (r < size * nmemb)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+
+	if (rtr_str_inject(STRINJECT_FUNC_FREAD, ptr, r)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+	}
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -628,6 +642,33 @@ int RETRACE_IMPLEMENTATION(fputs)(const char *s, FILE *stream)
 }
 
 RETRACE_REPLACE(fputs, int, (const char *s, FILE *stream), (s, stream))
+
+char *RETRACE_IMPLEMENTATION(fgets)(char *s, int size, FILE *stream)
+{
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_INT, PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&s, &size, &stream};
+	char *r;
+
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "fgets";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_STRING;
+	event_info.return_value = &r;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_fgets(s, size, stream);
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return r;
+}
+
+RETRACE_REPLACE(fgets, char *, (char *s, int size, FILE *stream), (s, size, stream))
 
 int RETRACE_IMPLEMENTATION(fgetc)(FILE *stream)
 {

@@ -28,6 +28,7 @@
 #include "malloc.h"
 #include "printf.h"
 #include "netfuzz.h"
+#include "strinject.h"
 #include "sock.h"
 #include <string.h>
 #include <netinet/in.h>
@@ -475,6 +476,12 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 		errno = err;
 		ret = -1;
 	} else {
+		if (rtr_str_inject(STRINJECT_FUNC_SEND, (void *) buf, len)) {
+			event_info.extra_info = "[redirected]";
+			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+		}
+
 		ret = real_send(sockfd, buf, len, flags);
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
@@ -524,6 +531,12 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 		errno = err;
 		ret = -1;
 	} else {
+		if (rtr_str_inject(STRINJECT_FUNC_SENDTO, (void *) buf, len)) {
+			event_info.extra_info = "[redirected]";
+			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+		}
+
 		ret = real_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
@@ -621,6 +634,13 @@ ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flag
 		recv_len = real_recv(sockfd, buf, len, flags);
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+		else {
+			if (rtr_str_inject(STRINJECT_FUNC_RECV, buf, len)) {
+				event_info.extra_info = "[redirected]";
+				event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+				event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+			}
+		}
 	}
 
 	retrace_log_and_redirect_after(&event_info);
@@ -681,6 +701,13 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 		recv_len = real_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+		else {
+			if (rtr_str_inject(STRINJECT_FUNC_RECV, buf, len)) {
+				event_info.extra_info = "[redirected]";
+				event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+				event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+			}
+		}
 	}
 
 	retrace_log_and_redirect_after(&event_info);
