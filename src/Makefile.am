@@ -1,5 +1,5 @@
 
-ACLOCAL_AMFLAGS = -I m4
+ACLOCAL_AMFLAGS = -I ../m4
 
 lib_LTLIBRARIES= libretrace.la
 libretrace_la_LDFLAGS= -no-undefined -avoid-version
