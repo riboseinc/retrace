@@ -16,8 +16,8 @@ get_lib_file() {
 	readonly fname="$1"
 
 	for path in "${fname}" \
-	    ".libs/${fname}" \
-	    "../.libs/${fname}" \
+	    "./src/.libs/${fname}" \
+	    "../src/.libs/${fname}" \
 	    "@libdir@/${fname}" \
 	    "/usr/lib/${fname}" \
 	    "/usr/lib64/${fname}"; do
