@@ -5,7 +5,7 @@
 #define FAIL(exp)								\
 	do {									\
 		if (exp) {							\
-			fprintf(stderr, "test failed at line %d", __LINE__);	\
+			fprintf(stderr, "test failed at line %d\n", __LINE__);	\
 			exit(1);						\
 		}								\
 	} while (0)
@@ -56,5 +56,5 @@ int main(void)
 
 	r = rtr_get_config_multiple(&ch, "config-test2", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT,
 	    ARGUMENT_TYPE_END, &s, &i);
-	FAIL(r != 0);
+	FAIL(r == 0);
 }

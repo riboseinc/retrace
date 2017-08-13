@@ -186,6 +186,9 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 					enabled_redirect = 1;
 					break;
 				}
+
+				if (!config)
+					break;
 			}
 
 			if (enabled_redirect) {
