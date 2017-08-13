@@ -975,11 +975,11 @@ retrace_log_and_redirect_after(struct rtr_event_info *event_info)
 
 
 struct config_entry {
-	SLIST_ENTRY(config_entry) next;
+	STAILQ_ENTRY(config_entry) next;
 	char *line;  /* line with commas replaced by '\0' */
 	int nargs;
 };
-SLIST_HEAD(config_head, config_entry);
+STAILQ_HEAD(config_head, config_entry);
 
 static void
 trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
@@ -1335,7 +1335,7 @@ static const struct config_entry *
 get_config() {
 	static struct config_entry *pconfig, config_end;
 	struct config_head config;
-	struct config_entry *pentry, *ptail;
+	struct config_entry *pentry;
 	FILE *config_file;
 	char *buf = NULL, *p;
 	size_t buflen = 0;
@@ -1350,56 +1350,55 @@ get_config() {
 		return pconfig;
 	}
 
-	SLIST_INIT(&config);
-	for (ptail = NULL; ptail != &config_end; ptail = pentry) {
+	STAILQ_INIT(&config);
+	do {
+		pentry = NULL;
 
 		sz = getline(&buf, &buflen, config_file);
 
-		if (sz > 0 && buf[sz - 1] == '\n')
-			--sz;
-
-		if (sz == 0)
-			continue;
-
-		pentry = NULL;
-		if (sz == -1 && errno == 0)
-			pentry = &config_end;
-
 		if (sz > 0) {
+			if (buf[sz - 1] == '\n')
+				buf[--sz] = '\0';
+
+			if (sz == 0)
+				continue;
+
 			pentry = real_malloc(sizeof(struct config_entry) +
 			    sz + 1);
 
 			if (pentry != NULL) {
 				pentry->line = (char *)&pentry[1];
-				real_strncpy(pentry->line, buf, sz);
+				real_strcpy(pentry->line, buf);
 				pentry->nargs = 0;
-				for (p = real_strchr(pentry->line, ','); p;
-				    p = real_strchr(++p, ',')) {
+				p = real_strchr(pentry->line, ',');
+				while (p != NULL) {
 					*p = '\0';
 					++pentry->nargs;
+					p = real_strchr(p + 1, ',');
 				}
 			}
-		}
+		} else if (sz == 0 || (sz == -1 && errno == 0))
+			/* end of file */
+			pentry = &config_end;
 
 		if (pentry == NULL) {
-			while (!SLIST_EMPTY(&config)) {
-				pentry = SLIST_FIRST(&config);
-				SLIST_REMOVE_HEAD(&config, next);
+			/* failed malloc or failed getline */
+			while (!STAILQ_EMPTY(&config)) {
+				pentry = STAILQ_FIRST(&config);
+				STAILQ_REMOVE_HEAD(&config, next);
 				real_free(pentry);
 			}
 			pentry = &config_end;
 		}
 
-		if (SLIST_EMPTY(&config))
-			SLIST_INSERT_HEAD(&config, pentry, next);
-		else
-			SLIST_INSERT_AFTER(ptail, pentry, next);
-	}
+		STAILQ_INSERT_TAIL(&config, pentry, next);
+
+	} while (pentry != &config_end);
 
 	real_free(buf);
 	real_fclose(config_file);
 
-	pconfig = SLIST_FIRST(&config);
+	pconfig = STAILQ_FIRST(&config);
 
 	return pconfig;
 }
@@ -1451,7 +1450,7 @@ rtr_parse_config(const struct config_entry **pentry,
 
 			retval = 1;
 		}
-		*pentry = SLIST_NEXT(*pentry, next);
+		*pentry = STAILQ_NEXT(*pentry, next);
 	}
 
 	va_end(arg_values);
