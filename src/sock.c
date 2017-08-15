@@ -128,7 +128,9 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 			char dst_ipaddr[INET6_ADDRSTRLEN];
 			int dst_port;
 
-			struct sockaddr redirect_addr;
+			struct sockaddr_storage redirect_addr;
+			struct sockaddr_in *addr4 = (struct sockaddr_in *)&redirect_addr;
+			struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&redirect_addr;
 
 			char *redirect_ipaddr = NULL;
 			int redirect_port;
@@ -171,15 +173,14 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 					/* set redirect address info */
 					memset(&redirect_addr, 0, sizeof(redirect_addr));
 
-					redirect_addr.sa_family = address->sa_family;
-					if (redirect_addr.sa_family == AF_INET) {
-						inet_pton(redirect_addr.sa_family, redirect_ipaddr,
-							&(((struct sockaddr_in *) &redirect_addr)->sin_addr));
-						((struct sockaddr_in *) &redirect_addr)->sin_port = htons(redirect_port);
+					if (address->sa_family == AF_INET) {
+						addr4->sin_family = AF_INET;
+						inet_pton(AF_INET, redirect_ipaddr, &addr4->sin_addr);
+						addr4->sin_port = htons(redirect_port);
 					} else {
-						inet_pton(redirect_addr.sa_family, redirect_ipaddr,
-							&(((struct sockaddr_in6 *) &redirect_addr)->sin6_addr));
-						((struct sockaddr_in6 *) &redirect_addr)->sin6_port = htons(redirect_port);
+						addr6->sin6_family = AF_INET6;
+						inet_pton(AF_INET6, redirect_ipaddr, &addr6->sin6_addr);
+						addr6->sin6_port = htons(redirect_port);
 					}
 
 					/* set redirect flag */
@@ -190,7 +191,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 
 			if (enabled_redirect) {
 				event_info.extra_info = "redirected";
-				remote_addr = &redirect_addr;
+				remote_addr = (struct sockaddr *)&redirect_addr;
 			}
 
 			/* connect to remote */
