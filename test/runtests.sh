@@ -6,6 +6,7 @@
 ../retrace ./file
 ../retrace ./fork
 ../retrace ./getaddrinfo
+./httpredirect.sh
 ../retrace ./id
 ../retrace ./malloc
 ../retrace ./pipe

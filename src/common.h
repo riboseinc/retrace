@@ -17,6 +17,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include "httpredirect.h"
+
 #define MAXLEN		40
 
 #define VAR "\033[33m"  /* ANSI yellow for variable values */
@@ -217,6 +219,7 @@ struct descriptor_info {
 	int fd;
 	unsigned int type;
 	char *location; /* File name or address */
+	struct rtr_http_redirect_info *http_redirect;
 };
 
 void retrace_log_and_redirect_before(struct rtr_event_info *event_info);
@@ -234,7 +237,8 @@ int trace_disable();
 void trace_restore(int oldstate);
 
 /* Descriptor tracking */
-void file_descriptor_update(int fd, unsigned int type, const char *location);
+struct descriptor_info *file_descriptor_update(int fd, unsigned int type,
+	const char *location);
 struct descriptor_info *file_descriptor_get(int fd);
 void file_descriptor_remove(int fd);
 

@@ -1526,7 +1526,7 @@ file_descriptor_get(int fd)
 	return NULL;
 }
 
-void
+struct descriptor_info *
 file_descriptor_update(int fd, unsigned int type, const char *location)
 {
 	struct descriptor_info *pinfo;
@@ -1536,15 +1536,17 @@ file_descriptor_update(int fd, unsigned int type, const char *location)
 	pinfo = real_malloc(sizeof(struct descriptor_info) +
 	    real_strlen(location) + 1);
 
-	if (pinfo == NULL)
-		return;
+	if (pinfo != NULL) {
+		pinfo->fd = fd;
+		pinfo->type = type;
+		pinfo->location = (char *)&pinfo[1];
+		pinfo->http_redirect = NULL;
+		real_strcpy(pinfo->location, location);
 
-	pinfo->fd = fd;
-	pinfo->type = type;
-	pinfo->location = (char *)&pinfo[1];
-	real_strcpy(pinfo->location, location);
+		SLIST_INSERT_HEAD(&g_fdlist, pinfo, next);
+	}
 
-	SLIST_INSERT_HEAD(&g_fdlist, pinfo, next);
+	return pinfo;
 }
 
 void
@@ -1556,6 +1558,11 @@ file_descriptor_remove(int fd)
 
 	if (pinfo) {
 		SLIST_REMOVE(&g_fdlist, pinfo, descriptor_info, next);
+		if (pinfo->http_redirect != NULL) {
+			if (pinfo->http_redirect->filefd != -1)
+				real_close(pinfo->http_redirect->filefd);
+			real_free(pinfo->http_redirect);
+		}
 		real_free(pinfo);
 	}
 }

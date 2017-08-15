@@ -16,8 +16,11 @@ noinst_HEADERS= \
 	exit.h \
 	file.h \
 	fork.h \
+	httpredirect.h \
 	id.h \
+	log.h \
 	malloc.h \
+	netfuzz.h \
 	rtr-netdb.h \
 	perror.h \
 	pipe.h \
@@ -30,12 +33,10 @@ noinst_HEADERS= \
 	select.h \
 	sock.h \
 	str.h \
-	trace.h \
-	write.h \
-	log.h \
-	netfuzz.h \
 	strinject.h \
-	temp.h
+	temp.h \
+	trace.h \
+	write.h
 
 if OPENSSL
 noinst_HEADERS+= ssl.h
@@ -52,9 +53,12 @@ libretrace_la_SOURCES= \
 	exit.c \
 	file.c \
 	fork.c \
+	httpredirect.c \
 	id.c \
+	log.c \
 	malloc.c \
 	netdb.c \
+	netfuzz.c \
 	perror.c \
 	pipe.c \
 	pledge.c \
@@ -65,13 +69,11 @@ libretrace_la_SOURCES= \
 	select.c \
 	sock.c \
 	str.c \
+	strinject.c \
+	temp.c \
 	time.c \
 	trace.c \
-	write.c \
-	log.c \
-	netfuzz.c \
-	strinject.c \
-	temp.c
+	write.c
 
 if OPENSSL
 libretrace_la_SOURCES+= ssl.c

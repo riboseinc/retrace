@@ -29,6 +29,7 @@
 #include "printf.h"
 #include "netfuzz.h"
 #include "strinject.h"
+#include "httpredirect.h"
 #include "sock.h"
 #include <string.h>
 #include <netinet/in.h>
@@ -196,12 +197,19 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 
 			/* connect to remote */
 			ret = real_connect(fd, remote_addr, len);
-			if (ret == 0) {
-				real_snprintf(location, sizeof(location), "connected[%s:%d]",
+			if (ret == 0 || errno == EINPROGRESS) {
+				struct descriptor_info *di;
+				struct rtr_http_redirect_info *ri;
+				RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
+
+				real_snprintf(location, sizeof(location), "socket[%s:%d]",
 					enabled_redirect ? redirect_ipaddr : dst_ipaddr,
 					enabled_redirect ? redirect_port : dst_port);
 
-				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_SOCK, location);
+				di = file_descriptor_update(fd,
+				    FILE_DESCRIPTOR_TYPE_SOCK, location);
+
+				di->http_redirect = rtr_setup_http_redirect(remote_addr);
 			}
 
 			event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
@@ -483,7 +491,10 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 		}
 
+		rtr_http_sniff_request(sockfd, buf, len);
+
 		ret = real_send(sockfd, buf, len, flags);
+
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
@@ -506,6 +517,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
 					  PARAMETER_TYPE_MEMORY_BUFFER,
+					  PARAMETER_TYPE_INT,
 					  PARAMETER_TYPE_INT,
 					  PARAMETER_TYPE_POINTER,
 					  PARAMETER_TYPE_INT,
@@ -538,7 +550,10 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 		}
 
+		rtr_http_sniff_request(sockfd, buf, len);
+
 		ret = real_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
@@ -632,7 +647,14 @@ ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flag
 		errno = err;
 		recv_len = -1;
 	} else {
-		recv_len = real_recv(sockfd, buf, len, flags);
+		recv_len = rtr_http_redirect_response(sockfd, buf, len,
+		    flags);
+
+		if (recv_len == 0)
+			recv_len = real_recv(sockfd, buf, len, flags);
+		else
+			event_info.extra_info = "[redirected]";
+
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 		else {
@@ -699,7 +721,13 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 		errno = err;
 		recv_len = -1;
 	} else {
-		recv_len = real_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+		recv_len = rtr_http_redirect_response(sockfd, buf, len, flags);
+
+		if (recv_len == 0)
+			recv_len = real_recvfrom(sockfd, buf, len, flags,
+			    src_addr, addrlen);
+		else
+			event_info.extra_info = "[redirected]";
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 		else {
