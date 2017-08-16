@@ -79,6 +79,9 @@ static void rtr_strinject_init(void)
 {
 	RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
 
+	if (!get_tracing_enabled())
+		return;
+
 	while (1) {
 		char *inject_type_str = NULL;
 		char *func_list = NULL;
@@ -121,6 +124,9 @@ static void rtr_strinject_init(void)
 				g_strinject_infos[i].exist = 1;
 			}
 		}
+
+		if (!config)
+			break;
 	}
 
 	/* set init flag */

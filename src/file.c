@@ -278,6 +278,9 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 
 				break;
 			}
+
+			if (!config)
+				break;
 		}
 	}
 
