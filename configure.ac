@@ -201,79 +201,9 @@ AC_MSG_NOTICE([no])
 fi
 AC_SUBST([TESTS_CFLAGS])
 
-
-
-cmocka=false
-if test "x$enable_tests" = "xyes" ; then
-    SAVE_LDFLAGS=$LDFLAGS
-    SAVE_CFLAGS=$CFLAGS
-
-    CMOCKA_LIBS="-lcmocka"
-    AC_MSG_CHECKING(for cmocka)
-    AC_ARG_WITH(cmocka,
-      AS_HELP_STRING(--with-cmocka=PATH, base of cmocka installation),
-      [AC_MSG_RESULT([$with_cmocka])
-       case $with_cmocka in
-       no)
-         ;;
-       yes)
-        AC_CHECK_HEADERS([cmocka.h],, [AC_MSG_ERROR([cmocka.h header not found or not usable])],
-        [#include <stdarg.h>
-         #include <stddef.h>
-         #include <setjmp.h>])
-        AC_CHECK_LIB(cmocka, [main], [CMOCKA_LIBS="-lcmocka"],[
-                AC_MSG_ERROR([Could not find cmocka installation])
-        ])
-        cmocka=true
-         ;;
-       *)
-
-        LDFLAGS="-L$with_cmocka/lib $LDFLAGS"
-        CFLAGS="-I$with_cmocka/include $CFLAGS"
-
-        AC_CHECK_HEADERS(cmocka.h,
-         CMOCKA_CFLAGS="-I$with_cmocka/include"
-         CMOCKA_LDFLAGS="-L$with_cmocka/lib",
-         AC_MSG_ERROR([cmocka.h header not found or not usable]),
-         [#include <stdarg.h>
-          #include <stddef.h>
-          #include <setjmp.h>]
-        )
-
-        AC_CHECK_LIB(cmocka, [main], [CMOCKA_LIBS="-lcmocka"],[
-         AC_MSG_ERROR([Could not find cmocka installation])
-        ])
-
-        cmocka=true
-
-        #restore
-        LDFLAGS=$SAVE_LDFLAGS
-        CFLAGS=$SAVE_CFLAGS
-        ;;
-       esac
-      ],
-      [AC_MSG_RESULT([--with-cmocka not specified])
-        AC_CHECK_HEADERS([cmocka.h],,
-        [
-         cmocka=false
-         AC_MSG_NOTICE([cmocka.h header not found or not usable])
-         ],
-        [#include <stdarg.h>
-         #include <stddef.h>
-        #include <setjmp.h>])
-
-        AC_CHECK_LIB(cmocka, [main], [CMOCKA_LIBS="-lcmocka"],
-        [
-         cmocka=false
-         AC_MSG_NOTICE([Could not find cmocka installation])
-        ])
-      ])
-    AC_SUBST(CMOCKA_CFLAGS)
-    AC_SUBST(CMOCKA_LDFLAGS)
-    AC_SUBST(CMOCKA_LIBS)
-fi
-
+AX_CHECK_CMOCKA([cmocka=true], )
 AM_CONDITIONAL([CMOCKA], [test "x$cmocka" = "xtrue"])
+
 if test "x$cmocka" = "xtrue" ; then
     AC_DEFINE(USE_CMOCKA, [1], [Define to use cmocka])
 else
