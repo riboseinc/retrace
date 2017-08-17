@@ -73,7 +73,6 @@ static int test_inet(void)
 	}
 
 	write(sockfd, sendstr, strlen(sendstr));
-	read(sockfd, buf, strlen(sendstr));
 	close(sockfd);
 
 	return 0;

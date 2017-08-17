@@ -56,5 +56,7 @@ int main(void)
 
 	r = rtr_get_config_multiple(&ch, "config-test2", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT,
 	    ARGUMENT_TYPE_END, &s, &i);
-	FAIL(r != 0);
+	FAIL(r == 0);
+
+	return 0;
 }
