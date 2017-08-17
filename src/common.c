@@ -1338,29 +1338,27 @@ get_config_file()
 
 static const struct config_entry *
 get_config() {
-	static struct config_entry *pconfig, config_end;
 	struct config_head config;
-	struct config_entry *pentry;
+
 	FILE *config_file;
 	char *buf = NULL, *p;
 	size_t buflen = 0;
 	ssize_t sz;
 
+	static struct config_entry *pconfig;
+
 	if (pconfig != NULL)
 		return pconfig;
 
 	config_file = get_config_file();
-	if (config_file == NULL) {
-		pconfig = &config_end;
-		return pconfig;
-	}
+	if (config_file == NULL)
+		return NULL;
 
 	STAILQ_INIT(&config);
 	do {
-		pentry = NULL;
+		struct config_entry *pentry = NULL;
 
 		sz = getline(&buf, &buflen, config_file);
-
 		if (sz > 0) {
 			if (buf[sz - 1] == '\n')
 				buf[--sz] = '\0';
@@ -1368,9 +1366,7 @@ get_config() {
 			if (sz == 0)
 				continue;
 
-			pentry = real_malloc(sizeof(struct config_entry) +
-			    sz + 1);
-
+			pentry = real_malloc(sizeof(struct config_entry) + sz + 1);
 			if (pentry != NULL) {
 				pentry->line = (char *)&pentry[1];
 				real_strcpy(pentry->line, buf);
@@ -1382,23 +1378,11 @@ get_config() {
 					p = real_strchr(p + 1, ',');
 				}
 			}
-		} else if (sz == 0 || (sz == -1 && errno == 0))
-			/* end of file */
-			pentry = &config_end;
-
-		if (pentry == NULL) {
-			/* failed malloc or failed getline */
-			while (!STAILQ_EMPTY(&config)) {
-				pentry = STAILQ_FIRST(&config);
-				STAILQ_REMOVE_HEAD(&config, next);
-				real_free(pentry);
-			}
-			pentry = &config_end;
-		}
+		} else if (sz < 0)
+			break;
 
 		STAILQ_INSERT_TAIL(&config, pentry, next);
-
-	} while (pentry != &config_end);
+	} while (1);
 
 	real_free(buf);
 	real_fclose(config_file);
@@ -1430,7 +1414,7 @@ rtr_parse_config(const struct config_entry **pentry,
 		++nargs;
 
 	retval = 0;
-	while ((*pentry)->line != NULL && retval == 0) {
+	while ((*pentry) && (*pentry)->line != NULL && retval == 0) {
 		if (real_strcmp(function, (*pentry)->line) == 0
 		    && (*pentry)->nargs == nargs) {
 			parg = (*pentry)->line; /* points to func name */
@@ -1455,7 +1439,11 @@ rtr_parse_config(const struct config_entry **pentry,
 
 			retval = 1;
 		}
+
 		*pentry = STAILQ_NEXT(*pentry, next);
+
+		if (retval)
+			break;
 	}
 
 	va_end(arg_values);

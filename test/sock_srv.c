@@ -50,8 +50,6 @@ static void test_socksrv_inet(void)
 	if (clientfd > 0) {
 		send(clientfd, s, strlen(s), 0);
 		sendto(clientfd, s, strlen(s), 0, NULL, 0);
-
-		recv(clientfd, s, strlen(s), 0);
 	}
 #endif
 }
