@@ -6,6 +6,7 @@
 
 static void test_sbrk(void)
 {
+#ifndef __APPLE__
 	void *p, *request;
 
 	p = sbrk(0);
@@ -15,6 +16,7 @@ static void test_sbrk(void)
 		return;
 
 	brk(p);
+#endif
 }
 
 int main(void)

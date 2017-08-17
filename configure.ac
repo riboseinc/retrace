@@ -46,6 +46,7 @@ AC_CHECK_HEADERS_ONCE(m4_flatten([
     stdarg.h
     time.h
     unistd.h
+    execinfo.h
     sys/stat.h
     sys/utsname.h
     sys/time.h
