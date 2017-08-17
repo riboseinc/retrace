@@ -196,7 +196,7 @@ AC_MSG_RESULT($enable_test)
 AM_CONDITIONAL([ENABLE_TESTS], [test "x$enable_tests" = "xyes"])
 if test "x$enable_tests" = "xyes" ; then
 AC_MSG_NOTICE([yes])
-TESTS_CFLAGS="$TESTS_CFLAGS -fno-builtin"
+TESTS_CFLAGS="$TESTS_CFLAGS -fno-builtin -Wno-unused-result"
 else
 AC_MSG_NOTICE([no])
 fi

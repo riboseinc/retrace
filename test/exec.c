@@ -21,7 +21,7 @@ int main(void)
 
 	execvp("/bin/shouldntexitinanysystem", args);
 
-#ifdef __linux__
+#if _GNU_SOURCE
 	execvpe("/bin/shouldntexitinanysystem", args, env);
 
 	fexecve(1, args, env);

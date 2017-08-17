@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +31,7 @@ int main(void)
 	if (fd > 0)
 		close(fd);
 
-#ifndef __APPLE__
+#if _GUN_SOURCE
 	strcpy(buf, "/tmp/retrace-XXXXXX");
 	fd = mkostemp(buf, O_APPEND);
 	if (fd > 0)
