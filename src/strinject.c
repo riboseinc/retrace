@@ -180,7 +180,7 @@ static int parse_inject_param(enum RTR_STRINJECT_TYPE type, const char *param, s
 
 	case STRINJECT_TYPE_FMT_STR:
 		fmt_count = strtol(param_val, NULL, 10);
-		if (fmt_count == LONG_MIN || fmt_count == LONG_MAX)
+		if (fmt_count <= 0)
 			return -1;
 
 		if (fmt_count > (len - *offset) / 2)
@@ -192,7 +192,7 @@ static int parse_inject_param(enum RTR_STRINJECT_TYPE type, const char *param, s
 
 	case STRINJECT_TYPE_BUF_OVERFLOW:
 		overflow_buf_len = strtol(param_val, NULL, 10);
-		if (overflow_buf_len == LONG_MIN || overflow_buf_len == LONG_MAX)
+		if (overflow_buf_len <= 0)
 			return -1;
 
 		if (overflow_buf_len > (len - *offset))
@@ -204,6 +204,9 @@ static int parse_inject_param(enum RTR_STRINJECT_TYPE type, const char *param, s
 
 	case STRINJECT_TYPE_FILE_LINE:
 		real_strncpy((char *) val, param_val, real_strlen(param_val));
+		break;
+
+	default:
 		break;
 	}
 
@@ -390,6 +393,9 @@ int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, void *buffer, size_t len)
 
 	case STRINJECT_TYPE_FILE_LINE:
 		ret = inject_file_line(g_strinject_infos[func_id].param, buffer, len);
+		break;
+
+	default:
 		break;
 	}
 

@@ -303,7 +303,7 @@ void *RETRACE_IMPLEMENTATION(memcpy)(void *dest, const void *src, size_t n)
 	retrace_log_and_redirect_before(&event_info);
 
 	/* check overlapped memory copying */
-	if (abs(dest - src) < n) {
+	if (labs(dest - src) < n) {
 		overlapped = 1;
 		event_info.extra_info = "The memory areas must not overlap. It may arise bugs. Please refer the man page.";
 		event_info.event_flags = EVENT_FLAGS_PRINT_BACKTRACE;

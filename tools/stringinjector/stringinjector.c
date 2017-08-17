@@ -206,7 +206,7 @@ static void write_dst_file(FILE *fp, void *buffer, size_t size)
 		size_t write_bytes;
 
 		write_bytes = fwrite((char *) buffer + write_total, 1, size - write_total, fp);
-		if (write_bytes < 0)
+		if (write_bytes == 0)
 			break;
 
 		write_total += write_bytes;
@@ -443,7 +443,7 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
 
 	/* parse count */
 	count = strtol(count_str, NULL, 10);
-	if (count == LONG_MIN || count == LONG_MAX) {
+	if (count <= 0) {
 		fprintf(stderr, "Invalid count value(%s)\n", count_str);
 		return;
 	}

@@ -42,9 +42,7 @@ long int ptrace_v(int request, va_list ap)
 	return real_ptrace(request, pid, addr, data);
 }
 
-#ifdef __APPLE__
-long int RETRACE_IMPLEMENTATION(ptrace)(int request, ...)
-#elif defined(__FreeBSD__) || defined(__OpenBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 int RETRACE_IMPLEMENTATION(ptrace)(int request, pid_t pid, caddr_t addr, int data)
 #elif defined(__NetBSD__)
 int RETRACE_IMPLEMENTATION(ptrace)(int request, pid_t pid, void *addr, int data)
@@ -55,7 +53,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	struct rtr_event_info event_info;
 	char *request_str;
 	int r;
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__linux__)
 	int data;
 	pid_t pid;
 	caddr_t addr;
@@ -224,10 +222,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	return r;
 }
 
-#ifdef __APPLE__
-RETRACE_REPLACE_V(ptrace, long int, (int request, ...), request, ptrace_v,
-	(request, ap))
-#elif defined(__FreeBSD__) || defined(__OpenBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 RETRACE_REPLACE(ptrace, int, (int request, pid_t pid, caddr_t addr, int data),
 	(request, pid, addr, data))
 #elif defined(__NetBSD__)

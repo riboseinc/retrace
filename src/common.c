@@ -61,6 +61,10 @@
 #include <netdb.h>
 #include <sys/socket.h>
 
+#if HAVE_EXECINFO_H
+#include <execinfo.h>
+#endif
+
 #include "str.h"
 #include "id.h"
 #include "file.h"
@@ -1236,7 +1240,8 @@ set_tracing_state_thread(int state)
 
 	enabled_lock = _ATOMIC_LOCK_UNLOCKED;
 #else
-	pthread_setspecific(g_enable_tracing_key, state);
+	pthread_setspecific(g_enable_tracing_key, (void *) (size_t) (state == RTR_TRACE_ENABLED ?
+		RTR_TRACE_ENABLED : RTR_TRACE_DISABLED));
 #endif
 }
 

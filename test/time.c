@@ -24,12 +24,13 @@
  */
 
 #include <time.h>
+#include <sys/time.h>
 
 int main(void)
 {
 	char buf[26];
 	time_t t;
-	struct timeval *tv;
+	struct timeval tv;
 
 	t = time(NULL);
 

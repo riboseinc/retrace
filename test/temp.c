@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 
 int main(void)
@@ -38,15 +40,18 @@ int main(void)
 	fd = mkostemps(buf, 3, O_APPEND);
 	if (fd > 0)
 		close(fd);
-#endif
 
 	ret = tempnam("/tmp/", "retrace");
+#endif
+
 
 	ret_file = tmpfile();
 	if (ret_file)
 		fclose(ret_file);
 
+#ifndef __APPLE__
 	tmpnam(NULL);
+#endif
 
 	return 0;
 }
