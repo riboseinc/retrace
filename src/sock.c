@@ -151,7 +151,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 			}
 
 			/* get configuration for redirection */
-			do {
+			while (1) {
 				char *match_ipaddr = NULL;
 				int match_port;
 
@@ -187,7 +187,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 					enabled_redirect = 1;
 					break;
 				}
-			} while (config != NULL);
+			}
 
 			if (enabled_redirect) {
 				event_info.extra_info = "redirected";

@@ -79,7 +79,7 @@ static void rtr_strinject_init(void)
 {
 	RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
 
-	do {
+	while (1) {
 		char *inject_type_str = NULL;
 		char *func_list = NULL;
 		char *inject_param = NULL;
@@ -121,7 +121,7 @@ static void rtr_strinject_init(void)
 				g_strinject_infos[i].exist = 1;
 			}
 		}
-	} while (config != NULL);
+	}
 
 	/* set init flag */
 	g_strinject_init = 1;

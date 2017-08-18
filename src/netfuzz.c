@@ -78,7 +78,7 @@ static void init_netfuzz_config(void)
 {
 	RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
 
-	do {
+	while (1) {
 		char *func_name = NULL;
 		int fuzz_set;
 		char *fuzz_type_str = NULL;
@@ -114,7 +114,10 @@ static void init_netfuzz_config(void)
 			g_netfuzz_config.fuzz_err[func_id] = fuzz_err;
 			g_netfuzz_config.fuzz_rates[func_id] = fuzz_rate;
 		}
-	} while (config != NULL);
+
+		if (!config)
+			break;
+	}
 
 	g_netfuzz_config.init_flag = 1;
 }
