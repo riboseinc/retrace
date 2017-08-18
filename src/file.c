@@ -257,10 +257,9 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 
 	if (get_tracing_enabled() && file) {
 		RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
+		int r;
 
-		while (1) {
-			int r;
-
+		do {
 			r = rtr_get_config_multiple(&config,
 					"fopen",
 					ARGUMENT_TYPE_STRING,
@@ -268,9 +267,7 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 					ARGUMENT_TYPE_END,
 					&match_file,
 					&redirect_file);
-			if (r == 0)
-				break;
-			if (real_strcmp(match_file, file) == 0) {
+			if (r && real_strcmp(match_file, file) == 0) {
 				did_redirect = 1;
 
 				ret = real_fopen(redirect_file, mode);
@@ -278,7 +275,7 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 
 				break;
 			}
-		}
+		} while (r && config != NULL);
 	}
 
 	if (!did_redirect)

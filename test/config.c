@@ -1,6 +1,7 @@
 #include "common.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #define FAIL(exp)								\
 	do {									\
@@ -57,6 +58,18 @@ int main(void)
 	r = rtr_get_config_multiple(&ch, "config-test2", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT,
 	    ARGUMENT_TYPE_END, &s, &i);
 	FAIL(r == 0);
+
+	ch = RTR_CONFIG_START;
+	i = 0;
+	do {
+		int j;
+
+		r = rtr_get_config_multiple(&ch, "config-test2", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT,
+			ARGUMENT_TYPE_END, &s, &j);
+
+		++i;
+		assert(i < 10);
+	} while (r && ch != NULL);
 
 	return 0;
 }
