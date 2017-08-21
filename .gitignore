@@ -3,9 +3,16 @@
 *.so
 *.lo
 test/cmockatest
+test/config
+test/log
+test/memcpy
+test/mmap
+test/sbrk
 test/*.o
-core
+temp
 
+core
+tools/stringinjector
 # editors
 *.swp
 *~
