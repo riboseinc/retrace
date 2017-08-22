@@ -1345,47 +1345,55 @@ get_config() {
 	size_t buflen = 0;
 	ssize_t sz;
 
-	static struct config_entry *pconfig;
+	static struct config_entry config_end[1];
+	static const struct config_entry *pconfig;
 
 	if (pconfig != NULL)
 		return pconfig;
 
+	memset(config_end, 0, sizeof(config_end));
+
 	config_file = get_config_file();
-	if (config_file == NULL)
-		return NULL;
+	if (config_file == NULL) {
+		pconfig = config_end;
+		return pconfig;
+	}
 
 	STAILQ_INIT(&config);
-	do {
-		struct config_entry *pentry = NULL;
+	for (;;) {
+		struct config_entry *pentry;
 
 		sz = getline(&buf, &buflen, config_file);
-		if (sz > 0) {
-			if (buf[sz - 1] == '\n')
-				buf[--sz] = '\0';
 
-			if (sz == 0)
-				continue;
-
-			pentry = real_malloc(sizeof(struct config_entry) + sz + 1);
-			if (pentry != NULL) {
-				pentry->line = (char *)&pentry[1];
-				real_strcpy(pentry->line, buf);
-				pentry->nargs = 0;
-				p = real_strchr(pentry->line, ',');
-				while (p != NULL) {
-					*p = '\0';
-					++pentry->nargs;
-					p = real_strchr(p + 1, ',');
-				}
-			}
-		} else if (sz < 0)
+		if (sz <= 0)
 			break;
 
-		STAILQ_INSERT_TAIL(&config, pentry, next);
-	} while (1);
+		if (buf[sz - 1] == '\n')
+			--sz;
+
+		if (sz == 0)
+			continue;
+
+		pentry = real_malloc(sizeof(struct config_entry) + sz + 1);
+		if (pentry != NULL) {
+			pentry->line = (char *)&pentry[1];
+			real_strncpy(pentry->line, buf, sz);
+			pentry->line[sz] = '\0';
+			pentry->nargs = 0;
+			p = real_strchr(pentry->line, ',');
+			while (p != NULL) {
+				*p = '\0';
+				++pentry->nargs;
+				p = real_strchr(p + 1, ',');
+			}
+			STAILQ_INSERT_TAIL(&config, pentry, next);
+		}
+	}
 
 	real_free(buf);
 	real_fclose(config_file);
+
+	STAILQ_INSERT_TAIL(&config, config_end, next);
 
 	pconfig = STAILQ_FIRST(&config);
 
@@ -1414,7 +1422,7 @@ rtr_parse_config(const struct config_entry **pentry,
 		++nargs;
 
 	retval = 0;
-	while ((*pentry) && (*pentry)->line != NULL && retval == 0) {
+	while ((*pentry)->line != NULL && retval == 0) {
 		if (real_strcmp(function, (*pentry)->line) == 0
 		    && (*pentry)->nargs == nargs) {
 			parg = (*pentry)->line; /* points to func name */
@@ -1441,9 +1449,6 @@ rtr_parse_config(const struct config_entry **pentry,
 		}
 
 		*pentry = STAILQ_NEXT(*pentry, next);
-
-		if (retval)
-			break;
 	}
 
 	va_end(arg_values);
