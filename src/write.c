@@ -26,6 +26,7 @@
 #include "common.h"
 #include "strinject.h"
 #include "write.h"
+#include "httpredirect.h"
 
 ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 {
@@ -72,6 +73,8 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 	}
 
 	retrace_log_and_redirect_before(&event_info);
+
+	rtr_http_sniff_request(fd, buf, real_nbytes);
 
 	ret = real_write(fd, buf, real_nbytes);
 	if (errno)
