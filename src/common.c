@@ -1339,19 +1339,20 @@ get_config_file()
 static const struct config_entry *
 get_config() {
 	struct config_head config;
+	struct config_entry *config_end;
 
 	FILE *config_file;
 	char *buf = NULL, *p;
 	size_t buflen = 0;
 	ssize_t sz;
 
-	static struct config_entry config_end[1];
 	static const struct config_entry *pconfig;
 
 	if (pconfig != NULL)
 		return pconfig;
 
-	memset(config_end, 0, sizeof(config_end));
+	config_end = real_malloc(sizeof(struct config_entry));
+	memset(config_end, 0, sizeof(struct config_entry));
 
 	config_file = get_config_file();
 	if (config_file == NULL) {
