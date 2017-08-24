@@ -1,0 +1,25 @@
+{{=[[ ]]=}}
+#include <string.h>
+#include "functions.h"
+
+static const char *names[] = {
+	[[#functions]]
+	"[[name]]",
+	[[/functions]]
+	NULL
+};
+
+enum retrace_function_id
+retrace_function_id(const char *name) {
+	enum retrace_function_id i;
+
+	for (i = 0; i < RPC_FUNCTION_COUNT; i++)
+		if (strcmp(name, names[i]) == 0)
+			break;
+	return i;
+}
+
+const char *
+retrace_function_name(enum retrace_function_id id) {
+	return (id < RPC_FUNCTION_COUNT ? names[id] : NULL);
+}

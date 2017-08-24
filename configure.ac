@@ -7,7 +7,7 @@ AC_CONFIG_HEADERS([config.h])
 
 AC_CANONICAL_HOST
 
-AC_PROG_CC
+AC_PROG_CC([egcc gcc cl cc])
 AM_PROG_CC_C_O
 
 AC_USE_SYSTEM_EXTENSIONS
@@ -92,6 +92,17 @@ fi
 # FreeBSD specific configuration
 #if test "x$isfreebsd" = "xyes"; then
 #fi
+
+# OpenBSD specific configuration
+if test "x$isopenbsd" = "xyes"; then
+    AC_DEFINE([STAILQ_INIT], [SIMPLEQ_INIT], [Define to SIMPLEQ_ for OpenBSD])
+    AC_DEFINE([STAILQ_ENTRY], [SIMPLEQ_ENTRY], [Define to SIMPLEQ_ for OpenBSD])
+    AC_DEFINE([STAILQ_HEAD], [SIMPLEQ_HEAD], [Define to SIMPLEQ_ for OpenBSD])
+    AC_DEFINE([STAILQ_INSERT_TAIL], [SIMPLEQ_INSERT_TAIL], [Define to SIMPLEQ_ for OpenBSD])
+    AC_DEFINE([STAILQ_FIRST], [SIMPLEQ_FIRST], [Define to SIMPLEQ_ for OpenBSD])
+    AC_DEFINE([STAILQ_NEXT], [SIMPLEQ_NEXT], [Define to SIMPLEQ_ for OpenBSD])
+    AC_DEFINE([STAILQ_FOREACH], [SIMPLEQ_FOREACH], [Define to SIMPLEQ_ for OpenBSD])
+fi
 
 # Test for __atomic support
 AC_MSG_CHECKING([for gcc __atomic builtins])
@@ -238,6 +249,14 @@ if test "x$enable_rpc" = "xyes" ; then
     AC_DEFINE(RTR_RPC, [1], [Define to use rpc])
 else
     AC_DEFINE(RTR_RPC, [0], [Define to use rpc])
+fi
+
+backtrace=false
+AC_CHECK_HEADERS([execinfo.h], [backtrace=true], [AC_MSG_NOTICE([execinfo.h not found, backtrace disabled])])
+if test "x$backtrace" = "xtrue" ; then
+    AC_DEFINE(BACKTRACE, [1], [Define to enable backtrace])
+else
+    AC_DEFINE(BACKTRACE, [0], [Define to enable backtrace])
 fi
 
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile rpc/Makefile tools/Makefile tools/stringinjector/Makefile])

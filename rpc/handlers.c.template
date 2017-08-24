@@ -1,0 +1,70 @@
+{{=[[ ]]=}}
+#include <stdlib.h>
+#include <string.h>
+#include "rpc.h"
+#include "frontend.h"
+#include "handlers.h"
+#include "display.h"
+[[#functions]]
+
+int
+default_[[name]]_precall_handler(struct retrace_endpoint *ep, void *buf, void **context)
+{
+[[#has_parameters]]
+	struct retrace_[[name]]_params *params;
+
+	params = malloc(sizeof(struct retrace_[[name]]_params));
+	*params = *(struct retrace_[[name]]_params *)buf;
+	*context = params;
+[[/has_parameters]]
+
+	return 1;
+}
+
+int
+default_[[name]]_postcall_handler(struct retrace_endpoint *ep, void *buf, void *context)
+{
+#if BACKTRACE
+	struct display_info *display_info = ep->handle->user_data;
+	char btbuffer[4096];
+#endif
+[[#has_parameters]]
+	struct retrace_[[name]]_params *params = (struct retrace_[[name]]_params *)context;
+[[/has_parameters]]
+[[#result]]
+	[[rpctype]]result = *([[rpctype]]*)buf;
+[[/result]]
+
+	printf("(%d:%d %d)%.*s[[name]](", ep->pid, ep->thread_num, ep->call_num, ep->call_depth, "\t\t\t\t\t");
+[[#params]]
+	DISPLAY_[[type]](ep, params->[[name]]);
+[[^last]]
+	printf(", ");
+[[/last]]
+[[/params]]
+	printf(")");
+[[#result]]
+	printf(" = ");
+	DISPLAY_[[type]](ep, result);
+[[/result]]
+	printf("\n");
+
+#if BACKTRACE
+	if (display_info->backtrace_functions[RPC_[[name]]]) {
+		if (retrace_fetch_backtrace(ep->fd, display_info->backtrace_depth, btbuffer, sizeof(btbuffer)))
+			printf("%s", btbuffer);
+	}
+#endif
+
+	free(context);
+	return 0;
+}
+[[/functions]]
+
+void get_handlers(retrace_precall_handler_t *pre, retrace_postcall_handler_t *post)
+{
+	[[#functions]]
+	pre[RPC_[[name]]] = default_[[name]]_precall_handler;
+	post[RPC_[[name]]] = default_[[name]]_postcall_handler;
+	[[/functions]]
+};

@@ -1,26 +1,50 @@
-AM_CFLAGS = -Wall
+AM_CFLAGS = -Wall -Wno-sizeof-array-argument
 noinst_PROGRAMS = functions2yaml
 functions2yaml_SOURCES = functions2yaml.c
 
 lib_LTLIBRARIES = libretracerpc.la
 libretracerpc_la_LDFLAGS = -no-undefined -avoid-version
 libretracerpc_la_CFLAGS = $(AM_CFLAGS) $(LIBSSL_FLAGS)
-noinst_HEADERS = rpc.h shim.h frontend.h fixups.h
-libretracerpc_la_SOURCES = rpc.c shim.c version.c fixups.c
+noinst_HEADERS = rpc.h shim.h frontend.h backend.h functions.h
+libretracerpc_la_SOURCES = shim.c version.c backend.c
 bin_PROGRAMS = retrace
-retrace_SOURCES = retrace.c version.c handlers.c frontend.c
+retrace_SOURCES = retrace.c version.c handlers.c frontend.c functions.c display.c
 
-BUILT_SOURCES = shim.c shim.h version.c handlers.c
-CLEANFILES = shim.c shim.h version.c handlers.c
+if LINUX
+MD5SUM=/usr/bin/md5sum
+endif
+if DARWIN
+MD5SUM=/sbin/md5
+endif
+if OPENBSD
+MD5SUM=/bin/md5
+endif
 
-shim.c : functions functions2yaml shim_c.template shim.h
-	./functions2yaml <$< | mustache - shim_c.template >$@
+if !OPENBSD
+MUSTACHE=mustache
+endif
+if OPENBSD
+MUSTACHE=mustache22
+endif
 
-shim.h : functions functions2yaml shim_h.template
-	./functions2yaml <$< | mustache - shim_h.template >$@
+FUNCTIONS_DEPS= shim.c shim.h handlers.c functions.c functions.h
 
-handlers.c : functions functions2yaml handlers_c.template shim.h rpc.h frontend.h
-	./functions2yaml <$< | mustache - handlers_c.template >$@
+BUILT_SOURCES= $(FUNCTIONS_DEPS) version.c
+CLEANFILES= $(BUILT_SOURCES) functions.yaml
 
-version.c : shim.c shim.h
-	echo const char *rpc_version = \"$$(cat shim.c shim.h | md5sum | cut -c1-32)\"\; >$@
+shim.h: shim.h.template
+shim.c: shim.c.template
+functions.h: functions.h.template
+functions.c: functions.c.template
+handlers.c : handlers.c.template
+
+$(FUNCTIONS_DEPS): functions.yaml
+
+$(FUNCTIONS_DEPS):
+	$(MUSTACHE) - $@.template <functions.yaml >$@
+
+version.c : $(FUNCTION_DEPS)
+	echo const char *retrace_version = \"$$(cat $(FUNCTIONS_DEPS) | $(MD5SUM) | cut -c1-32)\"\; >$@
+
+functions.yaml : functions.txt functions2yaml
+	./functions2yaml <functions.txt >$@

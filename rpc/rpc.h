@@ -3,13 +3,26 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <pthread.h>
 #include "shim.h"
 
-extern const char *rpc_version;
+#define RPC_MSG_LEN_MAX 256
 
-enum rpc_call_type {
-	RPC_PRECALL,
-	RPC_POSTCALL
+extern const char *retrace_version;
+
+enum rpc_msg_type {
+	RPC_MSG_CALL_INIT,
+	RPC_MSG_DONE,
+	RPC_MSG_DO_CALL,
+	RPC_MSG_CALL_RESULT,
+	RPC_MSG_SET_RESULT,
+	RPC_MSG_SET_ERRNO,
+	RPC_MSG_SET_PARAMETERS,
+	RPC_MSG_GET_STRING,
+#if BACKTRACE
+	RPC_MSG_BACKTRACE,
+#endif
+	RPC_MSG_GET_MEMORY
 };
 
 struct rpc_control_header {
@@ -17,13 +30,23 @@ struct rpc_control_header {
 	pthread_t tid;
 };
 
-struct call_header {
-	enum rpc_call_type call_type;
-	enum rpc_function_id function_id;
+struct rpc_string_params {
+	char *address;
+	size_t length;
 };
 
-int rpc_sockfd(void);
+struct rpc_memory_params {
+	char *address;
+	size_t length;
+};
 
-int do_rpc(struct msghdr *send_msg, struct msghdr *recv_msg);
+#if BACKTRACE
+struct rpc_backtrace_params {
+	int depth;
+};
+#endif
 
+struct rpc_errno_params {
+	int e;
+};
 #endif

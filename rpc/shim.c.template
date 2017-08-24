@@ -1,0 +1,152 @@
+{{=[[ ]]=}}
+#include "config.h"
+#include <stdarg.h>
+#include <errno.h>
+
+#include "shim.h"
+#include "rpc.h"
+#include "backend.h"
+#include "functions.h"
+
+#ifndef __APPLE__
+#include <dlfcn.h>
+__attribute__((regparm (3))) extern void *_dl_sym(void *handle,
+	const char *symbol, const void *rtraddr);
+#else
+struct interpose {
+	const void *replacment;
+	const void *replacee;
+};
+#endif
+[[#functions]]
+
+int trace_functions[RPC_FUNCTION_COUNT];
+
+[[guard]]
+#ifdef __APPLE__
+[[ctype]]retrace_impl_[[name]]([[#params]][[ctype]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
+#else
+[[ctype]]([[name]])([[#params]][[ctype]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
+#endif
+{
+	enum rpc_msg_type _msg_type;
+	int _postcall = 0, _fd, _errno;
+	char _buf[RPC_MSG_LEN_MAX];
+	struct retrace_[[name]]_params _params = {RPC_[[name]][[#params]], [[name]][[/params]]};
+[[#has_parameters]]
+	struct retrace_[[name]]_params *_buf_params = (struct retrace_[[name]]_params *)_buf;
+[[/has_parameters]]
+[[#variadic]]
+	va_list ap;
+[[/variadic]]
+[[#result]]
+	[[ctype]]*_buf_result = ([[ctype]]*)_buf;
+	[[ctype]]_result;
+[[/result]]
+
+	_errno = errno;
+
+#if defined(__OpenBSD__)
+	_fd = rpc_get_sockfd(RPC_[[name]]);
+#else
+	_fd = rpc_get_sockfd();
+#endif
+
+	if (_fd == -1 || !trace_functions[RPC_[[name]]]) {
+[[#variadic]]
+		va_start(ap, [[last_param]]);
+		[[#result]]_result = [[/result]][[variadic]]([[#params]][[name]], [[/params]]ap);
+		va_end(ap);
+[[/variadic]]
+[[^variadic]]
+		[[#result]]_result = [[/result]]real_[[name]]([[#params]][[name]][[^last]], [[/last]][[/params]]);
+[[/variadic]]
+		return[[#result]] _result[[/result]];
+	}
+
+	if (!rpc_send_message(_fd, RPC_MSG_CALL_INIT, &_params, sizeof(_params)))
+		goto rpc_fail;
+
+	while (rpc_recv_message(_fd, &_msg_type, _buf)) {
+		if (_msg_type == RPC_MSG_DONE) {
+			errno = _errno;
+			return[[#result]] _result[[/result]];
+[[#result]]
+		} else if (_msg_type == RPC_MSG_SET_RESULT) {
+			_result = *_buf_result;
+[[/result]]
+[[#has_parameters]]
+		} else if (_msg_type == RPC_MSG_SET_PARAMETERS) {
+[[#params]]
+			[[name]] = _buf_params->[[name]];
+[[/params]]
+[[/has_parameters]]
+		} else if (_msg_type == RPC_MSG_DO_CALL) {
+[[#variadic]]
+			va_start(ap, [[last_param]]);
+			[[#result]]_result = [[/result]][[variadic]]([[#params]][[name]], [[/params]]ap);
+			va_end(ap);
+[[/variadic]]
+[[^variadic]]
+			[[#result]]_result = [[/result]]real_[[name]]([[#params]][[name]][[^last]], [[/last]][[/params]]);
+[[/variadic]]
+			_postcall = 1;
+			_errno = errno;
+			if (!rpc_send_message(_fd, RPC_MSG_CALL_RESULT, [[#result]]&_result, sizeof(_result)[[/result]][[^result]]NULL, 0[[/result]]))
+				goto rpc_fail;
+		} else if (!rpc_handle_message(_fd, _msg_type, _buf))
+			goto rpc_fail;
+	}
+
+rpc_fail:
+	real_close(_fd);
+	rpc_set_sockfd(-1);
+
+	if (!_postcall) {
+[[#variadic]]
+		va_start(ap, [[last_param]]);
+		[[#result]]_result = [[/result]][[variadic]]([[#params]][[name]], [[/params]]ap);
+		va_end(ap);
+[[/variadic]]
+[[^variadic]]
+		[[#result]]_result = [[/result]]real_[[name]]([[#params]][[name]][[^last]], [[/last]][[/params]]);
+[[/variadic]]
+	}
+	return[[#result]] _result[[/result]];
+}
+
+#ifdef __APPLE__
+[[ctype]]([[name]])([[#params]][[ctype]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]]);
+__attribute__((used)) static struct interpose _interpose_[[name]] __attribute__((section("__DATA,__interpose"))) = {
+	retrace_impl_[[name]],
+	[[name]]
+};
+rtr_[[name]]_t real_[[name]] = [[name]];
+#else
+[[ctype]]rtr_fixup_[[name]]([[#params]][[ctype]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
+{
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
+	void *fn = dlsym(RTLD_NEXT, "[[name]]");
+#else
+	void *fn = _dl_sym(RTLD_NEXT, "[[name]]", rtr_fixup_[[name]]);
+#endif
+#ifdef HAVE_ATOMIC_BUILTINS
+	__atomic_store_n(&real_[[name]], fn, __ATOMIC_RELAXED);
+#else
+	real_[[name]] = fn;
+#endif
+[[^variadic]]
+	[[#result]]return [[/result]]real_[[name]]([[#params]][[name]][[^last]], [[/last]][[/params]]);
+[[/variadic]]
+[[#variadic]]
+	va_list ap;
+	va_start(ap, [[last_param]]);
+	[[#result]][[ctype]]ret = [[/result]][[variadic]]([[#params]][[name]], [[/params]]ap);
+	va_end(ap);
+	return[[#result]] ret[[/result]];
+[[/variadic]]
+}
+__attribute__((visibility("hidden"))) rtr_[[name]]_t real_[[name]] = rtr_fixup_[[name]];
+#endif
+[[#guard]]#endif[[/guard]]
+[[/functions]]
