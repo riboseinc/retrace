@@ -47,6 +47,6 @@ struct rtr_strinject_info {
  * string injection function
  */
 
-int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, void *buffer, size_t len);
+int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, void *buffer, size_t len, void **inject_buffer, size_t *inject_len);
 
 #endif /* __RETRACE_STRINJECT_H__ */

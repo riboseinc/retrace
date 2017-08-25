@@ -148,7 +148,6 @@ static void trace_set_color(char *color);
 
 static int rtr_get_config_single_internal(const char *function, ...);
 
-static void trace_printf(int hdr, const char *fmt, ...);
 static void trace_printf_str(const char *string, int maxlength);
 static void trace_dump_data(const unsigned char *buf, size_t nbytes);
 static void trace_mode(mode_t mode, char *p);
@@ -1037,7 +1036,7 @@ trace_set_color(char *color)
 }
 
 
-static void
+void
 trace_printf(int hdr, const char *fmt, ...)
 {
 	va_list arglist;

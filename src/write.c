@@ -25,6 +25,7 @@
 
 #include "common.h"
 #include "strinject.h"
+#include "malloc.h"
 #include "write.h"
 #include "httpredirect.h"
 
@@ -42,6 +43,11 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 	size_t incompleteio_limit = 0;
 
 	int redirected = 0;
+
+	void *inject_buffer;
+	size_t inject_len;
+
+	int enable_inject = 0;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "write";
@@ -63,8 +69,10 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 		}
 
 		redirected = 1;
-	} else if (rtr_str_inject(STRINJECT_FUNC_WRITE, (void *) buf, nbytes))
+	} else if (rtr_str_inject(STRINJECT_FUNC_WRITE, (void *) buf, nbytes, &inject_buffer, &inject_len)) {
 		redirected = 1;
+		enable_inject = 1;
+	}
 
 	if (redirected) {
 		event_info.extra_info = "[redirected]";
@@ -76,11 +84,16 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 
 	rtr_http_sniff_request(fd, buf, real_nbytes);
 
-	ret = real_write(fd, buf, real_nbytes);
+	ret = real_write(fd,
+			enable_inject ? inject_buffer : buf,
+			enable_inject ? inject_len : real_nbytes);
 	if (errno)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
+
+	if (enable_inject)
+		real_free(inject_buffer);
 
 	return ret;
 }

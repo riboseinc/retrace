@@ -30,6 +30,7 @@
 #include <string.h>
 
 #include "file.h"
+#include "malloc.h"
 #include "strinject.h"
 
 #include "str.h"
@@ -522,6 +523,10 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 	int r;
 	struct descriptor_info *di = NULL;
 
+	void *inject_buffer = NULL;
+	size_t inject_len;
+
+	int enable_inject = 0;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fwrite";
@@ -531,17 +536,30 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
-	retrace_log_and_redirect_before(&event_info);
 
-	if (rtr_str_inject(STRINJECT_FUNC_FWRITE, (void *) ptr, size * nmemb)) {
+	if (size == 1 && rtr_str_inject(STRINJECT_FUNC_FWRITE, (void *) ptr, size * nmemb, &inject_buffer, &inject_len)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		parameter_values[2] = &inject_buffer;
+		parameter_values[4] = &inject_len;
+
+		enable_inject = 1;
 	}
 
-	r = real_fwrite(ptr, size, nmemb, stream);
-	if (r < size * nmemb)
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_fwrite(enable_inject ? inject_buffer : ptr,
+			size,
+			enable_inject ? inject_len : nmemb,
+			stream);
+
+	if (r < (inject_len > 0 ? size * nmemb : size * inject_len))
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+
+	if (enable_inject)
+		real_free(inject_buffer);
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -557,6 +575,8 @@ size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE 
 	void const *parameter_values[] = {&size, &nmemb, &ptr, &size, &nmemb, &stream};
 	int r;
 
+	void *inject_buffer;
+	size_t inject_len;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fread";
@@ -572,10 +592,15 @@ size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE 
 	if (r < size * nmemb)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
-	if (rtr_str_inject(STRINJECT_FUNC_FREAD, ptr, r)) {
+	if (size == 1 && rtr_str_inject(STRINJECT_FUNC_FREAD, ptr, r, &inject_buffer, &inject_len)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		r = inject_len > size * nmemb ? size * nmemb : inject_len;
+		real_memcpy(ptr, inject_buffer, r);
+
+		real_free(inject_buffer);
 	}
 
 	retrace_log_and_redirect_after(&event_info);
