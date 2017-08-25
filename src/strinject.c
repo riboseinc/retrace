@@ -217,17 +217,32 @@ static int parse_inject_param(enum RTR_STRINJECT_TYPE type, const char *param, s
  * inject single hex value
  */
 
-static int inject_single_hex(const char *param, void *buffer, size_t len)
+static int inject_single_hex(const char *param, void *buffer, size_t len, void **inject_buffer, size_t *inject_len)
 {
 	char hex_value;
 	off_t offset;
+
+	char *p;
 
 	/* parse injection parameter */
 	if (parse_inject_param(STRINJECT_TYPE_HEX, param, len, (void *) &hex_value, &offset) != 0)
 		return 0;
 
 	/* inject hex value */
-	((char *) buffer)[offset] = hex_value;
+	p = (char *) real_malloc(len + 1);
+	if (!p)
+		return 0;
+
+	if (offset > 0)
+		real_memcpy(p, buffer, offset);
+
+	real_memcpy(&p[offset], &hex_value, 1);
+
+	if (len - offset > 0)
+		real_memcpy(&p[offset + 1], buffer + offset, len - offset);
+
+	*inject_buffer = p;
+	*inject_len = len + 1;
 
 	return 1;
 }
@@ -236,9 +251,9 @@ static int inject_single_hex(const char *param, void *buffer, size_t len)
  * inject format string
  */
 
-static int inject_fmt_str(const char *param, void *buffer, size_t len)
+static int inject_fmt_str(const char *param, void *buffer, size_t len, void **inject_buffer, size_t *inject_len)
 {
-	char *p;
+	char *p, *fmt;
 	int count, i;
 
 	off_t offset;
@@ -248,12 +263,26 @@ static int inject_fmt_str(const char *param, void *buffer, size_t len)
 		count == 0)
 		return 0;
 
+	/* set inject buffer */
+	p = (char *) real_malloc(len + 2 * count);
+	if (!p)
+		return 0;
+
+	if (offset > 0)
+		real_memcpy(p, buffer, offset);
+
 	/* set format string */
-	p = (char *) buffer + offset;
+	fmt = p + offset;
 	for (i = 0; i < count; i++) {
-		*(p++) = '%';
-		*(p++) = 's';
+		*(fmt++) = '%';
+		*(fmt++) = 's';
 	}
+
+	if (len - offset > 0)
+		real_memcpy(&p[offset + 2 * count], buffer + offset, len - offset);
+
+	*inject_buffer = p;
+	*inject_len = len + 2 * count;
 
 	return 1;
 }
@@ -262,9 +291,9 @@ static int inject_fmt_str(const char *param, void *buffer, size_t len)
  * inject overflow buffer
  */
 
-static int inject_buf_overflow(const char *param, void *buffer, size_t len)
+static int inject_buf_overflow(const char *param, void *buffer, size_t len, void **inject_buffer, size_t *inject_len)
 {
-	char *p;
+	char *p, *ov;
 	int count, i;
 
 	off_t offset;
@@ -274,10 +303,24 @@ static int inject_buf_overflow(const char *param, void *buffer, size_t len)
 		count == 0)
 		return 0;
 
+	/* set inject buffer */
+	p = (char *) real_malloc(len + count);
+	if (!p)
+		return 0;
+
+	if (offset > 0)
+		real_memcpy(p, buffer, offset);
+
 	/* set overflow buffer */
-	p = (char *) buffer + offset;
+	ov = p + offset;
 	for (i = 0; i < count; i++)
-		*(p++) = 'A';
+		*(ov++) = 'A';
+
+	if (len - offset > 0)
+		real_memcpy(&p[offset + count], buffer + offset, len - offset);
+
+	*inject_buffer = p;
+	*inject_len = len + count;
 
 	return 1;
 }
@@ -286,15 +329,17 @@ static int inject_buf_overflow(const char *param, void *buffer, size_t len)
  * inject file line
  */
 
-static int inject_file_line(const char *param, void *buffer, size_t len)
+static int inject_file_line(const char *param, void *buffer, size_t len, void **inject_buffer, size_t *inject_len)
 {
 	char fpath[128];
 
 	FILE *fp;
 	int line_count = 0, selected_line;
 
-	char line_buf[1024];
-	size_t inject_len = 0;
+	char buf[1024];
+	size_t buf_len = 0;
+
+	char *p;
 
 	off_t offset;
 
@@ -309,7 +354,7 @@ static int inject_file_line(const char *param, void *buffer, size_t len)
 		return 0;
 
 	/* get whole line count of file */
-	while (real_fgets(line_buf, sizeof(line_buf), fp) != NULL)
+	while (real_fgets(buf, sizeof(buf), fp) != NULL)
 		line_count++;
 
 	/* check line count */
@@ -324,17 +369,13 @@ static int inject_file_line(const char *param, void *buffer, size_t len)
 	selected_line = rand() % line_count;
 
 	line_count = 0;
-	while (real_fgets(line_buf, sizeof(line_buf), fp) != NULL) {
+	while (real_fgets(buf, sizeof(buf), fp) != NULL) {
 		if (line_count == selected_line) {
-			inject_len = real_strlen(line_buf);
+			buf_len = real_strlen(buf);
 
 			/* remove end line */
-			if (line_buf[real_strlen(line_buf) - 1] == '\n')
-				--inject_len;
-
-			/* get injection length */
-			if (inject_len > len - offset)
-				inject_len = len - offset;
+			if (buf[real_strlen(buf) - 1] == '\n')
+				--buf_len;
 
 			break;
 		}
@@ -348,8 +389,20 @@ static int inject_file_line(const char *param, void *buffer, size_t len)
 	if (inject_len == 0)
 		return 0;
 
-	/* inject line buffer */
-	real_memcpy((char *) buffer + offset, line_buf, inject_len);
+	/* set inject buffer */
+	p = (char *) real_malloc(len + buf_len);
+	if (!p)
+		return 0;
+
+	if (offset > 0)
+		real_memcpy(p, buffer, offset);
+
+	real_memcpy(&p[offset], buf, buf_len);
+	if (len - offset > 0)
+		real_memcpy(&p[offset + buf_len], buffer + offset, len - offset);
+
+	*inject_buffer = p;
+	*inject_len = len + buf_len;
 
 	return 1;
 }
@@ -358,10 +411,13 @@ static int inject_file_line(const char *param, void *buffer, size_t len)
  * process string injection
  */
 
-int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, void *buffer, size_t len)
+int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, void *buffer, size_t len, void **inject_buffer, size_t *inject_len)
 {
 	enum RTR_STRINJECT_TYPE type;
 	int ret;
+
+	if (!get_tracing_enabled() || len == 0)
+		return 0;
 
 	/* init string injection configuration */
 	if (!g_strinject_init)
@@ -380,19 +436,23 @@ int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, void *buffer, size_t len)
 	/* inject string to original buffer */
 	switch (type) {
 	case STRINJECT_TYPE_HEX:
-		ret = inject_single_hex(g_strinject_infos[func_id].param, buffer, len);
+		ret = inject_single_hex(g_strinject_infos[func_id].param, buffer, len,
+			inject_buffer, inject_len);
 		break;
 
 	case STRINJECT_TYPE_FMT_STR:
-		ret = inject_fmt_str(g_strinject_infos[func_id].param, buffer, len);
+		ret = inject_fmt_str(g_strinject_infos[func_id].param, buffer, len,
+			inject_buffer, inject_len);
 		break;
 
 	case STRINJECT_TYPE_BUF_OVERFLOW:
-		ret = inject_buf_overflow(g_strinject_infos[func_id].param, buffer, len);
+		ret = inject_buf_overflow(g_strinject_infos[func_id].param, buffer, len,
+			inject_buffer, inject_len);
 		break;
 
 	case STRINJECT_TYPE_FILE_LINE:
-		ret = inject_file_line(g_strinject_infos[func_id].param, buffer, len);
+		ret = inject_file_line(g_strinject_infos[func_id].param, buffer, len,
+			inject_buffer, inject_len);
 		break;
 
 	default:

@@ -24,6 +24,7 @@
  */
 
 #include "common.h"
+#include "malloc.h"
 #include "strinject.h"
 
 #include "read.h"
@@ -73,10 +74,18 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 	if (errno)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	else {
-		if (rtr_str_inject(STRINJECT_FUNC_READ, buf, ret)) {
+		void *inject_buffer = NULL;
+		size_t inject_len;
+
+		if (rtr_str_inject(STRINJECT_FUNC_READ, buf, ret, &inject_buffer, &inject_len)) {
 			event_info.extra_info = "[redirected]";
 			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+			ret = inject_len > ret ? ret : inject_len;
+			real_memcpy(buf, inject_buffer, ret);
+
+			real_free(inject_buffer);
 		}
 	}
 

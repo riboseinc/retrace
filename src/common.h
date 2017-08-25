@@ -224,6 +224,7 @@ struct descriptor_info {
 
 void retrace_log_and_redirect_before(struct rtr_event_info *event_info);
 void retrace_log_and_redirect_after(struct rtr_event_info *event_info);
+void trace_printf(int hdr, const char *fmt, ...);
 
 typedef const void *RTR_CONFIG_HANDLE;
 #define RTR_CONFIG_START NULL

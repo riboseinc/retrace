@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_FREAD				0
-#define TEST_FWRITE				1
+#define TEST_FREAD				1
+#define TEST_FWRITE				0
 
-#define TEST_NUM				5
+#define TEST_NUM				1
 
 /*
  * test for fwrite() string injection
@@ -19,7 +19,7 @@ static void test_fwrite(void)
 		FILE *fp;
 		char fpath[128];
 
-		const char buf[] = "abcdefghijklmnopqrstuvwxyz";
+		const char buf[] = "AABBCCDDEEFF";
 
 		/* set file path */
 		snprintf(fpath, sizeof(fpath), "/tmp/strinject_fwrite_test_%d", i);
@@ -60,7 +60,7 @@ static void test_fread(void)
 		if (!fp)
 			break;
 
-		len = fread(read_buf, 1, len, fp);
+		len = fread(read_buf, 1, sizeof(read_buf), fp);
 		fclose(fp);
 
 		read_buf[len] = '\0';
