@@ -217,7 +217,8 @@ static int parse_inject_param(enum RTR_STRINJECT_TYPE type, const char *param, s
  * inject single hex value
  */
 
-static int inject_single_hex(const char *param, void *buffer, size_t len, void **inject_buffer, size_t *inject_len)
+static int inject_single_hex(const char *param, const void *buffer, size_t len,
+		void **inject_buffer, size_t *inject_len)
 {
 	char hex_value;
 	off_t offset;
@@ -229,20 +230,15 @@ static int inject_single_hex(const char *param, void *buffer, size_t len, void *
 		return 0;
 
 	/* inject hex value */
-	p = (char *) real_malloc(len + 1);
+	p = (char *) real_malloc(len);
 	if (!p)
 		return 0;
 
-	if (offset > 0)
-		real_memcpy(p, buffer, offset);
-
-	real_memcpy(&p[offset], &hex_value, 1);
-
-	if (len - offset > 0)
-		real_memcpy(&p[offset + 1], buffer + offset, len - offset);
+	real_memcpy(p, buffer, len);
+	p[offset] = hex_value;
 
 	*inject_buffer = p;
-	*inject_len = len + 1;
+	*inject_len = len;
 
 	return 1;
 }
@@ -251,7 +247,8 @@ static int inject_single_hex(const char *param, void *buffer, size_t len, void *
  * inject format string
  */
 
-static int inject_fmt_str(const char *param, void *buffer, size_t len, void **inject_buffer, size_t *inject_len)
+static int inject_fmt_str(const char *param, const void *buffer, size_t len,
+		void **inject_buffer, size_t *inject_len)
 {
 	char *p, *fmt;
 	int count, i;
@@ -291,7 +288,8 @@ static int inject_fmt_str(const char *param, void *buffer, size_t len, void **in
  * inject overflow buffer
  */
 
-static int inject_buf_overflow(const char *param, void *buffer, size_t len, void **inject_buffer, size_t *inject_len)
+static int inject_buf_overflow(const char *param, const void *buffer, size_t len,
+		void **inject_buffer, size_t *inject_len)
 {
 	char *p, *ov;
 	int count, i;
@@ -329,7 +327,8 @@ static int inject_buf_overflow(const char *param, void *buffer, size_t len, void
  * inject file line
  */
 
-static int inject_file_line(const char *param, void *buffer, size_t len, void **inject_buffer, size_t *inject_len)
+static int inject_file_line(const char *param, const void *buffer, size_t len,
+		void **inject_buffer, size_t *inject_len)
 {
 	char fpath[128];
 
@@ -411,7 +410,8 @@ static int inject_file_line(const char *param, void *buffer, size_t len, void **
  * process string injection
  */
 
-int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, void *buffer, size_t len, void **inject_buffer, size_t *inject_len)
+int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_t len,
+		    void **inject_buffer, size_t *inject_len)
 {
 	enum RTR_STRINJECT_TYPE type;
 	int ret;

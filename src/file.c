@@ -537,7 +537,7 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 	event_info.return_value = &r;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
-	if (size == 1 && rtr_str_inject(STRINJECT_FUNC_FWRITE, (void *) ptr, size * nmemb, &inject_buffer, &inject_len)) {
+	if (size == 1 && rtr_str_inject(STRINJECT_FUNC_FWRITE, ptr, size * nmemb, &inject_buffer, &inject_len)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
@@ -555,7 +555,7 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 			enable_inject ? inject_len : nmemb,
 			stream);
 
-	if (r < (inject_len > 0 ? size * nmemb : size * inject_len))
+	if (r < (inject_len > size * nmemb ? size * nmemb : size * inject_len))
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	if (enable_inject)

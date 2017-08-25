@@ -465,7 +465,12 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_MEMORY_BUFFER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&sockfd, &len, &buf, &len, &flags};
 
-	int err;
+	int err = 0;
+
+	void *inject_buffer;
+	size_t inject_len;
+
+	int enable_inject = 0;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "send";
@@ -475,7 +480,6 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
-	retrace_log_and_redirect_before(&event_info);
 
 	if (rtr_get_net_fuzzing(NET_FUNC_ID_SEND, &err)) {
 		event_info.extra_info = "[redirected]";
@@ -485,24 +489,26 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 		errno = err;
 		ret = -1;
 	} else {
-		void *inject_buffer;
-		size_t inject_len;
-
-		int enable_inject = 0;
-
-		if (rtr_str_inject(STRINJECT_FUNC_SEND, (void *) buf, len, &inject_buffer, &inject_len)) {
+		if (rtr_str_inject(STRINJECT_FUNC_SEND, buf, len, &inject_buffer, &inject_len)) {
 			event_info.extra_info = "[redirected]";
 			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
+			parameter_values[2] = &inject_buffer;
+			parameter_values[3] = &inject_len;
+
 			enable_inject = 1;
 		} else
 			rtr_http_sniff_request(sockfd, buf, len);
+	}
 
+	retrace_log_and_redirect_before(&event_info);
+
+	if (!err) {
 		ret = real_send(sockfd,
-				enable_inject ? inject_buffer : buf,
-				enable_inject ? inject_len : len,
-				flags);
+			enable_inject ? inject_buffer : buf,
+			enable_inject ? inject_len : len,
+			flags);
 		if (errno)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
@@ -535,7 +541,12 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 					  PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&sockfd, &len, &buf, &len, &flags, &dest_addr, &addrlen};
 
-	int err;
+	int err = 0;
+
+	void *inject_buffer;
+	size_t inject_len;
+
+	int enable_inject = 0;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sendto";
@@ -545,7 +556,6 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
-	retrace_log_and_redirect_before(&event_info);
 
 	if (rtr_get_net_fuzzing(NET_FUNC_ID_SENDTO, &err)) {
 		event_info.extra_info = "[redirected]";
@@ -555,20 +565,22 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 		errno = err;
 		ret = -1;
 	} else {
-		void *inject_buffer;
-		size_t inject_len;
-
-		int enable_inject = 0;
-
-		if (rtr_str_inject(STRINJECT_FUNC_SENDTO, (void *) buf, len, &inject_buffer, &inject_len)) {
+		if (rtr_str_inject(STRINJECT_FUNC_SENDTO, buf, len, &inject_buffer, &inject_len)) {
 			event_info.extra_info = "[redirected]";
 			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
+			parameter_values[2] = &inject_buffer;
+			parameter_values[3] = &inject_len;
+
 			enable_inject = 1;
 		} else
 			rtr_http_sniff_request(sockfd, buf, len);
+	}
 
+	retrace_log_and_redirect_before(&event_info);
+
+	if (!err) {
 		ret = real_sendto(sockfd,
 				enable_inject ? inject_buffer : buf,
 				enable_inject ? inject_len : len,
