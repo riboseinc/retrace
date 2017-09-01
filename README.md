@@ -320,11 +320,23 @@ Will redirect a `fopen()` call from `/etc/passwd` to `/tmp/passwd`.
 ## Logging
 
 ``` sh
-logtofile,retrace.log
+logtofile,retrace.log,1
 ```
 
 Will send the log file to a file rather than `stderr`. You can configure
 log output to write to `/dev/null` disable logging completely.
+
+The second parameter indicates whether  we should flush the output after every
+write. Disabling it (setting it to 0) has a considerable performace gain, but
+runs the risk of losing the last part of the output if the program crashes.
+
+``` sh
+logperthread
+```
+This setting with no parameters, in combination with `logtofile`, will cause
+one log to be written per every spawned process and thread. In this case the
+path passed to logtofile will be used as the base for the file names, appening
+the process id and thread id (only for non main threads).
 
 ## OpenSSL
 

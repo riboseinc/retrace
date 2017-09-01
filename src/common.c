@@ -60,6 +60,9 @@
 #include <sys/un.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#ifdef __APPLE__
+#include <sys/syslimits.h>
+#endif
 
 #if HAVE_EXECINFO_H
 #include <execinfo.h>
@@ -142,6 +145,10 @@ static pthread_mutex_t printing_lock = PTHREAD_MUTEX_INITIALIZER;
 static int show_timestamp;
 static int output_file_flush;
 static FILE *output_file;
+static int log_per_thread;
+static char *output_file_path;
+static pthread_key_t per_thread_logging = -1; /* Per thread FILE * pointer */
+
 
 static int is_main_thread(void);
 static void trace_set_color(char *color);
@@ -193,6 +200,42 @@ retrace_get_time(void)
 #endif
 
 	return ret;
+}
+
+static void
+retrace_init_file_key(void)
+{
+	pthread_key_create(&per_thread_logging, NULL);
+}
+
+static FILE *
+retrace_get_thread_file(void)
+{
+	static pthread_once_t tracing_key_once = PTHREAD_ONCE_INIT;
+
+	pthread_once(&tracing_key_once, retrace_init_file_key);
+
+
+	if (pthread_getspecific(per_thread_logging) == NULL) {
+		FILE *out_file_tmp;
+
+		if (output_file_path) {
+			char new_path[PATH_MAX + 1];
+			pthread_t tid;
+
+			if (is_main_thread())
+				real_snprintf(new_path, PATH_MAX, "%s.%u", output_file_path, real_getpid());
+			else
+				real_snprintf(new_path, PATH_MAX, "%s.%u.%u", output_file_path, real_getpid(), pthread_self());
+
+			out_file_tmp = real_fopen(new_path, "a");
+		}
+
+	       pthread_setspecific(per_thread_logging, (void *) out_file_tmp);
+
+	}
+
+	return (FILE *) pthread_getspecific(per_thread_logging);
 }
 
 static void **
@@ -817,7 +860,6 @@ retrace_event(struct rtr_event_info *event_info)
 {
 	int olderrno;
 	int old_trace_state;
-	static char *output_file_path;
 	static int loaded_config;
 	FILE *out_file_tmp = NULL;
 
@@ -840,9 +882,12 @@ retrace_event(struct rtr_event_info *event_info)
 		loaded_config = 1;
 		if (rtr_get_config_single_internal("logtofile", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END,
 								  &output_file_path, &output_file_flush)) {
-			if (output_file_path) {
-				 out_file_tmp = real_fopen(output_file_path, "a");
-			}
+			if (rtr_get_config_single_internal("logperthread", ARGUMENT_TYPE_END))
+				log_per_thread = 1;
+
+			if (output_file_path && !log_per_thread)
+				out_file_tmp = real_fopen(output_file_path, "a");
+
 			output_file = out_file_tmp;
 		}
 
@@ -991,7 +1036,14 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 	FILE *output_file_current = stderr;
 	int is_a_tty = 0;
 
-	if (output_file)
+	if (log_per_thread) {
+		FILE *tmp;
+
+		tmp = retrace_get_thread_file();
+
+		if (tmp)
+			output_file_current = tmp;
+	} else if (output_file)
 		output_file_current = output_file;
 
 	old_trace_state = trace_disable();
