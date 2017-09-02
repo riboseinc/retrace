@@ -28,6 +28,7 @@
 #include "malloc.h"
 #include "str.h"
 #include <unistd.h>
+#include <ctype.h>
 
 
 /* Duplicates a string array adding extra spaces,
@@ -112,6 +113,22 @@ inject_retrace_env_vars(const char **env)
 	return new_env;
 }
 
+static int
+may_contain_relative_paths(const char *command)
+{
+	const char *s = command;
+
+	while (s != NULL) {
+		while (*s == ';' || *s == '|' || isspace(*s))
+			++s;
+		if (*s && *s != '/')
+			return 1;
+
+		s = strpbrk(s, ";|");
+	}
+	return 0;
+}
+
 
 int RETRACE_IMPLEMENTATION(system)(const char *command)
 {
@@ -131,6 +148,10 @@ int RETRACE_IMPLEMENTATION(system)(const char *command)
 	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
+
+	if (may_contain_relative_paths(command))
+		event_info.extra_info = "WARNING: might be using a relative path";
+
 
 	r = real_system(command);
 	if (r != 0)
