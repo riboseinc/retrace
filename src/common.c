@@ -861,6 +861,7 @@ retrace_event(struct rtr_event_info *event_info)
 		unsigned int *parameter_type;
 		void **parameter_value;
 		int has_memory_buffers = 0;
+		int first = 1;
 
 		parameter_type = event_info->parameter_types;
 		parameter_value = event_info->parameter_values;
@@ -885,11 +886,15 @@ retrace_event(struct rtr_event_info *event_info)
 			    GET_PARAMETER_TYPE(*parameter_type) == PARAMETER_TYPE_SSL_WITH_KEY)
 				has_memory_buffers = 1;
 
+			if (first)
+				first = 0;
+			else
+				trace_printf(0, ", ");
+
 			parameter_value = retrace_print_parameter(event_info->event_type,
 								  GET_PARAMETER_TYPE(*parameter_type),
 								  GET_PARAMETER_FLAGS(*parameter_type),
 								  parameter_value);
-			trace_printf(0, ", ");
 
 			parameter_type++;
 		}
