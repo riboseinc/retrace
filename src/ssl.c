@@ -30,6 +30,8 @@
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 
+#include "malloc.h"
+#include "strinject.h"
 #include "ssl.h"
 
 int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
@@ -39,6 +41,9 @@ int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
 	unsigned int parameter_types[] = {PARAMETER_TYPE_SSL, PARAMETER_TYPE_MEMORY_BUFFER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&ssl, &num, &buf, &num};
 
+	void *inject_buffer;
+	size_t inject_len;
+	int enable_inject = 0;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_write";
@@ -48,11 +53,27 @@ int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+
+	if (rtr_str_inject(STRINJECT_FUNC_SSL_WRITE, buf, num, &inject_buffer, &inject_len)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		parameter_values[2] = &inject_buffer;
+		parameter_values[3] = &inject_len;
+
+		enable_inject = 1;
+	}
+
 	retrace_log_and_redirect_before(&event_info);
 
-	r = real_SSL_write(ssl, buf, num);
+	r = real_SSL_write(ssl, enable_inject ? inject_buffer : buf,
+				enable_inject ? inject_len : num);
 	if (r <= 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+
+	if (enable_inject)
+		real_free(inject_buffer);
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -70,6 +91,8 @@ int RETRACE_IMPLEMENTATION(SSL_read)(SSL *ssl, void *buf, int num)
 	unsigned int parameter_types[] = {PARAMETER_TYPE_SSL, PARAMETER_TYPE_MEMORY_BUFFER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&ssl, &r, &buf, &num};
 
+	void *inject_buffer;
+	size_t inject_len;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "SSL_read";
@@ -85,6 +108,17 @@ int RETRACE_IMPLEMENTATION(SSL_read)(SSL *ssl, void *buf, int num)
 	if (r <= 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
+	if (rtr_str_inject(STRINJECT_FUNC_RECV, buf, r, &inject_buffer, &inject_len)) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+		r = inject_len > num ? num : inject_len;
+		real_memcpy(buf, inject_buffer, r);
+
+		real_free(inject_buffer);
+	}
+
 	retrace_log_and_redirect_after(&event_info);
 
 	return (r);
@@ -92,7 +126,6 @@ int RETRACE_IMPLEMENTATION(SSL_read)(SSL *ssl, void *buf, int num)
 
 RETRACE_REPLACE(SSL_read, int, (SSL * ssl, void *buf, int num),
 	(ssl, buf, num))
-
 
 int RETRACE_IMPLEMENTATION(SSL_connect)(SSL *ssl)
 {

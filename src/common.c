@@ -60,6 +60,7 @@
 #include <sys/un.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <math.h>
 
 #if HAVE_EXECINFO_H
 #include <execinfo.h>
@@ -1802,6 +1803,7 @@ static const char *rtr_logging_groups[] = {
 	"LOG_GROUP_STR",
 	"LOG_GROUP_SSL",
 	"LOG_GROUP_PROC",
+	"LOG_GROUP_TEMP",
 	NULL
 };
 
@@ -1826,7 +1828,7 @@ static void parse_logging_options(int opt_type, char *opt_str)
 
 		for (i = 0; rtr_logging_groups[i] != NULL; i++) {
 			if (rtr_check_config_token(rtr_logging_groups[i], opt_str, sep, &reverse)) {
-				int bit_val = (i == 0) ? 0x01 : i * 2;
+				int bit_val = exp2(i);
 
 				if (!reverse)
 					opt_val |= bit_val;
