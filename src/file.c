@@ -93,7 +93,7 @@ int RETRACE_IMPLEMENTATION(chmod)(const char *path, mode_t mode)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_chmod(path, mode);
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -121,7 +121,7 @@ int RETRACE_IMPLEMENTATION(fchmod)(int fd, mode_t mode)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fchmod(fd, mode);
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -150,8 +150,6 @@ int RETRACE_IMPLEMENTATION(fileno)(FILE *stream)
 	retrace_log_and_redirect_before(&event_info);
 
 	fd = real_fileno(stream);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -189,7 +187,7 @@ int RETRACE_IMPLEMENTATION(fseek)(FILE *stream, long offset, int whence)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fseek(stream, offset, whence);
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -221,7 +219,7 @@ int RETRACE_IMPLEMENTATION(fclose)(FILE *stream)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fclose(stream);
-	if (errno)
+	if (r != 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -292,9 +290,7 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 
 		file_descriptor_update(
 			fd, FILE_DESCRIPTOR_TYPE_FILE, file);
-	}
-
-	if (errno)
+	} else
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -323,7 +319,7 @@ int RETRACE_IMPLEMENTATION(close)(int fd)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_close(fd);
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -354,7 +350,7 @@ int RETRACE_IMPLEMENTATION(dup)(int oldfd)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_dup(oldfd);
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -383,7 +379,7 @@ int RETRACE_IMPLEMENTATION(dup2)(int oldfd, int newfd)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_dup2(oldfd, newfd);
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -439,7 +435,7 @@ int RETRACE_IMPLEMENTATION(mkfifo)(const char *pathname, mode_t mode)
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_mkfifo(pathname, mode);
-	if (errno)
+	if (ret < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -488,7 +484,7 @@ open_v(const char *pathname, int flags, va_list ap)
 	else
 		r =  real_open(pathname, flags);
 
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	if (r > 0) {
@@ -554,8 +550,7 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 			size,
 			enable_inject ? inject_len : nmemb,
 			stream);
-
-	if (r < (inject_len > size * nmemb ? size * nmemb : size * inject_len))
+	if (r < (enable_inject ? inject_len : nmemb))
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	if (enable_inject)
@@ -589,7 +584,7 @@ size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE 
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fread(ptr, size, nmemb, stream);
-	if (r < size * nmemb)
+	if (r < nmemb)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	if (size == 1 && rtr_str_inject(STRINJECT_FUNC_FREAD, ptr, r, &inject_buffer, &inject_len)) {
@@ -687,6 +682,8 @@ char *RETRACE_IMPLEMENTATION(fgets)(char *s, int size, FILE *stream)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fgets(s, size, stream);
+	if (!r && !feof(stream))
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -1164,7 +1161,7 @@ fcntl_v(int fildes, int cmd, va_list ap)
 		break;
 	}
 
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -1204,6 +1201,8 @@ int RETRACE_IMPLEMENTATION(fgetpos)(FILE *stream, fpos_t *pos)
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_fgetpos(stream, pos);
+	if (ret < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -1231,6 +1230,8 @@ int RETRACE_IMPLEMENTATION(fsetpos)(FILE *stream, const fpos_t *pos)
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_fsetpos(stream, pos);
+	if (ret < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -1257,6 +1258,8 @@ long RETRACE_IMPLEMENTATION(ftell)(FILE *stream)
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_ftell(stream);
+	if (ret < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 

@@ -236,7 +236,7 @@ int RETRACE_IMPLEMENTATION(connect)(int fd, const struct sockaddr *address, sock
 
 	if (!fuzzing_enabled) {
 		ret = real_connect(fd, address, len);
-		if (errno)
+		if (ret < 0)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
@@ -291,9 +291,6 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 		char location[128];
 
 		ret = real_bind(fd, address, len);
-		if (errno)
-			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-
 		if (ret == 0) {
 			if (address->sa_family == AF_INET) {
 				struct sockaddr_in *bind_addr = (struct sockaddr_in *) address;
@@ -310,7 +307,9 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 				real_snprintf(location, sizeof(location), "bind[%s]", sun_path);
 				file_descriptor_update(fd, FILE_DESCRIPTOR_TYPE_SOCK, location);
 			}
-		}
+		} else
+			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+
 	}
 
 	retrace_log_and_redirect_after(&event_info);
@@ -444,7 +443,7 @@ int RETRACE_IMPLEMENTATION(setsockopt)(int fd, int level, int optname, const voi
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_setsockopt(fd, level, optname, optval, optlen);
-	if (errno)
+	if (ret < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -509,7 +508,7 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 			enable_inject ? inject_buffer : buf,
 			enable_inject ? inject_len : len,
 			flags);
-		if (errno)
+		if (ret < 0)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 		if (enable_inject)
@@ -588,7 +587,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 				dest_addr,
 				addrlen);
 
-		if (errno)
+		if (ret < 0)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 		if (enable_inject)
@@ -639,7 +638,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 		ret = -1;
 	} else {
 		ret = real_sendmsg(sockfd, msg, flags);
-		if (errno)
+		if (ret < 0)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
@@ -687,9 +686,9 @@ ssize_t RETRACE_IMPLEMENTATION(recv)(int sockfd, void *buf, size_t len, int flag
 		recv_len = rtr_http_redirect_response(sockfd, buf, len, flags);
 		if (recv_len == 0) {
 			recv_len = real_recv(sockfd, buf, len, flags);
-			if (errno)
+			if (recv_len < 0)
 				event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-			else {
+			else if (recv_len > 0) {
 				void *inject_buffer;
 				size_t inject_len;
 
@@ -767,9 +766,9 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 		recv_len = rtr_http_redirect_response(sockfd, buf, len, flags);
 		if (recv_len == 0) {
 			recv_len = real_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
-			if (errno)
+			if (recv_len < 0)
 				event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-			else {
+			else if (recv_len > 0) {
 				void *inject_buffer;
 				size_t inject_len;
 
@@ -832,7 +831,7 @@ ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flag
 		recv_len = -1;
 	} else {
 		recv_len = real_recvmsg(sockfd, msg, flags);
-		if (errno)
+		if (recv_len < 0)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 

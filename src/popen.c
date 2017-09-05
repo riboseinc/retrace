@@ -77,7 +77,7 @@ int RETRACE_IMPLEMENTATION(pclose)(FILE *stream)
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_pclose(stream);
-	if (errno)
+	if (ret < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	stream = NULL;

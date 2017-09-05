@@ -214,7 +214,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	}
 
 	r = real_ptrace(request, pid, addr, data);
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);

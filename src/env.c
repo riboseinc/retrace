@@ -52,7 +52,7 @@ int RETRACE_IMPLEMENTATION(unsetenv)(const char *name)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_unsetenv(name);
-	if (errno)
+	if (r != 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -80,7 +80,7 @@ int RETRACE_IMPLEMENTATION(putenv)(char *string)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_putenv(string);
-	if (errno)
+	if (r != 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -163,7 +163,7 @@ char *RETRACE_IMPLEMENTATION(getenv)(const char *envname)
 
 	if (!fuzzing_enabled) {
 		env = real_getenv(envname);
-		if (errno)
+		if (!env)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
@@ -194,7 +194,7 @@ int RETRACE_IMPLEMENTATION(uname)(struct utsname *buf)
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_uname(buf);
-	if (errno)
+	if (ret != 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);

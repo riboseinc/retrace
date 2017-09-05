@@ -78,7 +78,7 @@ RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 		event_info.extra_info = "no timeout";
 	}
 
-	if (errno)
+	if (ret < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);

@@ -1828,7 +1828,7 @@ static void parse_logging_options(int opt_type, char *opt_str)
 
 		for (i = 0; rtr_logging_groups[i] != NULL; i++) {
 			if (rtr_check_config_token(rtr_logging_groups[i], opt_str, sep, &reverse)) {
-				int bit_val = exp2(i);
+				int bit_val = 1 << i;
 
 				if (!reverse)
 					opt_val |= bit_val;
