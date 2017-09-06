@@ -137,7 +137,7 @@ void *RETRACE_IMPLEMENTATION(malloc)(size_t bytes)
 
 	if (!redirect) {
 		p = real_malloc(bytes);
-		if (errno)
+		if (!p)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
@@ -212,7 +212,7 @@ void *RETRACE_IMPLEMENTATION(calloc)(size_t nmemb, size_t size)
 
 	if (!redirect) {
 		p = real_calloc(nmemb, size);
-		if (errno)
+		if (!p)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
@@ -267,7 +267,7 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 
 	if (!redirect) {
 		p = real_realloc(ptr, size);
-		if (errno)
+		if (!p)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
@@ -310,8 +310,6 @@ void *RETRACE_IMPLEMENTATION(memcpy)(void *dest, const void *src, size_t n)
 	}
 
 	p = real_memcpy(dest, src, n);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -437,7 +435,7 @@ void *RETRACE_IMPLEMENTATION(mmap)(void *addr, size_t length, int prot, int flag
 
 	if (!redirect) {
 		p = real_mmap(addr, length, prot, flags, fd, offset);
-		if (errno)
+		if (p == MAP_FAILED)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
@@ -468,7 +466,7 @@ int RETRACE_IMPLEMENTATION(munmap)(void *addr, size_t length)
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_munmap(addr, length);
-	if (errno)
+	if (ret < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -519,7 +517,7 @@ int RETRACE_IMPLEMENTATION(brk)(void *addr)
 
 	if (!redirect) {
 		ret = real_brk((void *) addr);
-		if (errno)
+		if (ret < 0)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
@@ -569,7 +567,7 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 
 	if (!redirect) {
 		p = real_sbrk(increment);
-		if (errno)
+		if (p == (void *) -1)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 

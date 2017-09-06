@@ -68,6 +68,8 @@ static struct {
 	{STRINJECT_FUNC_RECV, "recv"},
 	{STRINJECT_FUNC_RECVFROM, "recvfrom"},
 	{STRINJECT_FUNC_RECVMSG, "recvmsg"},
+	{STRINJECT_FUNC_SSL_READ, "SSL_read"},
+	{STRINJECT_FUNC_SSL_WRITE, "SSL_write"},
 	{STRINJECT_FUNC_MAX, NULL}
 };
 

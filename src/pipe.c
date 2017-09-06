@@ -49,7 +49,7 @@ int RETRACE_IMPLEMENTATION(pipe)(int pipefd[2])
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_pipe(pipefd);
-	if (errno)
+	if (ret < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -84,7 +84,7 @@ int RETRACE_IMPLEMENTATION(pipe2)(int pipefd[2], int flags)
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_pipe2(pipefd, flags);
-	if (errno)
+	if (ret < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);

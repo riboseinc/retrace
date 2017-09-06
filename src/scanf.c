@@ -59,9 +59,6 @@ RETRACE_IMPLEMENTATION(scanf)(const char *format, ...)
 	result = real_vscanf(format, ap);
 	va_end(ap);
 
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-
 	va_start(ap, format);
 	retrace_log_and_redirect_after(&event_info);
 
@@ -98,9 +95,6 @@ RETRACE_IMPLEMENTATION(fscanf)(FILE *stream, const char *format, ...)
 	va_start(ap, format);
 	result = real_vfscanf(stream, format, ap);
 	va_end(ap);
-
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	va_start(ap, format);
 	retrace_log_and_redirect_after(&event_info);
@@ -139,9 +133,6 @@ RETRACE_IMPLEMENTATION(sscanf)(const char *str, const char *format, ...)
 	result = real_vsscanf(str, format, ap);
 	va_end(ap);
 
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-
 	va_start(ap, format);
 	retrace_log_and_redirect_after(&event_info);
 	va_end(ap);
@@ -177,9 +168,6 @@ RETRACE_IMPLEMENTATION(vscanf)(const char *format, va_list ap)
 	result = real_vscanf(format, ap1);
 	va_end(ap1);
 
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-
 	__va_copy(ap1, ap);
 	retrace_log_and_redirect_after(&event_info);
 	va_end(ap1);
@@ -214,9 +202,6 @@ RETRACE_IMPLEMENTATION(vsscanf)(const char *str, const char *format, va_list ap)
 	__va_copy(ap1, ap);
 	result = real_vsscanf(str, format, ap1);
 	va_end(ap1);
-
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	__va_copy(ap1, ap);
 	retrace_log_and_redirect_after(&event_info);
@@ -254,9 +239,6 @@ RETRACE_IMPLEMENTATION(vfscanf)(FILE *stream, const char *format, va_list ap)
 	__va_copy(ap1, ap);
 	result = real_vfscanf(stream, format, ap1);
 	va_end(ap1);
-
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	__va_copy(ap1, ap);
 	retrace_log_and_redirect_after(&event_info);

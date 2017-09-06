@@ -62,30 +62,27 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
-	}
 
-	ret = rtr_http_redirect_response(fd, buf, real_nbytes, 0);
-
-	if (ret == 0)
 		ret = real_read(fd, buf, real_nbytes);
-	else
-		event_info.extra_info = "[redirected]";
+	} else {
+		ret = rtr_http_redirect_response(fd, buf, real_nbytes, 0);
+		if (ret == 0) {
+			void *inject_buffer = NULL;
+			size_t inject_len;
 
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-	else {
-		void *inject_buffer = NULL;
-		size_t inject_len;
+			ret = real_read(fd, buf, real_nbytes);
+			if (ret < 0)
+				event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+			else if (ret > 0 && rtr_str_inject(STRINJECT_FUNC_READ, buf, ret, &inject_buffer, &inject_len)) {
+				event_info.extra_info = "[redirected]";
+				event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+				event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
-		if (rtr_str_inject(STRINJECT_FUNC_READ, buf, ret, &inject_buffer, &inject_len)) {
-			event_info.extra_info = "[redirected]";
-			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
-			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+				ret = inject_len > ret ? ret : inject_len;
+				real_memcpy(buf, inject_buffer, ret);
 
-			ret = inject_len > ret ? ret : inject_len;
-			real_memcpy(buf, inject_buffer, ret);
-
-			real_free(inject_buffer);
+				real_free(inject_buffer);
+			}
 		}
 	}
 

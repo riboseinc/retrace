@@ -115,7 +115,7 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_gettimeofday(tv, tz);
-	if (errno)
+	if (ret < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);

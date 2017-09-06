@@ -47,7 +47,7 @@ int RETRACE_IMPLEMENTATION(setuid)(uid_t uid)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_setuid(uid);
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -64,7 +64,6 @@ int RETRACE_IMPLEMENTATION(seteuid)(uid_t uid)
 	void *parameter_values[] = {&uid};
 	int r;
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "seteuid";
 	event_info.function_group = RTR_FUNC_GRP_SYS;
@@ -76,7 +75,7 @@ int RETRACE_IMPLEMENTATION(seteuid)(uid_t uid)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_seteuid(uid);
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -106,7 +105,7 @@ int RETRACE_IMPLEMENTATION(setgid)(gid_t gid)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_setgid(gid);
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);

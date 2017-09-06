@@ -44,7 +44,7 @@ DIR *RETRACE_IMPLEMENTATION(opendir)(const char *dirname)
 	retrace_log_and_redirect_before(&event_info);
 
 	dirp = real_opendir(dirname);
-	if (errno)
+	if (!dirp)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -74,7 +74,7 @@ int RETRACE_IMPLEMENTATION(closedir)(DIR *dirp)
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_closedir(dirp);
-	if (errno)
+	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -104,7 +104,7 @@ DIR *RETRACE_IMPLEMENTATION(fdopendir)(int fd)
 	retrace_log_and_redirect_before(&event_info);
 
 	dirp = real_fdopendir(fd);
-	if (errno)
+	if (!dirp)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -134,7 +134,7 @@ int RETRACE_IMPLEMENTATION(readdir_r)(DIR *dirp, struct dirent *entry, struct di
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_readdir_r(dirp, entry, result);
-	if (errno)
+	if (ret != 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
@@ -166,8 +166,6 @@ long RETRACE_IMPLEMENTATION(telldir)(DIR *dirp)
 	retrace_log_and_redirect_before(&event_info);
 
 	offset = real_telldir(dirp);
-	if (errno)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
 
@@ -245,7 +243,7 @@ int RETRACE_IMPLEMENTATION(dirfd)(DIR *dirp)
 
 	/* get dir fd */
 	dir_fd = real_dirfd(dirp);
-	if (errno)
+	if (dir_fd < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);

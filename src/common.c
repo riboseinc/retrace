@@ -151,7 +151,6 @@ static int rtr_get_config_single_internal(const char *function, ...);
 static void trace_printf_str(const char *string, int maxlength);
 static void trace_dump_data(const unsigned char *buf, size_t nbytes);
 static void trace_mode(mode_t mode, char *p);
-static void trace_printf_backtrace(void);
 
 static int rtr_check_logging_config(struct rtr_event_info *event_info, int stack_trace);
 static void initialize_tracing_key(void);
@@ -646,16 +645,17 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 				trace_printf(0, ",");
 			}
 
+			if (!rp->ai_addr)
+				continue;
+
 			switch (rp->ai_family) {
 			case AF_INET:
 				inet_ntop(rp->ai_family, &(((struct sockaddr_in *)rp->ai_addr)->sin_addr), addr, sizeof(addr));
-
 				trace_printf(0, "%s", addr);
 				break;
 
 			case AF_INET6:
 				inet_ntop(rp->ai_family, &(((struct sockaddr_in6 *)rp->ai_addr)->sin6_addr), addr, sizeof(addr));
-
 				trace_printf(0, "%s", addr);
 				break;
 
@@ -1654,7 +1654,7 @@ trace_mode(mode_t mode, char *p)
 }
 
 /* printf backtrace callback */
-static void
+void
 trace_printf_backtrace()
 {
 	void *callstack[128];
@@ -1802,6 +1802,7 @@ static const char *rtr_logging_groups[] = {
 	"LOG_GROUP_STR",
 	"LOG_GROUP_SSL",
 	"LOG_GROUP_PROC",
+	"LOG_GROUP_TEMP",
 	NULL
 };
 
@@ -1826,7 +1827,7 @@ static void parse_logging_options(int opt_type, char *opt_str)
 
 		for (i = 0; rtr_logging_groups[i] != NULL; i++) {
 			if (rtr_check_config_token(rtr_logging_groups[i], opt_str, sep, &reverse)) {
-				int bit_val = (i == 0) ? 0x01 : i * 2;
+				int bit_val = 1 << i;
 
 				if (!reverse)
 					opt_val |= bit_val;
