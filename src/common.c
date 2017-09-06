@@ -60,7 +60,6 @@
 #include <sys/un.h>
 #include <netdb.h>
 #include <sys/socket.h>
-#include <math.h>
 
 #if HAVE_EXECINFO_H
 #include <execinfo.h>
