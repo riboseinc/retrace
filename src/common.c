@@ -149,18 +149,30 @@ static int log_per_thread;
 static char *output_file_path;
 static pthread_key_t per_thread_logging = -1; /* Per thread FILE * pointer */
 
+#define PRINT_BUFFER_INITIAL_SIZE 1024
+
+struct rtr_print_buf {
+	char buffer[PRINT_BUFFER_INITIAL_SIZE];
+	int size_left;
+	int size;
+};
+
+
 
 static int is_main_thread(void);
-static void trace_set_color(char *color);
+static void trace_set_color(struct rtr_print_buf *print_buffer, char *color);
 
 static int rtr_get_config_single_internal(const char *function, ...);
 
-static void trace_printf_str(const char *string, int maxlength);
-static void trace_dump_data(const unsigned char *buf, size_t nbytes);
+static void trace_printf(struct rtr_print_buf *print_buffer, int hdr, const char *fmt, ...);
+static void trace_printf_backtrace(struct rtr_print_buf *print_buffer);
+static void trace_printf_str(struct rtr_print_buf *print_buffer, const char *string, int maxlength);
+static void trace_dump_data(struct rtr_print_buf *print_buffer, const unsigned char *buf, size_t nbytes);
 static void trace_mode(mode_t mode, char *p);
 
 static int rtr_check_logging_config(struct rtr_event_info *event_info, int stack_trace);
 static void initialize_tracing_key(void);
+
 
 /* Returns time as zero on the first call and in subsequents call
  * returns the time elapsed since the first called */
@@ -238,43 +250,43 @@ retrace_get_thread_file(void)
 }
 
 static void **
-retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, void **value)
+retrace_print_parameter(struct rtr_print_buf *print_buffer, unsigned int event_type, unsigned int type, int flags, void **value)
 {
-	trace_set_color(VAR);
+	trace_set_color(print_buffer, VAR);
 
 	switch (type) {
 	case PARAMETER_TYPE_INT:
-		trace_printf(0, "%d", (*(int *) *value));
+		trace_printf(print_buffer, 0, "%d", (*(int *) *value));
 		break;
 	case PARAMETER_TYPE_POINTER:
-		trace_printf(0, "%p", (*(void **) *value));
+		trace_printf(print_buffer, 0, "%p", (*(void **) *value));
 		break;
 	case PARAMETER_TYPE_UINT:
-		trace_printf(0, "%u", *((unsigned int *) *value));
+		trace_printf(print_buffer, 0, "%u", *((unsigned int *) *value));
 		break;
 	case PARAMETER_TYPE_LONG:
-		trace_printf(0, "%ld", *((long *) *value));
+		trace_printf(print_buffer, 0, "%ld", *((long *) *value));
 		break;
 	case PARAMETER_TYPE_ULONG:
-		trace_printf(0, "%lu", *((unsigned long *) *value));
+		trace_printf(print_buffer, 0, "%lu", *((unsigned long *) *value));
 		break;
 	case PARAMETER_TYPE_FLOAT:
-		trace_printf(0, "%f", *((float *) *value));
+		trace_printf(print_buffer, 0, "%f", *((float *) *value));
 		break;
 	case PARAMETER_TYPE_DOUBLE:
-		trace_printf(0, "%f", *((double *) *value));
+		trace_printf(print_buffer, 0, "%f", *((double *) *value));
 		break;
 	case PARAMETER_TYPE_STRING:
 
 		if (event_type == EVENT_TYPE_BEFORE_CALL && flags & PARAMETER_FLAG_OUTPUT_VARIABLE) {
-			trace_printf(0, "%p", (*(void **) *value));
+			trace_printf(print_buffer, 0, "%p", (*(void **) *value));
 		} else {
 			if ((*(char **) *value) != NULL) {
-				trace_printf(0, "\"");
-				trace_printf_str((*(char **) *value), -1);
-				trace_printf(0, "\"");
+				trace_printf(print_buffer, 0, "\"");
+				trace_printf_str(print_buffer, (*(char **) *value), -1);
+				trace_printf(print_buffer, 0, "\"");
 			} else
-				trace_printf(0, "(nil)");
+				trace_printf(print_buffer, 0, "(nil)");
 		}
 		break;
 	case PARAMETER_TYPE_STRING_LEN:
@@ -284,23 +296,23 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		len = (*(int *) *value);
 		value++;
 
-		trace_printf(0, "\"");
-		trace_printf_str((*(char **) *value), len);
-		trace_printf(0, "\"");
+		trace_printf(print_buffer, 0, "\"");
+		trace_printf_str(print_buffer, (*(char **) *value), len);
+		trace_printf(print_buffer, 0, "\"");
 
 		break;
 	}
 	case PARAMETER_TYPE_MEMORY_BUFFER:
 		value++;
 
-		trace_printf(0, "%p", (*(void **) *value));
+		trace_printf(print_buffer, 0, "%p", (*(void **) *value));
 		break;
 	case PARAMETER_TYPE_MEM_BUFFER_ARRAY:
 		value += 2;
-		trace_printf(0, "%p", (*(void **) *value));
+		trace_printf(print_buffer, 0, "%p", (*(void **) *value));
 		break;
 	case PARAMETER_TYPE_CHAR:
-		trace_printf(0, "'%c'(%d)", (*(char **) *value), *((int *) *value));
+		trace_printf(print_buffer, 0, "'%c'(%d)", (*(char **) *value), *((int *) *value));
 		break;
 	case PARAMETER_TYPE_DIR:
 	{
@@ -312,10 +324,10 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		if (dirp)
 			fd = real_dirfd(dirp);
 
-		trace_printf(0, "%p", dirp);
-		trace_set_color(INF);
-		trace_printf(0, " [fd %d]", fd);
-		trace_set_color(VAR);
+		trace_printf(print_buffer, 0, "%p", dirp);
+		trace_set_color(print_buffer, INF);
+		trace_printf(print_buffer, 0, " [fd %d]", fd);
+		trace_set_color(print_buffer, VAR);
 
 		if (fd > 0) {
 			struct descriptor_info *di;
@@ -323,9 +335,9 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 			di = file_descriptor_get(fd);
 
 			if (di && di->location) {
-				trace_set_color(INF);
-				trace_printf(0, " [%s]", di->location);
-				trace_set_color(VAR);
+				trace_set_color(print_buffer, INF);
+				trace_printf(print_buffer, 0, " [%s]", di->location);
+				trace_set_color(print_buffer, VAR);
 			}
 		}
 
@@ -342,17 +354,17 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		if (stream)
 			fd = real_fileno(stream);
 
-		trace_printf(0, "%p", stream);
-		trace_set_color(INF);
-		trace_printf(0, " [fd %d]", fd);
-		trace_set_color(VAR);
+		trace_printf(print_buffer, 0, "%p", stream);
+		trace_set_color(print_buffer, INF);
+		trace_printf(print_buffer, 0, " [fd %d]", fd);
+		trace_set_color(print_buffer, VAR);
 
 		if (fd > 0) {
 			di = file_descriptor_get(fd);
 			if (di && di->location) {
-				trace_set_color(INF);
-				trace_printf(0, " [%s]", di->location);
-				trace_set_color(VAR);
+				trace_set_color(print_buffer, INF);
+				trace_printf(print_buffer, 0, " [%s]", di->location);
+				trace_set_color(print_buffer, VAR);
 			}
 		}
 
@@ -363,14 +375,14 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		int fd = *((int *) *value);
 		struct descriptor_info *di;
 
-		trace_printf(0, "%d", fd);
+		trace_printf(print_buffer, 0, "%d", fd);
 
 		if (event_type != EVENT_TYPE_BEFORE_CALL || (flags & PARAMETER_FLAG_OUTPUT_VARIABLE)) {
 			di = file_descriptor_get(fd);
 			if (di && di->location) {
-				trace_set_color(INF);
-				trace_printf(0, " [%s]", di->location);
-				trace_set_color(VAR);
+				trace_set_color(print_buffer, INF);
+				trace_printf(print_buffer, 0, " [%s]", di->location);
+				trace_set_color(print_buffer, VAR);
 			}
 		}
 
@@ -378,7 +390,7 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		break;
 	}
 	case PARAMETER_TYPE_INT_OCTAL:
-		trace_printf(0, "%o", *((int *) *value));
+		trace_printf(print_buffer, 0, "%o", *((int *) *value));
 		break;
 	case PARAMETER_TYPE_PRINTF_FORMAT:
 	{
@@ -395,11 +407,11 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		real_vsnprintf(buf, 1024, fmt, *ap);
 		trace_restore(old_trace_state);
 
-		trace_printf(0, "\"");
-		trace_printf_str(fmt, -1);
-		trace_printf(0, "\" -> \"");
-		trace_printf_str(buf, -1);
-		trace_printf(0, "\"");
+		trace_printf(print_buffer, 0, "\"");
+		trace_printf_str(print_buffer, fmt, -1);
+		trace_printf(print_buffer, 0, "\" -> \"");
+		trace_printf_str(print_buffer, buf, -1);
+		trace_printf(print_buffer, 0, "\"");
 
 		break;
 	}
@@ -410,12 +422,12 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		argv = *((char ***) *value);
 
 		while (*argv) {
-			trace_printf_str(*argv, -1);
-			trace_printf(0, ", ");
+			trace_printf_str(print_buffer, *argv, -1);
+			trace_printf(print_buffer, 0, ", ");
 
 			argv++;
 		}
-		trace_printf(0, "NULL");
+		trace_printf(print_buffer, 0, "NULL");
 		break;
 
 	}
@@ -430,7 +442,7 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 
 		buf = *((struct utsname **) *value);
 
-		trace_printf(0, "%p [%s, %s, %s, %s, %s]", buf, buf->sysname, buf->nodename,
+		trace_printf(print_buffer, 0, "%p [%s, %s, %s, %s, %s]", buf, buf->sysname, buf->nodename,
 				buf->release, buf->version, buf->machine);
 		break;
 
@@ -443,13 +455,13 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 
 		tv = *((struct timeval **) *value);
 
-		trace_printf(1, "%p", tv);
+		trace_printf(print_buffer, 1, "%p", tv);
 
 		if (tv) {
 			tv_sec  = tv->tv_sec;
 			tv_usec = tv->tv_usec;
 
-			trace_printf(1, "[%ld, %ld]", tv_sec, tv_usec);
+			trace_printf(print_buffer, 0, "[%ld, %ld]", tv_sec, tv_usec);
 		}
 		break;
 	}
@@ -461,90 +473,90 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 
 		tz = *((struct timezone **) *value);
 
-		trace_printf(0, "%p", tz);
+		trace_printf(print_buffer, 0, "%p", tz);
 		if (tz != NULL) {
 			tz_minuteswest	= tz->tz_minuteswest;
 			tz_dsttime	= tz->tz_dsttime;
 
-			trace_printf(0, "[%d, %d]", tz_minuteswest, tz_dsttime);
+			trace_printf(print_buffer, 0, "[%d, %d]", tz_minuteswest, tz_dsttime);
 		}
 
 		break;
 	}
 	case PARAMETER_TYPE_SSL:
 	case PARAMETER_TYPE_SSL_WITH_KEY:
-		trace_printf(0, "%p", (*(void **) *value));
+		trace_printf(print_buffer, 0, "%p", (*(void **) *value));
 		break;
 
 #if HAVE_STRUCT_FLOCK
 	case PARAMETER_TYPE_STRUCT_FLOCK:
-		trace_printf(1, "struct flock {\n");
-		trace_printf(1, "\tl_start = %zu\n", (*(struct flock **) *value)->l_start);
-		trace_printf(1, "\tl_len = %zu\n", (*(struct flock **) *value)->l_len);
-		trace_printf(1, "\tl_pid = %d\n", (*(struct flock **) *value)->l_pid);
-		trace_printf(1, "\tl_type = %d\n", (*(struct flock **) *value)->l_type);
-		trace_printf(1, "\tl_whence = %d\n", (*(struct flock **) *value)->l_whence);
-		trace_printf(1, "}\n");
+		trace_printf(print_buffer, 1, "struct flock {\n");
+		trace_printf(print_buffer, 1, "\tl_start = %zu\n", (*(struct flock **) *value)->l_start);
+		trace_printf(print_buffer, 1, "\tl_len = %zu\n", (*(struct flock **) *value)->l_len);
+		trace_printf(print_buffer, 1, "\tl_pid = %d\n", (*(struct flock **) *value)->l_pid);
+		trace_printf(print_buffer, 1, "\tl_type = %d\n", (*(struct flock **) *value)->l_type);
+		trace_printf(print_buffer, 1, "\tl_whence = %d\n", (*(struct flock **) *value)->l_whence);
+		trace_printf(print_buffer, 1, "}\n");
 		break;
 #endif
 
 #if HAVE_STRUCT_FSTORE
 	case PARAMETER_TYPE_STRUCT_FSTORE:
-		trace_printf(1, "struct fstore {\n");
-		trace_printf(1, "\tfst_flags = %zu\n", (*(struct fstore **) *value)->fst_flags);
-		trace_printf(1, "\tfst_posmode = %d\n", (*(struct fstore **) *value)->fst_posmode);
-		trace_printf(1, "\tfst_offset = %zu\n", (*(struct fstore **) *value)->fst_offset);
-		trace_printf(1, "\tfst_length = %zu\n", (*(struct fstore **) *value)->fst_length);
-		trace_printf(1, "\tfst_bytesalloc = %zu\n", (*(struct fstore **) *value)->fst_bytesalloc);
-		trace_printf(1, "}\n");
+		trace_printf(print_buffer, 1, "struct fstore {\n");
+		trace_printf(print_buffer, 1, "\tfst_flags = %zu\n", (*(struct fstore **) *value)->fst_flags);
+		trace_printf(print_buffer, 1, "\tfst_posmode = %d\n", (*(struct fstore **) *value)->fst_posmode);
+		trace_printf(print_buffer, 1, "\tfst_offset = %zu\n", (*(struct fstore **) *value)->fst_offset);
+		trace_printf(print_buffer, 1, "\tfst_length = %zu\n", (*(struct fstore **) *value)->fst_length);
+		trace_printf(print_buffer, 1, "\tfst_bytesalloc = %zu\n", (*(struct fstore **) *value)->fst_bytesalloc);
+		trace_printf(print_buffer, 1, "}\n");
 		break;
 #endif
 
 #if HAVE_STRUCT_FPUNCHHOLE
 	case PARAMETER_TYPE_STRUCT_FPUNCHHOLE:
-		trace_printf(1, "struct fpunchhole {\n");
-		trace_printf(1, "\tfp_flags = %zu\n", (*(struct fpunchhole **) *value)->fp_flags);
-		trace_printf(1, "\tfp_offset = %zu\n", (*(struct fpunchhole **) *value)->fp_offset);
-		trace_printf(1, "\tfp_length = %zu\n", (*(struct fpunchhole **) *value)->fp_length);
-		trace_printf(1, "}\n");
+		trace_printf(print_buffer, 1, "struct fpunchhole {\n");
+		trace_printf(print_buffer, 1, "\tfp_flags = %zu\n", (*(struct fpunchhole **) *value)->fp_flags);
+		trace_printf(print_buffer, 1, "\tfp_offset = %zu\n", (*(struct fpunchhole **) *value)->fp_offset);
+		trace_printf(print_buffer, 1, "\tfp_length = %zu\n", (*(struct fpunchhole **) *value)->fp_length);
+		trace_printf(print_buffer, 1, "}\n");
 		break;
 #endif
 
 #if HAVE_STRUCT_RADVISORY
 	case PARAMETER_TYPE_STRUCT_RADVISORY:
-		trace_printf(1, "struct radvisory {\n");
-		trace_printf(1, "\tra_offset = %zu\n", (*(struct radvisory **) *value)->ra_offset);
-		trace_printf(1, "\tra_count = %zu\n", (*(struct radvisory **) *value)->ra_count);
-		trace_printf(1, "}\n");
+		trace_printf(print_buffer, 1, "struct radvisory {\n");
+		trace_printf(print_buffer, 1, "\tra_offset = %zu\n", (*(struct radvisory **) *value)->ra_offset);
+		trace_printf(print_buffer, 1, "\tra_count = %zu\n", (*(struct radvisory **) *value)->ra_count);
+		trace_printf(print_buffer, 1, "}\n");
 		break;
 #endif
 
 #if HAVE_STRUCT_FBOOTSTRAPTRANSFER
 	case PARAMETER_TYPE_STRUCT_FBOOTSTRAPTRANSFER:
-		trace_printf(1, "struct fbootstraptransfer {\n");
-		trace_printf(1, "\tfbt_offset = %zu\n", (*(struct fbootstraptransfer **) *value)->fbt_offset);
-		trace_printf(1, "\tfbt_length = %zu\n", (*(struct fbootstraptransfer **) *value)->fbt_length);
-		trace_printf(1, "\tfbt_buffer = %p\n", (*(struct fbootstraptransfer **) *value)->fbt_buffer);
-		trace_printf(1, "}\n");
+		trace_printf(print_buffer, 1, "struct fbootstraptransfer {\n");
+		trace_printf(print_buffer, 1, "\tfbt_offset = %zu\n", (*(struct fbootstraptransfer **) *value)->fbt_offset);
+		trace_printf(print_buffer, 1, "\tfbt_length = %zu\n", (*(struct fbootstraptransfer **) *value)->fbt_length);
+		trace_printf(print_buffer, 1, "\tfbt_buffer = %p\n", (*(struct fbootstraptransfer **) *value)->fbt_buffer);
+		trace_printf(print_buffer, 1, "}\n");
 		break;
 #endif
 
 #if HAVE_STRUCT_LOG2PHYS
 	case PARAMETER_TYPE_STRUCT_LOG2PHYS:
-		trace_printf(1, "struct log2phys {\n");
-		trace_printf(1, "\tl2p_flags = %zu\n", (*(struct log2phys **) *value)->l2p_flags);
-		trace_printf(1, "\tl2p_contigbytes = %zu\n", (*(struct log2phys **) *value)->l2p_contigbytes);
-		trace_printf(1, "\tl2p_devoffset = %zu\n", (*(struct log2phys **) *value)->l2p_devoffset);
-		trace_printf(1, "}\n");
+		trace_printf(print_buffer, 1, "struct log2phys {\n");
+		trace_printf(print_buffer, 1, "\tl2p_flags = %zu\n", (*(struct log2phys **) *value)->l2p_flags);
+		trace_printf(print_buffer, 1, "\tl2p_contigbytes = %zu\n", (*(struct log2phys **) *value)->l2p_contigbytes);
+		trace_printf(print_buffer, 1, "\tl2p_devoffset = %zu\n", (*(struct log2phys **) *value)->l2p_devoffset);
+		trace_printf(print_buffer, 1, "}\n");
 		break;
 #endif
 
 #if HAVE_DECL_F_GETOWN_EX
 	case PARAMETER_TYPE_STRUCT_F_GETOWN_EX:
-		trace_printf(1, "struct f_owner_ex {\n");
-		trace_printf(1, "\ttype = %d\n", (*(struct f_owner_ex **) *value)->type);
-		trace_printf(1, "\tpid = %zu\n", (*(struct f_owner_ex **) *value)->pid);
-		trace_printf(1, "}\n");
+		trace_printf(print_buffer, 1, "struct f_owner_ex {\n");
+		trace_printf(print_buffer, 1, "\ttype = %d\n", (*(struct f_owner_ex **) *value)->type);
+		trace_printf(print_buffer, 1, "\tpid = %zu\n", (*(struct f_owner_ex **) *value)->pid);
+		trace_printf(print_buffer, 1, "}\n");
 		break;
 #endif
 	case PARAMETER_TYPE_PERM:
@@ -552,10 +564,10 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 		char perm[10];
 
 		trace_mode(*((mode_t *) *value), perm);
-		trace_printf(0, "%o", *((int *) *value));
-		trace_set_color(INF);
-		trace_printf(0, " [%s]", perm);
-		trace_set_color(VAR);
+		trace_printf(print_buffer, 0, "%o", *((int *) *value));
+		trace_set_color(print_buffer, INF);
+		trace_printf(print_buffer, 0, " [%s]", perm);
+		trace_set_color(print_buffer, VAR);
 
 		break;
 	}
@@ -564,26 +576,26 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 	{
 		char perm[10];
 
-		trace_printf(1, "struct stat {\n");
-		trace_printf(1, "\tst_dev = %lu\n", (*(struct stat **) *value)->st_dev);
-		trace_printf(1, "\tst_ino = %i\n", (*(struct stat **) *value)->st_ino);
+		trace_printf(print_buffer, 1, "struct stat {\n");
+		trace_printf(print_buffer, 1, "\tst_dev = %lu\n", (*(struct stat **) *value)->st_dev);
+		trace_printf(print_buffer, 1, "\tst_ino = %i\n", (*(struct stat **) *value)->st_ino);
 		trace_mode((*(struct stat **) *value)->st_mode, perm);
-		trace_printf(1, "\tst_mode = %d [%s]\n", (*(struct stat **) *value)->st_mode, perm);
-		trace_printf(1, "\tst_nlink = %lu\n", (*(struct stat **) *value)->st_nlink);
-		trace_printf(1, "\tst_uid = %d\n", (*(struct stat **) *value)->st_uid);
-		trace_printf(1, "\tst_gid = %d\n", (*(struct stat **) *value)->st_gid);
-		trace_printf(1, "\tst_rdev = %r\n", (*(struct stat **) *value)->st_rdev);
-		trace_printf(1, "\tst_atime = %lu\n", (*(struct stat **) *value)->st_atime);
-		trace_printf(1, "\tst_mtime = %lu\n", (*(struct stat **) *value)->st_mtime);
-		trace_printf(1, "\tst_ctime = %lu\n", (*(struct stat **) *value)->st_ctime);
-		trace_printf(1, "\tst_size = %zu\n", (*(struct stat **) *value)->st_size);
-		trace_printf(1, "\tst_blocks = %lu\n", (*(struct stat **) *value)->st_blocks);
-		trace_printf(1, "\tst_blksize = %lu\n", (*(struct stat **) *value)->st_blksize);
+		trace_printf(print_buffer, 1, "\tst_mode = %d [%s]\n", (*(struct stat **) *value)->st_mode, perm);
+		trace_printf(print_buffer, 1, "\tst_nlink = %lu\n", (*(struct stat **) *value)->st_nlink);
+		trace_printf(print_buffer, 1, "\tst_uid = %d\n", (*(struct stat **) *value)->st_uid);
+		trace_printf(print_buffer, 1, "\tst_gid = %d\n", (*(struct stat **) *value)->st_gid);
+		trace_printf(print_buffer, 1, "\tst_rdev = %r\n", (*(struct stat **) *value)->st_rdev);
+		trace_printf(print_buffer, 1, "\tst_atime = %lu\n", (*(struct stat **) *value)->st_atime);
+		trace_printf(print_buffer, 1, "\tst_mtime = %lu\n", (*(struct stat **) *value)->st_mtime);
+		trace_printf(print_buffer, 1, "\tst_ctime = %lu\n", (*(struct stat **) *value)->st_ctime);
+		trace_printf(print_buffer, 1, "\tst_size = %zu\n", (*(struct stat **) *value)->st_size);
+		trace_printf(print_buffer, 1, "\tst_blocks = %lu\n", (*(struct stat **) *value)->st_blocks);
+		trace_printf(print_buffer, 1, "\tst_blksize = %lu\n", (*(struct stat **) *value)->st_blksize);
 #if __APPLE__
-		trace_printf(1, "\tst_flags = %d\n", (*(struct stat **) *value)->st_flags);
-		trace_printf(1, "\tst_gen = %d\n", (*(struct stat **) *value)->st_gen);
+		trace_printf(print_buffer, 1, "\tst_flags = %d\n", (*(struct stat **) *value)->st_flags);
+		trace_printf(print_buffer, 1, "\tst_gen = %d\n", (*(struct stat **) *value)->st_gen);
 #endif
-		trace_printf(1, "}\n");
+		trace_printf(print_buffer, 1, "}\n");
 
 		break;
 	}
@@ -591,25 +603,25 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 	case PARAMETER_TYPE_STRUCT_SOCKADDR:
 		switch ((*(struct sockaddr **) *value)->sa_family) {
 		case AF_INET:
-			trace_printf(0, "%s:%d[AF_INET]",
+			trace_printf(print_buffer, 0, "%s:%d[AF_INET]",
 						 inet_ntoa(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_addr),
 						 ntohs(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_port));
 			break;
 
 #ifdef AF_INET6
 		case AF_INET6:
-			trace_printf(0, "[%s]:%d[AF_INET6]",
+			trace_printf(print_buffer, 0, "[%s]:%d[AF_INET6]",
 						 inet_ntoa(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_addr),
 						 ntohs(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_port));
 			break;
 #endif
 
 		case AF_UNIX:
-			trace_printf(0, "%s[AF_UNIX|AF_LOCAL]", ((struct sockaddr_un *)(*(struct sockaddr **) *value))->sun_path);
+			trace_printf(print_buffer, 0, "%s[AF_UNIX|AF_LOCAL]", ((struct sockaddr_un *)(*(struct sockaddr **) *value))->sun_path);
 			break;
 
 		default:
-			trace_printf(0, "unssuported sa_family: %d", (*(struct sockaddr **) *value)->sa_family);
+			trace_printf(print_buffer, 0, "unssuported sa_family: %d", (*(struct sockaddr **) *value)->sa_family);
 			break;
 		}
 		break;
@@ -634,14 +646,14 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 
 		for (fd = 0; fd < nfds; fd++) {
 			if (FD_ISSET(fd, &in)) {
-				trace_printf(0, "%.*s%.*s%d", comma, ",",
+				trace_printf(print_buffer, 0, "%.*s%.*s%d", comma, ",",
 							 FD_ISSET(fd, out) ? 1 : 0, "+", fd);
 
 				if (comma == 0)
 					comma = 1;
 			}
 		}
-		trace_printf(0, ")");
+		trace_printf(print_buffer, 0, ")");
 
 		break;
 	}
@@ -655,7 +667,7 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 			char ip_addr[INET6_ADDRSTRLEN];
 
 			inet_ntop(hent->h_addrtype, hent->h_addr_list[i], ip_addr, sizeof(ip_addr));
-			trace_printf(0, i > 0 ? ",%s" : "%s", ip_addr);
+			trace_printf(print_buffer, 0, i > 0 ? ",%s" : "%s", ip_addr);
 		}
 
 		break;
@@ -672,7 +684,7 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 
 		inet_ntop(type, addr, ip_addr, sizeof(ip_addr));
 
-		trace_printf(0, "%s", addr);
+		trace_printf(print_buffer, 0, "%s", addr);
 
 		break;
 	}
@@ -685,7 +697,7 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 			char addr[INET6_ADDRSTRLEN];
 
 			if (rp != result) {
-				trace_printf(0, ",");
+				trace_printf(print_buffer, 0, ",");
 			}
 
 			if (!rp->ai_addr)
@@ -694,35 +706,35 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 			switch (rp->ai_family) {
 			case AF_INET:
 				inet_ntop(rp->ai_family, &(((struct sockaddr_in *)rp->ai_addr)->sin_addr), addr, sizeof(addr));
-				trace_printf(0, "%s", addr);
+				trace_printf(print_buffer, 0, "%s", addr);
 				break;
 
 			case AF_INET6:
 				inet_ntop(rp->ai_family, &(((struct sockaddr_in6 *)rp->ai_addr)->sin6_addr), addr, sizeof(addr));
-				trace_printf(0, "%s", addr);
+				trace_printf(print_buffer, 0, "%s", addr);
 				break;
 
 			default:
-				trace_printf(0, "AI_FAMILY:%d", rp->ai_family);
+				trace_printf(print_buffer, 0, "AI_FAMILY:%d", rp->ai_family);
 				break;
 			}
 		}
 
-		trace_printf(0, "]\n");
+		trace_printf(print_buffer, 0, "]\n");
 
 		break;
 	}
 
 	}
 
-	trace_set_color(RST);
+	trace_set_color(print_buffer, RST);
 
 	/* There's a string following this parameter that expands its meaning */
 	if ((flags & PARAMETER_FLAG_STRING_NEXT) == PARAMETER_FLAG_STRING_NEXT) {
 		value++;
-		trace_set_color(INF);
-		trace_printf(0, " [%s]", (*(char **) *value));
-		trace_set_color(RST);
+		trace_set_color(print_buffer, INF);
+		trace_printf(print_buffer, 0, " [%s]", (*(char **) *value));
+		trace_set_color(print_buffer, RST);
 	}
 
 	return value + 1;
@@ -730,16 +742,16 @@ retrace_print_parameter(unsigned int event_type, unsigned int type, int flags, v
 
 #ifdef HAVE_OPENSSL_SSL_H
 static void
-retrace_print_key(const unsigned char *buf, int len)
+retrace_print_key(struct rtr_print_buf *print_buffer, const unsigned char *buf, int len)
 {
 	int i;
 	for (i = 0; i < len; i++) {
-		trace_printf(0, "%02X", buf[i]);
+		trace_printf(print_buffer, 0, "%02X", buf[i]);
 	}
 }
 
 static void
-retrace_print_ssl_keys(void *_ssl)
+retrace_print_ssl_keys(struct rtr_print_buf *print_buffer, void *_ssl)
 {
 	SSL *ssl = (SSL *) _ssl;
 
@@ -790,17 +802,17 @@ retrace_print_ssl_keys(void *_ssl)
 	}
 
 	if (master_key_length > 0 && client_random_length > 0) {
-		trace_printf(0, "\tCLIENT_RANDOM ");
-		retrace_print_key(client_random, client_random_length);
-		trace_printf(0, " ");
-		retrace_print_key(master_key, master_key_length);
-		trace_printf(0, "\n");
+		trace_printf(print_buffer, 0, "\tCLIENT_RANDOM ");
+		retrace_print_key(print_buffer, client_random, client_random_length);
+		trace_printf(print_buffer, 0, " ");
+		retrace_print_key(print_buffer, master_key, master_key_length);
+		trace_printf(print_buffer, 0, "\n");
 	}
 }
 #endif
 
 void **
-retrace_dump_parameter(unsigned int type, int flags, void **value)
+retrace_dump_parameter(struct rtr_print_buf *print_buffer, unsigned int type, int flags, void **value)
 {
 	if (type == PARAMETER_TYPE_MEMORY_BUFFER) {
 		int size;
@@ -809,7 +821,7 @@ retrace_dump_parameter(unsigned int type, int flags, void **value)
 		value++;
 
 		if (size > 0)
-			trace_dump_data((*(unsigned char **) *value), size);
+			trace_dump_data(print_buffer, (*(unsigned char **) *value), size);
 	} else if (type == PARAMETER_TYPE_MEM_BUFFER_ARRAY) {
 		int size;
 		int nmemb;
@@ -823,10 +835,10 @@ retrace_dump_parameter(unsigned int type, int flags, void **value)
 		data = *((void **) (*value));
 
 		if (size == 1) /* Special case for size == 1 */
-			trace_dump_data((*(unsigned char **) *value), nmemb);
+			trace_dump_data(print_buffer, (*(unsigned char **) *value), nmemb);
 		else if (size > 0)
 			for (i = 0; i < nmemb; i++)
-				trace_dump_data(data + i, size);
+				trace_dump_data(print_buffer, data + i, size);
 	} else if (type == PARAMETER_TYPE_IOVEC) {
 		int i;
 		int size;
@@ -840,14 +852,14 @@ retrace_dump_parameter(unsigned int type, int flags, void **value)
 			struct iovec *msg_iov = &iov[i];
 
 			if (msg_iov->iov_len > 0)
-				trace_dump_data((unsigned char *) iov->iov_base, msg_iov->iov_len);
+				trace_dump_data(print_buffer, (unsigned char *) iov->iov_base, msg_iov->iov_len);
 		}
 	} else if (type == PARAMETER_TYPE_SSL_WITH_KEY) {
 #ifdef HAVE_OPENSSL_SSL_H
 		void *ssl = (*(void **) *value);
 
 		if (ssl != NULL)
-			retrace_print_ssl_keys(ssl);
+			retrace_print_ssl_keys(print_buffer, ssl);
 #endif /* HAVE_OPENSSL_SSL */
 	}
 
@@ -862,6 +874,11 @@ retrace_event(struct rtr_event_info *event_info)
 	int old_trace_state;
 	static int loaded_config;
 	FILE *out_file_tmp = NULL;
+	FILE *output_file_current = stderr;
+	struct rtr_print_buf print_buffer;
+
+	print_buffer.size = PRINT_BUFFER_INITIAL_SIZE;
+	print_buffer.size_left = PRINT_BUFFER_INITIAL_SIZE;
 
 	if (!get_tracing_enabled())
 		return;
@@ -875,7 +892,6 @@ retrace_event(struct rtr_event_info *event_info)
 	}
 
 	old_trace_state = trace_disable();
-	pthread_mutex_lock(&printing_lock);
 	olderrno = errno;
 
 	if (!loaded_config) {
@@ -896,7 +912,6 @@ retrace_event(struct rtr_event_info *event_info)
 	}
 
 	if (!rtr_check_logging_config(event_info, 0)) {
-		pthread_mutex_unlock(&printing_lock);
 		trace_restore(old_trace_state);
 
 		return;
@@ -913,15 +928,15 @@ retrace_event(struct rtr_event_info *event_info)
 
 #if 0
 		if (event_info->event_type == EVENT_TYPE_BEFORE_CALL)
-			trace_printf(1, "->: ", event_info->function_name);
+			trace_printf(&print_buffer, 1, "->: ", event_info->function_name);
 		else if (event_info->event_type == EVENT_TYPE_AFTER_CALL)
-			trace_printf(1, "<-: ", event_info->function_name);
+			trace_printf(&print_buffer, 1, "<-: ", event_info->function_name);
 #endif
 
-		trace_set_color(FUNC);
-		trace_printf(1, "%s", event_info->function_name);
-		trace_set_color(RST);
-		trace_printf(0, "(");
+		trace_set_color(&print_buffer, FUNC);
+		trace_printf(&print_buffer, 1, "%s", event_info->function_name);
+		trace_set_color(&print_buffer, RST);
+		trace_printf(&print_buffer, 0, "(");
 
 		while (GET_PARAMETER_TYPE(*parameter_type) != PARAMETER_TYPE_END) {
 
@@ -934,9 +949,9 @@ retrace_event(struct rtr_event_info *event_info)
 			if (first)
 				first = 0;
 			else
-				trace_printf(0, ", ");
+				trace_printf(&print_buffer, 0, ", ");
 
-			parameter_value = retrace_print_parameter(event_info->event_type,
+			parameter_value = retrace_print_parameter(&print_buffer, event_info->event_type,
 								  GET_PARAMETER_TYPE(*parameter_type),
 								  GET_PARAMETER_FLAGS(*parameter_type),
 								  parameter_value);
@@ -944,22 +959,22 @@ retrace_event(struct rtr_event_info *event_info)
 			parameter_type++;
 		}
 
-		trace_printf(0, ")");
+		trace_printf(&print_buffer, 0, ")");
 
 		/* Return value is only valid in EVENT_TYPE_AFTER_CALL */
 		if (event_info->event_type == EVENT_TYPE_AFTER_CALL && event_info->return_value_type != PARAMETER_TYPE_END) {
-			trace_printf(0, " = ");
-			retrace_print_parameter(event_info->event_type,
+			trace_printf(&print_buffer, 0, " = ");
+			retrace_print_parameter(&print_buffer, event_info->event_type,
 						 GET_PARAMETER_TYPE(event_info->return_value_type),
 						 GET_PARAMETER_FLAGS(event_info->return_value_type),
 						 &event_info->return_value);
 		}
 
 		if (event_info->extra_info)
-			trace_printf(0, " [%s]", event_info->extra_info);
+			trace_printf(&print_buffer, 0, " [%s]", event_info->extra_info);
 
 		if (event_info->event_flags & EVENT_FLAGS_PRINT_RAND_SEED)
-			trace_printf(0, " [fuzzing seed: %u]", g_rand_seed);
+			trace_printf(&print_buffer, 0, " [fuzzing seed: %u]", g_rand_seed);
 
 		if (event_info->event_type == EVENT_TYPE_AFTER_CALL) {
 			static int loaded_time_config;
@@ -979,14 +994,14 @@ retrace_event(struct rtr_event_info *event_info)
 				elapsed_time = retrace_get_time() - event_info->start_time;
 
 				if (elapsed_time >= timestamp_limit) {
-					trace_set_color(INF);
-					trace_printf(0, " [took: %0.5f]", elapsed_time);
-					trace_set_color(RST);
+					trace_set_color(&print_buffer, INF);
+					trace_printf(&print_buffer, 0, " [took: %0.5f]", elapsed_time);
+					trace_set_color(&print_buffer, RST);
 				}
 			}
 		}
 
-		trace_printf(0, "\n");
+		trace_printf(&print_buffer, 0, "\n");
 
 		/* Give another pass to dump memory buffers in case we have any */
 		if (has_memory_buffers && event_info->event_type == EVENT_TYPE_AFTER_CALL) {
@@ -994,7 +1009,7 @@ retrace_event(struct rtr_event_info *event_info)
 			parameter_value = event_info->parameter_values;
 
 			while (GET_PARAMETER_TYPE(*parameter_type) != PARAMETER_TYPE_END) {
-				parameter_value = retrace_dump_parameter(GET_PARAMETER_TYPE(*parameter_type), 0, parameter_value);
+				parameter_value = retrace_dump_parameter(&print_buffer, GET_PARAMETER_TYPE(*parameter_type), 0, parameter_value);
 				parameter_type++;
 			}
 
@@ -1003,12 +1018,26 @@ retrace_event(struct rtr_event_info *event_info)
 
 	if ((event_info->event_flags & EVENT_FLAGS_PRINT_BACKTRACE) &&
 		(rtr_check_logging_config(event_info, 1))) {
-		trace_printf_backtrace();
+		trace_printf_backtrace(&print_buffer);
 	}
+
+	if (log_per_thread) {
+		FILE *tmp;
+
+		tmp = retrace_get_thread_file();
+
+		if (tmp)
+			output_file_current = tmp;
+	} else if (output_file)
+		output_file_current = output_file;
+
+	real_fputs(print_buffer.buffer, output_file_current);
+
+	if (output_file_flush)
+		fflush(output_file_current);
 
 	errno = olderrno;
 
-	pthread_mutex_unlock(&printing_lock);
 	trace_restore(old_trace_state);
 }
 
@@ -1035,11 +1064,12 @@ struct config_entry {
 STAILQ_HEAD(config_head, config_entry);
 
 static void
-trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
+trace_printfv(struct rtr_print_buf *print_buffer, int hdr, char *color, const char *fmt, va_list arglist)
 {
 	int old_trace_state;
 	FILE *output_file_current = stderr;
 	int is_a_tty = 0;
+	int ret;
 
 	if (log_per_thread) {
 		FILE *tmp;
@@ -1054,16 +1084,33 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 	old_trace_state = trace_disable();
 
 	if (hdr == 1) {
-		real_fprintf(output_file_current, "(%d) ", real_getpid());
+		ret = real_snprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
+					 print_buffer->size_left, "(%d) ", real_getpid());
+		if (ret > 0)
+			print_buffer->size_left -= ret;
+		if (print_buffer->size_left < 0)
+			print_buffer->size_left = 0;
 
-		if (!is_main_thread())
-			real_fprintf(output_file_current, "(thread: %u) ", pthread_self());
+		if (!is_main_thread()) {
+			ret = real_snprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
+					 print_buffer->size_left, "(thread: %u) ", pthread_self());
+
+			if (ret > 0)
+				print_buffer->size_left -= ret;
+			if (print_buffer->size_left < 0)
+				print_buffer->size_left = 0;
+		}
 
 		if (show_timestamp) {
 			float current_time;
 
 			current_time = retrace_get_time();
-			real_fprintf(output_file_current, "(%0.5f) ", current_time);
+			ret = real_snprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
+						 print_buffer->size_left, "(%0.5f) ", current_time);
+			if (ret > 0)
+				print_buffer->size_left -= ret;
+			if (print_buffer->size_left < 0)
+				print_buffer->size_left = 0;
 		}
 	}
 
@@ -1073,38 +1120,47 @@ trace_printfv(int hdr, char *color, const char *fmt, va_list arglist)
 		fd = real_fileno(output_file_current);
 		is_a_tty = isatty(fd);
 
-		if (is_a_tty)
-			real_fputs(color, output_file_current);
+		if (is_a_tty) {
+			ret = real_snprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
+					print_buffer->size_left, "%s", color);
+			if (ret > 0)
+				print_buffer->size_left -= ret;
+			if (print_buffer->size_left < 0)
+				print_buffer->size_left = 0;
+		}
 	}
 
-	if (arglist)
-		real_vfprintf(output_file_current, fmt, arglist);
+	if (arglist) {
+		ret = real_vsnprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
+							  print_buffer->size_left, fmt, arglist);
+		if (ret > 0)
+			print_buffer->size_left -= ret;
+		if (print_buffer->size_left < 0)
+			print_buffer->size_left = 0;
 
-	if (output_file_flush)
-		fflush(output_file_current);
-
+	}
 	trace_restore(old_trace_state);
 }
 
 static void
-trace_set_color(char *color)
+trace_set_color(struct rtr_print_buf *print_buffer, char *color)
 {
-	trace_printfv(0, color, "", NULL);
+	trace_printfv(print_buffer, 0, color, "", NULL);
 }
 
 
-void
-trace_printf(int hdr, const char *fmt, ...)
+static void
+trace_printf(struct rtr_print_buf *print_buffer, int hdr, const char *fmt, ...)
 {
 	va_list arglist;
 
 	va_start(arglist, fmt);
-	trace_printfv(hdr, NULL, fmt, arglist);
+	trace_printfv(print_buffer, hdr, NULL, fmt, arglist);
 	va_end(arglist);
 }
 
 static void
-trace_printf_str(const char *string, int maxlength)
+trace_printf_str(struct rtr_print_buf *print_buffer, const char *string, int maxlength)
 {
 	static const char CR[] = VAR "\\r" RST;
 	static const char LF[] = VAR "\\n" RST;
@@ -1147,12 +1203,12 @@ trace_printf_str(const char *string, int maxlength)
 
 	trace_restore(old_trace_state);
 
-	trace_printf(0, buf);
+	trace_printf(print_buffer, 0, buf);
 }
 
 #define DUMP_LINE_SIZE 20
 static void
-trace_dump_data(const unsigned char *buf, size_t nbytes)
+trace_dump_data(struct rtr_print_buf *print_buffer, const unsigned char *buf, size_t nbytes)
 {
 	static const char fmt[] = "\t%07u\t%s | %s\n";
 	static const size_t asc_len = DUMP_LINE_SIZE + 1;
@@ -1177,7 +1233,7 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 		if (i % DUMP_LINE_SIZE == 0) {
 			if (i) {
 				trace_restore(old_trace_state);
-				trace_printf(0, fmt, i - DUMP_LINE_SIZE, hex_str, asc_str);
+				trace_printf(print_buffer, 0, fmt, i - DUMP_LINE_SIZE, hex_str, asc_str);
 				old_trace_state = trace_disable();
 			}
 			hexp = hex_str;
@@ -1194,7 +1250,7 @@ trace_dump_data(const unsigned char *buf, size_t nbytes)
 		real_sprintf(hexp, "%*s", n * 2 + n/2, "");
 
 		trace_restore(old_trace_state);
-		trace_printf(0, fmt, i - DUMP_LINE_SIZE + n, hex_str, asc_str);
+		trace_printf(print_buffer, 0, fmt, i - DUMP_LINE_SIZE + n, hex_str, asc_str);
 		old_trace_state = trace_disable();
 	}
 
@@ -1706,8 +1762,8 @@ trace_mode(mode_t mode, char *p)
 }
 
 /* printf backtrace callback */
-void
-trace_printf_backtrace()
+static void
+trace_printf_backtrace(struct rtr_print_buf *print_buffer)
 {
 	void *callstack[128];
 	int old_trace_state;
@@ -1721,12 +1777,12 @@ trace_printf_backtrace()
 	char **strs = backtrace_symbols(callstack, frames);
 
 	if (strs != NULL) {
-		trace_set_color(INF);
-		trace_printf(1, "======== begin callstack =========\n");
+		trace_set_color(print_buffer, INF);
+		trace_printf(print_buffer, 1, "======== begin callstack =========\n");
 		for (i = 2; i < frames; ++i)
-			trace_printf(1, "%s\n", strs[i]);
-		trace_printf(1, "======== end callstack =========\n");
-		trace_set_color(RST);
+			trace_printf(print_buffer, 1, "%s\n", strs[i]);
+		trace_printf(print_buffer, 1, "======== end callstack =========\n");
+		trace_set_color(print_buffer, RST);
 
 		real_free(strs);
 	}
