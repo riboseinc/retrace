@@ -1217,13 +1217,10 @@ trace_dump_data(struct rtr_print_buf *print_buffer, const unsigned char *buf, si
 	char *hex_str, *asc_str;
 	char *hexp, *ascp;
 	size_t i;
-	int disable = 0;
 	int old_trace_state;
 
-	if (rtr_get_config_single_internal("disabledatadump", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &disable)) {
-		if (disable)
-			return;
-	}
+	if (rtr_get_config_single_internal("disabledatadump", ARGUMENT_TYPE_END))
+		return;
 
 	old_trace_state = trace_disable();
 
