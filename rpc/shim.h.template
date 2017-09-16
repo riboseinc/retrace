@@ -1,0 +1,22 @@
+{{=[[ ]]=}}
+#ifndef __RTR_SHIM_H__
+#define __RTR_SHIM_H__
+
+#include "../config.h"
+
+#include <dirent.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <stdarg.h>
+
+#include "functions.h"
+
+[[#functions]]
+typedef [[ctype]](*rtr_[[name]]_t)([[#params]][[ctype]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]]);
+extern rtr_[[name]]_t real_[[name]];
+[[/functions]]
+
+extern int trace_functions[RPC_FUNCTION_COUNT];
+
+#endif

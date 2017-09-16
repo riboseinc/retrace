@@ -1,0 +1,30 @@
+{{=[[ ]]=}}
+#ifndef __RETRACE_FUNCTIONS_H__
+#define __RETRACE_FUNCTIONS_H__
+
+#include "../config.h"
+
+#include <dirent.h>
+#include <stdio.h>
+#include <sys/types.h>
+
+enum retrace_function_id {
+	[[#functions]]
+	RPC_[[name]],
+	[[/functions]]
+	RPC_FUNCTION_COUNT
+};
+
+[[#functions]]
+struct retrace_[[name]]_params {
+	enum retrace_function_id function_id;
+	[[#params]]
+	[[rpctype]][[name]];
+	[[/params]]
+};
+
+[[/functions]]
+
+enum retrace_function_id retrace_function_id(const char *name);
+const char *retrace_function_name(enum retrace_function_id id);
+#endif

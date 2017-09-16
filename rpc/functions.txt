@@ -1,0 +1,175 @@
+function getenv string
+parameter name cstring
+
+function closedir int
+parameter dirp dir
+
+function dirfd fd
+parameter dirp dir
+
+function fclose int
+parameter stream file
+
+function fdopendir dir
+parameter fd fd
+
+function fileno fd
+parameter stream file
+
+function fopen file
+parameter path cstring
+parameter mode cstring
+
+function fprintf int
+parameter stream file
+parameter format cstring
+variadic real_vfprintf
+
+function free void
+parameter ptr pvoid
+
+function getpid pid_t
+
+function _IO_putc char
+parameter c char
+parameter stream file
+guard #ifndef __APPLE__
+
+function malloc pvoid
+parameter size size_t
+
+function realloc pvoid
+parameter ptr pvoid
+parameter size size_t
+
+function opendir dir
+parameter name cstring
+
+function putc char
+parameter c char
+parameter stream file
+
+function readdir_r int
+parameter dirp dir
+parameter entry dirent
+parameter result pdirent
+
+function read ssize_t
+parameter fd fd
+parameter buf pvoid
+parameter count size_t
+
+function sprintf int
+parameter str string
+parameter format cstring
+variadic real_vsprintf
+
+function vsprintf int
+parameter str string
+parameter format cstring
+parameter ap va_list
+
+function sscanf int
+parameter str cstring
+parameter format cstring
+variadic real_vsscanf
+
+function strcat string
+parameter dest string
+parameter src cstring
+
+function strchr string
+parameter s cstring
+parameter c char
+
+function strstr string
+parameter haystack cstring
+parameter needle cstring
+
+function strcmp int
+parameter s1 cstring
+parameter s2 cstring
+
+function strcpy string
+parameter dest string
+parameter src cstring
+
+function strncpy string
+parameter dest string
+parameter src cstring
+parameter n size_t
+
+function strlen size_t
+parameter s cstring
+
+function tolower char
+parameter c char
+
+function toupper char
+parameter c char
+
+function vfprintf int
+parameter stream file
+parameter format cstring
+parameter ap va_list
+
+function vsnprintf int
+parameter str string
+parameter size size_t
+parameter format cstring
+parameter ap va_list
+
+function vsscanf int
+parameter str cstring
+parameter format cstring
+parameter ap va_list
+
+function write ssize_t
+parameter fd fd
+parameter buf pcvoid
+parameter count size_t
+
+function memmove pvoid
+parameter dest pvoid
+parameter src pcvoid
+parameter n size_t
+
+function memcpy pvoid
+parameter dest pvoid
+parameter src pcvoid
+parameter n size_t
+
+function memset pvoid
+parameter s pvoid
+parameter c char
+parameter n size_t
+
+function getline ssize_t
+parameter lineptr pstring
+parameter n psize_t
+parameter stream file
+
+function close int
+parameter fd fd
+
+function socketpair int
+parameter domain int
+parameter type int
+parameter protocol int
+parameter sv pint
+
+function send ssize_t
+parameter sockfd int
+parameter buf pcvoid
+parameter len size_t
+parameter flags int
+
+function sendmsg ssize_t
+parameter sockfd int
+parameter msg cmsghdr
+parameter flags int
+
+function recvmsg ssize_t
+parameter sockfd int
+parameter msg msghdr
+parameter flags int

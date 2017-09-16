@@ -26,7 +26,6 @@
 #include "config.h"
 
 #include <sys/socket.h>
-#include <error.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,22 +33,22 @@
 #include <errno.h>
 #include <sys/wait.h>
 #include <ctype.h>
+#include <assert.h>
 
 #include "rpc.h"
 #include "frontend.h"
 
-#define IOBUFLEN 64 * 1024
+#define IOBUFLEN (64 * 1024)
 
-static struct retrace_rpc_endpoint *
+static struct retrace_endpoint *
 recv_endpoint(int fd)
 {
 	char version[32];
-	struct retrace_rpc_endpoint *endpoint;
+	struct retrace_endpoint *endpoint;
 	struct rpc_control_header header;
 	struct iovec iov[2] = {
 		{&header, sizeof(header)},
-		{version, 32}
-	};
+		{version, 32} };
 	struct msghdr msg = { 0 };
 	struct cmsghdr *cmsg;
 	union {
@@ -66,29 +65,34 @@ recv_endpoint(int fd)
 	iolen = recvmsg(fd, &msg, 0);
 	if (iolen == 0)
 		return NULL;
-	if (iolen == -1)
-		error(1, 0, "error reading control socket");
+	if (iolen == -1) {
+		perror("error reading control socket");
+		exit(EXIT_FAILURE);
+	}
 
 	/*
 	 * check version sent with new fd
 	 */
-	if (memcmp(version, rpc_version, 32) != 0)
-		error(1, 0, "Version mismatch");
+	if (memcmp(version, retrace_version, 32) != 0) {
+		fprintf(stderr, "Version mismatch");
+		exit(EXIT_FAILURE);
+	}
 
 	cmsg = CMSG_FIRSTHDR(&msg);
 
-	endpoint = malloc(sizeof(struct retrace_rpc_endpoint));
-	endpoint->fd = *(int *)CMSG_DATA(cmsg);
+	endpoint = malloc(sizeof(struct retrace_endpoint));
+	memcpy(&endpoint->fd, CMSG_DATA(cmsg), sizeof(int));
 	endpoint->pid = header.pid;
+	SLIST_INIT(&endpoint->call_stack);
 
 	return endpoint;
 }
 
-struct retrace_rpc_endpoint *
+struct retrace_endpoint *
 add_endpoint(struct retrace_handle *handle)
 {
 	struct retrace_process_info *pi, *procinfo = NULL;
-	struct retrace_rpc_endpoint *endpoint;
+	struct retrace_endpoint *endpoint;
 
 	endpoint = recv_endpoint(handle->control_fd);
 	if (!endpoint)
@@ -103,8 +107,10 @@ add_endpoint(struct retrace_handle *handle)
 
 	if (!procinfo) {
 		procinfo = malloc(sizeof(struct retrace_process_info));
-		if (!procinfo)
-			error(1, 0, "Out of memory.");
+		if (!procinfo) {
+			perror(__func__);
+			exit(EXIT_FAILURE);
+		}
 		procinfo->pid = endpoint->pid;
 		procinfo->next_thread_num = 0;
 		SLIST_INSERT_HEAD(&handle->processes, procinfo, next);
@@ -112,21 +118,25 @@ add_endpoint(struct retrace_handle *handle)
 
 	endpoint->thread_num = procinfo->next_thread_num++;
 	endpoint->call_num = 0;
+	endpoint->call_depth = 0;
+	endpoint->handle = handle;
 	SLIST_INSERT_HEAD(&handle->endpoints, endpoint, next);
 
 	return endpoint;
 }
 
 struct retrace_handle *
-retrace_start(char *const argv[])
+retrace_start(char *const argv[], const int *trace_flags)
 {
-	int sv[2];
-	char fd_str[16];
+	int sv[2], i;
+	char fd_str[16], trace_funcs[RPC_FUNCTION_COUNT + 1];
 	pid_t pid;
 	struct retrace_handle *handle;
 
-	if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sv))
-		error(1, 0, "Unable to create socketpair.");
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv)) {
+		perror("Unable to create socketpair.");
+		exit(EXIT_FAILURE);
+	}
 
 	pid = fork();
 
@@ -136,33 +146,63 @@ retrace_start(char *const argv[])
 		/*
 		 * TODO: get proper path for shared library
 		 */
+#ifndef __APPLE__
 		putenv("LD_PRELOAD=.libs/libretracerpc.so");
-		sprintf(fd_str, "%d", sv[1]);
+#else
+		putenv("DYLD_INSERT_LIBRARIES=.libs/libretracerpc.dylib");
+		putenv("DYLD_FORCE_FLAT_NAMESPACE=1");
+#endif
+		snprintf(fd_str, sizeof(fd_str), "%d", sv[1]);
 		setenv("RTR_SOCKFD", fd_str, 1);
 
+		for (i = 0; i < RPC_FUNCTION_COUNT; i++)
+			trace_funcs[i] =
+			    trace_flags[i] & RETRACE_TRACE ? '1' : '0';
+		trace_funcs[RPC_FUNCTION_COUNT] = '\0';
+		setenv("RTR_FUNCTIONS", trace_funcs, 1);
+
 		execv(argv[0], argv);
-		error(1, 0, "Failed to exec (%s.)", strerror(errno));
 
-		return NULL;
+		perror("Failed to exec");
+		close(sv[1]);
+		exit(EXIT_FAILURE);
+	} else {
+		close(sv[1]);
+
+		handle = malloc(sizeof(struct retrace_handle));
+		if (handle == NULL) {
+			perror(NULL);
+			exit(EXIT_FAILURE);
+		}
+		SLIST_INIT(&handle->endpoints);
+		SLIST_INIT(&handle->processes);
+
+		handle->control_fd = sv[0];
+
+		return handle;
 	}
+}
 
-	close(sv[1]);
+void
+retrace_set_handlers(struct retrace_handle *handle,
+	retrace_precall_handler_t *pre, retrace_postcall_handler_t *post)
+{
+	memcpy(handle->precall_handlers, pre,
+	    sizeof(handle->precall_handlers));
+	memcpy(handle->postcall_handlers, post,
+	    sizeof(handle->postcall_handlers));
+}
 
-	handle = malloc(sizeof(struct retrace_handle));
-	if (handle == NULL)
-		error(1, 0, "Out of memory.");
-	SLIST_INIT(&handle->endpoints);
-	SLIST_INIT(&handle->processes);
-
-	handle->control_fd = sv[0];
-
-	return handle;
+void
+retrace_set_user_data(struct retrace_handle *handle, void *data)
+{
+	handle->user_data = data;
 }
 
 void
 retrace_close(struct retrace_handle *handle)
 {
-	struct retrace_rpc_endpoint *endpoint;
+	struct retrace_endpoint *endpoint;
 	struct retrace_process_info *procinfo;
 
 	close(handle->control_fd);
@@ -170,137 +210,258 @@ retrace_close(struct retrace_handle *handle)
 	while (!SLIST_EMPTY(&handle->endpoints)) {
 		endpoint = SLIST_FIRST(&handle->endpoints);
 		SLIST_REMOVE_HEAD(&handle->endpoints, next);
-		close(endpoint->fd);
-		if (endpoint->pid)
-			waitpid(endpoint->pid, NULL, 0);
+		if (endpoint->fd != -1)
+			close(endpoint->fd);
 		free(endpoint);
 	}
 
 	while (!SLIST_EMPTY(&handle->processes)) {
 		procinfo = SLIST_FIRST(&handle->processes);
 		SLIST_REMOVE_HEAD(&handle->processes, next);
+		waitpid(procinfo->pid, NULL, 0);
 		free(procinfo);
 	}
 
 	free(handle);
 }
 
+int
+rpc_send(int fd, const void *buf, size_t len)
+{
+	ssize_t result;
+
+	do {
+		result = send(fd, buf, len, 0);
+	} while (result == -1 && errno == EINTR);
+
+	return (result != -1 ? 1 : 0);
+}
+
+static void
+handle_precall(struct retrace_endpoint *ep, void *buf)
+{
+	struct rpc_call_context *ctx;
+	void *context = NULL;
+	enum retrace_function_id function_id;
+
+	++ep->call_depth;
+	function_id = *(enum retrace_function_id *)buf;
+	if (ep->handle->precall_handlers[function_id](ep, buf, &context)) {
+		ctx = malloc(sizeof(struct rpc_call_context));
+		ctx->function_id = function_id;
+		ctx->context = context;
+		SLIST_INSERT_HEAD(&ep->call_stack, ctx, next);
+		rpc_send_message(ep->fd, RPC_MSG_DO_CALL, NULL, 0);
+	} else {
+		rpc_send_message(ep->fd, RPC_MSG_DONE, NULL, 0);
+		--ep->call_depth;
+	}
+}
+
+static void
+handle_postcall(struct retrace_endpoint *ep, void *buf)
+{
+	struct rpc_call_context *ctx;
+
+	ctx = SLIST_FIRST(&ep->call_stack);
+	SLIST_REMOVE_HEAD(&ep->call_stack, next);
+
+	++ep->call_num;
+	ep->handle->postcall_handlers[ctx->function_id](ep, buf, ctx->context);
+
+	rpc_send_message(ep->fd, RPC_MSG_DONE, NULL, 0);
+	--ep->call_depth;
+}
+
 void
 retrace_trace(struct retrace_handle *handle)
 {
-	char *buf;
-	struct call_header call_header;
-	union rpc_precall_redirect redirect;
-	union rpc_postcall *post;
-	struct iovec call_iov[2], precall_iov[1], postcall_iov[1];
-	struct msghdr call_msghdr, precall_msghdr, postcall_msghdr;
-	ssize_t iolen;
+	enum rpc_msg_type msg_type;
+	char buf[RPC_MSG_LEN_MAX];
 	fd_set readfds;
-	struct retrace_rpc_endpoint *endpoint;
-	int numfds;
+	struct retrace_endpoint *endpoint;
+	int numfds, err;
 
-	buf = malloc(IOBUFLEN);
-	if (buf == NULL)
-		error(1, 0, "Out of memory.");
-
-	call_iov[0].iov_base = &call_header;
-	call_iov[0].iov_len = sizeof(struct call_header);
-	call_iov[1].iov_base = buf;
-	call_iov[1].iov_len = IOBUFLEN;
-
-	memset(&call_msghdr, 0, sizeof(struct msghdr));
-	call_msghdr.msg_iov = call_iov;
-	call_msghdr.msg_iovlen = 2;
-
-	precall_iov[0].iov_base = &redirect;
-	precall_iov[0].iov_len = sizeof(redirect);
-
-	memset(&precall_msghdr, 0, sizeof(struct msghdr));
-	precall_msghdr.msg_iov = precall_iov;
-	precall_msghdr.msg_iovlen = 1;
-
-	postcall_iov[0].iov_base = &post;
-	postcall_iov[0].iov_len = sizeof(post);
-
-	memset(&postcall_msghdr, 0, sizeof(struct msghdr));
-	postcall_msghdr.msg_iov = postcall_iov;
-	postcall_msghdr.msg_iovlen = 1;
+	FD_ZERO(&readfds);
 
 	for (;;) {
-		FD_ZERO(&readfds);
-
 		numfds = handle->control_fd;
 		FD_SET(handle->control_fd, &readfds);
 
 		SLIST_FOREACH(endpoint, &handle->endpoints, next) {
-			FD_SET(endpoint->fd, &readfds);
-			if (endpoint->fd > numfds)
-				numfds = endpoint->fd;
+			if (endpoint->fd != -1) {
+				FD_SET(endpoint->fd, &readfds);
+				if (endpoint->fd > numfds)
+					numfds = endpoint->fd;
+			}
 		}
-		select(numfds + 1, &readfds, NULL, NULL, NULL);
+		err = select(numfds + 1, &readfds, NULL, NULL, NULL);
+		if (err == -1 && errno == EINTR)
+			continue;
+		if (err == -1) {
+			perror(__func__);
+			exit(EXIT_FAILURE);
+		}
+
+		SLIST_FOREACH(endpoint, &handle->endpoints, next) {
+			if (endpoint->fd == -1)
+				continue;
+
+			if (!FD_ISSET(endpoint->fd, &readfds))
+				continue;
+
+			if (!rpc_recv_message(endpoint->fd, &msg_type, buf)) {
+				FD_CLR(endpoint->fd, &readfds);
+				close(endpoint->fd);
+				endpoint->fd = -1;
+				continue;
+			}
+
+			if (msg_type == RPC_MSG_CALL_INIT)
+				handle_precall(endpoint, buf);
+			else if (msg_type == RPC_MSG_CALL_RESULT)
+				handle_postcall(endpoint, buf);
+			else
+				assert(0);
+		}
 
 		if (FD_ISSET(handle->control_fd, &readfds)) {
 			if (!add_endpoint(handle))
 				break;
-			continue;
-		}
-
-		SLIST_FOREACH(endpoint, &handle->endpoints, next) {
-			if (!FD_ISSET(endpoint->fd, &readfds))
-				continue;
-
-			iolen = recvmsg(endpoint->fd, &call_msghdr, 0);
-
-			if (iolen == -1)
-				error(1, 0, "Error receiving call info (%s.)",
-				    strerror(errno));
-
-			if (iolen == 0) {
-				SLIST_REMOVE(&handle->endpoints, endpoint,
-				    retrace_rpc_endpoint, next);
-				close(endpoint->fd);
-				free(endpoint);
-				break;
-			}
-
-			if (call_header.call_type == RPC_PRECALL) {
-				g_precall_handlers[call_header.function_id](
-				    endpoint, (union rpc_precall *)buf, &redirect);
-				iolen = sendmsg(endpoint->fd, &precall_msghdr, 0);
-			} else if (call_header.call_type == RPC_POSTCALL) {
-				g_postcall_handlers[call_header.function_id](
-				    endpoint, (union rpc_postcall *)buf, &post);
-				iolen = sendmsg(endpoint->fd, &postcall_msghdr, 0);
-				++(endpoint->call_num);
-			}
-
-			if (iolen == -1)
-				error(1, 0, "Error sending redirect info (%s.)", strerror(errno));
 		}
 	}
-	free(buf);
 }
 
-retrace_precall_handler_t
-retrace_get_precall_handler(enum rpc_function_id id)
+int
+rpc_send_message(int fd, enum rpc_msg_type msg_type, const void *buf, size_t length)
 {
-	return g_precall_handlers[id];
+	struct iovec iov[] = {
+	    {&msg_type, sizeof(msg_type)}, {(void *)buf, length} };
+	struct msghdr msg = {NULL, 0, iov, 2, NULL, 0, 0};
+	ssize_t result;
+
+	do {
+		result = sendmsg(fd, &msg, 0);
+	} while (result == -1 && errno == EINTR);
+
+	return (result != -1 ? 1 : 0);
 }
 
-void
-retrace_set_precall_handler(enum rpc_function_id id, retrace_precall_handler_t fn)
+int
+rpc_recv_message(int fd, enum rpc_msg_type *msg_type, void *buf)
 {
-	g_precall_handlers[id] = fn;
+	struct iovec iov[] = {
+	    {msg_type, sizeof(*msg_type)}, {(void *)buf, RPC_MSG_LEN_MAX} };
+	struct msghdr msg = {NULL, 0, iov, 2, NULL, 0, 0};
+	ssize_t result;
+
+	do {
+		result = recvmsg(fd, &msg, 0);
+	} while (result == -1 && errno == EINTR);
+
+	return (result > 0 ? 1 : 0);
 }
 
-void *
-trace_buffer(void *buffer, size_t length)
+int
+rpc_recv(int fd, void *buf, size_t len)
 {
-	char *p = buffer;
-	int i;
+	ssize_t n;
+	size_t count = 0;
 
-	for (i = 0; i < length; i++, p++)
-		printf("%c", isprint(*p) ? *p : '.');
+	while (count < len) {
+		n = recv(fd, buf + count, len - count, 0);
+		if (n == -1) {
+			if (errno == EINTR)
+				continue;
+			return 0;
+		}
+		count += n;
+	}
 
-	return (buffer + length);
+	return 1;
+}
+
+int
+rpc_recv_string(int fd, char *buf, size_t len)
+{
+	ssize_t n;
+	size_t count = 0;
+
+	while (count < len) {
+		n = recv(fd, buf + count, len - count, 0);
+		if (n == -1) {
+			if (errno == EINTR)
+				continue;
+			return 0;
+		}
+		count += n;
+		if (buf[count - 1] == '\0')
+			break;
+	}
+	return 1;
+}
+
+#if BACKTRACE
+static void
+discard_string(int fd)
+{
+	static const size_t len = 256;
+	char buf[len];
+
+	while (1) {
+		buf[len - 1] = '\0';
+		if (!rpc_recv_string(fd, buf, len)
+		    || buf[len - 1] == '\0')
+			return;
+	}
+}
+
+int
+retrace_fetch_backtrace(int fd, int depth, char *buffer, size_t len)
+{
+	struct rpc_backtrace_params bp = {depth};
+	int result;
+
+	rpc_send_message(fd, RPC_MSG_BACKTRACE, &bp, sizeof(bp));
+
+	buffer[len - 1] = '\0';
+	result = rpc_recv_string(fd, buffer, len);
+	if (result && buffer[len - 1] != '\0') {
+		discard_string(fd);
+		buffer[len - 1] = '\0';
+	}
+	return result;
+}
+#endif
+
+int
+retrace_fetch_string(int fd, const char *address, char *buffer, size_t len)
+{
+	struct rpc_string_params sp = {(char *)address, len};
+
+	rpc_send_message(fd, RPC_MSG_GET_STRING, &sp, sizeof(sp));
+
+	return (rpc_recv_string(fd, buffer, len));
+}
+
+int
+retrace_fetch_memory(int fd, unsigned long int address, void *buffer,
+	size_t len)
+{
+	struct rpc_memory_params mp = {(char *)address, len};
+
+	rpc_send_message(fd, RPC_MSG_GET_MEMORY, &mp, sizeof(mp));
+
+	if (rpc_recv(fd, buffer, len) != -1)
+		return 1;
+
+	return 0;
+}
+
+int
+retrace_inject_errno(int fd, int e)
+{
+	struct rpc_errno_params ep = {e};
+
+	return (rpc_send_message(fd, RPC_MSG_SET_ERRNO, &ep, sizeof(ep)));
 }

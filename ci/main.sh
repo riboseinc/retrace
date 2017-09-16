@@ -44,7 +44,7 @@ function checkpatch() {
 		git format-patch -1 $1 --stdout -- $CHECKPATCH_EXCLUDE . | _checkpatch
 }
 
-sh autogen.sh && ./configure --disable-silent-rules --enable-tests --with-cmocka=${CMOCKA_INSTALL} && make clean && make
+sh autogen.sh && ./configure --disable-silent-rules --enable-tests --with-cmocka=${CMOCKA_INSTALL} --enable-rpc && make clean && make
 make check
 
 # checkpatch

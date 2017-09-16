@@ -27,13 +27,21 @@
 
 #include <unistd.h>
 #include <sys/types.h>
-#include <error.h>
 #include <sys/socket.h>
 #include <pthread.h>
 #include <errno.h>
 
+#if BACKTRACE
+#include <execinfo.h>
+#endif
+
 #include "shim.h"
 #include "rpc.h"
+#include "backend.h"
+
+/*
+ * TODO: pthread_setspecific(g_fdkey, (void *)-1);
+ */
 
 static pthread_once_t g_once_control = PTHREAD_ONCE_INIT;
 static pthread_key_t g_fdkey;
@@ -42,7 +50,7 @@ static int g_sockfd = -1;
 static void
 free_tls(void *p)
 {
-	close((long int)p);
+	real_close((long int)p);
 }
 
 static void
@@ -64,6 +72,7 @@ static void
 init(void)
 {
 	const char *p;
+	int i;
 
 	/*
 	 * get fd of control socket from environment
@@ -72,15 +81,28 @@ init(void)
 	 */
 
 	p = real_getenv("RTR_SOCKFD");
-	if (p == 0)
-		error(1, 0, "retrace env{RTR_SOCKFD} not set.");
+	if (p != 0) {
+		g_sockfd = 0;
+		for (; *p; ++p) {
+			if (*p < '0' || *p > '9') {
+				real_fprintf(stderr,
+				    "retrace env{RTR_SOCKFD} bad.");
+				g_sockfd = -1;
+				break;
+			}
+			g_sockfd = g_sockfd * 10 + *p - '0';
+		}
+	} else
+		real_fprintf(stderr, "retrace env{RTR_SOCKFD} not set.");
 
-	g_sockfd = 0;
-	for (; *p; ++p) {
-		if (*p < '0' || *p > '9')
-			error(1, 0, "retrace env{RTR_SOCKFD} bad.");
-		g_sockfd = g_sockfd * 10 + *p - '0';
-	}
+	/*
+	 * setup traced functions
+	 */
+
+	p = real_getenv("RTR_FUNCTIONS");
+	if (p)
+		for (i = 0; i < sizeof(trace_functions) && p[i]; i++)
+			trace_functions[i] = p[i] == '1' ? 1 : 0;
 
 	pthread_key_create(&g_fdkey, free_tls);
 
@@ -95,12 +117,11 @@ new_rpc_endpoint()
 	 * via the control socket
 	 */
 
-	int sv[2], *pfd;
+	int sv[2], *pfd, err;
 	struct rpc_control_header control_header;
 	struct iovec iov[] = {
-	    { &control_header, sizeof(control_header) },
-	    { (char *)rpc_version, 32 }
-	};
+	    {&control_header, sizeof(control_header)},
+	    {(char *)retrace_version, 32 } };
 	struct msghdr msg = { 0 };
 	struct cmsghdr *cmsg;
 	union {
@@ -108,6 +129,8 @@ new_rpc_endpoint()
 		struct cmsghdr align;
 	} u;
 
+	if (g_sockfd == -1)
+		return -1;
 	msg.msg_iov = iov;
 	msg.msg_iovlen = 2;
 	msg.msg_control = u.buf;
@@ -118,32 +141,57 @@ new_rpc_endpoint()
 	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
 	pfd = (int *)CMSG_DATA(cmsg);
 
-	socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sv);
+	err = real_socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
+	if (err == -1)
+		return -1;
+
 	*pfd = sv[0];
 
 	control_header.pid = real_getpid();
 	control_header.tid = pthread_self();
 
-	sendmsg(g_sockfd, &msg, 0);
+	err = real_sendmsg(g_sockfd, &msg, 0);
+	if (err == -1) {
+		real_close(sv[0]);
+		real_close(sv[1]);
+		return -1;
+	}
 
-	close(sv[0]);
+	real_close(sv[0]);
 	return (sv[1]);
 }
 
 int
-rpc_sockfd()
+#if defined(__OpenBSD__)
+rpc_get_sockfd(enum retrace_function_id fid)
+#else
+rpc_get_sockfd()
+#endif
 {
 	/*
 	 * we only need an fd per thread
-	 * so we'll store (void *)(fd + 1)
+	 * so we'll store (void *)fd
 	 * as address of thread local.
-	 * malloc no good at this point
-	 * for firefox
 	 */
 
 	long int fd;
 
+#if defined(__OpenBSD__)
+	static int initialised;
+
+	/*
+	 * BSDs pthread_once calls these so tracing them
+	 * before init is complete causes infinite recusion
+	 */
+	if ((fid == RPC_getenv || fid == RPC_malloc) && initialised == 0)
+		return -1;
+
 	pthread_once(&g_once_control, init);
+
+	initialised = 1;
+#else
+	pthread_once(&g_once_control, init);
+#endif
 
 	fd = (long int)pthread_getspecific(g_fdkey);
 	if (fd == 0) {
@@ -153,29 +201,101 @@ rpc_sockfd()
 	return fd;
 }
 
-int
-do_rpc(struct msghdr *send_msg, struct msghdr *recv_msg)
+void
+rpc_set_sockfd(long int fd)
 {
-	int fd;
+	pthread_setspecific(g_fdkey, (void *)fd);
+}
 
-	fd = rpc_sockfd();
+int
+rpc_send_message(int fd, enum rpc_msg_type msg_type, const void *buf, size_t length)
+{
+	struct iovec iov[] = {
+	    {&msg_type, sizeof(msg_type)}, {(void *)buf, length} };
+	struct msghdr msg = {NULL, 0, iov, 2, NULL, 0, 0};
+	ssize_t result;
+
+	do {
+		result = real_sendmsg(fd, &msg, 0);
+	} while (result == -1 && errno == EINTR);
+
+	return (result != -1 ? 1 : 0);
+}
+
+int
+rpc_recv_message(int fd, enum rpc_msg_type *msg_type, void *buf)
+{
+	struct iovec iov[] = {
+	    {msg_type, sizeof(*msg_type)}, {(void *)buf, RPC_MSG_LEN_MAX} };
+	struct msghdr msg = {NULL, 0, iov, 2, NULL, 0, 0};
+	ssize_t result;
+
+	do {
+		result = real_recvmsg(fd, &msg, 0);
+	} while (result == -1 && errno == EINTR);
+
+	return (result != -1 ? 1 : 0);
+}
+
+static int
+send_string(int fd, const char *s, size_t len)
+{
+	size_t n;
+	ssize_t result;
+
+	n = real_strlen(s) + 1;
+
+	if (n > len)
+		n = len;
+
+	do {
+		result = real_send(fd, s, n, 0);
+	} while (result == -1 && errno == EINTR);
+
+	return (result != -1 ? 1 : 0);
+}
+
+#if BACKTRACE
+static int
+send_backtrace(int fd, int depth)
+{
+	void *addresses[depth + 3];
+	int frames;
+
+	rpc_set_sockfd(-1);
+	frames = backtrace(addresses, depth + 3);
+	backtrace_symbols_fd(addresses + 3, frames - 3, fd);
+	rpc_set_sockfd(fd);
+
+	return send_string(fd, "", 1);
+}
+#endif
+
+int
+rpc_handle_message(int fd, enum rpc_msg_type msg_type, void *buf)
+{
+#if BACKTRACE
+	struct rpc_backtrace_params *btp = buf;
+#endif
+	struct rpc_string_params *sp = buf;
 
 	if (fd == -1)
 		return 0;
 
-	while (sendmsg(fd, send_msg, 0) == -1) {
-		if (errno != EINTR) {
-			pthread_setspecific(g_fdkey, (void *)-1);
+	switch (msg_type) {
+	case RPC_MSG_GET_STRING:
+		if (!send_string(fd, (char *)sp->address, sp->length))
 			return 0;
-		}
-	}
-
-	while (recvmsg(fd, recv_msg, 0) == -1) {
-		if (errno != EINTR) {
-			pthread_setspecific(g_fdkey, (void *)-1);
+		break;
+#if BACKTRACE
+	case RPC_MSG_BACKTRACE:
+		if (!send_backtrace(fd, btp->depth))
 			return 0;
-		}
+		break;
+#endif
+	default:
+		real_fprintf(stderr, "Unknown RPC message type (%d)", msg_type);
+		break;
 	}
-
 	return 1;
 }
