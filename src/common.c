@@ -155,6 +155,8 @@ struct rtr_print_buf {
 	char buffer[PRINT_BUFFER_INITIAL_SIZE];
 	int size_left;
 	int size;
+	int print_directly;
+	FILE *outputfile;
 };
 
 
@@ -874,11 +876,12 @@ retrace_event(struct rtr_event_info *event_info)
 	int old_trace_state;
 	static int loaded_config;
 	FILE *out_file_tmp = NULL;
-	FILE *output_file_current = stderr;
 	struct rtr_print_buf print_buffer;
 
 	print_buffer.size = PRINT_BUFFER_INITIAL_SIZE;
 	print_buffer.size_left = PRINT_BUFFER_INITIAL_SIZE;
+	print_buffer.print_directly = 0;
+	print_buffer.outputfile = stderr;
 
 	if (!get_tracing_enabled())
 		return;
@@ -916,6 +919,17 @@ retrace_event(struct rtr_event_info *event_info)
 
 		return;
 	}
+
+	if (log_per_thread) {
+		FILE *tmp;
+
+		tmp = retrace_get_thread_file();
+
+		if (tmp)
+			print_buffer.outputfile = tmp;
+	} else if (output_file)
+		print_buffer.outputfile = output_file;
+
 
 	if (event_info->event_type == EVENT_TYPE_AFTER_CALL || event_info->event_type == EVENT_TYPE_BEFORE_CALL) {
 		unsigned int *parameter_type;
@@ -1003,8 +1017,21 @@ retrace_event(struct rtr_event_info *event_info)
 
 		trace_printf(&print_buffer, 0, "\n");
 
+		if ((event_info->event_flags & EVENT_FLAGS_PRINT_BACKTRACE) &&
+			(rtr_check_logging_config(event_info, 1))) {
+			trace_printf_backtrace(&print_buffer);
+		}
+
 		/* Give another pass to dump memory buffers in case we have any */
 		if (has_memory_buffers && event_info->event_type == EVENT_TYPE_AFTER_CALL) {
+			pthread_mutex_lock(&printing_lock);
+			real_fputs(print_buffer.buffer, print_buffer.outputfile);
+
+			/* Print all the buffers directly as there's likely no space
+			 * in print_buffer for them. Do it under locking
+			 */
+			print_buffer.print_directly = 1;
+
 			parameter_type = event_info->parameter_types;
 			parameter_value = event_info->parameter_values;
 
@@ -1012,29 +1039,15 @@ retrace_event(struct rtr_event_info *event_info)
 				parameter_value = retrace_dump_parameter(&print_buffer, GET_PARAMETER_TYPE(*parameter_type), 0, parameter_value);
 				parameter_type++;
 			}
-
+			pthread_mutex_unlock(&printing_lock);
+		} else {
+			real_fputs(print_buffer.buffer, print_buffer.outputfile);
 		}
+
+		if (output_file_flush)
+			fflush(print_buffer.outputfile);
 	}
 
-	if ((event_info->event_flags & EVENT_FLAGS_PRINT_BACKTRACE) &&
-		(rtr_check_logging_config(event_info, 1))) {
-		trace_printf_backtrace(&print_buffer);
-	}
-
-	if (log_per_thread) {
-		FILE *tmp;
-
-		tmp = retrace_get_thread_file();
-
-		if (tmp)
-			output_file_current = tmp;
-	} else if (output_file)
-		output_file_current = output_file;
-
-	real_fputs(print_buffer.buffer, output_file_current);
-
-	if (output_file_flush)
-		fflush(output_file_current);
 
 	errno = olderrno;
 
@@ -1064,81 +1077,69 @@ struct config_entry {
 STAILQ_HEAD(config_head, config_entry);
 
 static void
-trace_printfv(struct rtr_print_buf *print_buffer, int hdr, char *color, const char *fmt, va_list arglist)
+rtr_vaprintf(struct rtr_print_buf *print_buffer, const char *fmt, va_list arglist)
 {
-	int old_trace_state;
-	FILE *output_file_current = stderr;
-	int is_a_tty = 0;
-	int ret;
+	if (print_buffer->print_directly) {
+		real_vfprintf(print_buffer->outputfile, fmt, arglist);
+	} else {
+		int ret;
 
-	if (log_per_thread) {
-		FILE *tmp;
+		ret = real_vsnprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
+					print_buffer->size_left, fmt, arglist);
 
-		tmp = retrace_get_thread_file();
-
-		if (tmp)
-			output_file_current = tmp;
-	} else if (output_file)
-		output_file_current = output_file;
-
-	old_trace_state = trace_disable();
-
-	if (hdr == 1) {
-		ret = real_snprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
-					 print_buffer->size_left, "(%d) ", real_getpid());
 		if (ret > 0)
 			print_buffer->size_left -= ret;
 		if (print_buffer->size_left < 0)
 			print_buffer->size_left = 0;
+	}
+}
 
-		if (!is_main_thread()) {
-			ret = real_snprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
-					 print_buffer->size_left, "(thread: %u) ", pthread_self());
+static void
+rtr_printf(struct rtr_print_buf *print_buffer, const char *fmt, ...)
+{
+	va_list ap;
 
-			if (ret > 0)
-				print_buffer->size_left -= ret;
-			if (print_buffer->size_left < 0)
-				print_buffer->size_left = 0;
-		}
+	va_start(ap, fmt);
+	rtr_vaprintf(print_buffer, fmt, ap);
+	va_end(ap);
+}
+
+static void
+trace_printfv(struct rtr_print_buf *print_buffer, int hdr, char *color, const char *fmt, va_list arglist)
+{
+	int old_trace_state;
+	int is_a_tty = 0;
+	int ret;
+
+	old_trace_state = trace_disable();
+
+	if (hdr == 1) {
+		rtr_printf(print_buffer, "(%d) ", real_getpid());
+
+		if (!is_main_thread())
+			rtr_printf(print_buffer, "(thread: %u) ", pthread_self());
 
 		if (show_timestamp) {
 			float current_time;
 
 			current_time = retrace_get_time();
-			ret = real_snprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
-						 print_buffer->size_left, "(%0.5f) ", current_time);
-			if (ret > 0)
-				print_buffer->size_left -= ret;
-			if (print_buffer->size_left < 0)
-				print_buffer->size_left = 0;
+			rtr_printf(print_buffer, "(%0.5f) ", current_time);
 		}
 	}
 
 	if (color) {
 		int fd;
 
-		fd = real_fileno(output_file_current);
+		fd = real_fileno(print_buffer->outputfile);
 		is_a_tty = isatty(fd);
 
-		if (is_a_tty) {
-			ret = real_snprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
-					print_buffer->size_left, "%s", color);
-			if (ret > 0)
-				print_buffer->size_left -= ret;
-			if (print_buffer->size_left < 0)
-				print_buffer->size_left = 0;
-		}
+		if (is_a_tty)
+			rtr_printf(print_buffer, "%s", color);
 	}
 
-	if (arglist) {
-		ret = real_vsnprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
-							  print_buffer->size_left, fmt, arglist);
-		if (ret > 0)
-			print_buffer->size_left -= ret;
-		if (print_buffer->size_left < 0)
-			print_buffer->size_left = 0;
+	if (arglist)
+		rtr_vaprintf(print_buffer, fmt, arglist);
 
-	}
 	trace_restore(old_trace_state);
 }
 
