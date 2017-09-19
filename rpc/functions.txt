@@ -1,78 +1,206 @@
-function getenv string
-parameter name cstring
+function bind int
+parameter sockfd fd
+parameter addr csockaddr
+parameter addrlen socklen_t
+errno -1
+
+function close int
+parameter fd fd
+errno -1
 
 function closedir int
 parameter dirp dir
+errno -1
+
+function connect int
+parameter sockfd fd
+parameter addr csockaddr
+parameter addrlen socklen_t
+errno -1
+
+function creat int
+parameter pathname cstring
+parameter mode mode_t
+errno -1
 
 function dirfd fd
 parameter dirp dir
+errno -1
 
 function fclose int
 parameter stream file
+errno EOF
 
 function fdopendir dir
 parameter fd fd
+errno NULL
 
 function fileno fd
 parameter stream file
+errno -1
 
 function fopen file
 parameter path cstring
 parameter mode cstring
+errno NULL
 
 function fprintf int
 parameter stream file
 parameter format cstring
 variadic real_vfprintf
 
+function fputs int
+parameter s cstring
+parameter stream file
+errno EOF
+
 function free void
 parameter ptr pvoid
 
+function getenv string
+parameter name cstring
+
+function getline ssize_t
+parameter lineptr pstring
+parameter n psize_t
+parameter stream file
+errno -1
+
 function getpid pid_t
+
+function getppid pid_t
 
 function _IO_putc char
 parameter c char
 parameter stream file
+errno EOF
 guard #ifndef __APPLE__
 
 function malloc pvoid
 parameter size size_t
+errno NULL
 
-function realloc pvoid
-parameter ptr pvoid
-parameter size size_t
+function memcpy pvoid
+parameter dest pvoid
+parameter src pcvoid
+parameter n size_t
+
+function memmove pvoid
+parameter dest pvoid
+parameter src pcvoid
+parameter n size_t
+
+function memset pvoid
+parameter s pvoid
+parameter c char
+parameter n size_t
+
+function open int
+parameter pathname cstring
+parameter flags fileflags
+parameter mode mode_t
+errno -1
+
+function openat int
+parameter dirfd fd
+parameter pathname cstring
+parameter flags fileflags
+parameter mode mode_t
+errno -1
 
 function opendir dir
 parameter name cstring
+errno NULL
 
 function putc char
 parameter c char
 parameter stream file
+errno EOF
 
 function readdir_r int
 parameter dirp dir
 parameter entry dirent
 parameter result pdirent
+errno (result > 0 ? result : 0)
 
 function read ssize_t
 parameter fd fd
 parameter buf pvoid
 parameter count size_t
+errno -1
+
+function realloc pvoid
+parameter ptr pvoid
+parameter size size_t
+errno NULL
+
+function recv ssize_t
+parameter sockfd fd
+parameter buf pvoid
+parameter len size_t
+parameter flags msgflags
+errno -1
+
+function recvfrom ssize_t
+parameter sockfd fd
+parameter buf pvoid
+parameter len size_t
+parameter flags msgflags
+parameter src_addr sockaddr
+parameter addrlen psocklen_t
+errno -1
+
+function recvmsg ssize_t
+parameter sockfd fd
+parameter msg msghdr
+parameter flags msgflags
+errno -1
+
+function send ssize_t
+parameter sockfd fd
+parameter buf pcvoid
+parameter len size_t
+parameter flags msgflags
+errno -1
+
+function sendmsg ssize_t
+parameter sockfd fd
+parameter msg cmsghdr
+parameter flags msgflags
+errno -1
+
+function sendto ssize_t
+parameter sockfd fd
+parameter buf pcvoid
+parameter len size_t
+parameter flags msgflags
+parameter dest_addr csockaddr
+parameter addrlen socklen_t
+errno -1
+
+function socket int
+parameter domain domain
+parameter type socktype
+parameter protocol protocol
+errno -1
+
+function socketpair int
+parameter domain domain
+parameter type socktype
+parameter protocol protocol
+parameter sv pint
+errno -1
 
 function sprintf int
 parameter str string
 parameter format cstring
 variadic real_vsprintf
 
-function vsprintf int
-parameter str string
-parameter format cstring
-parameter ap va_list
-
 function sscanf int
 parameter str cstring
 parameter format cstring
 variadic real_vsscanf
+errno EOF
 
 function strcat string
 parameter dest string
@@ -119,57 +247,19 @@ parameter size size_t
 parameter format cstring
 parameter ap va_list
 
+function vsprintf int
+parameter str string
+parameter format cstring
+parameter ap va_list
+
 function vsscanf int
 parameter str cstring
 parameter format cstring
 parameter ap va_list
+errno EOF
 
 function write ssize_t
 parameter fd fd
 parameter buf pcvoid
 parameter count size_t
-
-function memmove pvoid
-parameter dest pvoid
-parameter src pcvoid
-parameter n size_t
-
-function memcpy pvoid
-parameter dest pvoid
-parameter src pcvoid
-parameter n size_t
-
-function memset pvoid
-parameter s pvoid
-parameter c char
-parameter n size_t
-
-function getline ssize_t
-parameter lineptr pstring
-parameter n psize_t
-parameter stream file
-
-function close int
-parameter fd fd
-
-function socketpair int
-parameter domain int
-parameter type int
-parameter protocol int
-parameter sv pint
-
-function send ssize_t
-parameter sockfd int
-parameter buf pcvoid
-parameter len size_t
-parameter flags int
-
-function sendmsg ssize_t
-parameter sockfd int
-parameter msg cmsghdr
-parameter flags int
-
-function recvmsg ssize_t
-parameter sockfd int
-parameter msg msghdr
-parameter flags int
+errno -1

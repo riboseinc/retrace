@@ -159,6 +159,7 @@ else
     AC_DEFINE(USE_OPENSSL, [0], [Define to use OpenSSL])
 fi
 
+AC_CHECK_DECLS([O_TMPFILE], [], [], [#include <fcntl.h>])
 
 # Check for PTRACE features
 AC_CHECK_DECLS([PTRACE_GETREGS, PTRACE_GETREGSET, PTRACE_SETREGSET], [], [], [#include <sys/ptrace.h.h>])
@@ -207,7 +208,7 @@ AC_MSG_RESULT($enable_test)
 AM_CONDITIONAL([ENABLE_TESTS], [test "x$enable_tests" = "xyes"])
 if test "x$enable_tests" = "xyes" ; then
 AC_MSG_NOTICE([yes])
-TESTS_CFLAGS="$TESTS_CFLAGS -fno-builtin -Wno-unused-result"
+TESTS_CFLAGS="$TESTS_CFLAGS -fno-builtin"
 else
 AC_MSG_NOTICE([no])
 fi

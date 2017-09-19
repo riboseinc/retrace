@@ -177,6 +177,11 @@ retrace_start(char *const argv[], const int *trace_flags)
 		SLIST_INIT(&handle->endpoints);
 		SLIST_INIT(&handle->processes);
 
+		for (i = 0; i < RPC_FUNCTION_COUNT; i++) {
+			SLIST_INIT(&handle->precall_handlers[i]);
+			SLIST_INIT(&handle->postcall_handlers[i]);
+		}
+
 		handle->control_fd = sv[0];
 
 		return handle;
@@ -184,13 +189,37 @@ retrace_start(char *const argv[], const int *trace_flags)
 }
 
 void
-retrace_set_handlers(struct retrace_handle *handle,
-	retrace_precall_handler_t *pre, retrace_postcall_handler_t *post)
+retrace_add_precall_handler(
+	struct retrace_handle *handle,
+	enum retrace_function_id fid,
+	retrace_precall_handler_t fn)
 {
-	memcpy(handle->precall_handlers, pre,
-	    sizeof(handle->precall_handlers));
-	memcpy(handle->postcall_handlers, post,
-	    sizeof(handle->postcall_handlers));
+	struct retrace_precall_handler *handler;
+	struct retrace_precall_handlers *handlers;
+
+	handler = malloc(sizeof(struct retrace_precall_handler));
+	handlers = &handle->precall_handlers[fid];
+	if (handler) {
+		handler->fn = fn;
+		SLIST_INSERT_HEAD(handlers, handler, next);
+	}
+}
+
+void
+retrace_add_postcall_handler(
+	struct retrace_handle *handle,
+	enum retrace_function_id fid,
+	retrace_postcall_handler_t fn)
+{
+	struct retrace_postcall_handler *handler;
+	struct retrace_postcall_handlers *handlers;
+
+	handler = malloc(sizeof(struct retrace_postcall_handler));
+	handlers = &handle->postcall_handlers[fid];
+	if (handler) {
+		handler->fn = fn;
+		SLIST_INSERT_HEAD(handlers, handler, next);
+	}
 }
 
 void
@@ -238,39 +267,76 @@ rpc_send(int fd, const void *buf, size_t len)
 }
 
 static void
-handle_precall(struct retrace_endpoint *ep, void *buf)
+init_call_context(struct retrace_endpoint *ep, const void *buf, size_t len)
 {
-	struct rpc_call_context *ctx;
-	void *context = NULL;
-	enum retrace_function_id function_id;
+	struct retrace_call_context *context;
 
-	++ep->call_depth;
-	function_id = *(enum retrace_function_id *)buf;
-	if (ep->handle->precall_handlers[function_id](ep, buf, &context)) {
-		ctx = malloc(sizeof(struct rpc_call_context));
-		ctx->function_id = function_id;
-		ctx->context = context;
-		SLIST_INSERT_HEAD(&ep->call_stack, ctx, next);
-		rpc_send_message(ep->fd, RPC_MSG_DO_CALL, NULL, 0);
-	} else {
-		rpc_send_message(ep->fd, RPC_MSG_DONE, NULL, 0);
-		--ep->call_depth;
+	assert(len < sizeof(enum retrace_function_id) + sizeof(context->params));
+
+	context = malloc(sizeof(struct retrace_call_context));
+	context->function_id = *(enum retrace_function_id *)buf;
+	len -= sizeof(enum retrace_function_id);
+	if (len > 0) {
+		buf = (enum retrace_function_id *)buf + 1;
+		memcpy(context->params, buf, len);
 	}
+	SLIST_INSERT_HEAD(&ep->call_stack, context, next);
+	++ep->call_depth;
 }
 
 static void
-handle_postcall(struct retrace_endpoint *ep, void *buf)
+update_call_context(struct retrace_endpoint *ep, const void *buf, size_t len)
 {
-	struct rpc_call_context *ctx;
+	struct retrace_call_context *context;
 
-	ctx = SLIST_FIRST(&ep->call_stack);
+	assert(len < sizeof(int) + sizeof(context->result));
+
+	context = SLIST_FIRST(&ep->call_stack);
+	context->_errno = *(int *)buf;
+	memcpy(context->result, (((int *)buf) + 1), len - sizeof(int));
+}
+
+static void
+free_call_context(struct retrace_endpoint *ep)
+{
+	struct retrace_call_context *context;
+
+	context = SLIST_FIRST(&ep->call_stack);
 	SLIST_REMOVE_HEAD(&ep->call_stack, next);
-
-	++ep->call_num;
-	ep->handle->postcall_handlers[ctx->function_id](ep, buf, ctx->context);
-
-	rpc_send_message(ep->fd, RPC_MSG_DONE, NULL, 0);
+	free(context);
 	--ep->call_depth;
+	++ep->call_num;
+}
+
+static int
+handle_precall(struct retrace_endpoint *ep)
+{
+	struct retrace_call_context *context;
+	struct retrace_precall_handlers *handlers;
+	struct retrace_precall_handler *handler;
+
+	context = SLIST_FIRST(&ep->call_stack);
+	handlers = &ep->handle->precall_handlers[context->function_id];
+
+	SLIST_FOREACH(handler, handlers, next)
+		if (handler->fn(ep, context) == 0)
+			return 0;
+
+	return 1;
+}
+
+static void
+handle_postcall(struct retrace_endpoint *ep)
+{
+	struct retrace_call_context *context;
+	struct retrace_postcall_handlers *handlers;
+	struct retrace_postcall_handler *handler;
+
+	context = SLIST_FIRST(&ep->call_stack);
+	handlers = &ep->handle->postcall_handlers[context->function_id];
+
+	SLIST_FOREACH(handler, handlers, next)
+		handler->fn(ep, context);
 }
 
 void
@@ -304,24 +370,38 @@ retrace_trace(struct retrace_handle *handle)
 		}
 
 		SLIST_FOREACH(endpoint, &handle->endpoints, next) {
+			ssize_t len;
+
 			if (endpoint->fd == -1)
 				continue;
 
 			if (!FD_ISSET(endpoint->fd, &readfds))
 				continue;
 
-			if (!rpc_recv_message(endpoint->fd, &msg_type, buf)) {
+			len = rpc_recv_message(endpoint->fd, &msg_type, buf);
+			if (len <= 0) {
 				FD_CLR(endpoint->fd, &readfds);
 				close(endpoint->fd);
 				endpoint->fd = -1;
 				continue;
 			}
 
-			if (msg_type == RPC_MSG_CALL_INIT)
-				handle_precall(endpoint, buf);
-			else if (msg_type == RPC_MSG_CALL_RESULT)
-				handle_postcall(endpoint, buf);
-			else
+			if (msg_type == RPC_MSG_CALL_INIT) {
+				init_call_context(endpoint, buf, len);
+
+				if (handle_precall(endpoint))
+					rpc_send_message(endpoint->fd, RPC_MSG_DO_CALL, NULL, 0);
+				else {
+					handle_postcall(endpoint);
+					rpc_send_message(endpoint->fd, RPC_MSG_DONE, NULL, 0);
+					free_call_context(endpoint);
+				}
+			} else if (msg_type == RPC_MSG_CALL_RESULT) {
+				update_call_context(endpoint, buf, len);
+				handle_postcall(endpoint);
+				rpc_send_message(endpoint->fd, RPC_MSG_DONE, NULL, 0);
+				free_call_context(endpoint);
+			} else
 				assert(0);
 		}
 
@@ -347,7 +427,7 @@ rpc_send_message(int fd, enum rpc_msg_type msg_type, const void *buf, size_t len
 	return (result != -1 ? 1 : 0);
 }
 
-int
+ssize_t
 rpc_recv_message(int fd, enum rpc_msg_type *msg_type, void *buf)
 {
 	struct iovec iov[] = {
@@ -359,7 +439,7 @@ rpc_recv_message(int fd, enum rpc_msg_type *msg_type, void *buf)
 		result = recvmsg(fd, &msg, 0);
 	} while (result == -1 && errno == EINTR);
 
-	return (result > 0 ? 1 : 0);
+	return result;
 }
 
 int
@@ -445,7 +525,7 @@ retrace_fetch_string(int fd, const char *address, char *buffer, size_t len)
 }
 
 int
-retrace_fetch_memory(int fd, unsigned long int address, void *buffer,
+retrace_fetch_memory(int fd, const void *address, void *buffer,
 	size_t len)
 {
 	struct rpc_memory_params mp = {(char *)address, len};
@@ -453,6 +533,19 @@ retrace_fetch_memory(int fd, unsigned long int address, void *buffer,
 	rpc_send_message(fd, RPC_MSG_GET_MEMORY, &mp, sizeof(mp));
 
 	if (rpc_recv(fd, buffer, len) != -1)
+		return 1;
+
+	return 0;
+}
+
+int
+retrace_fetch_fileno(int fd, FILE *s, int *result)
+{
+	struct rpc_fileno_params fp = {s};
+
+	rpc_send_message(fd, RPC_MSG_GET_FILENO, &fp, sizeof(fp));
+
+	if (rpc_recv(fd, result, sizeof(*result)) != -1)
 		return 1;
 
 	return 0;

@@ -32,8 +32,8 @@ int trace_functions[RPC_FUNCTION_COUNT];
 	enum rpc_msg_type _msg_type;
 	int _postcall = 0, _fd, _errno;
 	char _buf[RPC_MSG_LEN_MAX];
-	struct retrace_[[name]]_params _params = {RPC_[[name]][[#params]], [[name]][[/params]]};
 [[#has_parameters]]
+	struct retrace_[[name]]_params _params = {[[#params]][[name]][[^last]], [[/last]][[/params]]};
 	struct retrace_[[name]]_params *_buf_params = (struct retrace_[[name]]_params *)_buf;
 [[/has_parameters]]
 [[#variadic]]
@@ -46,7 +46,7 @@ int trace_functions[RPC_FUNCTION_COUNT];
 
 	_errno = errno;
 
-#if defined(__OpenBSD__)
+#if defined __OpenBSD__ || defined __FreeBSD__
 	_fd = rpc_get_sockfd(RPC_[[name]]);
 #else
 	_fd = rpc_get_sockfd();
@@ -64,7 +64,12 @@ int trace_functions[RPC_FUNCTION_COUNT];
 		return[[#result]] _result[[/result]];
 	}
 
-	if (!rpc_send_message(_fd, RPC_MSG_CALL_INIT, &_params, sizeof(_params)))
+[[#has_parameters]]
+	if (!rpc_send_init(_fd, RPC_[[name]], &_params, sizeof(_params)))
+[[/has_parameters]]
+[[^has_parameters]]
+	if (!rpc_send_init(_fd, RPC_[[name]], NULL, 0))
+[[/has_parameters]]
 		goto rpc_fail;
 
 	while (rpc_recv_message(_fd, &_msg_type, _buf)) {
@@ -92,15 +97,15 @@ int trace_functions[RPC_FUNCTION_COUNT];
 [[/variadic]]
 			_postcall = 1;
 			_errno = errno;
-			if (!rpc_send_message(_fd, RPC_MSG_CALL_RESULT, [[#result]]&_result, sizeof(_result)[[/result]][[^result]]NULL, 0[[/result]]))
+			if (!rpc_send_result(_fd, [[#result]]&_result, sizeof(_result)[[/result]][[^result]]NULL, 0[[/result]]))
 				goto rpc_fail;
 		} else if (!rpc_handle_message(_fd, _msg_type, _buf))
 			goto rpc_fail;
 	}
 
 rpc_fail:
-	real_close(_fd);
 	rpc_set_sockfd(-1);
+	real_close(_fd);
 
 	if (!_postcall) {
 [[#variadic]]

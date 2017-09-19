@@ -39,10 +39,6 @@
 #include "rpc.h"
 #include "backend.h"
 
-/*
- * TODO: pthread_setspecific(g_fdkey, (void *)-1);
- */
-
 static pthread_once_t g_once_control = PTHREAD_ONCE_INIT;
 static pthread_key_t g_fdkey;
 static int g_sockfd = -1;
@@ -50,6 +46,7 @@ static int g_sockfd = -1;
 static void
 free_tls(void *p)
 {
+	g_sockfd = -1;
 	real_close((long int)p);
 }
 
@@ -122,7 +119,7 @@ new_rpc_endpoint()
 	struct iovec iov[] = {
 	    {&control_header, sizeof(control_header)},
 	    {(char *)retrace_version, 32 } };
-	struct msghdr msg = { 0 };
+	struct msghdr msg;
 	struct cmsghdr *cmsg;
 	union {
 		char buf[CMSG_SPACE(sizeof(int))];
@@ -131,6 +128,8 @@ new_rpc_endpoint()
 
 	if (g_sockfd == -1)
 		return -1;
+
+	real_memset(&msg, 0, sizeof(msg));
 	msg.msg_iov = iov;
 	msg.msg_iovlen = 2;
 	msg.msg_control = u.buf;
@@ -162,7 +161,7 @@ new_rpc_endpoint()
 }
 
 int
-#if defined(__OpenBSD__)
+#if defined __OpenBSD__ || defined __FreeBSD__
 rpc_get_sockfd(enum retrace_function_id fid)
 #else
 rpc_get_sockfd()
@@ -176,15 +175,21 @@ rpc_get_sockfd()
 
 	long int fd;
 
-#if defined(__OpenBSD__)
+#if defined __OpenBSD__ || defined __FreeBSD__
 	static int initialised;
 
 	/*
 	 * BSDs pthread_once calls these so tracing them
 	 * before init is complete causes infinite recusion
 	 */
-	if ((fid == RPC_getenv || fid == RPC_malloc) && initialised == 0)
+#ifdef __OpenBSD__
+	if ((fid == RPC_getenv || fid == RPC_malloc || fid == RPC_memset) && initialised == 0)
 		return -1;
+#endif
+#ifdef __FreeBSD__
+	if ((fid == RPC_getenv || fid == RPC_malloc || fid == RPC_memset || fid == RPC_memcpy || fid == RPC_strlen) && initialised == 0)
+		return -1;
+#endif
 
 	pthread_once(&g_once_control, init);
 
@@ -192,6 +197,9 @@ rpc_get_sockfd()
 #else
 	pthread_once(&g_once_control, init);
 #endif
+
+	if (g_sockfd == -1)
+		return -1;
 
 	fd = (long int)pthread_getspecific(g_fdkey);
 	if (fd == 0) {
@@ -223,6 +231,42 @@ rpc_send_message(int fd, enum rpc_msg_type msg_type, const void *buf, size_t len
 }
 
 int
+rpc_send_init(int fd, enum retrace_function_id fid, void *params, size_t length)
+{
+	static const enum rpc_msg_type type = RPC_MSG_CALL_INIT;
+	struct iovec iov[] = {
+	    {(enum rpc_msg_type *)&type, sizeof(type)},
+	    {&fid, sizeof(fid)},
+	    {params, length} };
+	struct msghdr msg = {NULL, 0, iov, 3, NULL, 0, 0};
+	ssize_t err;
+
+	do {
+		err = real_sendmsg(fd, &msg, 0);
+	} while (err == -1 && errno == EINTR);
+
+	return (err != -1 ? 1 : 0);
+}
+
+int
+rpc_send_result(int fd, const void *result, size_t length)
+{
+	static const enum rpc_msg_type type = RPC_MSG_CALL_RESULT;
+	struct iovec iov[] = {
+	    {(enum rpc_msg_type *)&type, sizeof(type)},
+	    {&errno, sizeof(errno)},
+	    {(void *)result, length} };
+	struct msghdr msg = {NULL, 0, iov, 3, NULL, 0, 0};
+	ssize_t err;
+
+	do {
+		err = real_sendmsg(fd, &msg, 0);
+	} while (err == -1 && errno == EINTR);
+
+	return (err != -1 ? 1 : 0);
+}
+
+int
 rpc_recv_message(int fd, enum rpc_msg_type *msg_type, void *buf)
 {
 	struct iovec iov[] = {
@@ -249,7 +293,19 @@ send_string(int fd, const char *s, size_t len)
 		n = len;
 
 	do {
-		result = real_send(fd, s, n, 0);
+		result = real_sendto(fd, s, n, 0, NULL, 0);
+	} while (result == -1 && errno == EINTR);
+
+	return (result != -1 ? 1 : 0);
+}
+
+static int
+send_memory(int fd, const char *p, size_t len)
+{
+	ssize_t result;
+
+	do {
+		result = real_sendto(fd, p, len, 0, NULL, 0);
 	} while (result == -1 && errno == EINTR);
 
 	return (result != -1 ? 1 : 0);
@@ -278,6 +334,7 @@ rpc_handle_message(int fd, enum rpc_msg_type msg_type, void *buf)
 	struct rpc_backtrace_params *btp = buf;
 #endif
 	struct rpc_string_params *sp = buf;
+	struct rpc_memory_params *mp = buf;
 
 	if (fd == -1)
 		return 0;
@@ -285,6 +342,10 @@ rpc_handle_message(int fd, enum rpc_msg_type msg_type, void *buf)
 	switch (msg_type) {
 	case RPC_MSG_GET_STRING:
 		if (!send_string(fd, (char *)sp->address, sp->length))
+			return 0;
+		break;
+	case RPC_MSG_GET_MEMORY:
+		if (!send_memory(fd, (char *)mp->address, mp->length))
 			return 0;
 		break;
 #if BACKTRACE

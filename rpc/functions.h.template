@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 
 enum retrace_function_id {
 	[[#functions]]
@@ -16,13 +17,13 @@ enum retrace_function_id {
 };
 
 [[#functions]]
+[[#has_parameters]]
 struct retrace_[[name]]_params {
-	enum retrace_function_id function_id;
 	[[#params]]
 	[[rpctype]][[name]];
 	[[/params]]
 };
-
+[[/has_parameters]]
 [[/functions]]
 
 enum retrace_function_id retrace_function_id(const char *name);

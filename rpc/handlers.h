@@ -1,6 +1,19 @@
 #ifndef __RETRACE_HANDLERS_H__
 #define __RETRACE_HANDLERS_H__
 
-void get_handlers(retrace_precall_handler_t *pre, retrace_postcall_handler_t *post);
+#include "tracefd.h"
+
+void set_log_handlers(struct retrace_handle *handle);
+
+struct handler_info {
+#if BACKTRACE
+	int backtrace_depth;
+#endif
+	int expand_buffers;
+	int expand_strings;
+	int expand_structs;
+	int tracefds;
+	struct fdinfo_h fdinfos;
+};
 
 #endif

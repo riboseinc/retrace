@@ -50,21 +50,31 @@ struct type {
 } types[] = {
 	{"char",	"int ",			NULL		},
 	{"cmsghdr",	"const struct msghdr *",	NULL	},
+	{"csockaddr",	"const struct sockaddr *",	NULL	},
 	{"cstring",	"const char *",		NULL		},
 	{"dir",		"DIR *",		NULL		},
 	{"dirent",	"struct dirent *",	NULL		},
+	{"domain",	"int ",			NULL		},
 	{"fd",		"int ",			NULL		},
 	{"file",	"FILE *",		NULL		},
+	{"fileflags",	"int ",			NULL		},
 	{"int",		"int ",			NULL		},
+	{"mode_t",	"mode_t ",		NULL		},
 	{"msghdr",	"struct msghdr *",	NULL		},
+	{"msgflags",	"int ",			NULL		},
 	{"pcvoid",	"const void *",		NULL		},
 	{"pdirent",	"struct dirent **",	NULL		},
 	{"pid_t",	"pid_t ",		NULL		},
 	{"pint",	"int *",		NULL		},
+	{"protocol",	"int ",			NULL		},
 	{"psize_t",	"size_t *",		NULL		},
+	{"psocklen_t",	"socklen_t *",		NULL		},
 	{"pstring",	"char **",		NULL		},
 	{"pvoid",	"void *",		NULL		},
 	{"size_t",	"size_t ",		NULL		},
+	{"sockaddr",	"struct sockaddr *",	NULL		},
+	{"socklen_t",	"socklen_t ",		NULL		},
+	{"socktype",	"int ",			NULL		},
 	{"ssize_t",	"ssize_t ",		NULL		},
 	{"string",	"char *",		NULL		},
 	{"va_list",	"va_list ",		"void *"	},
@@ -91,6 +101,7 @@ struct function {
 	struct param_list params;
 	const char *va_fn;
 	const char *guard;
+	const char *errno;
 };
 
 STAILQ_HEAD(function_list, function);
@@ -139,6 +150,8 @@ void yaml(struct function_list *fns)
 			printf("  result: true\n");
 		if (fn->guard != NULL)
 			printf("  guard: \"%s\"\n", fn->guard);
+		if (fn->errno != NULL)
+			printf("  errno: \"%s\"\n", fn->errno);
 
 		if (!TAILQ_EMPTY(&(fn->params))) {
 			printf("  has_parameters: true\n");
@@ -282,8 +295,11 @@ int main(void)
 			fn->va_fn = _strdup(strtok(NULL, " "));
 			if (fn->va_fn == NULL)
 				errexit(1, "Keyword 'variadic' must be followed the name of a fixed param version at line %d.", line);
-		} else if (strcmp(tok, "guard") == 0)
+		} else if (strcmp(tok, "guard") == 0) {
 			fn->guard = _strdup(strtok(NULL, "\n"));
+		} else if (strcmp(tok, "errno") == 0) {
+			fn->errno = _strdup(strtok(NULL, "\n"));
+		}
 	}
 
 	if (fn)

@@ -28,25 +28,70 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <sys/queue.h>
 
 #include "frontend.h"
 #include "handlers.h"
 #include "display.h"
-
-#define OPT_FUNCS '0'
-#define OPT_BTFUNCS '1'
-#define OPT_BTDEPTH '2'
-#define OPT_STRINGS '3'
+#include "tracefd.h"
+#if BACKTRACE
+#include "backtrace.h"
+#endif
 
 static struct option options[] = {
-	{"functions", required_argument, 0, OPT_FUNCS},
+	{"help", no_argument, 0, 'h'},
+	{"version", no_argument, 0, 'v'},
+	{"functions", required_argument, 0, 'f'},
 #if BACKTRACE
-	{"backtrace-functions", required_argument, 0, OPT_BTFUNCS},
-	{"backtrace-depth", required_argument, 0, OPT_BTDEPTH},
+	{"backtrace-functions", required_argument, 0, 'b'},
+	{"backtrace-depth", required_argument, 0, 'd'},
 #endif
-	{"show-strings", required_argument, 0, OPT_STRINGS},
+	{"show-buffers", required_argument, 0, 'u'},
+	{"show-strings", required_argument, 0, 's'},
+	{"show-structs", no_argument, 0, 't'},
+	{"trace-fds", no_argument, 0, 'F'},
 	{NULL, 0, 0, 0}
 };
+
+#define STDOPTS "+f:s:u:hvFt"
+
+#if BACKTRACE
+#define BTOPTS "b:d:"
+#else
+#define BTOPTS
+#endif
+
+static void usage(const char *argv0, int exitval)
+{
+	FILE *stream = exitval == EXIT_SUCCESS ? stdout : stderr;
+
+	fprintf(stream, "Usage: %s [options] <executable>\n\n"
+	    "Retrace is a versatile security vulnerability / bug discovery "
+	    "tool through monitoring and modifying the behavior of compiled "
+	    "binaries on Linux, OpenBSD/FreeBSD (shared object) and macOS "
+	    "(dynamic library).\n\n"
+	    "Retrace can be used to assist reverse engineering / debugging "
+	    "dynamically-linked ELF (Linux/OpenBSD/FreeBSD) and Mach-O "
+	    "(macOS) binary executables.\n\n"
+	    "Options:\n"
+	    "  -f --functions=LIST	LIST is a comma separated list of "
+	    "function names to trace (defaults to all supported functions)\n"
+	    "  -u --show-buffers=n	Show the first n bytes of "
+	    "buffer parameters\n"
+	    "  -s --show-strings=n	Show the first n characters of "
+	    "string parameters\n"
+	    "  -t --show-structs	Show additional information for "
+	    "structs\n"
+	    "  -b --backtrace-functions=LIST	LIST is a comma separated "
+	    "list of function names for which to show a stach trace\n"
+	    "  -d --backtrace-depth=n	Show n frames when displaying stack "
+	    "traces (default 4)\n"
+	    "  -F --trace-fds	Show extended information for FILE * and "
+	    "file descriptor parameters\n"
+	    "  -h --help	Show this help\n"
+	    "  -v --version	Show version information\n", argv0);
+	exit(exitval);
+}
 
 static void set_trace_flags(int *flags, int setflag, char *funcs)
 {
@@ -69,46 +114,63 @@ static void set_trace_flags(int *flags, int setflag, char *funcs)
 int main(int argc, char **argv)
 {
 	struct retrace_handle *trace_handle;
-	struct display_info display_info;
-	int i, c, opt_funcs = 0,
-	    trace_flags[RPC_FUNCTION_COUNT];
-	retrace_precall_handler_t pre[RPC_FUNCTION_COUNT];
-	retrace_postcall_handler_t post[RPC_FUNCTION_COUNT];
+	struct handler_info handler_info;
+	int i, c, opt_funcs = 0, trace_flags[RPC_FUNCTION_COUNT],
+	    tracefds = 0;
+#if BACKTRACE
+	int backtrace_funcs[RPC_FUNCTION_COUNT];
+#endif
 
 	memset(trace_flags, 0, sizeof(trace_flags));
-	memset(&display_info, 0, sizeof(display_info));
+	memset(&handler_info, 0, sizeof(handler_info));
 
 #if BACKTRACE
-	display_info.backtrace_depth = 10;
+	memset(backtrace_funcs, 0, sizeof(backtrace_funcs));
+	handler_info.backtrace_depth = 4;
 #endif
 
 	while (1) {
-		c = getopt_long(argc, argv, "+", options, NULL);
+		c = getopt_long(argc, argv, STDOPTS BTOPTS, options, NULL);
 
 		if (c == -1)
 			break;
 
 		switch (c) {
-		case OPT_FUNCS:
+		case 'f':
 			opt_funcs = 1;
 			set_trace_flags(trace_flags, RETRACE_TRACE, optarg);
 			break;
 #if BACKTRACE
-		case OPT_BTFUNCS:
+		case 'b':
 			opt_funcs = 1;
 			set_trace_flags(trace_flags, RETRACE_TRACE, optarg);
-			set_trace_flags(display_info.backtrace_functions, 0x01, optarg);
+			set_trace_flags(backtrace_funcs, 0x01, optarg);
 			break;
-		case OPT_BTDEPTH:
-			display_info.backtrace_depth = atoi(optarg);
+		case 'd':
+			handler_info.backtrace_depth = atoi(optarg);
 			break;
 #endif
-		case OPT_STRINGS:
-			display_info.expand_strings = atoi(optarg);
+		case 'u':
+			handler_info.expand_buffers = atoi(optarg);
+			break;
+		case 's':
+			handler_info.expand_strings = atoi(optarg);
+			break;
+		case 'h':
+			usage(argv[0], EXIT_SUCCESS);
+			break;
+		case 'v':
+			printf("%s version %s\n", argv[0], PACKAGE_VERSION);
+			exit(EXIT_SUCCESS);
+			break;
+		case 'F':
+			tracefds = 1;
+			break;
+		case 't':
+			handler_info.expand_structs = 1;
 			break;
 		default:
-			fprintf(stderr, "got %c from optarg()", c);
-			break;
+			usage(argv[0], EXIT_FAILURE);
 		}
 	}
 
@@ -118,11 +180,16 @@ int main(int argc, char **argv)
 
 	trace_handle = retrace_start(&argv[optind], trace_flags);
 
-	get_handlers(pre, post);
+	retrace_set_user_data(trace_handle, &handler_info);
 
-	retrace_set_handlers(trace_handle, pre, post);
+	if (tracefds)
+		init_tracefd_handlers(trace_handle);
 
-	retrace_set_user_data(trace_handle, &display_info);
+	#if BACKTRACE
+		init_backtrace_handlers(trace_handle, backtrace_funcs);
+	#endif
+
+	set_log_handlers(trace_handle);
 
 	retrace_trace(trace_handle);
 
