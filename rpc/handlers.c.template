@@ -1,70 +1,193 @@
 {{=[[ ]]=}}
-#include <stdlib.h>
+#include "../config.h"
 #include <string.h>
-#include "rpc.h"
+#include <fcntl.h>
+
 #include "frontend.h"
-#include "handlers.h"
 #include "display.h"
-[[#functions]]
 
-int
-default_[[name]]_precall_handler(struct retrace_endpoint *ep, void *buf, void **context)
+#if HAVE_DECL_O_TMPFILE
+#define OPEN_CREATE_FLAGS (O_CREAT | O_TMPFILE)
+#else
+#define OPEN_CREATE_FLAGS O_CREAT
+#endif
+
+#define LOG_PARAMS_bind
+static void
+log_params_bind(struct retrace_endpoint *ep, struct retrace_bind_params *params, int result)
 {
-[[#has_parameters]]
-	struct retrace_[[name]]_params *params;
-
-	params = malloc(sizeof(struct retrace_[[name]]_params));
-	*params = *(struct retrace_[[name]]_params *)buf;
-	*context = params;
-[[/has_parameters]]
-
-	return 1;
+	DISPLAY_fd(ep, params->sockfd);
+	printf(", ");
+	display_sockaddr(ep, params->addr, params->addrlen);
+	printf(", ");
+	DISPLAY_socklen_t(ep, params->addrlen);
 }
 
-int
-default_[[name]]_postcall_handler(struct retrace_endpoint *ep, void *buf, void *context)
+#define LOG_PARAMS_connect
+static void
+log_params_connect(struct retrace_endpoint *ep, struct retrace_connect_params *params, int result)
 {
-#if BACKTRACE
-	struct display_info *display_info = ep->handle->user_data;
-	char btbuffer[4096];
-#endif
+	DISPLAY_fd(ep, params->sockfd);
+	printf(", ");
+	display_sockaddr(ep, params->addr, params->addrlen);
+	printf(", ");
+	DISPLAY_socklen_t(ep, params->addrlen);
+}
+
+#define LOG_PARAMS_open
+static void
+log_params_open(struct retrace_endpoint *ep, struct retrace_open_params *params, int result)
+{
+	DISPLAY_cstring(ep, params->pathname);
+	printf(", ");
+	DISPLAY_fileflags(ep, params->flags);
+	if (params->flags & OPEN_CREATE_FLAGS) {
+		printf(", ");
+		DISPLAY_mode_t(ep, params->mode);
+	}
+}
+
+#define LOG_PARAMS_openat
+static void
+log_params_openat(struct retrace_endpoint *ep, struct retrace_openat_params *params, int result)
+{
+	DISPLAY_fd(ep, params->dirfd);
+	printf(", ");
+	DISPLAY_cstring(ep, params->pathname);
+	printf(", ");
+	DISPLAY_fileflags(ep, params->flags);
+	if (params->flags & OPEN_CREATE_FLAGS) {
+		printf(", ");
+		DISPLAY_mode_t(ep, params->mode);
+	}
+}
+
+#define LOG_PARAMS_recvfrom
+static void
+log_params_recvfrom(struct retrace_endpoint *ep, struct retrace_recvfrom_params *params, int result)
+{
+	socklen_t addrlen = 0;
+
+	DISPLAY_fd(ep, params->sockfd);
+	printf(", ");
+
+	if (result != -1)
+		display_buffer(ep, params->buf, result);
+	else
+		DISPLAY_pvoid(ep, params->buf);
+
+	printf(", ");
+	DISPLAY_size_t(ep, params->len);
+	printf(", ");
+	DISPLAY_msgflags(ep, params->flags);
+	printf(", ");
+
+	if (result != -1 && params->addrlen != NULL)
+		retrace_fetch_memory(ep->fd, params->addrlen, &addrlen,
+		    sizeof(addrlen));
+
+	if (addrlen != 0) {
+		display_sockaddr(ep, params->src_addr, addrlen);
+		printf(", ");
+		DISPLAY_pint(ep, params->addrlen);
+	} else {
+		DISPLAY_pvoid(ep, params->src_addr);
+		printf(", ");
+		DISPLAY_pvoid(ep, params->addrlen);
+	}
+}
+
+#define LOG_PARAMS_recvmsg
+static void
+log_params_recvmsg(struct retrace_endpoint *ep, struct retrace_recvmsg_params *params, int result)
+{
+	DISPLAY_fd(ep, params->sockfd);
+	printf(", ");
+	if (result != -1)
+		display_msg(ep, params->msg, result);
+	else
+		DISPLAY_pvoid(ep, params->msg);
+	printf(", ");
+	DISPLAY_msgflags(ep, params->flags);
+}
+
+#define LOG_PARAMS_sendmsg
+static void
+log_params_sendmsg(struct retrace_endpoint *ep, struct retrace_sendmsg_params *params, int result)
+{
+	DISPLAY_fd(ep, params->sockfd);
+	printf(", ");
+	if (result != -1)
+		display_msg(ep, params->msg, result);
+	else
+		display_msg(ep, params->msg, 0);
+	printf(", ");
+	DISPLAY_msgflags(ep, params->flags);
+}
+
+#define LOG_PARAMS_sendto
+static void
+log_params_sendto(struct retrace_endpoint *ep, struct retrace_sendto_params *params, int result)
+{
+	DISPLAY_fd(ep, params->sockfd);
+	printf(", ");
+	if (result != -1)
+		DISPLAY_pvoid(ep, params->buf);
+	else
+		DISPLAY_pvoid(ep, params->buf);
+	printf(", ");
+	DISPLAY_size_t(ep, params->len);
+	printf(", ");
+	DISPLAY_msgflags(ep, params->flags);
+	printf(", ");
+	if (result != -1)
+		display_sockaddr(ep, params->dest_addr, params->addrlen);
+	else
+		DISPLAY_pvoid(ep, params->dest_addr);
+
+	printf(", ");
+	DISPLAY_int(ep, params->addrlen);
+}
+
+[[#functions]]
+static void
+log_[[name]](struct retrace_endpoint *ep, struct retrace_call_context *context)
+{
 [[#has_parameters]]
-	struct retrace_[[name]]_params *params = (struct retrace_[[name]]_params *)context;
+	struct retrace_[[name]]_params *params = (struct retrace_[[name]]_params *)&context->params;
 [[/has_parameters]]
 [[#result]]
-	[[rpctype]]result = *([[rpctype]]*)buf;
+	[[rpctype]]result = *([[rpctype]]*)context->result;
 [[/result]]
 
 	printf("(%d:%d %d)%.*s[[name]](", ep->pid, ep->thread_num, ep->call_num, ep->call_depth, "\t\t\t\t\t");
+#ifndef LOG_PARAMS_[[name]]
 [[#params]]
 	DISPLAY_[[type]](ep, params->[[name]]);
 [[^last]]
 	printf(", ");
 [[/last]]
 [[/params]]
+#else
+	log_params_[[name]](ep, params, result);
+#endif
 	printf(")");
 [[#result]]
 	printf(" = ");
 	DISPLAY_[[type]](ep, result);
+[[#errno]]
+	if (result == [[& errno]])
+		display_errno(context->_errno);
+[[/errno]]
 [[/result]]
 	printf("\n");
-
-#if BACKTRACE
-	if (display_info->backtrace_functions[RPC_[[name]]]) {
-		if (retrace_fetch_backtrace(ep->fd, display_info->backtrace_depth, btbuffer, sizeof(btbuffer)))
-			printf("%s", btbuffer);
-	}
-#endif
-
-	free(context);
-	return 0;
 }
-[[/functions]]
 
-void get_handlers(retrace_precall_handler_t *pre, retrace_postcall_handler_t *post)
+[[/functions]]
+void
+set_log_handlers(struct retrace_handle *handle)
 {
 	[[#functions]]
-	pre[RPC_[[name]]] = default_[[name]]_precall_handler;
-	post[RPC_[[name]]] = default_[[name]]_postcall_handler;
+	retrace_add_postcall_handler(handle, RPC_[[name]], log_[[name]]);
 	[[/functions]]
 };

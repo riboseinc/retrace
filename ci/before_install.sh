@@ -11,16 +11,21 @@ get_os() {
 }
 
 macos_install() {
-	brew upgrade
-	brew install openssl
-	brew install make
-	brew install cmake
-	brew install autoconf
-	brew install automake
-	brew install libtool
-	brew install cmocka
-	brew install pkg-config
-	brew install ruby
+	brew update
+	packages="
+		openssl
+		make
+		cmake
+		autoconf
+		automake
+		libtool
+		cmocka
+		pkg-config
+		ruby
+	"
+	for p in ${packages}; do
+		brew install ${p} || brew upgrade ${p}
+	done
 	mkdir -p ${CMOCKA_INSTALL}
 	gem install mustache
 }
