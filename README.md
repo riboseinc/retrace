@@ -409,6 +409,16 @@ stacktrace-groups,[logging groups]
 stacktrace-disabled-funcs,[functions list]
 ```
 
+## Data dump
+
+``` sh
+disabledatadump
+```
+
+By default `retrace` will dump the full buffers passed to functions such as `write()` and `read()`.
+If this option (without parameters) is present, no buffers will be dumped. This can be useful to get
+a cleaner output. It will even speed up the tracing if there are a lot of buffers are being printed.
+
 # Notes
 
 ## macOS System Integrity Protection
