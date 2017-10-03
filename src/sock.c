@@ -493,6 +493,7 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
+			parameter_values[1] = &inject_len;
 			parameter_values[2] = &inject_buffer;
 			parameter_values[3] = &inject_len;
 
@@ -569,6 +570,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
+			parameter_values[1] = &inject_len;
 			parameter_values[2] = &inject_buffer;
 			parameter_values[3] = &inject_len;
 
