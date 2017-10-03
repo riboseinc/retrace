@@ -197,9 +197,6 @@ static int parse_inject_param(enum RTR_STRINJECT_TYPE type, const char *param, s
 		if (overflow_buf_len <= 0)
 			return -1;
 
-		if (overflow_buf_len > (len - *offset))
-			overflow_buf_len = (len - *offset);
-
 		*((int *) val) = overflow_buf_len;
 
 		break;
@@ -308,16 +305,9 @@ static int inject_buf_overflow(const char *param, const void *buffer, size_t len
 	if (!p)
 		return 0;
 
-	if (offset > 0)
-		real_memcpy(p, buffer, offset);
-
-	/* set overflow buffer */
-	ov = p + offset;
-	for (i = 0; i < count; i++)
-		*(ov++) = 'A';
-
-	if (len - offset > 0)
-		real_memcpy(&p[offset + count], buffer + offset, len - offset);
+	real_memcpy(p, buffer, offset);
+	memset(p + offset, 'A', count);
+	real_memcpy(p + offset + count, buffer + offset, len - offset);
 
 	*inject_buffer = p;
 	*inject_len = len + count;
