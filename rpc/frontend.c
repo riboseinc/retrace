@@ -289,7 +289,7 @@ update_call_context(struct retrace_endpoint *ep, const void *buf, size_t len)
 {
 	struct retrace_call_context *context;
 
-	assert(len < sizeof(int) + sizeof(context->result));
+	assert(len <= sizeof(int) + sizeof(context->result));
 
 	context = SLIST_FIRST(&ep->call_stack);
 	context->_errno = *(int *)buf;

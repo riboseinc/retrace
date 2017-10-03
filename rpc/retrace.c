@@ -29,6 +29,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <sys/queue.h>
+#include <err.h>
 
 #include "frontend.h"
 #include "handlers.h"
@@ -37,10 +38,13 @@
 #if BACKTRACE
 #include "backtrace.h"
 #endif
+#include "conf.h"
 
 static struct option options[] = {
 	{"help", no_argument, 0, 'h'},
 	{"version", no_argument, 0, 'v'},
+	{"config-file", required_argument, 0, 'c'},
+	{"clean-config", no_argument, 0, 'C'},
 	{"functions", required_argument, 0, 'f'},
 #if BACKTRACE
 	{"backtrace-functions", required_argument, 0, 'b'},
@@ -53,7 +57,7 @@ static struct option options[] = {
 	{NULL, 0, 0, 0}
 };
 
-#define STDOPTS "+f:s:u:hvFt"
+#define STDOPTS "+c:Cf:s:u:hvFt"
 
 #if BACKTRACE
 #define BTOPTS "b:d:"
@@ -74,6 +78,8 @@ static void usage(const char *argv0, int exitval)
 	    "dynamically-linked ELF (Linux/OpenBSD/FreeBSD) and Mach-O "
 	    "(macOS) binary executables.\n\n"
 	    "Options:\n"
+	    "  -c --config-file		Read additional config file\n"
+	    "  -C --clean-config	Discard any config read so far\n"
 	    "  -f --functions=LIST	LIST is a comma separated list of "
 	    "function names to trace (defaults to all supported functions)\n"
 	    "  -u --show-buffers=n	Show the first n bytes of "
@@ -120,15 +126,29 @@ int main(int argc, char **argv)
 #if BACKTRACE
 	int backtrace_funcs[RPC_FUNCTION_COUNT];
 #endif
+	struct config config;
+	char path[PATH_MAX];
+	const char *home;
 
 	memset(trace_flags, 0, sizeof(trace_flags));
 	memset(&handler_info, 0, sizeof(handler_info));
+	STAILQ_INIT(&config);
 
 #if BACKTRACE
 	memset(backtrace_funcs, 0, sizeof(backtrace_funcs));
 	handler_info.backtrace_depth = 4;
 #endif
 
+	if (!read_config_file(&config, path))
+		err(EXIT_FAILURE, "failed config (/etc/retrace.conf)");
+	
+	home = getenv("HOME");
+	if (home != NULL) {
+		c = snprintf(path, sizeof(path), "%s/.retrace", home);
+		if (c >= sizeof(path) || !read_config_file(&config, path))
+			err(EXIT_FAILURE, "failed config read (%s)", path);
+	}
+	
 	while (1) {
 		c = getopt_long(argc, argv, STDOPTS BTOPTS, options, NULL);
 
@@ -136,6 +156,14 @@ int main(int argc, char **argv)
 			break;
 
 		switch (c) {
+		case 'c':
+			if (!read_config_file(&config, optarg))
+				err(EXIT_FAILURE, "failed config read (%s)",
+					optarg);
+			break;
+		case 'C':
+			free_config_entries(&config);
+			break;
 		case 'f':
 			opt_funcs = 1;
 			set_trace_flags(trace_flags, RETRACE_TRACE, optarg);
