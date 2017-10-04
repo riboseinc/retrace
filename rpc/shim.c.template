@@ -18,10 +18,99 @@ struct interpose {
 	const void *replacee;
 };
 #endif
-[[#functions]]
 
 int trace_functions[RPC_FUNCTION_COUNT];
 
+#define OVERRIDE_fork
+#ifdef __APPLE__
+pid_t retrace_impl_fork()
+#else
+pid_t (fork)()
+#endif
+{
+	enum rpc_msg_type _msg_type;
+	int _postcall = 0, _fd, _errno;
+	char _buf[RPC_MSG_LEN_MAX];
+	pid_t *_buf_result = (pid_t *)_buf;
+	pid_t _result;
+
+	_errno = errno;
+
+#if defined __OpenBSD__ || defined __FreeBSD__
+	_fd = rpc_get_sockfd(RPC_fork);
+#else
+	_fd = rpc_get_sockfd();
+#endif
+
+	if (_fd == -1 || !trace_functions[RPC_fork]) {
+		_result = real_fork();
+		return _result;
+	}
+
+	if (!rpc_send_init(_fd, RPC_fork, NULL, 0))
+		goto rpc_fail;
+
+	while (rpc_recv_message(_fd, &_msg_type, _buf)) {
+		if (_msg_type == RPC_MSG_DONE) {
+			errno = _errno;
+			return _result;
+		} else if (_msg_type == RPC_MSG_SET_RESULT) {
+			_result = *_buf_result;
+		} else if (_msg_type == RPC_MSG_DO_CALL) {
+			_result = real_fork();
+			if (_result == 0) {
+#if defined __OpenBSD__ || defined __FreeBSD__
+				rpc_get_sockfd(RPC_fork);
+#else
+				rpc_get_sockfd();
+#endif
+				return 0;
+			}
+			_postcall = 1;
+			_errno = errno;
+			if (!rpc_send_result(_fd, &_result, sizeof(_result)))
+				goto rpc_fail;
+		} else if (!rpc_handle_message(_fd, _msg_type, _buf))
+			goto rpc_fail;
+	}
+
+rpc_fail:
+	rpc_set_sockfd(-1);
+	real_close(_fd);
+
+	if (!_postcall) {
+		_result = real_fork();
+	}
+	return _result;
+}
+
+#ifdef __APPLE__
+pid_t (fork)();
+__attribute__((used)) static struct interpose _interpose_fork __attribute__((section("__DATA,__interpose"))) = {
+	retrace_impl_fork,
+	fork
+};
+rtr_fork_t real_fork = fork;
+#else
+pid_t rtr_fixup_fork()
+{
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
+	void *fn = dlsym(RTLD_NEXT, "fork");
+#else
+	void *fn = _dl_sym(RTLD_NEXT, "fork", rtr_fixup_fork);
+#endif
+#ifdef HAVE_ATOMIC_BUILTINS
+	__atomic_store_n(&real_fork, fn, __ATOMIC_RELAXED);
+#else
+	real_fork = fn;
+#endif
+	return real_fork();
+}
+__attribute__((visibility("hidden"))) rtr_fork_t real_fork = rtr_fixup_fork;
+#endif
+[[#functions]]
+
+#ifndef OVERRIDE_[[name]]
 [[guard]]
 #ifdef __APPLE__
 [[ctype]]retrace_impl_[[name]]([[#params]][[ctype]][[name]][[^last]], [[/last]][[/params]][[#variadic]], ...[[/variadic]])
@@ -154,4 +243,5 @@ rtr_[[name]]_t real_[[name]] = [[name]];
 __attribute__((visibility("hidden"))) rtr_[[name]]_t real_[[name]] = rtr_fixup_[[name]];
 #endif
 [[#guard]]#endif[[/guard]]
+#endif
 [[/functions]]

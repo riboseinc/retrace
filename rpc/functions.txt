@@ -1,3 +1,9 @@
+function accept int
+parameter sockfd fd
+parameter addr sockaddr
+parameter addrlen psocklen_t
+errno -1
+
 function bind int
 parameter sockfd fd
 parameter addr csockaddr
@@ -52,6 +58,9 @@ function fopen file
 parameter path cstring
 parameter mode cstring
 errno NULL
+
+function fork pid_t
+errno -1
 
 function fprintf int
 parameter stream file

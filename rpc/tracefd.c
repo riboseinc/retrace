@@ -318,6 +318,33 @@ socket_postcall(struct retrace_endpoint *ep,
 }
 
 static void
+accept_postcall(struct retrace_endpoint *ep,
+	struct retrace_call_context *context)
+{
+	struct retrace_accept_params *params =
+	    (struct retrace_accept_params *)&context->params;
+	struct handler_info *hi = ep->handle->user_data;
+	struct fdinfo_h *fdinfos = &hi->fdinfos;
+	const struct fdinfo *old_info;
+	int fd = *(int *)context->result;
+	char info[1024];
+
+	if (fd == -1)
+		return;
+
+	old_info = get_fdinfo(fdinfos, ep->pid, fd);
+
+	if (old_info)
+		snprintf(info, sizeof(info), "accept(%d:%s, ...)",
+		    params->sockfd, old_info->info);
+	else
+		snprintf(info, sizeof(info), "accept(%d, ...)",
+		    params->sockfd);
+
+	set_fdinfo(fdinfos, ep->pid, fd, info);
+}
+
+static void
 socketpair_postcall(struct retrace_endpoint *ep,
 	struct retrace_call_context *context)
 {
@@ -395,6 +422,7 @@ init_tracefd_handlers(struct retrace_handle *handle)
 	retrace_add_postcall_handler(handle, RPC_open, open_postcall);
 	retrace_add_postcall_handler(handle, RPC_openat, openat_postcall);
 	retrace_add_postcall_handler(handle, RPC_socket, socket_postcall);
+	retrace_add_postcall_handler(handle, RPC_accept, accept_postcall);
 	retrace_add_postcall_handler(handle, RPC_socketpair, socketpair_postcall);
 	retrace_add_postcall_handler(handle, RPC_close, close_postcall);
 	retrace_add_postcall_handler(handle, RPC_fclose, fclose_postcall);
