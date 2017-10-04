@@ -2,6 +2,7 @@
 #define __RETRACE_HANDLERS_H__
 
 #include "tracefd.h"
+#include "dns.h"
 
 void set_log_handlers(struct retrace_handle *handle);
 
@@ -14,6 +15,7 @@ struct handler_info {
 	int expand_structs;
 	int tracefds;
 	struct fdinfo_h fdinfos;
+	struct dns_info dns_info;
 };
 
 #endif

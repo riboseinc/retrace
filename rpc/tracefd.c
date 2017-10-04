@@ -84,13 +84,21 @@ static void
 inherit(struct retrace_endpoint *ep)
 {
 	struct handler_info *hi = ep->handle->user_data;
-	struct fdinfo_h *infos = &hi->fdinfos;
+	struct fdinfo_h *infos = &hi->fdinfos, new_infos;
 	struct fdinfo *fi;
+
+	SLIST_INIT(&new_infos);
 
 	SLIST_FOREACH(fi, infos, next) {
 		if (fi->pid != ep->ppid)
 			continue;
-		_set_fdinfo(infos, fi->type, ep->pid, fi->key, fi->info);
+		_set_fdinfo(&new_infos, fi->type, ep->pid, fi->key, fi->info);
+	}
+
+	while (!SLIST_EMPTY(&new_infos)) {
+		fi = SLIST_FIRST(&new_infos);
+		SLIST_REMOVE_HEAD(&new_infos, next);
+		SLIST_INSERT_HEAD(infos, fi, next);
 	}
 }
 

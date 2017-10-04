@@ -27,6 +27,15 @@ function dirfd fd
 parameter dirp dir
 errno -1
 
+function dup int
+parameter oldfd fd
+errno -1
+
+function dup2 int
+parameter oldfd fd
+parameter newfd fd
+errno -1
+
 function fclose int
 parameter stream file
 errno EOF
