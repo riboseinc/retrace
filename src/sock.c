@@ -511,12 +511,12 @@ ssize_t RETRACE_IMPLEMENTATION(send)(int sockfd, const void *buf, size_t len, in
 			flags);
 		if (ret < 0)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-
-		if (enable_inject)
-			real_free(inject_buffer);
 	}
 
 	retrace_log_and_redirect_after(&event_info);
+
+	if (enable_inject)
+		real_free(inject_buffer);
 
 	return ret;
 }
@@ -591,12 +591,12 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 
 		if (ret < 0)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-
-		if (enable_inject)
-			real_free(inject_buffer);
 	}
 
 	retrace_log_and_redirect_after(&event_info);
+
+	if (enable_inject)
+		real_free(inject_buffer);
 
 	return ret;
 }
