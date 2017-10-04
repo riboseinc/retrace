@@ -51,5 +51,6 @@ void display_sockaddr(struct retrace_endpoint *ep,
 void display_socktype(int socktype);
 void display_stream(struct retrace_endpoint *ep, FILE *s);
 void display_string(struct retrace_endpoint *ep, const char *s);
-
+void add_info(struct retrace_call_context *ctx, const char *fmt, ...);
+void display_info(struct retrace_call_context *ctx, unsigned int call_depth);
 #endif

@@ -28,6 +28,7 @@ enum rpc_msg_type {
 
 struct rpc_control_header {
 	pid_t pid;
+	pid_t ppid;
 	pthread_t tid;
 };
 

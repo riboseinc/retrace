@@ -39,6 +39,7 @@
 #include "backtrace.h"
 #endif
 #include "conf.h"
+#include "dns.h"
 
 static struct option options[] = {
 	{"help", no_argument, 0, 'h'},
@@ -79,7 +80,7 @@ static void usage(const char *argv0, int exitval)
 	    "(macOS) binary executables.\n\n"
 	    "Options:\n"
 	    "  -c --config-file		Read additional config file\n"
-	    "  -C --clean-config	Discard any config read so far\n"
+	    "  -C --clean-config	Discard config files read so far\n"
 	    "  -f --functions=LIST	LIST is a comma separated list of "
 	    "function names to trace (defaults to all supported functions)\n"
 	    "  -u --show-buffers=n	Show the first n bytes of "
@@ -218,6 +219,8 @@ int main(int argc, char **argv)
 	#endif
 
 	set_log_handlers(trace_handle);
+
+	init_dns_handlers(trace_handle);
 
 	retrace_trace(trace_handle);
 

@@ -147,6 +147,7 @@ new_rpc_endpoint()
 	*pfd = sv[0];
 
 	control_header.pid = real_getpid();
+	control_header.ppid = real_getppid();
 	control_header.tid = pthread_self();
 
 	err = real_sendmsg(g_sockfd, &msg, 0);

@@ -5,10 +5,10 @@ functions2yaml_SOURCES = functions2yaml.c
 lib_LTLIBRARIES = libretracerpc.la
 libretracerpc_la_LDFLAGS = -no-undefined -avoid-version
 libretracerpc_la_CFLAGS = $(AM_CFLAGS) $(LIBSSL_FLAGS)
-noinst_HEADERS = rpc.h shim.h frontend.h backend.h functions.h tracefd.h backtrace.h conf.h
+noinst_HEADERS = rpc.h shim.h frontend.h backend.h functions.h tracefd.h backtrace.h conf.h dns.h
 libretracerpc_la_SOURCES = shim.c version.c backend.c
 bin_PROGRAMS = retrace
-retrace_SOURCES = retrace.c version.c handlers.c frontend.c functions.c display.c tracefd.c backtrace.c conf.c
+retrace_SOURCES = retrace.c version.c handlers.c frontend.c functions.c display.c tracefd.c backtrace.c conf.c dns.c
 
 if LINUX
 MD5SUM=md5sum

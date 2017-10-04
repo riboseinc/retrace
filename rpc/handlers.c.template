@@ -181,6 +181,7 @@ log_[[name]](struct retrace_endpoint *ep, struct retrace_call_context *context)
 [[/errno]]
 [[/result]]
 	printf("\n");
+	display_info(context, ep->call_depth);
 }
 
 [[/functions]]

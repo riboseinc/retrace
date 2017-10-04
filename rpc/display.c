@@ -719,3 +719,68 @@ display_buffer(struct retrace_endpoint *ep, const void *addr, size_t len)
 	}
 	printf(truncated ? "]+" : "]");
 }
+
+struct log_info {
+	STAILQ_ENTRY(log_info) next;
+	const char *info;
+};
+
+STAILQ_HEAD(log_infos, log_info);
+
+static void
+free_info(void *user_data)
+{
+	struct log_infos *infos = user_data;
+	struct log_info *pinfo;
+
+	while (!STAILQ_EMPTY(infos)) {
+		pinfo = STAILQ_FIRST(infos);
+		STAILQ_REMOVE_HEAD(infos, next);
+		free(pinfo);
+	}
+	free(infos);
+}
+
+void
+add_info(struct retrace_call_context *ctx, const char *fmt, ...)
+{
+	char buf[1024];
+	va_list ap;
+	struct log_infos *infos;
+	struct log_info *pinfo;
+	size_t n;
+
+	infos = ctx->user_data;
+	if (infos == NULL) {
+		infos = malloc(sizeof(struct log_infos));
+		if (infos == NULL)
+			return;
+		STAILQ_INIT(infos);
+		ctx->user_data = infos;
+		ctx->free_user_data = free_info;
+	}
+
+	va_start(ap, fmt);
+
+	n = vsnprintf(buf, sizeof(buf), fmt, ap);
+	if (n >= sizeof(buf))
+		n = sizeof(buf) - 1;
+
+	pinfo = malloc(sizeof(struct log_info) + n + 1);
+	if (pinfo != NULL) {
+		pinfo->info = (char *)(pinfo + 1);
+		strcpy((char *)pinfo->info, buf);
+	}
+	STAILQ_INSERT_TAIL(infos, pinfo, next);
+}
+
+void
+display_info(struct retrace_call_context *ctx, unsigned int depth)
+{
+	struct log_info *pinfo;
+
+	if (ctx->user_data == NULL)
+		return;
+	STAILQ_FOREACH(pinfo, (struct log_infos *)ctx->user_data, next)
+		printf("\t%.*s%s\n", depth, "\t\t\t\t\t", pinfo->info);
+}

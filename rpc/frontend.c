@@ -83,16 +83,18 @@ recv_endpoint(int fd)
 	endpoint = malloc(sizeof(struct retrace_endpoint));
 	memcpy(&endpoint->fd, CMSG_DATA(cmsg), sizeof(int));
 	endpoint->pid = header.pid;
+	endpoint->ppid = header.ppid;
 	SLIST_INIT(&endpoint->call_stack);
 
 	return endpoint;
 }
 
-struct retrace_endpoint *
+static struct retrace_endpoint *
 add_endpoint(struct retrace_handle *handle)
 {
 	struct retrace_process_info *pi, *procinfo = NULL;
 	struct retrace_endpoint *endpoint;
+	struct retrace_process_handler *process_handler;
 
 	endpoint = recv_endpoint(handle->control_fd);
 	if (!endpoint)
@@ -121,6 +123,9 @@ add_endpoint(struct retrace_handle *handle)
 	endpoint->call_depth = 0;
 	endpoint->handle = handle;
 	SLIST_INSERT_HEAD(&handle->endpoints, endpoint, next);
+
+	SLIST_FOREACH(process_handler, &handle->process_handlers, next)
+		process_handler->fn(endpoint);
 
 	return endpoint;
 }
@@ -176,11 +181,13 @@ retrace_start(char *const argv[], const int *trace_flags)
 		}
 		SLIST_INIT(&handle->endpoints);
 		SLIST_INIT(&handle->processes);
+		SLIST_INIT(&handle->process_handlers);
 
 		for (i = 0; i < RPC_FUNCTION_COUNT; i++) {
 			SLIST_INIT(&handle->precall_handlers[i]);
 			SLIST_INIT(&handle->postcall_handlers[i]);
 		}
+
 
 		handle->control_fd = sv[0];
 
@@ -216,6 +223,21 @@ retrace_add_postcall_handler(
 
 	handler = malloc(sizeof(struct retrace_postcall_handler));
 	handlers = &handle->postcall_handlers[fid];
+	if (handler) {
+		handler->fn = fn;
+		SLIST_INSERT_HEAD(handlers, handler, next);
+	}
+}
+
+void
+retrace_add_process_handler(struct retrace_handle *handle,
+	retrace_process_handler_t fn)
+{
+	struct retrace_process_handler *handler;
+	struct retrace_process_handlers *handlers;
+
+	handler = malloc(sizeof(struct retrace_process_handler));
+	handlers = &handle->process_handlers;
 	if (handler) {
 		handler->fn = fn;
 		SLIST_INSERT_HEAD(handlers, handler, next);
@@ -280,6 +302,8 @@ init_call_context(struct retrace_endpoint *ep, const void *buf, size_t len)
 		buf = (enum retrace_function_id *)buf + 1;
 		memcpy(context->params, buf, len);
 	}
+	context->user_data = NULL;
+	context->free_user_data = NULL;
 	SLIST_INSERT_HEAD(&ep->call_stack, context, next);
 	++ep->call_depth;
 }
@@ -303,6 +327,8 @@ free_call_context(struct retrace_endpoint *ep)
 
 	context = SLIST_FIRST(&ep->call_stack);
 	SLIST_REMOVE_HEAD(&ep->call_stack, next);
+	if (context->user_data != NULL && context->free_user_data != NULL)
+		context->free_user_data(context->user_data);
 	free(context);
 	--ep->call_depth;
 	++ep->call_num;

@@ -80,6 +80,20 @@ _set_fdinfo(struct fdinfo_h *infos, enum tracefd_keytype type, pid_t pid,
 	}
 }
 
+static void
+inherit(struct retrace_endpoint *ep)
+{
+	struct handler_info *hi = ep->handle->user_data;
+	struct fdinfo_h *infos = &hi->fdinfos;
+	struct fdinfo *fi;
+
+	SLIST_FOREACH(fi, infos, next) {
+		if (fi->pid != ep->ppid)
+			continue;
+		_set_fdinfo(infos, fi->type, ep->pid, fi->key, fi->info);
+	}
+}
+
 void
 set_dirinfo(struct fdinfo_h *infos, pid_t pid, DIR *dir, const char *info)
 {
@@ -305,15 +319,19 @@ socketpair_postcall(struct retrace_endpoint *ep,
 	struct fdinfo_h *fdinfos = &hi->fdinfos;
 	int result = *(int *)context->result;
 	char info[1024];
+	int sv[2];
 
 	if (result == -1)
 		return;
 
+	if (!retrace_fetch_memory(ep->fd, params->sv, sv, sizeof(sv)))
+		return;
+
 	snprintf(info, sizeof(info), "socketpair(%d, %d, %d, %d<->%d)",
 	    params->domain, params->type, params->protocol,
-	    *params->sv, *(params->sv + 1));
-	set_fdinfo(fdinfos, ep->pid, params->sv[0], info);
-	set_fdinfo(fdinfos, ep->pid, params->sv[1], info);
+	    sv[0], sv[1]);
+	set_fdinfo(fdinfos, ep->pid, sv[0], info);
+	set_fdinfo(fdinfos, ep->pid, sv[1], info);
 }
 
 static void
@@ -373,6 +391,8 @@ init_tracefd_handlers(struct retrace_handle *handle)
 	retrace_add_postcall_handler(handle, RPC_close, close_postcall);
 	retrace_add_postcall_handler(handle, RPC_fclose, fclose_postcall);
 	retrace_add_postcall_handler(handle, RPC_closedir, closedir_postcall);
+
+	retrace_add_process_handler(handle, inherit);
 
 	handler_info->tracefds = 1;
 }

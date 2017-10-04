@@ -16,6 +16,7 @@ struct retrace_call_context {
 	char result[16];
 	int _errno;
 	void *user_data;
+	void (*free_user_data)(void *data);
 };
 
 SLIST_HEAD(retrace_call_stack, retrace_call_context);
@@ -24,6 +25,7 @@ struct retrace_endpoint {
 	SLIST_ENTRY(retrace_endpoint) next;
 	int fd;
 	pid_t pid;
+	pid_t ppid;
 	int thread_num;
 	unsigned int call_num;
 	unsigned int call_depth;
@@ -43,6 +45,7 @@ SLIST_HEAD(process_list, retrace_process_info);
 
 typedef int (*retrace_precall_handler_t)(struct retrace_endpoint *ep, struct retrace_call_context *context);
 typedef void (*retrace_postcall_handler_t)(struct retrace_endpoint *ep, struct retrace_call_context *context);
+typedef void (*retrace_process_handler_t)(struct retrace_endpoint *ep);
 
 struct retrace_precall_handler {
 	SLIST_ENTRY(retrace_precall_handler) next;
@@ -58,12 +61,20 @@ struct retrace_postcall_handler {
 
 SLIST_HEAD(retrace_postcall_handlers, retrace_postcall_handler);
 
+struct retrace_process_handler {
+	SLIST_ENTRY(retrace_process_handler) next;
+	retrace_process_handler_t fn;
+};
+
+SLIST_HEAD(retrace_process_handlers, retrace_process_handler);
+
 struct retrace_handle {
 	struct retrace_endpoints endpoints;
 	struct process_list processes;
 	int control_fd;
 	struct retrace_precall_handlers precall_handlers[RPC_FUNCTION_COUNT];
 	struct retrace_postcall_handlers postcall_handlers[RPC_FUNCTION_COUNT];
+	struct retrace_process_handlers process_handlers;
 	void *user_data;
 };
 
@@ -75,6 +86,8 @@ void retrace_add_precall_handler(struct retrace_handle *handle,
 	enum retrace_function_id fid, retrace_precall_handler_t fn);
 void retrace_add_postcall_handler(struct retrace_handle *handle,
 	enum retrace_function_id fid, retrace_postcall_handler_t fn);
+void retrace_add_process_handler(struct retrace_handle *handle,
+	retrace_process_handler_t fn);
 void retrace_set_user_data(struct retrace_handle *handle, void *data);
 int retrace_fetch_backtrace(int fd, int depth, char *buf, size_t len);
 int retrace_fetch_memory(int fd, const void *address, void *buffer, size_t len);
