@@ -10,7 +10,7 @@ enum RTR_STRINJECT_TYPE {
 	STRINJECT_TYPE_FMT_STR,
 	STRINJECT_TYPE_BUF_OVERFLOW,
 	STRINJECT_TYPE_FILE_LINE,
-	STRINJECT_TYPE_UNKNOWN,
+	STRINJECT_TYPE_STANDARD
 };
 
 /*
@@ -41,7 +41,8 @@ struct rtr_strinject_info {
 	int exist;
 
 	enum RTR_STRINJECT_TYPE type;
-	char param[512];
+	const char *param;
+	const char *param2;
 	double rate;
 };
 

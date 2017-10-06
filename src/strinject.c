@@ -47,7 +47,7 @@ static struct {
 	{STRINJECT_TYPE_FMT_STR, "INJECT_FORMAT_STR"},
 	{STRINJECT_TYPE_BUF_OVERFLOW, "INJECT_BUF_OVERFLOW"},
 	{STRINJECT_TYPE_FILE_LINE, "INJECT_FILE_LINE"},
-	{STRINJECT_TYPE_UNKNOWN, NULL}
+	{STRINJECT_TYPE_STANDARD, NULL}
 };
 
 /*
@@ -79,48 +79,45 @@ static struct {
 
 static void rtr_strinject_init(void)
 {
+	const char *arg1, *arg2, *arg3,
+	     *func_list, *inject_param, *inject_param2;
+	double inject_rate;
+	enum RTR_STRINJECT_TYPE type;
+	enum RTR_STRINJECT_FUNC_ID fid;
+	int reverse;
+
 	RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
-
 	while (1) {
-		char *inject_type_str = NULL;
-		char *func_list = NULL;
-		char *inject_param = NULL;
-		double inject_rate;
-
-		enum RTR_STRINJECT_TYPE inject_type = STRINJECT_TYPE_UNKNOWN;
-
-		int i, reverse;
-
 		/* get configuration line */
 		if (rtr_get_config_multiple(&config, "stringinject", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_STRING,
 			ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_DOUBLE, ARGUMENT_TYPE_END,
-			&inject_type_str, &func_list, &inject_param, &inject_rate) == 0)
+			&arg1, &arg2, &arg3, &inject_rate) == 0)
 			break;
 
 		/* get inject type */
-		for (i = 0; i < STRINJECT_TYPE_UNKNOWN; i++) {
-			if (real_strcmp(inject_type_str, g_inject_types[i].type_str) == 0) {
-				inject_type = g_inject_types[i].type;
+		for (type = 0; type < STRINJECT_TYPE_STANDARD; type++)
+			if (real_strcmp(arg1, g_inject_types[type].type_str) == 0)
 				break;
-			}
+
+		func_list = arg2;
+		inject_param = arg3;
+		inject_param2 = NULL;
+		if (type == STRINJECT_TYPE_STANDARD) {
+			func_list = arg1;
+			inject_param = arg2;
+			inject_param2 = arg3;
 		}
 
-		if (inject_type == STRINJECT_TYPE_UNKNOWN)
-			continue;
-
 		/* get function list */
-		for (i = 0; i < STRINJECT_FUNC_MAX; i++) {
-			if (rtr_check_config_token(g_inject_funcs[i].name, func_list, "|", &reverse) &&
-				!g_strinject_infos[i].exist) {
-				g_strinject_infos[i].type = inject_type;
-
-				if (strlen(inject_param) > sizeof(g_strinject_infos[i].param) - 1)
-					inject_param[sizeof(g_strinject_infos[i].param) -  1] = '\0';
-
-				real_strcpy(g_strinject_infos[i].param, inject_param);
-
-				g_strinject_infos[i].rate = inject_rate;
-				g_strinject_infos[i].exist = 1;
+		for (fid = 0; fid < STRINJECT_FUNC_MAX; fid++) {
+			if (g_strinject_infos[fid].exist)
+				continue;
+			if (rtr_check_config_token(g_inject_funcs[fid].name, func_list, "|", &reverse)) {
+				g_strinject_infos[fid].type = type;
+				g_strinject_infos[fid].param = inject_param;
+				g_strinject_infos[fid].param2 = inject_param2;
+				g_strinject_infos[fid].rate = inject_rate;
+				g_strinject_infos[fid].exist = 1;
 			}
 		}
 	}
@@ -398,6 +395,241 @@ static int inject_file_line(const char *param, const void *buffer, size_t len,
 	return 1;
 }
 
+static char *
+get_param(const char *src)
+{
+	const char *s;
+	char *d, *buf;
+
+	s = src;
+	while (*s != '\0' && *s != '(')
+		++s;
+
+	if (*s++ == '\0')
+		return NULL;
+
+	buf = real_malloc(real_strlen(s) + 1);
+
+	if (buf) {
+		d = buf;
+		while (*s != '\0' && *s != ')')
+			*d++ = *s++;
+		if (*s != ')' && *(s+1) != '\0') {
+			real_free(buf);
+			return NULL;
+		}
+		*d = '\0';
+	}
+
+	return buf;
+}
+
+static char *
+gen_random(size_t len, int mask)
+{
+	char *buf;
+
+	buf = real_malloc(len);
+	if (buf != NULL)
+		while (len--)
+			buf[len] = rand() & mask;
+
+	return buf;
+}
+
+static char *
+parse_immediate(const char *imm, size_t *len)
+{
+	static const char hex[] = "0123456789abcdef";
+	const char *s, *phi, *plo;
+	char *buf, *d;
+	int hi, lo;
+
+	buf = real_malloc(real_strlen(imm) + 1);
+
+	if (buf == NULL)
+		goto fail;
+
+	for (s = imm, d = buf; *s != '\0'; ++s, ++d) {
+		*d = *s;
+		if (*d == '\\') {
+			if (s[1] == '\0' || s[2] == '\0')
+				goto fail;
+			phi = real_strchr(hex, s[1] | 0x20);
+			plo = real_strchr(hex, s[2] | 0x20);
+			if (phi == NULL || plo == NULL)
+				goto fail;
+			*d = ((phi - hex) << 4) + (plo - hex);
+			s += 2;
+		}
+	}
+
+	*len = d - buf;
+	return buf;
+
+fail:
+	real_free(buf);
+	*len = 0;
+	return NULL;
+}
+
+static void
+copy_buffer(char *dst, const char *src, size_t srclen, size_t addlen)
+{
+	int i = 0;
+
+	while (addlen--) {
+		*(dst++) = src[i++];
+		if (i == srclen)
+			i = 0;
+	}
+}
+
+static void
+or_buffer(char *dst, const char *src, size_t srclen, size_t addlen)
+{
+	int i = 0;
+
+	while (addlen--) {
+		*(dst++) |= src[i++];
+		if (i == srclen)
+			i = 0;
+	}
+}
+
+static void
+and_buffer(char *dst, const char *src, size_t srclen, size_t addlen)
+{
+	int i = 0;
+
+	while (addlen--) {
+		*(dst++) &= src[i++];
+		if (i == srclen)
+			i = 0;
+	}
+}
+
+static void
+xor_buffer(char *dst, const char *src, size_t srclen, size_t addlen)
+{
+	int i = 0;
+
+	while (addlen--) {
+		*(dst++) ^= src[i++];
+		if (i == srclen)
+			i = 0;
+	}
+}
+
+static int
+inject(struct rtr_strinject_info *info, const void *buffer, size_t len,
+		void **inject_buffer, size_t *inject_len)
+{
+	long offset, addlen, cutlen, temp[] = {-1, -1, -1};
+	const char *p;
+	char *pp, *srcbuf = NULL, *param = NULL;
+	size_t srclen = 0;
+	int i, headlen, taillen, retval = 0;
+	void (*src_fn)(char *, const char *, size_t, size_t);
+
+	/* control off[:addlen[:cutlen]] */
+	/* parse up to 3 ':' separated unsigned values */
+	p = info->param2;
+	for (i = 0; i < 3 && *p != '\0'; i++) {
+		if (*p != ':') {
+			errno = 0;
+			temp[i] = strtol(p, &pp, 10);
+
+			if (errno != 0
+			    || (*pp != '\0' && *pp != ':')
+			    || temp[i] < 0)
+				goto done;
+			p = pp;
+		}
+		if (*p == ':')
+			++p;
+	}
+
+	if (*p != '\0' || temp[0] == -1)
+		goto done;
+
+	offset = temp[0];
+	addlen = temp[1];
+	cutlen = temp[2];
+
+	if (offset == -1)
+		goto done;
+
+	param = get_param(info->param);
+	if (param == NULL)
+		goto done;
+
+	/* inject type */
+	if (!real_strcmp(info->param, "ascii()")) {
+		src_fn = copy_buffer;
+		srclen = addlen;
+		if (srclen == -1)
+			srclen = 1;
+		srcbuf = gen_random(srclen, 0x7f);
+	} else if (!real_strcmp(info->param, "random()")) {
+		src_fn = copy_buffer;
+		srclen = addlen;
+		if (srclen == -1)
+			srclen = 1;
+		srcbuf = gen_random(srclen, 0xff);
+	} else if (!real_strncmp(info->param, "or(", 3)) {
+		src_fn = or_buffer;
+		srcbuf = parse_immediate(param, &srclen);
+	} else if (!real_strncmp(info->param, "and(", 4)) {
+		src_fn = and_buffer;
+		srcbuf = parse_immediate(param, &srclen);
+	} else if (!real_strncmp(info->param, "xor(", 4)) {
+		src_fn = xor_buffer;
+		srcbuf = parse_immediate(param, &srclen);
+	} else if (!real_strncmp(info->param, "chr(", 4)) {
+		src_fn = copy_buffer;
+		srcbuf = parse_immediate(param, &srclen);
+	} else
+		goto done;
+
+	/* sanitise offset and lengths */
+	if (addlen == -1)
+		addlen = srclen;
+
+	if (srclen == 0 && addlen > 0)
+		goto done;
+
+	if (cutlen == -1)
+		cutlen = addlen;
+
+	if (addlen == 0 && cutlen == 0)
+		goto done;
+
+	taillen = len - offset - cutlen;
+	if (taillen < 0)
+		taillen = 0;
+
+	headlen = offset + addlen;
+	if (headlen > len)
+		headlen = len;
+
+	*inject_len = offset + addlen + taillen;
+	*inject_buffer = real_malloc(*inject_len);
+	if (inject_buffer == 0)
+		goto done;
+	real_memcpy(*inject_buffer, buffer, headlen);
+	real_memcpy(*inject_buffer + offset + addlen,
+	    buffer + offset + cutlen, taillen);
+
+	src_fn(*inject_buffer + offset, srcbuf, srclen, addlen);
+	retval = 1;
+
+done:
+	real_free(srcbuf);
+	real_free(param);
+	return retval;
+}
+
 /*
  * process string injection
  */
@@ -405,7 +637,6 @@ static int inject_file_line(const char *param, const void *buffer, size_t len,
 int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_t len,
 		    void **inject_buffer, size_t *inject_len)
 {
-	enum RTR_STRINJECT_TYPE type;
 	int ret;
 
 	if (!get_tracing_enabled() || len == 0)
@@ -423,10 +654,8 @@ int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_
 	if (!rtr_get_fuzzing_flag(g_strinject_infos[func_id].rate))
 		return 0;
 
-	type = g_strinject_infos[func_id].type;
-
 	/* inject string to original buffer */
-	switch (type) {
+	switch (g_strinject_infos[func_id].type) {
 	case STRINJECT_TYPE_HEX:
 		ret = inject_single_hex(g_strinject_infos[func_id].param, buffer, len,
 			inject_buffer, inject_len);
@@ -446,8 +675,9 @@ int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_
 		ret = inject_file_line(g_strinject_infos[func_id].param, buffer, len,
 			inject_buffer, inject_len);
 		break;
-
-	default:
+	case STRINJECT_TYPE_STANDARD:
+		ret = inject(&g_strinject_infos[func_id], buffer, len,
+			inject_buffer, inject_len);
 		break;
 	}
 

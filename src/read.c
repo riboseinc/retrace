@@ -78,7 +78,7 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 				event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 				event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
-				ret = inject_len > ret ? ret : inject_len;
+				ret = inject_len > real_nbytes ? real_nbytes : inject_len;
 				real_memcpy(buf, inject_buffer, ret);
 
 				real_free(inject_buffer);

@@ -1831,7 +1831,7 @@ rtr_get_fuzzing_random(void)
 }
 
 /* get configuration token by separator */
-int rtr_check_config_token(const char *token, char *str, const char *sep, int *reverse)
+int rtr_check_config_token(const char *token, const char *str, const char *sep, int *reverse)
 {
 	char *p, *q;
 

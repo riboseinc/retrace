@@ -774,7 +774,7 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 				void *inject_buffer;
 				size_t inject_len;
 
-				if (rtr_str_inject(STRINJECT_FUNC_RECV, buf, recv_len, &inject_buffer, &inject_len)) {
+				if (rtr_str_inject(STRINJECT_FUNC_RECVFROM, buf, recv_len, &inject_buffer, &inject_len)) {
 					event_info.extra_info = "[redirected]";
 					event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 					event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
