@@ -247,7 +247,7 @@ int rtr_get_fuzzing_flag(double fail_rate);
 int rtr_get_fuzzing_random(void);
 
 /* get configuration token by separator */
-int rtr_check_config_token(const char *token, char *str, const char *sep, int *reverse);
+int rtr_check_config_token(const char *token, const char *str, const char *sep, int *reverse);
 
 /* get fuzzing values */
 void *rtr_get_fuzzing_value(enum RTR_FUZZ_TYPE fuzz_type, void *param);

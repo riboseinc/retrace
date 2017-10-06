@@ -69,10 +69,11 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 		}
 
 		redirected = 1;
-	} else if (rtr_str_inject(STRINJECT_FUNC_WRITE, buf, nbytes, &inject_buffer, &inject_len)) {
+	} else if (rtr_str_inject(STRINJECT_FUNC_WRITE, (void *)buf, nbytes, &inject_buffer, &inject_len)) {
 		redirected = 1;
 		enable_inject = 1;
 
+		parameter_values[1] = &inject_len;
 		parameter_values[2] = &inject_buffer;
 		parameter_values[3] = &inject_len;
 	}
@@ -95,7 +96,7 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 
 	retrace_log_and_redirect_after(&event_info);
 
-	if (enable_inject)
+	if (enable_inject && inject_buffer != buf)
 		real_free(inject_buffer);
 
 	return ret;

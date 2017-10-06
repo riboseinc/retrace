@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# make sure ../retrace itself can fail
+../retrace -f nonexistent ls || ../retrace nonexistent || echo ok
+
+./strinject.sh
 LC_ALL="POSIX" ../retrace ./setlocale
 ../retrace ./exec
 ../retrace ./env

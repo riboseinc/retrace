@@ -32,42 +32,40 @@ get_lib_file() {
 	return 1
 }
 
-main() {
-	[ $# -lt 1  ] && \
-		usage
+[ $# -lt 1  ] && \
+	usage
 
-	if [ $# -ge 3 -a "$1" = "-f" ]; then
-		RETRACE_CONFIG="$2"
+if [ $# -ge 3 -a "$1" = "-f" ]; then
+	RETRACE_CONFIG="$2"
 
-		shift 2
-	fi
+	shift 2
+fi
 
-	if [ "${RETRACE_CONFIG}" ]; then
-		[ ! -f "${RETRACE_CONFIG}" ] && \
-			errx "cannot open '${RETRACE_CONFIG}'"
-	fi
+if [ "${RETRACE_CONFIG}" ]; then
+	[ ! -f "${RETRACE_CONFIG}" ] && \
+		errx "cannot open '${RETRACE_CONFIG}'"
+fi
 
-	readonly libname="libretrace"
+readonly libname="libretrace"
 
-	if $(uname | grep -q ^Darwin); then
-		readonly lib="${libname}.dylib"
-		readonly output=$(get_lib_file "${lib}")
-		readonly envload="RETRACE_CONFIG=${RETRACE_CONFIG} DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES=${output}"
-	else
-		readonly lib="${libname}.so"
-		readonly output=$(get_lib_file "${lib}")
-		readonly envload="RETRACE_CONFIG=${RETRACE_CONFIG} LD_PRELOAD=${output}"
-	fi
+if $(uname | grep -q ^Darwin); then
+	readonly lib="${libname}.dylib"
+	readonly output=$(get_lib_file "${lib}")
+	DYLD_FORCE_FLAT_NAMESPACE=1
+	DYLD_INSERT_LIBRARIES=${output}
+	readonly exports="RETRACE_CONFIG DYLD_FORCE_FLAT_NAMESPACE DYLD_INSERT_LIBRARIES"
+else
+	readonly lib="${libname}.so"
+	readonly output=$(get_lib_file "${lib}")
+	LD_PRELOAD=${output}
+	readonly exports="RETRACE_CONFIG LD_PRELOAD"
+fi
 
-	[ ! "${output}" ] && \
-		errx "cannot find '${lib}'"
+[ ! "${output}" ] && \
+	errx "cannot find '${lib}'"
 
-	which "$1" >/dev/null 2>&1 || \
-		errx "cannot execute '$1'"
+which "$1" >/dev/null 2>&1 || \
+	errx "cannot execute '$1'"
 
-	eval "${envload}" "$@"
-}
-
-main "$@"
-
-exit $?
+export $exports
+exec "$@"

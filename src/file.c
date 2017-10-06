@@ -32,6 +32,7 @@
 #include "file.h"
 #include "malloc.h"
 #include "strinject.h"
+#include "printf.h"
 
 #include "str.h"
 
@@ -533,11 +534,12 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 	event_info.return_value = &r;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 
-	if (size == 1 && rtr_str_inject(STRINJECT_FUNC_FWRITE, ptr, size * nmemb, &inject_buffer, &inject_len)) {
+	if (rtr_str_inject(STRINJECT_FUNC_FWRITE, ptr, size * nmemb, &inject_buffer, &inject_len)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
+		inject_len /= size;
 		parameter_values[2] = &inject_buffer;
 		parameter_values[4] = &inject_len;
 
@@ -553,10 +555,10 @@ size_t RETRACE_IMPLEMENTATION(fwrite)(const void *ptr, size_t size, size_t nmemb
 	if (r < (enable_inject ? inject_len : nmemb))
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
+	retrace_log_and_redirect_after(&event_info);
+
 	if (enable_inject)
 		real_free(inject_buffer);
-
-	retrace_log_and_redirect_after(&event_info);
 
 	return r;
 }
@@ -584,17 +586,23 @@ size_t RETRACE_IMPLEMENTATION(fread)(void *ptr, size_t size, size_t nmemb, FILE 
 	retrace_log_and_redirect_before(&event_info);
 
 	r = real_fread(ptr, size, nmemb, stream);
+
+	parameter_values[1] = &r;
 	if (r < nmemb)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
-	if (size == 1 && rtr_str_inject(STRINJECT_FUNC_FREAD, ptr, r, &inject_buffer, &inject_len)) {
+	if (rtr_str_inject(STRINJECT_FUNC_FREAD, ptr, r * size, &inject_buffer, &inject_len)) {
 		event_info.extra_info = "[redirected]";
 		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
 		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
 
-		r = inject_len > size * nmemb ? size * nmemb : inject_len;
-		real_memcpy(ptr, inject_buffer, r);
+		r = inject_len / size;
+		if (r > nmemb)
+			r = nmemb;
 
+		real_memcpy(ptr, inject_buffer, r * size);
+
+		parameter_values[1] = &r;
 		real_free(inject_buffer);
 	}
 
@@ -1004,7 +1012,7 @@ fcntl_v(int fildes, int cmd, va_list ap)
 	default:
 		event_info.parameter_types = parameter_types_maybe;
 		event_info.parameter_values = (void **) parameter_values_maybe;
-		sprintf(extra_info_buf, "Unsupported fcntl command: %d", cmd);
+		real_sprintf(extra_info_buf, "Unsupported fcntl command: %d", cmd);
 		event_info.extra_info = extra_info_buf;
 
 		maybe_parameter = va_arg(ap, void *);

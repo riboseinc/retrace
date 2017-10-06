@@ -72,10 +72,10 @@ int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
 	if (r <= 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
+	retrace_log_and_redirect_after(&event_info);
+
 	if (enable_inject)
 		real_free(inject_buffer);
-
-	retrace_log_and_redirect_after(&event_info);
 
 	return (r);
 }

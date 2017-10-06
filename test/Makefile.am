@@ -15,6 +15,6 @@ endif
 endif
 
 if ENABLE_TESTS
-noinst_PROGRAMS += id env time fork exit malloc str pipe sock sock_srv file trace pledge scanf dlopen dir exec printf popen char mmap sbrk getaddrinfo log memcpy temp config perror setlocale
+noinst_PROGRAMS += id env time fork exit malloc str pipe sock sock_srv file trace pledge scanf dlopen dir exec printf popen char mmap sbrk getaddrinfo log memcpy temp config perror setlocale strinject
 TESTS += $(dist_check_SCRIPTS)
 endif
