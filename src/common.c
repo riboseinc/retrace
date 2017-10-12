@@ -62,6 +62,7 @@
 #include <sys/socket.h>
 #ifdef __APPLE__
 #include <sys/syslimits.h>
+#include <xlocale.h>
 #endif
 
 #if HAVE_EXECINFO_H
@@ -1084,8 +1085,14 @@ rtr_vaprintf(struct rtr_print_buf *print_buffer, const char *fmt, va_list arglis
 	} else {
 		int ret;
 
+#ifndef __APPLE__
 		ret = real_vsnprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
 					print_buffer->size_left, fmt, arglist);
+#else
+		/* macOS vsnprintf hangs if tracee is in setlocale. force "C" locale */
+		ret = vsnprintf_l(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
+					print_buffer->size_left, NULL, fmt, arglist);
+#endif
 
 		if (ret > 0)
 			print_buffer->size_left -= ret;
