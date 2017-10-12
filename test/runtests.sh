@@ -1,5 +1,6 @@
 #!/bin/sh
 
+LC_ALL="POSIX" ../retrace ./setlocale
 ../retrace ./exec
 ../retrace ./env
 ../retrace ./exit
