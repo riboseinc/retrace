@@ -67,7 +67,7 @@ RETRACE_IMPLEMENTATION(scanf)(const char *format, ...)
 	return result;
 }
 
-RETRACE_REPLACE_V(scanf, int, (const char *format, ...), format, vscanf,
+RETRACE_REPLACE_V(scanf, int, (const char *format, ...), format, real_vscanf,
 	(format, ap))
 
 int
@@ -105,7 +105,7 @@ RETRACE_IMPLEMENTATION(fscanf)(FILE *stream, const char *format, ...)
 }
 
 RETRACE_REPLACE_V(fscanf, int, (FILE *stream, const char *format, ...),
-	format, vfscanf, (stream, format, ap))
+	format, real_vfscanf, (stream, format, ap))
 
 int
 RETRACE_IMPLEMENTATION(sscanf)(const char *str, const char *format, ...)
@@ -140,7 +140,7 @@ RETRACE_IMPLEMENTATION(sscanf)(const char *str, const char *format, ...)
 	return result;
 }
 
-RETRACE_REPLACE_V(sscanf, int, (const char *str, const char *format, ...), format, vsscanf, (str, format, ap))
+RETRACE_REPLACE_V(sscanf, int, (const char *str, const char *format, ...), format, real_vsscanf, (str, format, ap))
 
 int
 RETRACE_IMPLEMENTATION(vscanf)(const char *format, va_list ap)

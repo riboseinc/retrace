@@ -36,14 +36,26 @@
 
 int ioctl_v(int fd, unsigned long request, va_list ap)
 {
+	void *arg;
+
+	arg = va_arg(ap, void *);
+
+	return real_ioctl(fd, request, arg);
+}
+
+int RETRACE_IMPLEMENTATION(ioctl)(int fd, unsigned long request, ...)
+{
+	char *request_str;
+	void *arg;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_INT | PARAMETER_FLAG_STRING_NEXT, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
-	char *arg;
-	char *request_str;
 	void *parameter_values[] = {&fd, &request, &request_str, &arg};
+	va_list ap;
 	int ret;
 
+	va_start(ap, request);
 	arg = va_arg(ap, char *);
+	va_end(ap);
 
 	switch (request) {
 #ifdef TCGETS
@@ -381,7 +393,6 @@ int ioctl_v(int fd, unsigned long request, va_list ap)
 		break;
 	}
 
-
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "ioctl";
 	event_info.function_group = RTR_FUNC_GRP_PROC;
@@ -392,7 +403,6 @@ int ioctl_v(int fd, unsigned long request, va_list ap)
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-
 	ret = real_ioctl(fd, request, arg);
 
 	retrace_log_and_redirect_after(&event_info);
@@ -400,16 +410,4 @@ int ioctl_v(int fd, unsigned long request, va_list ap)
 	return ret;
 }
 
-int RETRACE_IMPLEMENTATION(ioctl)(int fd, unsigned long request, ...)
-{
-	int r;
-	va_list ap;
-
-	va_start(ap, request);
-	r = ioctl_v(fd, request, ap);
-	va_end(ap);
-
-	return (r);
-}
-
-RETRACE_REPLACE_V(ioctl, int, (int fd, long request, ...), request, ioctl_v, (fd, request, ap))
+RETRACE_REPLACE_V(ioctl, int, (int fd, unsigned long request, ...), request, ioctl_v, (fd, request, ap))
