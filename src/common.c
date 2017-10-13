@@ -160,7 +160,12 @@ struct rtr_print_buf {
 	FILE *outputfile;
 };
 
-
+struct config_entry {
+	STAILQ_ENTRY(config_entry) next;
+	char *line;  /* line with commas replaced by '\0' */
+	int nargs;
+};
+STAILQ_HEAD(config_head, config_entry);
 
 static int is_main_thread(void);
 static void trace_set_color(struct rtr_print_buf *print_buffer, char *color);
@@ -1069,22 +1074,14 @@ retrace_log_and_redirect_after(struct rtr_event_info *event_info)
 	retrace_event(event_info);
 }
 
-
-struct config_entry {
-	STAILQ_ENTRY(config_entry) next;
-	char *line;  /* line with commas replaced by '\0' */
-	int nargs;
-};
-STAILQ_HEAD(config_head, config_entry);
-
 static void
 rtr_vaprintf(struct rtr_print_buf *print_buffer, const char *fmt, va_list arglist)
 {
+	int ret;
+
 	if (print_buffer->print_directly) {
 		real_vfprintf(print_buffer->outputfile, fmt, arglist);
 	} else {
-		int ret;
-
 #ifndef __APPLE__
 		ret = real_vsnprintf(print_buffer->buffer + print_buffer->size - print_buffer->size_left,
 					print_buffer->size_left, fmt, arglist);
@@ -1112,11 +1109,11 @@ rtr_printf(struct rtr_print_buf *print_buffer, const char *fmt, ...)
 }
 
 static void
-trace_printfv(struct rtr_print_buf *print_buffer, int hdr, char *color, const char *fmt, va_list arglist)
+trace_printf(struct rtr_print_buf *print_buffer, int hdr, const char *fmt, ...)
 {
+	va_list arglist;
 	int old_trace_state;
-	int is_a_tty = 0;
-	int ret;
+	float current_time;
 
 	old_trace_state = trace_disable();
 
@@ -1127,25 +1124,14 @@ trace_printfv(struct rtr_print_buf *print_buffer, int hdr, char *color, const ch
 			rtr_printf(print_buffer, "(thread: %u) ", pthread_self());
 
 		if (show_timestamp) {
-			float current_time;
-
 			current_time = retrace_get_time();
 			rtr_printf(print_buffer, "(%0.5f) ", current_time);
 		}
 	}
 
-	if (color) {
-		int fd;
-
-		fd = real_fileno(print_buffer->outputfile);
-		is_a_tty = isatty(fd);
-
-		if (is_a_tty)
-			rtr_printf(print_buffer, "%s", color);
-	}
-
-	if (arglist)
-		rtr_vaprintf(print_buffer, fmt, arglist);
+	va_start(arglist, fmt);
+	rtr_vaprintf(print_buffer, fmt, arglist);
+	va_end(arglist);
 
 	trace_restore(old_trace_state);
 }
@@ -1153,18 +1139,8 @@ trace_printfv(struct rtr_print_buf *print_buffer, int hdr, char *color, const ch
 static void
 trace_set_color(struct rtr_print_buf *print_buffer, char *color)
 {
-	trace_printfv(print_buffer, 0, color, "", NULL);
-}
-
-
-static void
-trace_printf(struct rtr_print_buf *print_buffer, int hdr, const char *fmt, ...)
-{
-	va_list arglist;
-
-	va_start(arglist, fmt);
-	trace_printfv(print_buffer, hdr, NULL, fmt, arglist);
-	va_end(arglist);
+	if (isatty(real_fileno(print_buffer->outputfile)))
+		trace_printf(print_buffer, 0, "%s", color);
 }
 
 static void
