@@ -142,7 +142,7 @@ RETRACE_IMPLEMENTATION(dprintf)(int fd, const char *fmt, ...)
 	return result;
 }
 
-RETRACE_REPLACE_V(dprintf, int, (int fd, const char *fmt, ...), fmt, vdprintf, (fd, fmt, ap))
+RETRACE_REPLACE_V(dprintf, int, (int fd, const char *fmt, ...), fmt, real_vdprintf, (fd, fmt, ap))
 
 int
 RETRACE_IMPLEMENTATION(sprintf)(char *str, const char *fmt, ...)
@@ -180,7 +180,7 @@ RETRACE_IMPLEMENTATION(sprintf)(char *str, const char *fmt, ...)
 	return result;
 }
 
-RETRACE_REPLACE_V(sprintf, int, (char *str, const char *fmt, ...), fmt, vsprintf, (str, fmt, ap))
+RETRACE_REPLACE_V(sprintf, int, (char *str, const char *fmt, ...), fmt, real_vsprintf, (str, fmt, ap))
 
 int
 RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
@@ -218,7 +218,7 @@ RETRACE_IMPLEMENTATION(snprintf)(char *str, size_t size, const char *fmt, ...)
 	return result;
 }
 
-RETRACE_REPLACE_V(snprintf, int, (char *str, size_t size, const char *fmt, ...), fmt, vsnprintf, (str, size, fmt, ap))
+RETRACE_REPLACE_V(snprintf, int, (char *str, size_t size, const char *fmt, ...), fmt, real_vsnprintf, (str, size, fmt, ap))
 
 int
 RETRACE_IMPLEMENTATION(vprintf)(const char *fmt, va_list ap)

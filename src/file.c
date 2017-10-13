@@ -459,15 +459,28 @@ RETRACE_REPLACE(mkfifo, int, (const char *pathname, mode_t mode), (pathname, mod
 static int
 open_v(const char *pathname, int flags, va_list ap)
 {
+	mode_t mode = 0;
+
+	if (flags & MODEFLAGS)
+		mode = va_arg(ap, mode_t);
+
+	return (real_open(pathname, flags, mode));
+}
+
+int RETRACE_IMPLEMENTATION(open)(const char *pathname, int flags, ...)
+{
 	int r;
 	mode_t mode = 0;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_INT, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&pathname, &flags, &mode};
+	va_list ap;
 
-	if (flags & MODEFLAGS)
+	if (flags & MODEFLAGS) {
+		va_start(ap, flags);
 		mode = va_arg(ap, int);
-
+		va_end(ap);
+	}
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "open";
@@ -479,35 +492,17 @@ open_v(const char *pathname, int flags, va_list ap)
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-
-	if (flags & MODEFLAGS)
-		r = real_open(pathname, flags, mode);
-	else
-		r =  real_open(pathname, flags);
+	r = real_open(pathname, flags, mode);
 
 	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
-
-	if (r > 0) {
+	else
 		file_descriptor_update(
 			r, FILE_DESCRIPTOR_TYPE_FILE, pathname);
-	}
 
 	retrace_log_and_redirect_after(&event_info);
 
 	return r;
-}
-
-int RETRACE_IMPLEMENTATION(open)(const char *pathname, int flags, ...)
-{
-	int fd;
-	va_list ap;
-
-	va_start(ap, flags);
-	fd = open_v(pathname, flags, ap);
-	va_end(ap);
-
-	return fd;
 }
 
 RETRACE_REPLACE_V(open, int, (const char *pathname, int flags, ...), flags, open_v, (pathname, flags, ap))
@@ -754,6 +749,117 @@ RETRACE_REPLACE(strmode, void, (int mode, char *bp), (mode, bp))
 static int
 fcntl_v(int fildes, int cmd, va_list ap)
 {
+	struct descriptor_info *di;
+	const char *old_location = "fcntl";
+	int r;
+
+	switch (cmd) {
+	// hack for duplicating FD
+	case F_DUPFD:
+#if HAVE_DECL_F_DUPFD_CLOEXEC
+	case F_DUPFD_CLOEXEC:
+#endif
+		r = real_fcntl(fildes, cmd, va_arg(ap, int));
+		if (r >= 0) {
+			di = file_descriptor_get(fildes);
+			if (di->location != NULL)
+				old_location = di->location;
+
+			file_descriptor_update(r, di->type, old_location);
+		}
+		break;
+
+	// (int) arg
+	case F_SETFD:
+		/* fallthrough */
+	case F_SETFL:
+		/* fallthrough */
+#if HAVE_DECL_F_SETOWN
+	case F_SETOWN:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_RDAHEAD
+	case F_RDAHEAD:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_NOCACHE
+	case F_NOCACHE:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_SETNOSIGPIPE
+	case F_SETNOSIGPIPE:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_SETSIG
+	case F_SETSIG:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_SETLEASE
+	case F_SETLEASE:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_NOTIFY
+	case F_NOTIFY:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_SETPIPE_SZ
+	case F_SETPIPE_SZ:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_ADD_SEALS
+	case F_ADD_SEALS:
+#endif
+		r = real_fcntl(fildes, cmd, va_arg(ap, int));
+		break;
+
+	// (void) arg
+	case F_GETFD:
+		/* fallthrough */
+	case F_GETFL:
+		/* fallthrough */
+#if HAVE_DECL_F_GETOWN
+	case F_GETOWN:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_SETSIZE
+	case F_SETSIZE:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_FULLFSYNC
+	case F_FULLFSYNC:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_GETNOSIGPIPE
+	case F_GETNOSIGPIPE:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_GETSIG
+	case F_GETSIG:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_GETLEASE
+	case F_GETLEASE:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_GETPIPE_SZ
+	case F_GETPIPE_SZ:
+		/* fallthrough */
+#endif
+#if HAVE_DECL_F_GET_SEALS
+	case F_GET_SEALS:
+#endif
+		r = real_fcntl(fildes, cmd);
+		break;
+	default:
+		r = real_fcntl(fildes, cmd, va_arg(ap, void *));
+	}
+
+	return r;
+}
+
+int RETRACE_IMPLEMENTATION(fcntl)(int fildes, int cmd, ...)
+{
+	va_list ap;
 	char extra_info_buf[128];
 
 	int r;
@@ -783,9 +889,6 @@ fcntl_v(int fildes, int cmd, va_list ap)
 #if HAVE_DECL_F_GETOWN_EX && (HAVE_DECL_F_GETOWN_EX || HAVE_DECL_F_SETOWN_EX)
 	struct f_owner_ex *f_owner_ex_parameter = NULL;
 #endif
-
-	struct descriptor_info *di;
-	const char *old_location = "fcntl";
 
 	struct rtr_event_info event_info;
 
@@ -837,6 +940,8 @@ fcntl_v(int fildes, int cmd, va_list ap)
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+
+	va_start(ap, cmd);
 
 	switch (cmd) {
 	// (int) arg
@@ -1017,176 +1122,17 @@ fcntl_v(int fildes, int cmd, va_list ap)
 
 		maybe_parameter = va_arg(ap, void *);
 	}
+	va_end(ap);
 
 	retrace_log_and_redirect_before(&event_info);
 
-	switch (cmd) {
-	// hack for duplicating FD
-	case F_DUPFD:
-#if HAVE_DECL_F_DUPFD_CLOEXEC
-	case F_DUPFD_CLOEXEC:
-#endif
-		r = real_fcntl(fildes, cmd, int_parameter);
-		if (r >= 0) {
-			di = file_descriptor_get(fildes);
-			if (di->location != NULL)
-				old_location = di->location;
-
-			file_descriptor_update(r, di->type, old_location);
-		}
-		break;
-
-	// (int) arg
-	case F_SETFD:
-	case F_SETFL:
-#if HAVE_DECL_F_SETOWN
-	case F_SETOWN:
-#endif
-#if HAVE_DECL_F_RDAHEAD
-	case F_RDAHEAD:
-#endif
-#if HAVE_DECL_F_NOCACHE
-	case F_NOCACHE:
-#endif
-#if HAVE_DECL_F_SETNOSIGPIPE
-	case F_SETNOSIGPIPE:
-#endif
-#if HAVE_DECL_F_SETSIG
-	case F_SETSIG:
-#endif
-#if HAVE_DECL_F_SETLEASE
-	case F_SETLEASE:
-#endif
-#if HAVE_DECL_F_NOTIFY
-	case F_NOTIFY:
-#endif
-#if HAVE_DECL_F_SETPIPE_SZ
-	case F_SETPIPE_SZ:
-#endif
-#if HAVE_DECL_F_ADD_SEALS
-	case F_ADD_SEALS:
-#endif
-		r = real_fcntl(fildes, cmd, int_parameter);
-		break;
-
-	// (void) arg
-	case F_GETFD:
-	case F_GETFL:
-#if HAVE_DECL_F_GETOWN
-	case F_GETOWN:
-#endif
-#if HAVE_DECL_F_SETSIZE
-	case F_SETSIZE:
-#endif
-#if HAVE_DECL_F_FULLFSYNC
-	case F_FULLFSYNC:
-#endif
-#if HAVE_DECL_F_GETNOSIGPIPE
-	case F_GETNOSIGPIPE:
-#endif
-#if HAVE_DECL_F_GETSIG
-	case F_GETSIG:
-#endif
-#if HAVE_DECL_F_GETLEASE
-	case F_GETLEASE:
-#endif
-#if HAVE_DECL_F_GETPIPE_SZ
-	case F_GETPIPE_SZ:
-#endif
-#if HAVE_DECL_F_GET_SEALS
-	case F_GET_SEALS:
-#endif
-		r = real_fcntl(fildes, cmd);
-		break;
-
-#if HAVE_STRUCT_FLOCK
-	// (struct flock *) arg
-	case F_SETLK:
-#if HAVE_DECL_F_SETLKW
-	case F_SETLKW:
-#endif
-	case F_GETLK:
-#if HAVE_DECL_F_OFD_SETLK
-	case F_OFD_SETLK:
-#endif
-#if HAVE_DECL_F_OFD_SETLKW
-	case F_OFD_SETLKW:
-#endif
-#if HAVE_DECL_F_OFD_GETLK
-	case F_OFD_GETLK:
-#endif
-		r = real_fcntl(fildes, cmd, flock_parameter);
-		break;
-#endif
-#if HAVE_DECL_F_GETPATH
-		// char* arg
-	case F_GETPATH:
-		r = real_fcntl(fildes, cmd, char_parameter);
-		break;
-#endif
-#if HAVE_STRUCT_FSTORE && HAVE_DECL_F_PREALLOCATE
-	// (struct fstore *) arg
-	case F_PREALLOCATE:
-			r = real_fcntl(fildes, cmd, fstore_parameter);
-		break;
-#endif
-#if HAVE_STRUCT_FPUNCHHOLE && HAVE_DECL_F_PUNCHHOLE
-	// (struct fpunchhole *) arg
-	case F_PUNCHHOLE:
-		r = real_fcntl(fildes, cmd, fpunchhole_parameter);
-		break;
-#endif
-#if HAVE_STRUCT_RADVISORY && HAVE_DECL_F_RDADVISE
-	// (struct radvisory *) arg
-	case F_RDADVISE:
-		r = real_fcntl(fildes, cmd, radvisory_parameter);
-		break;
-#endif
-#if HAVE_STRUCT_FBOOTSTRAPTRANSFER && (HAVE_DECL_F_READBOOTSTRAP || HAVE_DECL_F_WRITEBOOTSTRAP)
-	// (struct fbootstraptransfer *) arg
-	case F_READBOOTSTRAP:
-	case F_WRITEBOOTSTRAP:
-		r = real_fcntl(fildes, cmd, fbootstraptransfer_parameter);
-		break;
-#endif
-#if HAVE_STRUCT_LOG2PHYS && (HAVE_DECL_F_LOG2PHYS || HAVE_DECL_F_LOG2PHYS_EXT)
-	// (struct fbootstraptransfer *) arg
-	case F_LOG2PHYS:
-	case F_LOG2PHYS_EXT:
-		r = real_fcntl(fildes, cmd, log2phys_parameter);
-		break;
-#endif
-#if HAVE_DECL_F_GETOWN_EX && (HAVE_DECL_F_GETOWN_EX || HAVE_DECL_F_SETOWN_EX)
-	// (struct f_owner_ex *) arg
-	case F_GETOWN_EX:
-	case F_SETOWN_EX:
-		r = real_fcntl(fildes, cmd, f_owner_ex_parameter);
-		break;
-#endif
-
-	default:
-		r = real_fcntl(fildes, cmd, maybe_parameter);
-		break;
-	}
-
-	if (r < 0)
-		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+	va_start(ap, cmd);
+	r = fcntl_v(fildes, cmd, ap);
+	va_end(ap);
 
 	retrace_log_and_redirect_after(&event_info);
 
 	return r;
-}
-
-int RETRACE_IMPLEMENTATION(fcntl)(int fildes, int cmd, ...)
-{
-	int rc;
-	va_list ap;
-
-	va_start(ap, cmd);
-	rc = fcntl_v(fildes, cmd, ap);
-	va_end(ap);
-
-	return rc;
 }
 
 RETRACE_REPLACE_V(fcntl, int, (int fildes, int cmd, ...), cmd, fcntl_v, (fildes, cmd, ap))

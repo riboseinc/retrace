@@ -168,11 +168,8 @@ int
 execl_v(const char *path, const char *arg0, va_list ap)
 {
 	va_list ap_copy;
-	int nargs, i, r, old_trace_state;
+	int nargs, i, old_trace_state;
 	char **args;
-	struct rtr_event_info event_info;
-	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&path, &args};
 
 	old_trace_state = trace_disable();
 
@@ -188,6 +185,33 @@ execl_v(const char *path, const char *arg0, va_list ap)
 
 	trace_restore(old_trace_state);
 
+	return (real_execv(path, args));
+}
+
+int RETRACE_IMPLEMENTATION(execl)(const char *path, const char *arg0, ... /*, (char *)0 */)
+{
+	va_list ap;
+	int nargs, i, r, old_trace_state;
+	char **args;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&path, &args};
+
+	old_trace_state = trace_disable();
+
+	va_start(ap, arg0);
+	for (nargs = 2; va_arg(ap, char *) != NULL; ++nargs)
+		;
+	va_end(ap);
+
+	va_start(ap, arg0);
+	args = alloca(nargs * sizeof(void *));
+	args[0] = (char *)arg0;
+	for (i = 1; i < nargs; i++)
+		args[i] = va_arg(ap, char *);
+	va_end(ap);
+
+	trace_restore(old_trace_state);
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "execl";
@@ -205,19 +229,6 @@ execl_v(const char *path, const char *arg0, va_list ap)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
 	retrace_log_and_redirect_after(&event_info);
-
-	return (r);
-}
-
-int RETRACE_IMPLEMENTATION(execl)(const char *path, const char *arg0, ... /*, (char *)0 */)
-{
-	int r;
-	char *parg;
-	va_list ap;
-
-	va_start(ap, arg0);
-	r = execl_v(path, arg0, ap);
-	va_end(ap);
 
 	return (r);
 }
@@ -262,6 +273,33 @@ execle_v(const char *path, const char *arg0, va_list ap)
 	int nargs, i, r, old_trace_state;
 	char **args;
 	char **envp;
+
+	old_trace_state = trace_disable();
+
+	va_copy(ap_copy, ap);
+	for (nargs = 2; va_arg(ap_copy, char *) != NULL; ++nargs)
+		;
+	envp = va_arg(ap_copy, char **);
+	va_end(ap_copy);
+
+	args = alloca(nargs * sizeof(void *));
+	args[0] = (char *)arg0;
+	for (i = 1; i < nargs; i++)
+		args[i] = va_arg(ap, char *);
+
+	trace_restore(old_trace_state);
+
+	return (real_execve(path, args, envp));
+}
+
+int RETRACE_IMPLEMENTATION(execle)(const char *path,
+		const char *arg0,
+		... /*, (char *)0, char *const envp[]*/)
+{
+	va_list ap;
+	int nargs, i, r, old_trace_state;
+	char **args;
+	char **envp;
 	char **new_envp;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_END};
@@ -270,13 +308,11 @@ execle_v(const char *path, const char *arg0, va_list ap)
 
 	old_trace_state = trace_disable();
 
-	va_copy(ap_copy, ap);
-	for (nargs = 2; va_arg(ap_copy, char *) != NULL; ++nargs)
+	va_start(ap, arg0);
+	for (nargs = 2; va_arg(ap, char *) != NULL; ++nargs)
 		;
-
-	envp = va_arg(ap_copy, char **);
-
-	va_end(ap_copy);
+	envp = va_arg(ap, char **);
+	va_end(ap);
 
 	trace_restore(old_trace_state);
 	new_envp = inject_retrace_env_vars((const char **) envp);
@@ -284,11 +320,12 @@ execle_v(const char *path, const char *arg0, va_list ap)
 		new_envp = (char **) envp;
 	old_trace_state = trace_disable();
 
-	va_copy(ap_copy, ap);
+	va_start(ap, arg0);
 	args = alloca(nargs * sizeof(void *));
 	args[0] = (char *)arg0;
 	for (i = 1; i < nargs; i++)
 		args[i] = va_arg(ap, char *);
+	va_end(ap);
 
 	trace_restore(old_trace_state);
 
@@ -303,7 +340,7 @@ execle_v(const char *path, const char *arg0, va_list ap)
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	r = real_execve(path, args, envp);
+	r = real_execve(path, args, new_envp);
 	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
@@ -315,21 +352,6 @@ execle_v(const char *path, const char *arg0, va_list ap)
 	return (r);
 }
 
-int RETRACE_IMPLEMENTATION(execle)(const char *path,
-		const char *arg0,
-		... /*, (char *)0, char *const envp[]*/)
-{
-	int r;
-	const char *parg, *penv;
-	va_list ap;
-
-	va_start(ap, arg0);
-	r = execle_v(path, arg0, ap);
-	va_end(ap);
-
-	return (r);
-}
-
 RETRACE_REPLACE_V(execle, int, (const char *path, const char *arg0, ...), arg0, execle_v, (path, arg0, ap))
 
 int RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *const envp[])
@@ -337,9 +359,8 @@ int RETRACE_IMPLEMENTATION(execve)(const char *path, char *const argv[], char *c
 	int r;
 	char **new_envp;
 	struct rtr_event_info event_info;
-	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_END};
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&path, &argv, &new_envp};
-
 
 	new_envp = inject_retrace_env_vars((const char **) envp);
 	if (!new_envp)
@@ -389,21 +410,53 @@ execlp_v(const char *file, const char *arg0, va_list ap)
 	args[0] = (char *)arg0;
 	for (i = 1; i < nargs; i++)
 		args[i] = va_arg(ap, char *);
-	r = real_execvp(file, args);
-
 	trace_restore(old_trace_state);
-	return (r);
+
+	return (real_execvp(file, args));
 }
 
 int RETRACE_IMPLEMENTATION(execlp)(const char *file, const char *arg0, ... /*, (char *)0 */)
 {
-	int r;
-	char *parg;
 	va_list ap;
+	int nargs, i, r, old_trace_state;
+	char **args;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_STRING, PARAMETER_TYPE_STRING_ARRAY, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&file, &args};
+
+	old_trace_state = trace_disable();
 
 	va_start(ap, arg0);
-	r = execlp_v(file, arg0, ap);
+	for (nargs = 2; va_arg(ap, char *) != NULL; ++nargs)
+		;
 	va_end(ap);
+
+	args = alloca(nargs * sizeof(void *));
+
+	va_start(ap, arg0);
+	args[0] = (char *)arg0;
+	for (i = 1; i < nargs; i++)
+		args[i] = va_arg(ap, char *);
+	va_end(ap);
+
+	trace_restore(old_trace_state);
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "execlp";
+	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &r;
+	event_info.event_flags = EVENT_FLAGS_PRINT_BEFORE;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+	retrace_log_and_redirect_before(&event_info);
+
+	r = real_execvp(file, args);
+	if (r < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+
+	retrace_log_and_redirect_after(&event_info);
 
 	return (r);
 }
@@ -466,7 +519,7 @@ int RETRACE_IMPLEMENTATION(execvpe)(const char *file, char *const argv[], char *
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	r = real_execvpe(file, argv, envp);
+	r = real_execvpe(file, argv, new_envp);
 	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
@@ -511,7 +564,7 @@ int RETRACE_IMPLEMENTATION(execveat)(int dirfd, const char *pathname,
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	r = real_execveat(dirfd, pathname, argv, envp, flags);
+	r = real_execveat(dirfd, pathname, argv, new_envp, flags);
 	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
@@ -552,7 +605,7 @@ int RETRACE_IMPLEMENTATION(fexecve)(int fd, char *const argv[], char *const envp
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
 	retrace_log_and_redirect_before(&event_info);
 
-	r = real_fexecve(fd, argv, envp);
+	r = real_fexecve(fd, argv, new_envp);
 	if (r < 0)
 		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 
