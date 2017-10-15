@@ -6,7 +6,7 @@
 # ADRESS AND HOSTNAME. IT IS NOT MEANT AS A STANDALONE FUZZING TOOL. YOU CAN USE
 # IT FOR INSPIRATION AND TO GIVE YOU AN IDEA HOW RETRACE CAN BE USED TO FUZZ
 # NAMESERVERS.
-# 
+#
 # Dependencies:
 # 1) the executable 'query' which can be compiled with: 'gcc query.c -o query'
 # 2) gtimeout which can be installed with 'brew install coreutils'
@@ -20,8 +20,19 @@
 #
 # Inner workings and result:
 # 1) Go through the entire hex space 0x00:0xff inserting a hex char at an offset
-# 2) Inject long strings (AAAAAA..) inserting at an offset
-# 3) Inject format strings (%s%s%s%s..) inserting at an offset
+#    of the DNS query packet
+# 2) Inject long strings (AAAAAA..) inserting at an offset of the DNS query
+#    packet
+# 3) Inject format strings (%s%s%s%s..) inserting at an offset of the DNS query
+#    packet
+#
+# NOTE: THIS IMPLEMENTATION CURRENTLY ENLARGES THE DNS QUERY PACKET
+#
+# TODO:
+# 1) Add zone transfer requests
+# 2) Add DNSSEC operations
+# 3) Replace query.c with actual nslookup and dig as these have much more
+#    capabilities that can be used as fuzzing vehicles
 
 rm -rf /tmp/nslookup.conf*
 

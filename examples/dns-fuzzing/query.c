@@ -153,7 +153,7 @@ void ngethostbyname(char *host, int query_type)
 	}
 
 	i = sizeof dest;
-	if (recvfrom(s, (char *)buf, 65536, 0, (struct sockaddr *)&dest, (socklen_t *) & i) < 0) {
+	if (recvfrom(s, (char *)buf, 65536, 0, (struct sockaddr *)&dest, (socklen_t *) &i) < 0) {
 		perror("recvfrom failed");
 	}
 
