@@ -19,14 +19,7 @@
 #define T_SOA 6   // start of authority zone
 #define T_PTR 12  // domain name pointer
 #define T_MX 15   // Mail server
-
-#define T_PORT 53   // Name server port
-
-extern char *__progname;
-
-void ngethostbyname(char *host, int query_type, char *server);
-void ChangetoDnsNameFormat(unsigned char *dns, char *host);
-unsigned char *ReadName(unsigned char *reader, unsigned char *buffer, int *count);
+#define T_PORT 53 // Name server port
 
 // DNS header structure
 struct DNS_HEADER {
@@ -79,6 +72,73 @@ typedef struct {
 	struct QUESTION *ques;
 } QUERY;
 
+unsigned char
+*ReadName(unsigned char *reader, unsigned char *buffer, int *count)
+{
+	unsigned char *name;
+	unsigned int p = 0, jumped = 0, offset;
+	int i, j;
+
+	*count = 1;
+	name = (unsigned char *)malloc(256);
+	name[0] = '\0';
+
+	// read the names in 3www6google3com format
+	while (*reader != 0) {
+		if (*reader >= 192) {
+			offset = (*reader) * 256 + *(reader + 1) - 49152; // 49152 = 11000000 00000000
+			reader = buffer + offset - 1;
+			jumped = 1; // we have jumped to another location so counting wont go up!
+		} else {
+			name[p++] = *reader;
+		}
+
+		reader = reader + 1;
+
+		if (jumped == 0)
+			*count = *count + 1; // if we havent jumped to another location then we can count up
+	}
+
+	name[p] = '\0';
+
+	if (jumped == 1)
+		*count = *count + 1;
+
+	// now convert 3www6google3com0 to www.google.com
+	for (i = 0; i < (int)strlen((const char *)name); i++) {
+		p = name[i];
+
+		for (j = 0; j < (int)p; j++) {
+			name[i] = name[i + 1];
+			i = i + 1;
+		}
+
+		name[i] = '.';
+	}
+	name[i - 1] = '\0'; // remove the last dot
+
+	return(name);
+}
+
+void
+ChangetoDnsNameFormat(unsigned char *dns, char *host)
+{
+	int lock = 0, i;
+	strcat((char *)host, ".");
+
+	for (i = 0; i < strlen((char *)host); i++) {
+		if (host[i] == '.') {
+			*dns++ = i - lock;
+
+			for (; lock < i; lock++)
+				*dns++ = host[lock];
+
+			lock++;	// or lock=i+1;
+		}
+	}
+	*dns++ = '\0';
+}
+
 /*
  * Perform a DNS query by sending a packet
  */
@@ -110,12 +170,12 @@ ngethostbyname(char *host, int query_type, char *server)
 	dns = (struct DNS_HEADER *)&buf;
 
 	dns->id = (unsigned short)htons(getpid());
-	dns->qr = 0; // This is a query
+	dns->qr = 0;     // This is a query
 	dns->opcode = 0; // This is a standard query
-	dns->aa = 0; // Not Authoritative
-	dns->tc = 0; // This message is not truncated
-	dns->rd = 1; // Recursion Desired
-	dns->ra = 0; // Recursion not available
+	dns->aa = 0;     // Not Authoritative
+	dns->tc = 0;     // This message is not truncated
+	dns->rd = 1;     // Recursion Desired
+	dns->ra = 0;     // Recursion not available
 	dns->z = 0;
 	dns->ad = 0;
 	dns->cd = 0;
@@ -257,74 +317,6 @@ ngethostbyname(char *host, int query_type, char *server)
 	}
 }
 
-unsigned char
-*ReadName(unsigned char *reader, unsigned char *buffer, int *count)
-{
-	unsigned char *name;
-	unsigned int p = 0, jumped = 0, offset;
-	int i, j;
-
-	*count = 1;
-	name = (unsigned char *)malloc(256);
-
-	name[0] = '\0';
-
-	// read the names in 3www6google3com format
-	while (*reader != 0) {
-		if (*reader >= 192) {
-			offset = (*reader) * 256 + *(reader + 1) - 49152; // 49152 = 11000000 00000000
-			reader = buffer + offset - 1;
-			jumped = 1; // we have jumped to another location so counting wont go up!
-		} else {
-			name[p++] = *reader;
-		}
-
-		reader = reader + 1;
-
-		if (jumped == 0)
-			*count = *count + 1; // if we havent jumped to another location then we can count up
-	}
-
-	name[p] = '\0';
-
-	if (jumped == 1)
-		*count = *count + 1;
-
-	// now convert 3www6google3com0 to www.google.com
-	for (i = 0; i < (int)strlen((const char *)name); i++) {
-		p = name[i];
-
-		for (j = 0; j < (int)p; j++) {
-			name[i] = name[i + 1];
-			i = i + 1;
-		}
-
-		name[i] = '.';
-	}
-	name[i - 1] = '\0'; //remove the last dot
-
-	return(name);
-}
-
-void
-ChangetoDnsNameFormat(unsigned char *dns, char *host)
-{
-	int lock = 0, i;
-	strcat((char *)host, ".");
-
-	for (i = 0; i < strlen((char *)host); i++) {
-		if (host[i] == '.') {
-			*dns++ = i - lock;
-
-			for (; lock < i; lock++)
-				*dns++ = host[lock];
-
-			lock++;	// or lock=i+1;
-		}
-	}
-	*dns++ = '\0';
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -332,7 +324,7 @@ main(int argc, char *argv[])
 	char dns_server[100];
 
 	if (argc < 3) {
-		printf("usage: %s <dns server> <hostname>\n", __progname);
+		printf("usage: %s <dns server> <hostname>\n", argv[0]);
 		exit(1);
 	}
 
