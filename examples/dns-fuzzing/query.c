@@ -20,9 +20,13 @@
 #define T_PTR 12  // domain name pointer
 #define T_MX 15   // Mail server
 
-void ngethostbyname(char *, int, char *);
-void ChangetoDnsNameFormat(unsigned char *, char *);
-unsigned char *ReadName(unsigned char *, unsigned char *, int *);
+#define T_PORT 53   // Name server port
+
+extern char *__progname;
+
+void ngethostbyname(char *host, int query_type, char *server);
+void ChangetoDnsNameFormat(unsigned char *dns, char *host);
+unsigned char *ReadName(unsigned char *reader, unsigned char *buffer, int *count);
 
 // DNS header structure
 struct DNS_HEADER {
@@ -93,9 +97,13 @@ ngethostbyname(char *host, int query_type, char *server)
 	struct QUESTION *qinfo = NULL;
 
 	s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); // UDP packet for DNS queries
+	if (s == -1) {
+		perror("socket failed");
+		exit(1);
+	}
 
 	dest.sin_family = AF_INET;
-	dest.sin_port = htons(53);
+	dest.sin_port = htons(T_PORT);
 	dest.sin_addr.s_addr = inet_addr(server); // DNS server
 
 	// Set the DNS structure to standard queries
@@ -249,7 +257,7 @@ ngethostbyname(char *host, int query_type, char *server)
 	}
 }
 
-u_char
+unsigned char
 *ReadName(unsigned char *reader, unsigned char *buffer, int *count)
 {
 	unsigned char *name;
@@ -278,6 +286,7 @@ u_char
 	}
 
 	name[p] = '\0';
+
 	if (jumped == 1)
 		*count = *count + 1;
 
@@ -306,8 +315,10 @@ ChangetoDnsNameFormat(unsigned char *dns, char *host)
 	for (i = 0; i < strlen((char *)host); i++) {
 		if (host[i] == '.') {
 			*dns++ = i - lock;
+
 			for (; lock < i; lock++)
 				*dns++ = host[lock];
+
 			lock++;	// or lock=i+1;
 		}
 	}
@@ -321,7 +332,7 @@ main(int argc, char *argv[])
 	char dns_server[100];
 
 	if (argc < 3) {
-		printf("usage: %s <dns server> <hostname>\n", argv[0]);
+		printf("usage: %s <dns server> <hostname>\n", __progname);
 		exit(1);
 	}
 
