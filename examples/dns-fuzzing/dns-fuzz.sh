@@ -123,8 +123,38 @@
 # 3) Inject format strings (%s%s%s%s..) at an offset of the DNS query packet.
 #    For loop through each offset of the DNS query packet length.
 #
-# TODO: FORMAT STRING INJECT RESULT
-# <END>
+# Result of format string injection starting at offset 0, count 1
+#         |
+#         ▼
+# 0000000 2573 1e78 0100 0001 0000 0000 0000 0377 7777 0b72 | %s.x...........www.r
+# 0000020 6962 6f73 652d 7465 7374 026e 6c00 0001 0001      | ibose-test.nl.....
+#
+# Result of format string injection starting at offset 0, count 2
+#         |
+#         ▼
+# 0000000 2573 2573 1e83 0100 0001 0000 0000 0000 0377 7777 | %s%s.............www
+#
+# Result of format string injection starting at offset 0, count 4
+#         |
+#         ▼
+# 0000000 2573 2573 2573 2573 1e8b 0100 0001 0000 0000 0000 | %s%s%s%s............
+# 0000020 0377 7777 0b72 6962 6f73 652d 7465 7374 026e 6c00 | .www.ribose-test.nl.
+# 0000040 0001 0001                                         | ....
+#
+# Result of format string injection starting at offset 0, count 8
+#         |
+#         ▼
+# 0000000 2573 2573 2573 2573 2573 2573 2573 2573 1e93 0100 | %s%s%s%s%s%s%s%s....
+# 0000020 0001 0000 0000 0000 0377 7777 0b72 6962 6f73 652d | .........www.ribose-
+# 0000040 7465 7374 026e 6c00 0001 0001                     | test.nl.....
+#
+# Result of format string injection starting at offset 0, count 16
+#         |
+#         ▼
+# 0000000 2573 2573 2573 2573 2573 2573 2573 2573 2573 2573 | %s%s%s%s%s%s%s%s%s%s
+# 0000020 2573 2573 2573 2573 2573 2573 1e9b 0100 0001 0000 | %s%s%s%s%s%s........
+# 0000040 0000 0000 0377 7777 0b72 6962 6f73 652d 7465 7374 | .....www.ribose-test
+# 0000060 026e 6c00 0001 0001                               | .nl.....
 #
 # NOTE: THIS IMPLEMENTATION CURRENTLY ENLARGES THE DNS QUERY PACKET. WORK IS
 #       ONGOING TO MAKE RETRACE OVERWRITE INSTEAD OF INJECT, ETA IS VERY SOON!
