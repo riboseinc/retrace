@@ -21,6 +21,8 @@
 #define T_MX 15   // Mail server
 #define T_PORT 53 // Name server port
 
+#define BUFSIZE 100
+
 // DNS header structure
 struct DNS_HEADER {
 	unsigned short id;         // identification number
@@ -78,6 +80,7 @@ unsigned char
 	unsigned char *name;
 	unsigned int p = 0, jumped = 0, offset;
 	int i, j;
+	size_t len;
 
 	*count = 1;
 	name = (unsigned char *)malloc(256);
@@ -105,7 +108,8 @@ unsigned char
 		*count = *count + 1;
 
 	// now convert 3www6google3com0 to www.google.com
-	for (i = 0; i < (int)strlen((const char *)name); i++) {
+	len = strlen((const char *)name);
+	for (i = 0; i < len; i++) {
 		p = name[i];
 
 		for (j = 0; j < (int)p; j++) {
@@ -128,14 +132,15 @@ ChangetoDnsNameFormat(unsigned char *dns, char *host)
 	strcat(host, ".");
 
 	for (i = 0; i < strlen((char *)host); i++) {
-		if (host[i] == '.') {
-			*dns++ = i - lock;
+		if (host[i] != '.')
+			continue;
 
-			for (; lock < i; lock++)
-				*dns++ = host[lock];
+		*dns++ = i - lock;
 
-			lock++;	// or lock=i+1;
-		}
+		for (; lock < i; lock++)
+			*dns++ = host[lock];
+
+		lock++;	// or lock=i+1;
 	}
 
 	*dns++ = '\0';
@@ -322,8 +327,8 @@ ngethostbyname(char *host, int query_type, char *server)
 int
 main(int argc, char *argv[])
 {
-	char hostname[100];
-	char dns_server[100];
+	char hostname[BUFSIZE];
+	char dns_server[BUFSIZE];
 
 	if (argc < 3) {
 		printf("usage: %s <dns server> <hostname>\n", argv[0]);
