@@ -288,6 +288,7 @@ ngethostbyname(char *host, int query_type, char *server)
 		// IPv4 address
 		if (ntohs(answers[i].resource->type) == T_A) {
 			long *p;
+
 			p = (long *)answers[i].rdata;
 			a.sin_addr.s_addr = (*p);
 			printf("has IPv4 address: %s", inet_ntoa(a.sin_addr));
@@ -315,6 +316,7 @@ ngethostbyname(char *host, int query_type, char *server)
 
 		if (ntohs(addit[i].resource->type) == 1) {
 			long *p;
+
 			p = (long *)addit[i].rdata;
 			a.sin_addr.s_addr = (*p);
 			printf("has IPv4 address: %s", inet_ntoa(a.sin_addr));
