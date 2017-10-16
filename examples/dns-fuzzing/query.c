@@ -124,6 +124,7 @@ void
 ChangetoDnsNameFormat(unsigned char *dns, char *host)
 {
 	int lock = 0, i;
+
 	strcat((char *)host, ".");
 
 	for (i = 0; i < strlen((char *)host); i++) {
