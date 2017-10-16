@@ -125,7 +125,7 @@ ChangetoDnsNameFormat(unsigned char *dns, char *host)
 {
 	int lock = 0, i;
 
-	strcat((char *)host, ".");
+	strcat(host, ".");
 
 	for (i = 0; i < strlen((char *)host); i++) {
 		if (host[i] == '.') {
@@ -137,6 +137,7 @@ ChangetoDnsNameFormat(unsigned char *dns, char *host)
 			lock++;	// or lock=i+1;
 		}
 	}
+
 	*dns++ = '\0';
 }
 
