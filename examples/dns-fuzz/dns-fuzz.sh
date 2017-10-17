@@ -57,6 +57,17 @@
 # 0000000 4f26 0100 0009 0000 0000 0000 0377 7777 0b72 6962 | O&...........www.rib
 # <END>
 #
+# Offset will increase with 1 by the for loop:
+#
+# Result of hex injection at offset 6, hex 0x00 to 0xff:
+#                         |
+#                         ▼
+# 0000000 4ed5 0100 0000 0000 0000 0000 0377 7777 0b72 6962 | N............www.rib
+# 0000000 4ede 0100 0000 0100 0000 0000 0377 7777 0b72 6962 | N............www.rib
+# 0000000 4ee7 0100 0000 0200 0000 0000 0377 7777 0b72 6962 | N............www.rib
+#
+# ..
+#
 # 2) Inject a long string (AAAAAA..) at an offset of the DNS query packet. For
 #    loop through each offset of the DNS query packet length.
 #
@@ -171,6 +182,7 @@ rm -rf /tmp/nslookup.conf*
 
 readonly query="examples/dns-fuzzing/query"
 readonly gtimeout="/usr/local/bin/gtimeout"
+readonly timeoutvar="1"
 
 # the size of a UDP DNS request packet, the for loops depend on this
 readonly packetsize="36"
@@ -201,7 +213,7 @@ for ((pos=4; pos < ${packetsize}; pos++)); do
 			hex="0x${a}${b}"
 			conf="/tmp/nslookup.conf.${hex}"
 			echo -e "logging-global,LOG_GROUP_NET,LOG_LEVEL_ALL\nstringinject,INJECT_SINGLE_HEX,sendto,${hex}:${pos},1" > "${conf}"
-			${gtimeout} 1 ./retrace -f "${conf}" "${query}" "${dnsserver}" "${hostname}"
+			"${gtimeout}" "${timeoutvar}" ./retrace -f "${conf}" "${query}" "${dnsserver}" "${hostname}"
 			rm -rf /tmp/nslookup.conf*
 		done
 	done
@@ -212,7 +224,7 @@ for ((pos=0; pos < ${packetsize}; pos++)); do
 	for len in 1 2 4 8 16 32 64 128 256 512 1024 2048 4096; do
 		conf="/tmp/nslookup.conf.${pos}.${len}"
 		echo -e "logging-global,LOG_GROUP_NET,LOG_LEVEL_ALL\nstringinject,INJECT_BUF_OVERFLOW,sendto,${len}:${pos},1" > "${conf}"
-		${gtimeout} 2 ./retrace -f "${conf}" "${query}" "${dnsserver}" "${hostname}"
+		"${gtimeout}" "${timeoutvar}" ./retrace -f "${conf}" "${query}" "${dnsserver}" "${hostname}"
 		rm -rf /tmp/nslookup.conf*
 	done
 done
@@ -222,6 +234,6 @@ for ((pos=0; pos < ${packetsize}; pos++)); do
 	for len in 1 2 4 8 16 32 64 128 256 512 1024 2048 4096; do
 		conf="/tmp/nslookup.conf.${pos}.${len}"
 		echo -e "logging-global,LOG_GROUP_NET,LOG_LEVEL_ALL\nstringinject,INJECT_FORMAT_STR,sendto,${len}:${pos},1" > "${conf}"
-		${gtimeout} 2 ./retrace -f "${conf}" "${query}" "${dnsserver}" "${hostname}"
+		"${gtimeout}" "${timeoutvar}" ./retrace -f "${conf}" "${query}" "${dnsserver}" "${hostname}"
 	done
 done

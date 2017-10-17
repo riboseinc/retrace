@@ -91,7 +91,7 @@ unsigned char
 		if (*reader >= 192) {
 			offset = (*reader) * 256 + *(reader + 1) - 49152; // 49152 = 11000000 00000000
 			reader = buffer + offset - 1;
-			jumped = 1; // we have jumped to another location so counting wont go up!
+			jumped = 1; // we have jumped to another location so counting won't go up
 		} else {
 			name[p++] = *reader;
 		}
@@ -99,7 +99,7 @@ unsigned char
 		reader = reader + 1;
 
 		if (jumped == 0)
-			*count = *count + 1; // if we havent jumped to another location then we can count up
+			*count = *count + 1; // if we haven't jumped to another location then we can count up
 	}
 
 	name[p] = '\0';
@@ -197,7 +197,6 @@ ngethostbyname(char *host, int query_type, char *server)
 
 	ChangetoDnsNameFormat(qname, host);
 	qinfo = (struct QUESTION *)&buf[sizeof(struct DNS_HEADER) + (strlen((const char *)qname) + 1)];	// fill it
-
 	qinfo->qtype = htons(query_type); // type of the query, A, MX, CNAME, NS etc
 	qinfo->qclass = htons(1);
 
@@ -330,17 +329,17 @@ int
 main(int argc, char *argv[])
 {
 	char hostname[BUFSIZE];
-	char dns_server[BUFSIZE];
+	char server[BUFSIZE];
 
 	if (argc < 3) {
-		printf("usage: %s <dns server> <hostname>\n", argv[0]);
+		printf("usage: %s <nameserver> <hostname>\n", argv[0]);
 		exit(1);
 	}
 
-	snprintf(dns_server, sizeof(dns_server), "%s", argv[1]);
+	snprintf(server, sizeof(server), "%s", argv[1]);
 	snprintf(hostname, sizeof(hostname), "%s", argv[2]);
 
-	ngethostbyname(hostname, T_A, dns_server);
+	ngethostbyname(hostname, T_A, server);
 
 	return(0);
 }
