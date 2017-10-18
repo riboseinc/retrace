@@ -1,11 +1,16 @@
-# getenv retrace fuzzing
-Retrace can be used to fuzz system calls related with networking.
+# Network fuzzing
 
-## getenv fuzz configuration syntax
+Retrace can be used to fuzz network related system calls.
+
+
+## Network fuzzing configuration syntax
+
 ```
 fuzzing-net,[function name],[fuzzing type],[fuzzing rate]
 ```
-## Function names and Fuzzing types:
+
+
+## Function names and fuzzing types:
 
 1. socket, accept
 NO_MEMORY, LIMIT_SOCKET
@@ -28,10 +33,11 @@ HOST_NOT_FOUND, SERVICE_NOT_AVAIL
 7. getaddrinfo
 HOST_NOT_FOUND, SERVICE_NOT_AVAIL, NO_MEMORY
 
+
 ## Example runs:
 
 ```sh
 $ cc -o test_client test_client.c
 $ cd ../../
 $ ./retrace -f examples/net-fuzzing/netfuzzing.conf ./examples/net-fuzzing/test_client
-
+```
