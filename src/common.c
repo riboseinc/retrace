@@ -609,30 +609,42 @@ retrace_print_parameter(struct rtr_print_buf *print_buffer, unsigned int event_t
 	}
 
 	case PARAMETER_TYPE_STRUCT_SOCKADDR:
-		switch ((*(struct sockaddr **) *value)->sa_family) {
+	{
+		struct sockaddr *addr = *((struct sockaddr **) *value);
+
+		char ipaddr[INET6_ADDRSTRLEN];
+		int port;
+
+		if (addr == NULL)
+			break;
+
+		switch (addr->sa_family) {
 		case AF_INET:
-			trace_printf(print_buffer, 0, "%s:%d[AF_INET]",
-						 inet_ntoa(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_addr),
-						 ntohs(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_port));
+			inet_ntop(AF_INET, &((struct sockaddr_in *)addr)->sin_addr, ipaddr, INET_ADDRSTRLEN);
+			port = ntohs(((struct sockaddr_in *)addr)->sin_port);
+
+			trace_printf(print_buffer, 0, "%s:%d[AF_INET]", ipaddr, port);
 			break;
 
 #ifdef AF_INET6
 		case AF_INET6:
-			trace_printf(print_buffer, 0, "[%s]:%d[AF_INET6]",
-						 inet_ntoa(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_addr),
-						 ntohs(((struct sockaddr_in *)(*(struct sockaddr **) *value))->sin_port));
+			inet_ntop(AF_INET6, &((struct sockaddr_in6 *)addr)->sin6_addr, ipaddr, INET6_ADDRSTRLEN);
+			port = ntohs(((struct sockaddr_in6 *)addr)->sin6_port);
+
+			trace_printf(print_buffer, 0, "[%s]:%d[AF_INET6]", ipaddr, port);
 			break;
 #endif
 
 		case AF_UNIX:
-			trace_printf(print_buffer, 0, "%s[AF_UNIX|AF_LOCAL]", ((struct sockaddr_un *)(*(struct sockaddr **) *value))->sun_path);
+			trace_printf(print_buffer, 0, "%s[AF_UNIX|AF_LOCAL]", ((struct sockaddr_un *)addr)->sun_path);
 			break;
 
 		default:
-			trace_printf(print_buffer, 0, "unssuported sa_family: %d", (*(struct sockaddr **) *value)->sa_family);
+			trace_printf(print_buffer, 0, "sa_family: %d", addr->sa_family);
 			break;
 		}
 		break;
+	}
 
 	case PARAMETER_TYPE_FD_SET:
 	{
@@ -733,6 +745,168 @@ retrace_print_parameter(struct rtr_print_buf *print_buffer, unsigned int event_t
 		break;
 	}
 
+	case PARAMETER_TYPE_SOCKET_DOMAIN:
+	{
+		int domain = (*(int *) *value);
+		const char *domain_str = "AF_FAMILY";
+
+		switch (domain) {
+		case AF_INET:
+			domain_str = "AF_INET";
+			break;
+
+		case AF_INET6:
+			domain_str = "AF_INET6";
+			break;
+
+		case AF_LOCAL:
+			domain_str = "AF_LOCAL|AF_UNIX";
+			break;
+
+		default:
+			break;
+		}
+
+		trace_printf(print_buffer, 0, "%s(%d)", domain_str, domain);
+		break;
+	}
+
+	case PARAMETER_TYPE_SOCKET_TYPE:
+	{
+		int type = (*(int *) *value);
+		const char *type_str = "SOCKET_TYPE";
+
+		switch (type) {
+		case SOCK_STREAM:
+			type_str = "SOCK_STREAM";
+			break;
+
+		case SOCK_DGRAM:
+			type_str = "SOCK_DGRAM";
+			break;
+
+		case SOCK_SEQPACKET:
+			type_str = "SOCK_SEQPACKET";
+			break;
+
+		case SOCK_RAW:
+			type_str = "SOCK_RAW";
+			break;
+
+#if HAVE_DECL_SOCK_PACKET
+		case SOCK_PACKET:
+			type_str = "SOCK_PACKET";
+			break;
+#endif
+
+		default:
+			break;
+		}
+
+		trace_printf(print_buffer, 0, "%s(%d)", type_str, type);
+		break;
+	}
+
+	case PARAMETER_TYPE_SOCKET_OPTION:
+	{
+		int i, opt = (*(int *) *value);
+		const char *opt_str = "SOCKET_OPTION";
+
+		struct socket_opt_data {
+			int opt;
+			const char *opt_str;
+		} socket_opts[] = {
+			/* socket level options */
+			{SO_ACCEPTCONN, "SO_ACCEPTCONN"}, {SO_BROADCAST, "SO_BROADCAST"},
+			{SO_DEBUG, "SO_DEBUG"},	{SO_ERROR, "SO_ERROR"},
+#if HAVE_DECL_SO_BINDTODEVICE
+			{SO_BINDTODEVICE, "SO_BINDTODEVICE"},
+#endif
+#if HAVE_DECL_SO_BSDCOMPAT
+			{SO_BSDCOMPAT, "SO_BSDCOMPAT"},
+#endif
+#if HAVE_DECL_SO_DOMAIN
+			{SO_DOMAIN, "SO_DOMAIN"},
+#endif
+#if HAVE_DECL_SO_MARK
+			{SO_MARK, "SO_MARK"},
+#endif
+#if HAVE_DECL_SO_PASSCRED
+			{SO_PASSCRED, "SO_PASSCRED"},
+#endif
+#if HAVE_DECL_SO_PEERCRED
+			{SO_PEERCRED, "SO_PEERCRED"},
+#endif
+#if HAVE_DECL_SO_PRIORITY
+			{SO_PRIORITY, "SO_PRIORITY"},
+#endif
+#if HAVE_DECL_SO_PROTOCOL
+			{SO_PROTOCOL, "SO_PROTOCOL"},
+#endif
+#if HAVE_DECL_SO_RXQ_OVFL
+			{SO_RXQ_OVFL, "SO_RXQ_OVFL"},
+#endif
+#if HAVE_DECL_SO_SNDBUFFORCE
+			{SO_SNDBUFFORCE, "SO_SNDBUFFORCE"},
+#endif
+#if HAVE_DECL_SO_RCVBUFFORCE
+			{SO_RCVBUFFORCE, "SO_RCVBUFFORCE"},
+#endif
+#if HAVE_DECL_SO_BUSY_CALL
+			{SO_BUSY_POLL, "SO_BUSY_POLL"},
+#endif
+			{SO_DONTROUTE, "SO_DONTROUTE"}, {SO_KEEPALIVE, "SO_KEEPALIVE"},
+			{SO_LINGER, "SO_LINGER"}, {SO_OOBINLINE, "SO_OOBINLINE"},
+			{SO_RCVBUF, "SO_RCVBUF"}, {SO_RCVLOWAT, "SO_RCVLOWAT"}, {SO_SNDLOWAT, "SO_SNDLOWAT"},
+			{SO_RCVTIMEO, "SO_RCVTIMEO"}, {SO_SNDTIMEO, "SO_SNDTIMEO"},
+			{SO_REUSEADDR, "SO_REUSEADDR"}, {SO_REUSEPORT, "SO_REUSEPORT"},
+			{SO_SNDBUF, "SO_SNDBUF"}, {SO_TIMESTAMP, "SO_TIMESTAMP"}, {SO_TYPE, "SO_TYPE"},
+
+			/* IPv6 level options */
+			{IPV6_JOIN_GROUP, "IPV6_JOIN_GROUP"}, {IPV6_LEAVE_GROUP, "IPV6_LEAVE_GROUP"},
+			{IPV6_MULTICAST_HOPS, "IPV6_MULTICAST_HOPS"}, {IPV6_MULTICAST_IF, "IPV6_MULTICAST_IF"},
+			{IPV6_MULTICAST_LOOP, "IPV6_MULTICAST_LOOP"}, {IPV6_UNICAST_HOPS, "IPV6_UNICAST_HOPS"},
+			{IPV6_V6ONLY, "IPV6_V6ONLY"}, {IPV6_RECVTCLASS, "IPV6_RECVTCLASS"},
+			{IPV6_TCLASS, "IPV6_TCLASS"},
+
+			{-1, NULL}
+		};
+
+		for (i = 0; socket_opts[i].opt_str != NULL; i++) {
+			if (socket_opts[i].opt == opt)
+				opt_str = socket_opts[i].opt_str;
+		}
+
+		trace_printf(print_buffer, 0, "%s(%d)", opt_str, opt);
+		break;
+	}
+
+	case PARAMETER_TYPE_PROTO_LEVEL:
+	{
+		int i, level = (*(int *) *value);
+		const char *level_str = "PROTO_LEVEL";
+
+		struct proto_level_data {
+			int level;
+			const char *level_str;
+		} proto_levels[] = {
+			/* protocol level */
+			{IPPROTO_IP, "IPPROTO_IP"}, {IPPROTO_IPV6, "IPPROTO_IPV6"},
+			{IPPROTO_ICMP, "IPPROTO_ICMP"},	{IPPROTO_RAW, "IPPROTO_RAW"},
+			{IPPROTO_TCP, "IPPROTO_TCP"}, {IPPROTO_UDP, "IPPROTO_UDP"},
+			/* socket level */
+			{SOL_SOCKET, "SOL_SOCKET"},
+			{-1, NULL}
+		};
+
+		for (i = 0; proto_levels[i].level_str != NULL; i++) {
+			if (proto_levels[i].level == level)
+				level_str = proto_levels[i].level_str;
+		}
+
+		trace_printf(print_buffer, 0, "%s(%d)", level_str, level);
+		break;
+	}
 	}
 
 	trace_set_color(print_buffer, RST);
@@ -851,16 +1025,25 @@ retrace_dump_parameter(struct rtr_print_buf *print_buffer, unsigned int type, in
 		int i;
 		int size;
 		struct iovec *iov;
+		int res_len, len = 0;
 
 		size = *((size_t *) *value);
 		value++;
 		iov = *((struct iovec **) *value);
+		value++;
+		res_len = *((ssize_t *) *value);
 
-		for (i = 0; i < size; i++) {
-			struct iovec *msg_iov = &iov[i];
+		if (res_len > 0) {
+			for (i = 0; i < size; i++) {
+				struct iovec *msg_iov = &iov[i];
 
-			if (msg_iov->iov_len > 0)
-				trace_dump_data(print_buffer, (unsigned char *) iov->iov_base, msg_iov->iov_len);
+				if (msg_iov->iov_len > 0) {
+					int iov_len = (res_len - len) < msg_iov->iov_len ? res_len - len : msg_iov->iov_len;
+
+					trace_dump_data(print_buffer, (unsigned char *) iov->iov_base, iov_len);
+					len += msg_iov->iov_len;
+				}
+			}
 		}
 	} else if (type == PARAMETER_TYPE_SSL_WITH_KEY) {
 #ifdef HAVE_OPENSSL_SSL_H

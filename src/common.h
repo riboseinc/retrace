@@ -28,13 +28,13 @@
 #define FUNC "\033[35m" /* blue for functions */
 #define RET "\033[33m" /* yellow for return value */
 
-#define ARGUMENT_TYPE_END	0
-#define ARGUMENT_TYPE_INT	1
+#define ARGUMENT_TYPE_END		0
+#define ARGUMENT_TYPE_INT		1
 #define ARGUMENT_TYPE_STRING	2
 #define ARGUMENT_TYPE_DOUBLE	3
-#define ARGUMENT_TYPE_UINT	4
+#define ARGUMENT_TYPE_UINT		4
 
-#define FILE_DESCRIPTOR_TYPE_UNKNOWN		0
+#define FILE_DESCRIPTOR_TYPE_UNKNOWN	0
 #define FILE_DESCRIPTOR_TYPE_FILE		1 /* from open() */
 #define FILE_DESCRIPTOR_TYPE_SOCK		2 /* from socket() */
 
@@ -45,59 +45,66 @@ enum RTR_FUZZ_TYPE {
 	RTR_FUZZ_TYPE_GARBAGE				/* garbage */
 };
 
-#define PARAMETER_TYPE_END		0
-#define PARAMETER_TYPE_INT		1 /* int */
-#define PARAMETER_TYPE_POINTER		2 /* opaque pointer, we will print the address */
-#define PARAMETER_TYPE_UINT		3 /* unsigned int */
-#define PARAMETER_TYPE_LONG		4 /* long */
-#define PARAMETER_TYPE_ULONG		5 /* unsigned long */
-#define PARAMETER_TYPE_FLOAT		6 /* float */
-#define PARAMETER_TYPE_DOUBLE		7 /* double */
-#define PARAMETER_TYPE_STRING		8 /* Zero terminated string */
-#define PARAMETER_TYPE_STRING_LEN	9 /* Non zero terminated string, the length of the string precedes the string */
-#define PARAMETER_TYPE_MEMORY_BUFFER	10 /* A pointer to a memory buffer, the length of the string precedes the string */
-#define PARAMETER_TYPE_CHAR		11 /* char */
-#define PARAMETER_TYPE_FILE_STREAM	12 /* FILE* */
-#define PARAMETER_TYPE_FILE_DESCRIPTOR	13 /* int used as a file descriptor */
-#define PARAMETER_TYPE_DIR		14 /* DIR */
-#define PARAMETER_TYPE_INT_OCTAL	15 /* int, print as octal */
-#define PARAMETER_TYPE_MEM_BUFFER_ARRAY	16 /* first size of buffers, then number of buffers, memory pointer at the end */
-#define PARAMETER_TYPE_PRINTF_FORMAT	17 /* printf format string followed by pointer to a va_list */
-#define PARAMETER_TYPE_STRING_ARRAY	18 /* fist the size of the array, then an array of char * */
-#define PARAMETER_TYPE_IOVEC		19 /* number of buffers, then array of struct iovec */
-#define PARAMETER_TYPE_UTSNAME		20 /* struct utsname*  */
-#define PARAMETER_TYPE_TIMEVAL		21 /* struct timeval* */
-#define PARAMETER_TYPE_TIMEZONE		22 /* struct timezone* */
-#define PARAMETER_TYPE_SSL		23 /* OpenSSL's SSL* */
-#define PARAMETER_TYPE_SSL_WITH_KEY	24 /* OpenSSL's SSL* but attempt to dump the ssl key */
+/* parameter types */
+enum RTR_PARAMETER_TYPE {
+	PARAMETER_TYPE_END = 0,
+	PARAMETER_TYPE_INT,					/* int */
+	PARAMETER_TYPE_POINTER,				/* opaque pointer, we will print the address */
+	PARAMETER_TYPE_UINT,				/* unsigned int */
+	PARAMETER_TYPE_LONG,				/* long */
+	PARAMETER_TYPE_ULONG,				/* unsigned long */
+	PARAMETER_TYPE_FLOAT,				/* float */
+	PARAMETER_TYPE_DOUBLE,				/* double */
+	PARAMETER_TYPE_STRING,				/* zero terminated string */
+	PARAMETER_TYPE_STRING_LEN,			/* non zero terminated string, the length of the string precedes the string */
+	PARAMETER_TYPE_MEMORY_BUFFER,		/* a pointer to a memory buffer, the length of the string precedes the string */
+	PARAMETER_TYPE_CHAR,				/* char */
+	PARAMETER_TYPE_FILE_STREAM,			/* FILE* */
+	PARAMETER_TYPE_FILE_DESCRIPTOR,		/* int used as a file descriptor */
+	PARAMETER_TYPE_DIR,					/* DIR */
+	PARAMETER_TYPE_INT_OCTAL,			/* int, print as octal */
+	PARAMETER_TYPE_MEM_BUFFER_ARRAY,	/* first size of buffers, then number of buffers, memory pointer at the end */
+	PARAMETER_TYPE_PRINTF_FORMAT,		/* printf format string followed by pointer to a va_list */
+	PARAMETER_TYPE_STRING_ARRAY,		/* fist the size of the array, then an array of char * */
+	PARAMETER_TYPE_IOVEC,				/* struct iovec */
+	PARAMETER_TYPE_UTSNAME,				/* struct utsname*  */
+	PARAMETER_TYPE_TIMEVAL,				/* struct timeval* */
+	PARAMETER_TYPE_TIMEZONE,			/* struct timezone* */
+	PARAMETER_TYPE_SSL,					/* OpenSSL's SSL* */
+	PARAMETER_TYPE_SSL_WITH_KEY,		/* OpenSSL's SSL* but attempt to dump the ssl key */
 #if HAVE_STRUCT_FLOCK
-#define PARAMETER_TYPE_STRUCT_FLOCK 25 /* fcntl's struct flock */
+	PARAMETER_TYPE_STRUCT_FLOCK,		/* fcntl's struct flock */
 #endif
 #if HAVE_STRUCT_FSTORE
-#define PARAMETER_TYPE_STRUCT_FSTORE 26 /* fcntl's struct fstore */
+	PARAMETER_TYPE_STRUCT_FSTORE,		/* fcntl's struct fstore */
 #endif
 #if HAVE_STRUCT_FPUNCHHOLE
-#define PARAMETER_TYPE_STRUCT_FPUNCHHOLE 27 /* fcntl's struct fpunchhole */
+	PARAMETER_TYPE_STRUCT_FPUNCHHOLE,	/* fcntl's struct fpunchhole */
 #endif
 #if HAVE_STRUCT_RADVISORY
-#define PARAMETER_TYPE_STRUCT_RADVISORY 28 /* fcntl's struct radvisory */
+	PARAMETER_TYPE_STRUCT_RADVISORY,	/* fcntl's struct radvisory */
 #endif
 #if HAVE_STRUCT_FBOOTSTRAPTRANSFER
-#define PARAMETER_TYPE_STRUCT_FBOOTSTRAPTRANSFER 29 /* fcntl's struct fbootstraptransfer */
+	PARAMETER_TYPE_STRUCT_FBOOTSTRAPTRANSFER,		/* fcntl's struct fbootstraptransfer */
 #endif
 #if HAVE_STRUCT_LOG2PHYS
-#define PARAMETER_TYPE_STRUCT_LOG2PHYS 30 /* fcntl's struct log2phys */
+	PARAMETER_TYPE_STRUCT_LOG2PHYS,		/* fcntl's struct log2phys */
 #endif
 #if HAVE_DECL_F_GETOWN_EX
-#define PARAMETER_TYPE_STRUCT_F_GETOWN_EX 31 /* fcntl's struct f_owner_ex */
+	PARAMETER_TYPE_STRUCT_F_GETOWN_EX,	/* fcntl's struct f_owner_ex */
 #endif
-#define PARAMETER_TYPE_PERM  32 /* write permission  */
-#define PARAMETER_TYPE_STRUCT_STAT 33 /* struct stat */
-#define PARAMETER_TYPE_STRUCT_SOCKADDR	35 /* struct sockaddr */
-#define PARAMETER_TYPE_FD_SET	36 /* fd_set: char **set, int *nfds, fd_set **in, fd_set **out */
-#define PARAMETER_TYPE_STRUCT_HOSTEN	37 /* struct hosten */
-#define PARAMETER_TYPE_IP_ADDR	38 /* ip addr: void **addr, int *type */
-#define PARAMETER_TYPE_STRUCT_ADDRINFO	39 /* struct addrinfo */
+	PARAMETER_TYPE_PERM,				/* write permission  */
+	PARAMETER_TYPE_STRUCT_STAT,			/* struct stat */
+	PARAMETER_TYPE_STRUCT_SOCKADDR,		/* struct sockaddr */
+	PARAMETER_TYPE_FD_SET,				/* fd_set: char **set, int *nfds, fd_set **in, fd_set **out */
+	PARAMETER_TYPE_STRUCT_HOSTEN,		/* struct hosten */
+	PARAMETER_TYPE_IP_ADDR,				/* ip addr: void **addr, int *type */
+	PARAMETER_TYPE_STRUCT_ADDRINFO,		/* struct addrinfo */
+	PARAMETER_TYPE_SOCKET_DOMAIN,		/* socket domain */
+	PARAMETER_TYPE_SOCKET_TYPE,			/* socket types */
+	PARAMETER_TYPE_SOCKET_OPTION,		/* socket option */
+	PARAMETER_TYPE_PROTO_LEVEL
+};
 
 #define PARAMETER_FLAG_OUTPUT_VARIABLE		0x40000000 /* This is an output variable, is uninitialized in EVENT_TYPE_BEFORE_CALL */
 #define PARAMETER_FLAG_STRING_NEXT		0x80000000 /* There's a string parameter that describes the string */

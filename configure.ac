@@ -198,6 +198,21 @@ AC_CHECK_DECLS([F_NOTIFY], [], [], [#include <fcntl.h>])
 AC_CHECK_DECLS([F_SETPIPE_SZ, F_GETPIPE_SZ], [], [], [#include <fcntl.h>])
 AC_CHECK_DECLS([F_ADD_SEALS, F_GET_SEALS], [], [], [#include <fcntl.h>])
 
+AC_CHECK_DECLS([SOCK_PACKET], [], [], [#include <sys/socket.h>])
+
+AC_CHECK_DECLS([SO_BINDTODEVICE], [], [], [#include <sys/socket.h>])
+AC_CHECK_DECLS([SO_BSDCOMPAT], [], [], [#include <sys/socket.h>])
+AC_CHECK_DECLS([SO_DOMAIN], [], [], [#include <sys/socket.h>])
+AC_CHECK_DECLS([SO_MARK], [], [], [#include <sys/socket.h>])
+AC_CHECK_DECLS([SO_PASSCRED], [], [], [#include <sys/socket.h>])
+AC_CHECK_DECLS([SO_PEERCRED], [], [], [#include <sys/socket.h>])
+AC_CHECK_DECLS([SO_PRIORITY], [], [], [#include <sys/socket.h>])
+AC_CHECK_DECLS([SO_PROTOCOL], [], [], [#include <sys/socket.h>])
+AC_CHECK_DECLS([SO_RXQ_OVFL], [], [], [#include <sys/socket.h>])
+AC_CHECK_DECLS([SO_SNDBUFFORCE], [], [], [#include <sys/socket.h>])
+AC_CHECK_DECLS([SO_RCVBUFFORCE], [], [], [#include <sys/socket.h>])
+AC_CHECK_DECLS([SO_BUSY_POLL], [], [], [#include <sys/socket.h>])
+
 TESTS_CFLAGS=""
 AC_MSG_CHECKING(whether to run tests)
 AC_ARG_ENABLE([tests],

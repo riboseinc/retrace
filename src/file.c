@@ -308,10 +308,17 @@ int RETRACE_IMPLEMENTATION(close)(int fd)
 	void const *parameter_values[] = {&fd};
 	int r;
 
+	struct descriptor_info *di;
+	int func_group = RTR_FUNC_GRP_FILE;
+
+	/* get file descriptor info */
+	di = file_descriptor_get(fd);
+	if (di && di->type == FILE_DESCRIPTOR_TYPE_SOCK)
+		func_group = RTR_FUNC_GRP_NET;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "close";
-	event_info.function_group = RTR_FUNC_GRP_FILE;
+	event_info.function_group = func_group;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
@@ -934,9 +941,17 @@ int RETRACE_IMPLEMENTATION(fcntl)(int fildes, int cmd, ...)
 	void const *parameter_values_f_owner_ex[] = {&fildes, &cmd, &f_owner_ex_parameter};
 #endif
 
+	struct descriptor_info *di;
+	int func_group = RTR_FUNC_GRP_FILE;
+
+	/* check if file descriptor is for socket */
+	di = file_descriptor_get(fildes);
+	if (di && di->type == FILE_DESCRIPTOR_TYPE_SOCK)
+		func_group = RTR_FUNC_GRP_NET;
+
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fcntl";
-	event_info.function_group = RTR_FUNC_GRP_FILE;
+	event_info.function_group = func_group;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &r;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
