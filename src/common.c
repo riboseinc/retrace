@@ -615,8 +615,10 @@ retrace_print_parameter(struct rtr_print_buf *print_buffer, unsigned int event_t
 		char ipaddr[INET6_ADDRSTRLEN];
 		int port;
 
-		if (addr == NULL)
+		if (addr == NULL) {
+			trace_printf(print_buffer, 0, "(nil)");
 			break;
+		}
 
 		switch (addr->sa_family) {
 		case AF_INET:
@@ -873,7 +875,7 @@ retrace_print_parameter(struct rtr_print_buf *print_buffer, unsigned int event_t
 		};
 
 		for (i = 0; socket_opts[i].opt_str != NULL; i++) {
-			if (socket_opts[i].opt == opt)
+			if (opt != -1 && opt == socket_opts[i].opt)
 				opt_str = socket_opts[i].opt_str;
 		}
 
@@ -900,7 +902,7 @@ retrace_print_parameter(struct rtr_print_buf *print_buffer, unsigned int event_t
 		};
 
 		for (i = 0; proto_levels[i].level_str != NULL; i++) {
-			if (proto_levels[i].level == level)
+			if (level != -1 && level == proto_levels[i].level)
 				level_str = proto_levels[i].level_str;
 		}
 
