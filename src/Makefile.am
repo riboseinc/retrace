@@ -3,7 +3,8 @@ ACLOCAL_AMFLAGS = -I ../m4
 
 lib_LTLIBRARIES= libretrace.la
 libretrace_la_LDFLAGS= -no-undefined -avoid-version
-libretrace_la_CFLAGS= $(AM_CFLAGS) $(LIBSSL_FLAGS)
+libretrace_la_CFLAGS= $(AM_CFLAGS) $(OPENSSL_INCLUDES)
+libretrace_la_LDFLAGS+= $(OPENSSL_LDFLAGS)
 
 # include all headers here
 noinst_HEADERS= \
@@ -32,16 +33,13 @@ noinst_HEADERS= \
 	scanf.h \
 	select.h \
 	sock.h \
+	ssl.h \
 	str.h \
 	strinject.h \
 	temp.h \
 	trace.h \
 	write.h \
 	ioctl.h
-
-if OPENSSL
-noinst_HEADERS+= ssl.h
-endif
 
 # include all C files here
 libretrace_la_SOURCES= \
@@ -69,6 +67,7 @@ libretrace_la_SOURCES= \
 	scanf.c \
 	select.c \
 	sock.c \
+	ssl.c \
 	str.c \
 	strinject.c \
 	temp.c \
@@ -76,8 +75,3 @@ libretrace_la_SOURCES= \
 	trace.c \
 	write.c \
 	ioctl.c
-
-if OPENSSL
-libretrace_la_SOURCES+= ssl.c
-libretrace_la_LDFLAGS+= -lssl -lcrypto
-endif
