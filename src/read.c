@@ -40,9 +40,17 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_MEMORY_BUFFER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&fd, &ret, &buf, &nbytes};
 
+	struct descriptor_info *di;
+	int func_group = RTR_FUNC_GRP_FILE;
+
+	/* check if the file descriptor is for socket */
+	di = file_descriptor_get(fd);
+	if (di && di->type == FILE_DESCRIPTOR_TYPE_SOCK)
+		func_group = RTR_FUNC_GRP_NET;
+
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "read";
-	event_info.function_group = RTR_FUNC_GRP_FILE | RTR_FUNC_GRP_NET;
+	event_info.function_group = func_group;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;

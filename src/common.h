@@ -28,13 +28,13 @@
 #define FUNC "\033[35m" /* blue for functions */
 #define RET "\033[33m" /* yellow for return value */
 
-#define ARGUMENT_TYPE_END	0
-#define ARGUMENT_TYPE_INT	1
+#define ARGUMENT_TYPE_END		0
+#define ARGUMENT_TYPE_INT		1
 #define ARGUMENT_TYPE_STRING	2
 #define ARGUMENT_TYPE_DOUBLE	3
-#define ARGUMENT_TYPE_UINT	4
+#define ARGUMENT_TYPE_UINT		4
 
-#define FILE_DESCRIPTOR_TYPE_UNKNOWN		0
+#define FILE_DESCRIPTOR_TYPE_UNKNOWN	0
 #define FILE_DESCRIPTOR_TYPE_FILE		1 /* from open() */
 #define FILE_DESCRIPTOR_TYPE_SOCK		2 /* from socket() */
 
@@ -98,6 +98,10 @@ enum RTR_FUZZ_TYPE {
 #define PARAMETER_TYPE_STRUCT_HOSTEN	37 /* struct hosten */
 #define PARAMETER_TYPE_IP_ADDR	38 /* ip addr: void **addr, int *type */
 #define PARAMETER_TYPE_STRUCT_ADDRINFO	39 /* struct addrinfo */
+#define PARAMETER_TYPE_SOCKET_DOMAIN 40 /* socket domain */
+#define PARAMETER_TYPE_SOCKET_TYPE 41 /* socket types */
+#define PARAMETER_TYPE_SOCKET_OPTION 42 /* socket option */
+#define PARAMETER_TYPE_PROTO_LEVEL 43 /* socket protocol level */
 
 #define PARAMETER_FLAG_OUTPUT_VARIABLE		0x40000000 /* This is an output variable, is uninitialized in EVENT_TYPE_BEFORE_CALL */
 #define PARAMETER_FLAG_STRING_NEXT		0x80000000 /* There's a string parameter that describes the string */

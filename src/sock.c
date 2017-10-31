@@ -37,7 +37,8 @@
 int RETRACE_IMPLEMENTATION(socket)(int domain, int type, int protocol)
 {
 	struct rtr_event_info event_info;
-	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_INT, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	unsigned int parameter_types[] = {PARAMETER_TYPE_SOCKET_DOMAIN, PARAMETER_TYPE_SOCKET_TYPE,
+					PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&domain, &type, &protocol};
 	int sock;
 
@@ -265,7 +266,8 @@ int RETRACE_IMPLEMENTATION(bind)(int fd, const struct sockaddr *address, socklen
 #endif
 	int ret;
 	struct rtr_event_info event_info;
-	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR, PARAMETER_TYPE_STRUCT_SOCKADDR,
+				PARAMETER_TYPE_INT, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&fd, &address, &len};
 
 	int err;
@@ -424,13 +426,12 @@ int RETRACE_IMPLEMENTATION(setsockopt)(int fd, int level, int optname, const voi
 	int ret;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
-					  PARAMETER_TYPE_INT,
-					  PARAMETER_TYPE_INT,
+					  PARAMETER_TYPE_PROTO_LEVEL,
+					  PARAMETER_TYPE_SOCKET_OPTION,
 					  PARAMETER_TYPE_POINTER,
 					  PARAMETER_TYPE_INT,
 					  PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&fd, &level, &optname, &optval, &optlen};
-
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "setsockopt";
@@ -613,11 +614,11 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 	struct descriptor_info *di;
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
-					  PARAMETER_TYPE_POINTER,
+					  PARAMETER_TYPE_STRUCT_SOCKADDR,
 					  PARAMETER_TYPE_IOVEC,
 					  PARAMETER_TYPE_INT,
 					  PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&sockfd, &msg, &msg->msg_iovlen, &msg->msg_iov, &flags};
+	void const *parameter_values[] = {&sockfd, &msg->msg_name, &msg->msg_iovlen, &msg->msg_iov, &ret, &flags};
 
 	int err;
 
@@ -806,10 +807,11 @@ ssize_t RETRACE_IMPLEMENTATION(recvmsg)(int sockfd, struct msghdr *msg, int flag
 
 	struct rtr_event_info event_info;
 	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+						PARAMETER_TYPE_STRUCT_SOCKADDR,
 						PARAMETER_TYPE_IOVEC,
 						PARAMETER_TYPE_INT,
 						PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&sockfd, &msg->msg_iovlen, &msg->msg_iov, &flags};
+	void const *parameter_values[] = {&sockfd, &msg->msg_name, &msg->msg_iovlen, &msg->msg_iov, &recv_len, &flags};
 
 	int err;
 

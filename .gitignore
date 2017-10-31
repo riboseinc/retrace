@@ -9,6 +9,9 @@ test/memcpy
 test/mmap
 test/sbrk
 test/*.o
+test/recvmsg
+test/setlocale
+test/strinject
 temp
 
 core
