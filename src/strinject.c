@@ -61,7 +61,9 @@ static struct {
 	{STRINJECT_FUNC_FWRITE, "fwrite"},
 	{STRINJECT_FUNC_FREAD, "fread"},
 	{STRINJECT_FUNC_READ, "read"},
+	{STRINJECT_FUNC_READV, "readv"},
 	{STRINJECT_FUNC_WRITE, "write"},
+	{STRINJECT_FUNC_WRITEV, "writev"},
 	{STRINJECT_FUNC_SEND, "send"},
 	{STRINJECT_FUNC_SENDTO, "sendto"},
 	{STRINJECT_FUNC_SENDMSG, "sendmsg"},
@@ -631,15 +633,12 @@ done:
 }
 
 /*
- * process string injection
+ * check if injection is enabled in config
  */
 
-int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_t len,
-		    void **inject_buffer, size_t *inject_len)
+static int str_inject_enabled(enum RTR_STRINJECT_FUNC_ID func_id)
 {
-	int ret;
-
-	if (!get_tracing_enabled() || len == 0)
+	if (!get_tracing_enabled())
 		return 0;
 
 	/* init string injection configuration */
@@ -652,6 +651,26 @@ int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_
 
 	/* get fuzzing flag */
 	if (!rtr_get_fuzzing_flag(g_strinject_infos[func_id].rate))
+		return 0;
+
+	return 1;
+}
+
+/*
+ * process string injection for single buffer
+ */
+
+int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_t len,
+		    void **inject_buffer, size_t *inject_len)
+{
+	int ret;
+
+	/* check buffer length */
+	if (len == 0)
+		return 0;
+
+	/* check injection status */
+	if (!str_inject_enabled(func_id))
 		return 0;
 
 	/* inject string to original buffer */
@@ -682,4 +701,46 @@ int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_
 	}
 
 	return ret;
+}
+
+/*
+ * process string injection for multiple buffer
+ */
+
+int rtr_str_inject_v(enum RTR_STRINJECT_FUNC_ID func_id, const struct iovec *iov, int iovcount,
+		struct iovec **inject_iov, int *inject_iov_idx)
+{
+	int i, inject_idx;
+
+	void *inject_buffer;
+	size_t inject_len;
+
+	struct iovec *v;
+
+	int ret;
+
+	/* select random index from count */
+	inject_idx = random() % iovcount;
+
+	/* perform injection for selected buffer */
+	ret = rtr_str_inject(func_id, iov[inject_idx].iov_base, iov[inject_idx].iov_len,
+			&inject_buffer, &inject_len);
+	if (ret == 0)
+		return 0;
+
+	/* create new iovec structure */
+	v = (struct iovec *) real_malloc(iovcount * sizeof(struct iovec));
+	if (!v)
+		return 0;
+
+	/* set iovec for injection */
+	for (i = 0; i < iovcount; i++) {
+		v[i].iov_base = (i == inject_idx) ? inject_buffer : iov[i].iov_base;
+		v[i].iov_len = (i == inject_idx) ? inject_len : iov[i].iov_len;
+	}
+
+	*inject_iov = v;
+	*inject_iov_idx = inject_idx;
+
+	return 1;
 }

@@ -2,10 +2,13 @@
 #define __RETRACE_COMMON_H__
 
 #include "config.h"
+
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <sys/time.h>
 #include <sys/queue.h>
+#include <sys/uio.h>
 
 #include <dlfcn.h>
 #include <dirent.h>

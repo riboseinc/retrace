@@ -419,6 +419,23 @@ RTR_TEST_START(read)
 	assert_int_equal(ret, sizeof(buf));
 RTR_TEST_END
 
+RTR_TEST_START(readv)
+	int fd;
+	ssize_t ret;
+	char buf[READ_BUF_SIZE];
+
+	struct iovec iov[1];
+
+	fd = open("/dev/urandom", O_RDONLY);
+	assert_non_null(fd);
+
+	iov[0].iov_base = buf;
+	iov[0].iov_len = sizeof(buf);
+
+	ret = rtr_readv(fd, iov, 1);
+	assert_int_equal(ret, sizeof(buf));
+RTR_TEST_END
+
 #define WRITE_BUF_SIZE 256
 RTR_TEST_START(write)
 	int     fd;
@@ -429,6 +446,23 @@ RTR_TEST_START(write)
 	assert_non_null(fd);
 
 	ret = rtr_write(fd, buf, sizeof(buf));
+	assert_int_equal(ret, sizeof(buf));
+RTR_TEST_END
+
+RTR_TEST_START(writev)
+	int fd;
+	ssize_t ret;
+	char buf[WRITE_BUF_SIZE];
+
+	struct iovec iov[1];
+
+	fd = open("/dev/urandom", O_WRONLY);
+	assert_non_null(fd);
+
+	iov[0].iov_base = buf;
+	iov[0].iov_len = sizeof(buf);
+
+	ret = rtr_writev(fd, iov, 1);
 	assert_int_equal(ret, sizeof(buf));
 RTR_TEST_END
 
@@ -1169,9 +1203,13 @@ main(void)
 		cmocka_unit_test(test_rtr_strncmp),  cmocka_unit_test(test_rtr_strstr),
 		cmocka_unit_test(test_rtr_strchr),   cmocka_unit_test(test_rtr_strcasecmp),
 		cmocka_unit_test(test_rtr_strlen),   cmocka_unit_test(test_rtr_ctime),
-		cmocka_unit_test(test_rtr_ctime_r),  cmocka_unit_test(test_rtr_read),
-		cmocka_unit_test(test_rtr_write),
+		cmocka_unit_test(test_rtr_ctime_r),
 
+		/* read/write functions */
+		cmocka_unit_test(test_rtr_read),     cmocka_unit_test(test_rtr_readv),
+		cmocka_unit_test(test_rtr_write),    cmocka_unit_test(test_rtr_writev),
+
+		/* mem functions */
 		cmocka_unit_test(test_rtr_malloc),   cmocka_unit_test(test_rtr_free),
 		cmocka_unit_test(test_rtr_realloc),  cmocka_unit_test(test_rtr_calloc),
 		cmocka_unit_test(test_rtr_memcpy),   cmocka_unit_test(test_rtr_memmove),

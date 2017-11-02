@@ -21,7 +21,9 @@ enum RTR_STRINJECT_FUNC_ID {
 	STRINJECT_FUNC_FWRITE = 0,		/* fwrite() */
 	STRINJECT_FUNC_FREAD,			/* fread() */
 	STRINJECT_FUNC_READ,			/* read() */
+	STRINJECT_FUNC_READV,			/* readv() */
 	STRINJECT_FUNC_WRITE,			/* write() */
+	STRINJECT_FUNC_WRITEV,			/* writev() */
 	STRINJECT_FUNC_SEND,			/* send() */
 	STRINJECT_FUNC_SENDTO,			/* sendto() */
 	STRINJECT_FUNC_SENDMSG,			/* sendmsg() */
@@ -50,6 +52,10 @@ struct rtr_strinject_info {
  * string injection function
  */
 
-int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_t len, void **inject_buffer, size_t *inject_len);
+int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_t len,
+		void **inject_buffer, size_t *inject_len);
+
+int rtr_str_inject_v(enum RTR_STRINJECT_FUNC_ID func_id, const struct iovec *iov, int iovcount,
+		struct iovec **inject_iov, int *inject_iov_idx);
 
 #endif /* __RETRACE_STRINJECT_H__ */
