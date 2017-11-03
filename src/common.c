@@ -250,7 +250,7 @@ retrace_get_thread_file(void)
 			out_file_tmp = real_fopen(new_path, "a");
 		}
 
-	       pthread_setspecific(per_thread_logging, (void *) out_file_tmp);
+		pthread_setspecific(per_thread_logging, (void *) out_file_tmp);
 
 	}
 
@@ -1042,7 +1042,7 @@ retrace_dump_parameter(struct rtr_print_buf *print_buffer, unsigned int type, in
 				if (msg_iov->iov_len > 0) {
 					int iov_len = (res_len - len) < msg_iov->iov_len ? res_len - len : msg_iov->iov_len;
 
-					trace_dump_data(print_buffer, (unsigned char *) iov->iov_base, iov_len);
+					trace_dump_data(print_buffer, (unsigned char *) msg_iov->iov_base, iov_len);
 					len += msg_iov->iov_len;
 				}
 			}
