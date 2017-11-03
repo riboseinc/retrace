@@ -188,8 +188,8 @@ ssize_t RETRACE_IMPLEMENTATION(writev)(int fd, const struct iovec *iov, int iovc
 	retrace_log_and_redirect_after(&event_info);
 
 	if (enable_inject) {
-		free(inject_iov[inject_idx].iov_base);
-		free(inject_iov);
+		real_free(inject_iov[inject_idx].iov_base);
+		real_free(inject_iov);
 	}
 
 	return ret;

@@ -620,7 +620,15 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 					  PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&sockfd, &msg->msg_name, &msg->msg_iovlen, &msg->msg_iov, &ret, &flags};
 
-	int err;
+	int err = 0;
+
+	struct msghdr *inject_msg = NULL;
+
+	struct iovec *inject_iov = NULL;
+	int inject_idx;
+
+	int redirected = 0;
+	int enable_inject = 0;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "sendmsg";
@@ -630,7 +638,6 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &ret;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
-	retrace_log_and_redirect_before(&event_info);
 
 	if (rtr_get_net_fuzzing(NET_FUNC_ID_SENDMSG, &err)) {
 		event_info.extra_info = "[redirected]";
@@ -639,13 +646,54 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 
 		errno = err;
 		ret = -1;
-	} else {
-		ret = real_sendmsg(sockfd, msg, flags);
+	} else if (rtr_str_inject_v(STRINJECT_FUNC_SENDMSG, msg->msg_iov, msg->msg_iovlen,
+				&inject_iov, &inject_idx)) {
+		/* allocate new msghdr */
+		inject_msg = (struct msghdr *) real_malloc(sizeof(struct msghdr));
+		if (inject_msg) {
+			/* copy message */
+			real_memcpy(inject_msg, msg, sizeof(struct msghdr));
+
+			/* set injected msg data */
+			inject_msg->msg_iov = inject_iov;
+
+			/* set injection flag */
+			event_info.extra_info = "[redirected]";
+			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+
+			parameter_values[3] = &inject_iov;
+			enable_inject = 1;
+		}
+	}
+
+	retrace_log_and_redirect_before(&event_info);
+
+	if (!err) {
+		ret = real_sendmsg(sockfd,
+				enable_inject ? inject_msg : msg,
+				flags);
+
 		if (ret < 0)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
 
+	if (redirected) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+	}
+
 	retrace_log_and_redirect_after(&event_info);
+
+	if (enable_inject) {
+		/* free iov data */
+		real_free(inject_iov[inject_idx].iov_base);
+		real_free(inject_iov);
+
+		/* free inject msg */
+		real_free(inject_msg);
+	}
 
 	return ret;
 }
