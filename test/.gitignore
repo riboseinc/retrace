@@ -28,3 +28,4 @@ exec
 popen
 printf
 writev
+readv
