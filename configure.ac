@@ -118,47 +118,6 @@ if test "x$have_atomic_builtins" = "xyes"; then
 fi
 AC_MSG_RESULT([$have_atomic_builtins])
 
-
-openssl=false
-AC_MSG_CHECKING(for OpenSSL)
-AC_ARG_WITH([openssl], AS_HELP_STRING(--with-openssl=PATH, base of OpenSSL installation),
-  [
-   AC_MSG_RESULT([$with_openssl])
-   case $with_openssl in
-   no)
-     AC_MSG_NOTICE([OpenSSL not found, OpenSSL support disabled])
-     ;;
-   yes)
-     AC_CHECK_HEADERS([openssl/ssl.h], [openssl=true], [AC_MSG_NOTICE([OpenSSL not found, OpenSSL support disabled])])
-     ;;
-   *)
-     # determine if library is installed
-     SAVE_CFLAGS=$CFLAGS
-     SAVE_CPPFLAGS=$CPPFLAGS
-     CFLAGS="-I$with_openssl/include $CFLAGS"
-     CPPFLAGS="-I$with_openssl/include $CPPFLAGS"
-     LIBSSL_FLAGS="-I$with_openssl/include"
-     LDFLAGS="-L$with_openssl/lib"
-     AC_CHECK_HEADERS([openssl/ssl.h], [openssl=true], [AC_MSG_NOTICE([OpenSSL not found, OpenSSL support disabled])])
-     AC_SUBST(LIBSSL_FLAGS)
-     CFLAGS=$SAVE_CFLAGS
-     CPPFLAGS=$SAVE_CPPFLAGS
-     ;;
-   esac
-  ],
-  [
-     AC_MSG_RESULT([--with-openssl not specified])
-     AC_CHECK_HEADERS([openssl/ssl.h],[openssl=true], [AC_MSG_NOTICE([OpenSSL not found, OpenSSL support disabled])])
-  ]
-)
-
-AM_CONDITIONAL(OPENSSL, [test "x$openssl" = "xtrue"])
-if test "x$openssl" = "xtrue" ; then
-    AC_DEFINE(USE_OPENSSL, [1], [Define to use OpenSSL])
-else
-    AC_DEFINE(USE_OPENSSL, [0], [Define to use OpenSSL])
-fi
-
 AC_CHECK_DECLS([O_TMPFILE], [], [], [#include <fcntl.h>])
 
 # Check for PTRACE features
@@ -230,6 +189,7 @@ fi
 AC_SUBST([TESTS_CFLAGS])
 
 AX_CHECK_CMOCKA([cmocka=true], )
+AX_CHECK_OPENSSL([], AC_MSG_ERROR([]))
 AM_CONDITIONAL([CMOCKA], [test "x$cmocka" = "xtrue"])
 
 if test "x$cmocka" = "xtrue" ; then
