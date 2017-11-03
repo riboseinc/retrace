@@ -27,3 +27,4 @@ dir
 exec
 popen
 printf
+writev

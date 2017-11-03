@@ -29,4 +29,5 @@ LC_ALL="POSIX" ../retrace ./setlocale
 ../retrace ./char
 ../retrace ./trace
 ../retrace ./log
+../retrace ./writev
 ../retrace -f ../retrace.conf.example ./config
