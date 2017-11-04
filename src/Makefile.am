@@ -39,7 +39,8 @@ noinst_HEADERS= \
 	temp.h \
 	trace.h \
 	write.h \
-	ioctl.h
+	ioctl.h \
+	retrace_cli.h
 
 # include all C files here
 libretrace_la_SOURCES= \
@@ -74,4 +75,6 @@ libretrace_la_SOURCES= \
 	time.c \
 	trace.c \
 	write.c \
-	ioctl.c
+	ioctl.c \
+	retrace_cli.c \
+	retrace_main.c
