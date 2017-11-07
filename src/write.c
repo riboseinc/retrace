@@ -112,3 +112,88 @@ ssize_t RETRACE_IMPLEMENTATION(write)(int fd, const void *buf, size_t nbytes)
 
 RETRACE_REPLACE(write, ssize_t, (int fd, const void *buf, size_t nbytes),
 	(fd, buf, nbytes))
+
+ssize_t RETRACE_IMPLEMENTATION(writev)(int fd, const struct iovec *iov, int iovcnt)
+{
+	ssize_t ret;
+
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+					  PARAMETER_TYPE_IOVEC,
+					  PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &iovcnt, &iov, &ret, NULL};
+	size_t total_nbytes = 0, real_nbytes;
+	int incompleteio = 0;
+	size_t incompleteio_limit = 0;
+
+	int redirected = 0;
+
+	struct iovec *inject_iov = NULL;
+	int inject_idx;
+
+	int enable_inject = 0;
+
+	struct descriptor_info *di;
+	int func_group = RTR_FUNC_GRP_FILE;
+
+	int i;
+
+	/* check if the file descriptor is for socket */
+	di = file_descriptor_get(fd);
+	if (di && di->type == FILE_DESCRIPTOR_TYPE_SOCK)
+		func_group = RTR_FUNC_GRP_NET;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "writev";
+	event_info.function_group = func_group;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+
+	/* get whole buffer length of iov multiple buffers */
+	for (i = 0; i < iovcnt; i++)
+		total_nbytes += iov[i].iov_len;
+
+	if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &incompleteio_limit)) {
+		incompleteio = 1;
+		real_nbytes = rtr_get_fuzzing_random() % total_nbytes;
+		if (real_nbytes <= incompleteio_limit)
+			real_nbytes = incompleteio_limit;
+
+		if (real_nbytes > total_nbytes)
+			real_nbytes = total_nbytes;
+
+		redirected = 1;
+	} else if (rtr_str_inject_v(STRINJECT_FUNC_WRITEV, iov, iovcnt, &inject_iov, &inject_idx)) {
+		redirected = 1;
+		enable_inject = 1;
+
+		parameter_values[2] = &inject_iov;
+	}
+
+	if (redirected) {
+		event_info.extra_info = "[redirected]";
+		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+	}
+
+	retrace_log_and_redirect_before(&event_info);
+
+	ret = real_writev(fd, enable_inject ? inject_iov : iov, iovcnt);
+	if (ret < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+
+	retrace_log_and_redirect_after(&event_info);
+
+	if (enable_inject) {
+		real_free(inject_iov[inject_idx].iov_base);
+		real_free(inject_iov);
+	}
+
+	return ret;
+}
+
+RETRACE_REPLACE(writev, ssize_t, (int fd, const struct iovec *iov, int iovcnt),
+	(fd, iov, iovcnt))

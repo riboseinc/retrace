@@ -29,6 +29,7 @@
 #include "str.h"
 #include "malloc.h"
 #include "file.h"
+#include "printf.h"
 
 #include "strinject.h"
 
@@ -61,7 +62,9 @@ static struct {
 	{STRINJECT_FUNC_FWRITE, "fwrite"},
 	{STRINJECT_FUNC_FREAD, "fread"},
 	{STRINJECT_FUNC_READ, "read"},
+	{STRINJECT_FUNC_READV, "readv"},
 	{STRINJECT_FUNC_WRITE, "write"},
+	{STRINJECT_FUNC_WRITEV, "writev"},
 	{STRINJECT_FUNC_SEND, "send"},
 	{STRINJECT_FUNC_SENDTO, "sendto"},
 	{STRINJECT_FUNC_SENDMSG, "sendmsg"},
@@ -214,7 +217,7 @@ static int parse_inject_param(enum RTR_STRINJECT_TYPE type, const char *param, s
  */
 
 static int inject_single_hex(const char *param, const void *buffer, size_t len,
-		void **inject_buffer, size_t *inject_len)
+		void **inject_buffer, size_t *inject_len, off_t *off)
 {
 	char hex_value;
 	off_t offset;
@@ -235,6 +238,7 @@ static int inject_single_hex(const char *param, const void *buffer, size_t len,
 
 	*inject_buffer = p;
 	*inject_len = len;
+	*off = offset;
 
 	return 1;
 }
@@ -244,7 +248,7 @@ static int inject_single_hex(const char *param, const void *buffer, size_t len,
  */
 
 static int inject_fmt_str(const char *param, const void *buffer, size_t len,
-		void **inject_buffer, size_t *inject_len)
+		void **inject_buffer, size_t *inject_len, off_t *off)
 {
 	char *p, *fmt;
 	int count, i;
@@ -276,6 +280,7 @@ static int inject_fmt_str(const char *param, const void *buffer, size_t len,
 
 	*inject_buffer = p;
 	*inject_len = len + 2 * count;
+	*off = offset;
 
 	return 1;
 }
@@ -285,7 +290,7 @@ static int inject_fmt_str(const char *param, const void *buffer, size_t len,
  */
 
 static int inject_buf_overflow(const char *param, const void *buffer, size_t len,
-		void **inject_buffer, size_t *inject_len)
+		void **inject_buffer, size_t *inject_len, off_t *off)
 {
 	char *p, *ov;
 	int count, i;
@@ -308,6 +313,7 @@ static int inject_buf_overflow(const char *param, const void *buffer, size_t len
 
 	*inject_buffer = p;
 	*inject_len = len + count;
+	*off = offset;
 
 	return 1;
 }
@@ -317,7 +323,7 @@ static int inject_buf_overflow(const char *param, const void *buffer, size_t len
  */
 
 static int inject_file_line(const char *param, const void *buffer, size_t len,
-		void **inject_buffer, size_t *inject_len)
+		void **inject_buffer, size_t *inject_len, off_t *off)
 {
 	char fpath[128];
 
@@ -391,6 +397,7 @@ static int inject_file_line(const char *param, const void *buffer, size_t len,
 
 	*inject_buffer = p;
 	*inject_len = len + buf_len;
+	*off = offset;
 
 	return 1;
 }
@@ -523,7 +530,7 @@ xor_buffer(char *dst, const char *src, size_t srclen, size_t addlen)
 
 static int
 inject(struct rtr_strinject_info *info, const void *buffer, size_t len,
-		void **inject_buffer, size_t *inject_len)
+		void **inject_buffer, size_t *inject_len, off_t *off)
 {
 	long offset, addlen, cutlen, temp[] = {-1, -1, -1};
 	const char *p;
@@ -622,6 +629,7 @@ inject(struct rtr_strinject_info *info, const void *buffer, size_t len,
 	    buffer + offset + cutlen, taillen);
 
 	src_fn(*inject_buffer + offset, srcbuf, srclen, addlen);
+	*off = offset;
 	retval = 1;
 
 done:
@@ -631,15 +639,12 @@ done:
 }
 
 /*
- * process string injection
+ * check if injection is enabled in config
  */
 
-int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_t len,
-		    void **inject_buffer, size_t *inject_len)
+static int str_inject_enabled(enum RTR_STRINJECT_FUNC_ID func_id)
 {
-	int ret;
-
-	if (!get_tracing_enabled() || len == 0)
+	if (!get_tracing_enabled())
 		return 0;
 
 	/* init string injection configuration */
@@ -654,32 +659,183 @@ int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_
 	if (!rtr_get_fuzzing_flag(g_strinject_infos[func_id].rate))
 		return 0;
 
+	return 1;
+}
+
+/*
+ * process string injection for single buffer
+ */
+
+static int str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_t len,
+		    void **inject_buffer, size_t *inject_len, off_t *off)
+{
+	off_t offset;
+	int ret;
+
+	/* check buffer length */
+	if (len == 0)
+		return 0;
+
+	/* check injection status */
+	if (!str_inject_enabled(func_id))
+		return 0;
+
 	/* inject string to original buffer */
 	switch (g_strinject_infos[func_id].type) {
 	case STRINJECT_TYPE_HEX:
 		ret = inject_single_hex(g_strinject_infos[func_id].param, buffer, len,
-			inject_buffer, inject_len);
+			inject_buffer, inject_len, &offset);
 		break;
 
 	case STRINJECT_TYPE_FMT_STR:
 		ret = inject_fmt_str(g_strinject_infos[func_id].param, buffer, len,
-			inject_buffer, inject_len);
+			inject_buffer, inject_len, &offset);
 		break;
 
 	case STRINJECT_TYPE_BUF_OVERFLOW:
 		ret = inject_buf_overflow(g_strinject_infos[func_id].param, buffer, len,
-			inject_buffer, inject_len);
+			inject_buffer, inject_len, &offset);
 		break;
 
 	case STRINJECT_TYPE_FILE_LINE:
 		ret = inject_file_line(g_strinject_infos[func_id].param, buffer, len,
-			inject_buffer, inject_len);
+			inject_buffer, inject_len, &offset);
 		break;
 	case STRINJECT_TYPE_STANDARD:
 		ret = inject(&g_strinject_infos[func_id], buffer, len,
-			inject_buffer, inject_len);
+			inject_buffer, inject_len, &offset);
 		break;
 	}
+
+	if (ret && off)
+		*off = offset;
+
+	return ret;
+}
+
+int rtr_str_inject(enum RTR_STRINJECT_FUNC_ID func_id, const void *buffer, size_t len,
+		    void **inject_buffer, size_t *inject_len)
+{
+	return str_inject(func_id, buffer, len, inject_buffer, inject_len, NULL);
+}
+
+/*
+ * merge iov multiple buffers
+ */
+
+static size_t merge_iov_buffers(const struct iovec *iov, int iovcount, void **mbuf)
+{
+	void *p = NULL;
+	size_t msize = 0;
+
+	int i;
+
+	/* merging iov buffers */
+	for (i = 0; i < iovcount; i++) {
+		p = real_realloc(p, msize + iov[i].iov_len);
+		if (!p)
+			return -1;
+
+		real_memcpy((char *) p + msize, iov[i].iov_base, iov[i].iov_len);
+		msize += iov[i].iov_len;
+	}
+
+	/* set result buffer */
+	*mbuf = p;
+
+	return msize;
+}
+
+/*
+ * unmerge buffer to iov buffers
+ */
+
+static int unmerge_to_iov_buffers(const struct iovec *iov, int iovcount, const void *inject_buffer,
+			size_t inject_len, off_t offset, struct iovec **inject_iov, int *inject_iov_idx)
+{
+	size_t orig_iov_size = 0, inject_iov_start;
+	int i, inject_idx = -1;
+
+	struct iovec *v = NULL;
+	size_t inject_iov_len;
+
+	/* get original iov index from offset */
+	for (i = 0; i < iovcount; i++) {
+		if (inject_idx == -1 && (orig_iov_size + iov[i].iov_len) >= offset) {
+			inject_iov_start = orig_iov_size;
+			inject_idx = i;
+		}
+
+		orig_iov_size += iov[i].iov_len;
+	}
+
+	if (inject_idx == -1)
+		return 0;
+
+	/* get buffer len of injected iov buffer */
+	inject_iov_len = iov[inject_idx].iov_len + inject_len - orig_iov_size;
+
+	/* create new iovec structure */
+	v = (struct iovec *) real_malloc(iovcount * sizeof(struct iovec));
+	if (!v)
+		return 0;
+
+	/* set iovec for injection */
+	for (i = 0; i < iovcount; i++) {
+		if (i != inject_idx) {
+			v[i].iov_base = iov[i].iov_base;
+			v[i].iov_len = iov[i].iov_len;
+
+			continue;
+		}
+
+		v[i].iov_base = real_malloc(inject_iov_len);
+		if (!v[i].iov_base)
+			return 0;
+
+		real_memcpy(v[i].iov_base, inject_buffer + inject_iov_start, inject_iov_len);
+		v[i].iov_len = inject_iov_len;
+	}
+
+	*inject_iov = v;
+	*inject_iov_idx = inject_idx;
+
+	return 1;
+}
+
+/*
+ * process string injection for multiple buffer
+ */
+
+int rtr_str_inject_v(enum RTR_STRINJECT_FUNC_ID func_id, const struct iovec *iov, int iovcount,
+		struct iovec **inject_iov, int *inject_iov_idx)
+{
+	int i, inject_idx;
+
+	void *inject_buffer;
+	size_t inject_len;
+	off_t offset;
+
+	void *mbuf;
+	size_t msize;
+
+	struct iovec *v;
+
+	int ret;
+
+	/* merge iov buffers */
+	msize = merge_iov_buffers(iov, iovcount, &mbuf);
+	if (msize < 0)
+		return 0;
+
+	/* perform injection for selected buffer */
+	ret = str_inject(func_id, mbuf, msize, &inject_buffer, &inject_len, &offset);
+	if (ret == 0)
+		return 0;
+
+	/* unmerge buffer to iov */
+	ret = unmerge_to_iov_buffers(iov, iovcount, inject_buffer,
+					inject_len, offset, inject_iov, inject_iov_idx);
 
 	return ret;
 }

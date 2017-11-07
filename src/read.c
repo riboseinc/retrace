@@ -101,3 +101,48 @@ ssize_t RETRACE_IMPLEMENTATION(read)(int fd, void *buf, size_t nbytes)
 
 RETRACE_REPLACE(read, ssize_t, (int fd, void *buf, size_t nbytes),
 	(fd, buf, nbytes))
+
+ssize_t RETRACE_IMPLEMENTATION(readv)(int fd, const struct iovec *iov, int iovcnt)
+{
+	size_t total_nbytes = 0, real_nbytes;
+	ssize_t ret = 0;
+	int incompleteio = 0;
+	size_t incompleteio_limit = 0;
+
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+					PARAMETER_TYPE_IOVEC,
+					PARAMETER_TYPE_INT,
+					PARAMETER_TYPE_END};
+
+	void const *parameter_values[] = {&fd, &iovcnt, &iov, &ret, NULL};
+
+	struct descriptor_info *di;
+	int func_group = RTR_FUNC_GRP_FILE;
+
+	/* check if the file descriptor is for socket */
+	di = file_descriptor_get(fd);
+	if (di && di->type == FILE_DESCRIPTOR_TYPE_SOCK)
+		func_group = RTR_FUNC_GRP_NET;
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "readv";
+	event_info.function_group = func_group;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_INT;
+	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+	retrace_log_and_redirect_before(&event_info);
+
+	ret = real_readv(fd, iov, iovcnt);
+	if (ret < 0)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return ret;
+}
+
+RETRACE_REPLACE(readv, ssize_t, (int fd, const struct iovec *iov, int iovcnt),
+	(fd, iov, iovcnt))

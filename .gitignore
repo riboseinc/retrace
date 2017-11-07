@@ -13,6 +13,7 @@ test/recvmsg
 test/setlocale
 test/strinject
 temp
+examples/dns-fuzz/forward
 
 core
 tools/stringinjector
