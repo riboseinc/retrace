@@ -23,6 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* axfr.c zone transfer utility
+ * no output, returns 0 or 1
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -34,8 +38,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define QTYPE_AXFR					0xfc
-#define QCLASS_AXFR					0x01
+#define QTYPE_AXFR	0xfc
+#define QCLASS_AXFR	0x01
 
 /* axfr query header */
 struct axfr_query {
@@ -208,8 +212,8 @@ int main(int argc, char *argv[])
 
 	/* send length of query */
 	len = htons(query_len);
-	if (sendto(sock, (void *) &len, 2, 0, NULL, 0) < 0) {
-		fprintf(stderr, "sendto() failed(err:%d)\n", errno);
+	if (write(sock, (void *) &len, 2) == -1) {
+		fprintf(stderr, "write() failed(err:%d)\n", errno);
 		close(sock);
 
 		return -1;
@@ -224,10 +228,12 @@ int main(int argc, char *argv[])
 	}
 
 	/* receive response from DNS server */
-	if (recvfrom(sock, resp, sizeof(resp), 0, NULL, 0) < 0)
+	if (recvfrom(sock, resp, sizeof(resp), 0, NULL, 0) < 0) {
 		fprintf(stderr, "recvfrom() failed(err:%d)\n", errno);
-	else
-		fprintf(stderr, "recvfrom() success(err:%d)\n", errno);
+		close(sock);
+
+		return -1;
+	}
 
 	/* close socket */
 	close(sock);

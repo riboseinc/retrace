@@ -180,7 +180,7 @@
 
 rm -rf /tmp/nslookup.conf*
 
-readonly query="examples/dns-fuzzing/query"
+readonly query="examples/dns-fuzz/query"
 readonly gtimeout="/usr/local/bin/gtimeout"
 readonly timeoutvar="1"
 
