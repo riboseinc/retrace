@@ -537,7 +537,7 @@ ssize_t RETRACE_IMPLEMENTATION(sendto)(int sockfd, const void *buf, size_t len, 
 					  PARAMETER_TYPE_MEMORY_BUFFER,
 					  PARAMETER_TYPE_INT,
 					  PARAMETER_TYPE_INT,
-					  PARAMETER_TYPE_POINTER,
+					  PARAMETER_TYPE_STRUCT_SOCKADDR,
 					  PARAMETER_TYPE_INT,
 					  PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&sockfd, &len, &buf, &len, &flags, &dest_addr, &addrlen};
