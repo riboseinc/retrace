@@ -13,8 +13,7 @@ test/recvmsg
 test/setlocale
 test/strinject
 temp
-examples/dns-fuzz/forward
-
+examples/dns-fuzz/axfr
 core
 tools/stringinjector
 # editors

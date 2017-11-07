@@ -185,11 +185,7 @@ static int parse_inject_param(enum RTR_STRINJECT_TYPE type, const char *param, s
 		if (fmt_count <= 0)
 			return -1;
 
-		if (fmt_count > (len - *offset) / 2)
-			fmt_count = (len - *offset) / 2;
-
 		*((int *) val) = fmt_count;
-
 		break;
 
 	case STRINJECT_TYPE_BUF_OVERFLOW:
@@ -198,7 +194,6 @@ static int parse_inject_param(enum RTR_STRINJECT_TYPE type, const char *param, s
 			return -1;
 
 		*((int *) val) = overflow_buf_len;
-
 		break;
 
 	case STRINJECT_TYPE_FILE_LINE:
@@ -256,7 +251,7 @@ static int inject_fmt_str(const char *param, const void *buffer, size_t len,
 	off_t offset;
 
 	/* parse injection parameter */
-	if (parse_inject_param(STRINJECT_TYPE_FMT_STR, param, len, (void *) &count, &offset) != 0 &&
+	if (parse_inject_param(STRINJECT_TYPE_FMT_STR, param, len, (void *) &count, &offset) != 0 ||
 		count == 0)
 		return 0;
 
@@ -298,7 +293,7 @@ static int inject_buf_overflow(const char *param, const void *buffer, size_t len
 	off_t offset;
 
 	/* parse injection parameter */
-	if (parse_inject_param(STRINJECT_TYPE_BUF_OVERFLOW, param, len, (void *) &count, &offset) != 0 &&
+	if (parse_inject_param(STRINJECT_TYPE_BUF_OVERFLOW, param, len, (void *) &count, &offset) != 0 ||
 		count == 0)
 		return 0;
 
