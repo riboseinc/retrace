@@ -774,32 +774,20 @@ ssize_t RETRACE_IMPLEMENTATION(recvfrom)(int sockfd, void *buf, size_t len, int 
 {
 	ssize_t recv_len = 0;
 	struct rtr_event_info event_info;
-	unsigned int parameter_types_full[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
+	unsigned int parameter_types[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
 						PARAMETER_TYPE_MEMORY_BUFFER,
 						PARAMETER_TYPE_INT,
 						PARAMETER_TYPE_INT,
 						PARAMETER_TYPE_STRUCT_SOCKADDR,
 						PARAMETER_TYPE_END};
-	void const *parameter_values_full[] = {&sockfd, &recv_len, &buf, &len, &flags, &src_addr};
-
-	unsigned int parameter_types_short[] = {PARAMETER_TYPE_FILE_DESCRIPTOR,
-						PARAMETER_TYPE_MEMORY_BUFFER,
-						PARAMETER_TYPE_INT,
-						PARAMETER_TYPE_INT,
-						PARAMETER_TYPE_END};
-	void const *parameter_values_short[] = {&sockfd, &recv_len, &buf, &len, &flags};
-
+	void const *parameter_values[] = {&sockfd, &recv_len, &buf, &len, &flags, &src_addr};
 	int err;
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "recvfrom";
-	if (src_addr) {
-		event_info.parameter_types = parameter_types_full;
-		event_info.parameter_values = (void **) parameter_values_full;
-	} else {
-		event_info.parameter_types = parameter_types_short;
-		event_info.parameter_values = (void **) parameter_values_short;
-	}
+	event_info.function_group = RTR_FUNC_GRP_NET;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
 	event_info.return_value = &recv_len;
 	event_info.logging_level = RTR_LOG_LEVEL_NOR;
