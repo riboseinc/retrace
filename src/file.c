@@ -1161,7 +1161,7 @@ int RETRACE_IMPLEMENTATION(fgetpos)(FILE *stream, fpos_t *pos)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fgetpos";
-	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
@@ -1190,7 +1190,7 @@ int RETRACE_IMPLEMENTATION(fsetpos)(FILE *stream, const fpos_t *pos)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "fsetpos";
-	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
@@ -1218,7 +1218,7 @@ long RETRACE_IMPLEMENTATION(ftell)(FILE *stream)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "ftell";
-	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
@@ -1246,7 +1246,7 @@ void RETRACE_IMPLEMENTATION(rewind)(FILE *stream)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "rewind";
-	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_END;
@@ -1270,7 +1270,7 @@ int RETRACE_IMPLEMENTATION(feof)(FILE *stream)
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "feof";
-	event_info.function_group = RTR_FUNC_GRP_PROC;
+	event_info.function_group = RTR_FUNC_GRP_FILE;
 	event_info.parameter_types = parameter_types;
 	event_info.parameter_values = parameter_values;
 	event_info.return_value_type = PARAMETER_TYPE_INT;
