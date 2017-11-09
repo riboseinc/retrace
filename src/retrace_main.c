@@ -31,13 +31,13 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "retrace_cli.h"
 #include <pthread.h>
+
+#include "retrace_cli.h"
 
 #define RETRACE_VER "0.2"
 #define RETRACE_ENV_CLI_ENA "RETRACE_CLI"
 #define RETRACE_INFO_DELAY 3
-
 
 #define retrace_init_info(fmt, ...) printf("RETRACE-INIT [INFO]: " fmt, ## __VA_ARGS__)
 #define retrace_init_err(fmt, ...) printf("RETRACE-INIT [ERROR]: " fmt, ## __VA_ARGS__)
@@ -47,13 +47,11 @@
  *  @brief Initializes retrace upon loading into process address space
  */
 
-static void cmd_func_hello(void)
-{
+static void cmd_func_hello(void) {
 	cli_printf("Hello\r\n");
 }
 
-static void cmd_func_exit(void)
-{
+static void cmd_func_exit(void) {
 	exit(1);
 }
 
@@ -64,23 +62,20 @@ static cli_cmd_t cmd_blk[] = {
 };
 
 /* this function is run by the second thread */
-static void *cli_thread(void *x_void_ptr)
-{
+static void *cli_thread(void *x_void_ptr) {
 	cli_run();
 	return NULL;
 }
 
 __attribute__((constructor))
-static void retrace_main()
-{
+static void retrace_main(void) {
 	char *cli_env;
 	char pts_path[PATH_MAX];
 	int i;
 	pthread_t cli_t;
 
 	cli_env = getenv(RETRACE_ENV_CLI_ENA);
-	if ((cli_env != NULL) && (atoi(cli_env) == 1))
-	{
+	if ((cli_env != NULL) && (atoi(cli_env) == 1)) {
 		/* output only if not in silent mode */
 		retrace_init_info("version: %s\n", RETRACE_VER);
 
@@ -106,6 +101,7 @@ static void retrace_main()
 
 		for (i = RETRACE_INFO_DELAY; i; i--) {
 			retrace_init_info("continuing in %u sec...\n", i);
+
 			sleep(1);
 		}
 	}

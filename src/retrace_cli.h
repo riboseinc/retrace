@@ -35,8 +35,7 @@
  *
  * @see cli_register_command_blk
  */
-typedef struct
-{
+typedef struct {
 	/* name of command, as it will appear on cli */
 	char name[CLI_MAX_CMD_NAME_LEN];
 
