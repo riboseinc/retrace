@@ -224,7 +224,7 @@ void cli_run(void)
 		/*
 		 * print command menu
 		 * menu contents can be modified by cli_register_command_blk()
-		 * */
+		 */
 		pthread_mutex_lock(&data_mutex);
 
 		i = 0;

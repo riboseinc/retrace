@@ -47,11 +47,13 @@
  *  @brief Initializes retrace upon loading into process address space
  */
 
-static void cmd_func_hello(void) {
+static void cmd_func_hello(void)
+{
 	cli_printf("Hello\r\n");
 }
 
-static void cmd_func_exit(void) {
+static void cmd_func_exit(void)
+{
 	exit(1);
 }
 
@@ -62,13 +64,15 @@ static cli_cmd_t cmd_blk[] = {
 };
 
 /* this function is run by the second thread */
-static void *cli_thread(void *x_void_ptr) {
+static void *cli_thread(void *x_void_ptr)
+{
 	cli_run();
 	return NULL;
 }
 
 __attribute__((constructor))
-static void retrace_main(void) {
+static void retrace_main(void)
+{
 	char *cli_env;
 	char pts_path[PATH_MAX];
 	int i;
