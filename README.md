@@ -229,6 +229,52 @@ $ retrace [-f configuration file location] <executable>
 Configuration file path can be set either in `RETRACE_CONFIG`
 environment variable or by specifying `-f [path]` command line argument.
 
+# Interactive user interface
+
+Interactive control over retrace can be exercised using cli control feature
+over pseudo terminal (currently available on Linux platforms only).
+In order to enable the feature, export `RETRACE_CLI=1` environment variable.
+When enabled, the name of the pseudo device will be printed with a 3 seconds delay during the start up:
+
+``` console
+RETRACE-INIT [INFO]: cli pts is at: /dev/pts/1
+```
+
+After that, a terminal emulator can be connected to that device:
+
+``` console
+minicom -p /dev/pts/1
+```
+
+Hit the main Enter key, and the command menu with prompt will appear:
+
+``` console
+Welcome to minicom 2.7.1
+
+OPTIONS: I18n 
+Compiled on Aug 13 2017, 15:25:34.
+Port /dev/tty8, 13:10:04
+
+Press CTRL-A Z for help on special keys
+
+
+Failed to get command id, retry
+Retrace command menu
+--------------------
+[0] Say Hi
+[1] Terminate process
+Enter command id>> 
+```
+
+The following are the characteristics of the terminal:
+* Raw mode - no line processing will be performed on the input.
+* Characters are echoed back.
+* Main enter key is used to mark the end of input.
+
+## Note to developers
+In order to expose interactive commands from your module, use API defined in retrace_cli.h.
+To register commads use cli_register_command_blk(). To interact with the user use cli_printf() and cli_scanf().
+Refer to retrace_main.c for reference.
 
 # Examples
 
