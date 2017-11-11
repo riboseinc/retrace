@@ -34,6 +34,7 @@
 #include <pthread.h>
 
 #include "retrace_cli.h"
+#include "common.h"
 
 #define RETRACE_VER "0.2"
 #define RETRACE_ENV_CLI_ENA "RETRACE_CLI"
@@ -63,10 +64,16 @@ static cli_cmd_t cmd_blk[] = {
 		{"", NULL}
 };
 
-/* this function is run by the second thread */
-static void *cli_thread(void *x_void_ptr)
+static void *cli_thread(void *param)
 {
+	int old_trace_state;
+
+	old_trace_state = trace_disable();
+
 	cli_run();
+
+	trace_restore(old_trace_state);
+
 	return NULL;
 }
 
@@ -77,6 +84,10 @@ static void retrace_main(void)
 	char pts_path[PATH_MAX];
 	int i;
 	pthread_t cli_t;
+	int old_trace_state;
+
+	/* disable tracing during the init */
+	old_trace_state = trace_disable();
 
 	cli_env = getenv(RETRACE_ENV_CLI_ENA);
 	if ((cli_env != NULL) && (atoi(cli_env) == 1)) {
@@ -86,7 +97,7 @@ static void retrace_main(void)
 		/* init cli */
 		if (cli_init(pts_path, PATH_MAX)) {
 			retrace_init_err("failed to init cli!\n");
-			return;
+			goto Done;
 		}
 
 		retrace_init_info("cli pts is at: %s\n", pts_path);
@@ -94,13 +105,13 @@ static void retrace_main(void)
 		/* register commands */
 		if (cli_register_command_blk(cmd_blk)) {
 			retrace_init_err("failed to register commands!\n");
-			return;
+			goto Done;
 		}
 
 		/* create cli thread */
 		if (pthread_create(&cli_t, NULL, cli_thread, NULL)) {
 			retrace_init_err("failed to create cli thread!\n");
-			return;
+			goto Done;
 		}
 
 		for (i = RETRACE_INFO_DELAY; i; i--) {
@@ -109,6 +120,9 @@ static void retrace_main(void)
 			sleep(1);
 		}
 	}
+
+Done:
+	trace_restore(old_trace_state);
 }
 
 #endif /* __linux__ */
