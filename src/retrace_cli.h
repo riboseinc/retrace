@@ -26,7 +26,7 @@
 #ifndef SRC_RETRACE_CLI_H_
 #define SRC_RETRACE_CLI_H_
 
-#define CLI_MAX_CMD_NAME_LEN 20
+#define CLI_MAX_CMD_NAME_LEN 32
 
 //#define cli_err(fmt, ...) cli_printf("[ERROR] %s:%u" #fmt, __FILE__, __LINE__, __VA_ARGS__)
 
@@ -65,6 +65,7 @@ int cli_init(char *pts_path, size_t path_len);
  *
  * Implements command dispatching loop. Never returns.
  * Not threadsafe - only one instance is intended to be run.
+ * Tracing is disabled when invoking commands.
  *
  */
 void cli_run(void);
@@ -77,6 +78,7 @@ void cli_run(void);
  * User selects a command by entering its ID.
  * Tested with minicom.
  * Not threadsafe.
+ * Tracing is disabled when invoking commands.
  *
  * @param[in] cmd_blk Array of command blocks,
  * end of block must be marked by empty entry.

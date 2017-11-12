@@ -34,23 +34,20 @@
 #include <pthread.h>
 
 #include "retrace_cli.h"
+#include "retrace_env.h"
+#include "retrace_main.h"
 #include "common.h"
 
 #define RETRACE_VER "0.2"
-#define RETRACE_ENV_CLI_ENA "RETRACE_CLI"
 #define RETRACE_INFO_DELAY 3
 
 #define retrace_init_info(fmt, ...) printf("RETRACE-INIT [INFO]: " fmt, ## __VA_ARGS__)
 #define retrace_init_err(fmt, ...) printf("RETRACE-INIT [ERROR]: " fmt, ## __VA_ARGS__)
 #define retrace_init_dbg(fmt, ...) printf("RETRACE-INIT [DBG]: " fmt, ## __VA_ARGS__)
 
-/**
- *  @brief Initializes retrace upon loading into process address space
- */
-
 static void cmd_func_hello(void)
 {
-	cli_printf("Hello\r\n");
+	cli_printf("Hi\r\n");
 }
 
 static void cmd_func_exit(void)
@@ -59,8 +56,8 @@ static void cmd_func_exit(void)
 }
 
 static cli_cmd_t cmd_blk[] = {
-		{"Say Hi", cmd_func_hello},
-		{"Terminate process", cmd_func_exit},
+		{"<Main> Say Hi", cmd_func_hello},
+		{"<Main> Terminate process", cmd_func_exit},
 		{"", NULL}
 };
 
@@ -77,7 +74,10 @@ static void *cli_thread(void *param)
 	return NULL;
 }
 
-__attribute__((constructor))
+/**
+ *  @brief Initializes retrace upon loading into process address space
+ */
+__attribute__((constructor(RETRACE_MAIN_PRIORITY)))
 static void retrace_main(void)
 {
 	char *cli_env;

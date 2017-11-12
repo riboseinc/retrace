@@ -23,13 +23,36 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdio.h>
+
 #include "common.h"
 #include "str.h"
 #include "netdb.h"
 #include "printf.h"
 #include "netfuzz.h"
+#include "retrace_cli.h"
+#include "retrace_env.h"
+#include "retrace_main.h"
+
+#define retrace_netfuzz_info(fmt, ...) printf("RETRACE-NETFUZZ [INFO]: " fmt, ## __VA_ARGS__)
+#define retrace_netfuzz_err(fmt, ...) printf("RETRACE-NETFUZZ [ERROR]: " fmt, ## __VA_ARGS__)
+#define retrace_netfuzz_dbg(fmt, ...) printf("RETRACE-NETFUZZ [DBG]: " fmt, ## __VA_ARGS__)
 
 static rtr_netfuzz_config_t g_netfuzz_config;
+static rtr_netfuzz_stats_t g_netfuzz_stats;
+
+static char *rtr_fuzz_type_str[] = {
+		"NOMEM",
+		"LIMIT",
+		"INUSE",
+		"UNREACH",
+		"TIMEOUT",
+		"RESET",
+		"REFUSE",
+		"HOST_NOT_FOUND",
+		"TRY_AGAIN",
+		""
+};
 
 /* fuzzing functions for network */
 struct {
@@ -71,6 +94,53 @@ struct {
 	{NET_FUZZ_TYPE_HOST_NOT_FOUND, "HOST_NOT_FOUND", HOST_NOT_FOUND},
 	{NET_FUZZ_TYPE_TRY_AGAIN, "SERVICE_NOT_AVAIL", TRY_AGAIN},
 	{NET_FUZZ_TYPE_END, NULL, 0}
+};
+
+static void print_stats(void)
+{
+	unsigned int i;
+
+	cli_printf("netfuzz stats\r\n");
+	cli_printf("-------------\r\n");
+
+	i = 0;
+	while (rtr_net_funcs[i].id != NET_FUNC_ID_MAX) {
+		cli_printf("%s\r\n", rtr_net_funcs[i].name);
+		cli_printf("\terror_fuzz: %u\r\n", g_netfuzz_stats.error_fuzz[i]);
+		i++;
+	}
+}
+
+static void print_config(void)
+{
+	unsigned int i, j;
+
+	cli_printf("netfuzz config\r\n");
+	cli_printf("-------------\r\n");
+	cli_printf("init_flag: %d\r\n", g_netfuzz_config.init_flag);
+
+	for (i = 0; i != NET_FUNC_ID_MAX; i++) {
+
+		cli_printf("%s:\r\n", rtr_net_funcs[i].name);
+
+		cli_printf("\ttypes: ");
+		j = 0;
+		while (strlen(rtr_fuzz_type_str[j])) {
+			if (g_netfuzz_config.fuzz_types[i] & (1 << j))
+				cli_printf("%s ", rtr_fuzz_type_str[j]);
+
+			j++;
+		}
+		cli_printf("\r\n\tfuzze_error: %d\r\n", g_netfuzz_config.fuzz_err[i]);
+
+		cli_printf("\tfuzz_rates: %.2f\r\n", g_netfuzz_config.fuzz_rates[i]);
+	}
+}
+
+static cli_cmd_t cmd_blk[] = {
+		{"<Netfuzz> Print stats", print_stats},
+		{"<Netfuzz> Print config", print_config},
+		{"", NULL}
 };
 
 /* initialize network fuzzing configuration */
@@ -138,7 +208,36 @@ int rtr_get_net_fuzzing(enum RTR_NET_FUNC_ID func_id, int *err_val)
 
 		/* get error code for fuzzing type */
 		*err_val = g_netfuzz_config.fuzz_err[func_id];
+
+		/* update statistics */
+		g_netfuzz_stats.error_fuzz[func_id]++;
 	}
 
 	return matched;
 }
+
+#ifdef __linux__
+__attribute__((constructor(RETRACE_MAIN_PRIORITY_USER)))
+static void netfuzz_main(void)
+{
+	char *cli_env;
+	int old_trace_state;
+
+	/* disable tracing during the init */
+	old_trace_state = trace_disable();
+
+	/* TODO: Create a JSON based configuration module */
+	cli_env = getenv(RETRACE_ENV_CLI_ENA);
+	if ((cli_env != NULL) && (atoi(cli_env) == 1)) {
+
+		/* register commands */
+		if (cli_register_command_blk(cmd_blk))
+			retrace_netfuzz_err("failed to register commands!\n");
+	}
+
+	trace_restore(old_trace_state);
+
+	/* init config */
+	init_netfuzz_config();
+}
+#endif

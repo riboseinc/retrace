@@ -261,8 +261,8 @@ Press CTRL-A Z for help on special keys
 Failed to get command id, retry
 Retrace command menu
 --------------------
-[0] Say Hi
-[1] Terminate process
+[0] <Main> Say Hi
+[1] <Main> Terminate process
 Enter command id>> 
 ```
 
