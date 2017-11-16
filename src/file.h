@@ -2,6 +2,7 @@
 #define __RETRACE_FILE_H__
 
 typedef FILE *(*rtr_fopen_t)(const char *filename, const char *mode);
+typedef FILE *(*rtr_fdopen_t)(int fd, const char *mode);
 typedef int (*rtr_fclose_t)(FILE *stream);
 typedef int (*rtr_fseek_t)(FILE *stream, long offset, int whence);
 typedef int (*rtr_fileno_t)(FILE *stream);
@@ -31,6 +32,7 @@ typedef int (*rtr_feof_t)(FILE *stream);
 
 
 RETRACE_DECL(fopen);
+RETRACE_DECL(fdopen);
 RETRACE_DECL(fclose);
 RETRACE_DECL(fseek);
 RETRACE_DECL(fileno);
