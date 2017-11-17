@@ -235,5 +235,12 @@ else
     AC_DEFINE(BACKTRACE, [0], [Define to enable backtrace])
 fi
 
-AC_CONFIG_FILES([Makefile src/Makefile test/Makefile rpc/Makefile tools/Makefile tools/stringinjector/Makefile])
+AC_CONFIG_FILES([Makefile
+                 src/Makefile
+                 test/Makefile
+                 rpc/Makefile
+                 tools/Makefile
+                 tools/stringinjector/Makefile
+                 tools/spawn/Makefile
+                 ])
 AC_OUTPUT

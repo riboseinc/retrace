@@ -16,6 +16,7 @@ temp
 examples/dns-fuzz/axfr
 core
 tools/stringinjector
+tools/spawn/spawn
 # editors
 *.swp
 *~

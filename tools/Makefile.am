@@ -1,2 +1,2 @@
 
-SUBDIRS = stringinjector
+SUBDIRS = stringinjector spawn
