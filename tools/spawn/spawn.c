@@ -28,7 +28,9 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -213,6 +215,8 @@ static int fork_cmd(struct fork_info *fi)
 	char *tok, **args = NULL;
 	int tok_count = 0;
 
+	int fd_null;
+
 	int ret = 1;
 
 	/* lock mutex */
@@ -232,7 +236,7 @@ static int fork_cmd(struct fork_info *fi)
 	pthread_mutex_unlock(&g_opt.mt);
 
 	if (!cmd) {
-		fprintf(stderr, "No left command to be executed.\n");
+		fprintf(stderr, "No left command to be executed at thread[#%d].\n", fi->index);
 		return 0;
 	}
 
@@ -243,8 +247,12 @@ static int fork_cmd(struct fork_info *fi)
 	while (tok) {
 		/* allocate args */
 		args = realloc(args, (tok_count + 2) * sizeof(char *));
-		if (!args)
-			break;
+		if (!args) {
+			fprintf(stderr, "Out of memory.\n");
+			free(cmd);
+
+			return -1;
+		}
 
 		/* set args */
 		args[tok_count] = tok;
@@ -254,11 +262,19 @@ static int fork_cmd(struct fork_info *fi)
 	}
 	args[tok_count] = NULL;
 
+	/* open /dev/null for redirecting output */
+	fd_null = open("/dev/null", O_WRONLY);
+
 	/* fork new process */
 	pid = fork();
-	if (pid == 0)
+	if (pid == 0) {
+		if (fd_null > 0) {
+			dup2(fd_null, STDOUT_FILENO);
+			dup2(fd_null, STDERR_FILENO);
+		}
+
 		exit(execvp(args[0], args));
-	else if (pid < 0) {
+	} else if (pid < 0) {
 		fprintf(stderr, "Couldn't fork new process to execute command '%s'\n", fi->cmd);
 		ret = -1;
 	}
