@@ -78,6 +78,7 @@
 #include "dir.h"
 #include "ssl.h"
 #include "rtr-time.h"
+#include "retrace_env.h"
 
 /*
  * Global setting, we set this to disable all our
@@ -1578,7 +1579,7 @@ get_config_file()
 	olderrno = errno;
 
 	/* If we have a RETRACE_CONFIG env var, try to open the config file from there. */
-	file_path = real_getenv("RETRACE_CONFIG");
+	file_path = real_getenv(RETRACE_ENV_CONFIG_FILE);
 
 	if (file_path)
 		config_file = real_fopen(file_path, "r");

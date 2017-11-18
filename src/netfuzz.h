@@ -45,6 +45,11 @@ typedef struct _rtr_netfuzz_config {
 	double fuzz_rates[NET_FUNC_ID_MAX];
 } rtr_netfuzz_config_t;
 
+/* fuzzing statistics */
+typedef struct _rtr_netfuzz_stats {
+	unsigned int error_fuzz[NET_FUNC_ID_MAX];
+} rtr_netfuzz_stats_t;
+
 int rtr_get_net_fuzzing(enum RTR_NET_FUNC_ID func_id, int *err_val);
 
 #endif /* __RTR_NETFUZZ_H__ */
