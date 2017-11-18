@@ -216,7 +216,6 @@ static int fork_cmd(struct fork_info *fi)
 	int tok_count = 0;
 
 	int fd_null;
-
 	int ret = 1;
 
 	/* lock mutex */
@@ -271,6 +270,8 @@ static int fork_cmd(struct fork_info *fi)
 		if (fd_null > 0) {
 			dup2(fd_null, STDOUT_FILENO);
 			dup2(fd_null, STDERR_FILENO);
+
+			close(fd_null);
 		}
 
 		exit(execvp(args[0], args));
