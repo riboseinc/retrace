@@ -34,7 +34,6 @@
 #include <signal.h>
 #include <unistd.h>
 
-#define SPAWN_PROG_NAME                "spawn"
 #define MAX_TIMEOUT                    60          /* 60 seconds */
 
 /*
@@ -72,21 +71,91 @@ static struct spawn_opt g_opt;
  * show usage
  */
 
-static void usage(void)
+static void usage(const char *prog_name)
 {
 	fprintf(stderr, "Usage: %s <timeout in seconds> <number of forks> <command file>\n",
-						SPAWN_PROG_NAME);
+						prog_name);
 	exit(-1);
 }
 
 /*
- * init options
+ * parse options
  */
 
-static void init_options(void)
+static int parse_options(const char *timeout, const char *num_of_forks, const char *cmd_file)
 {
+	FILE *cmd_fp;
+
+	/* init options */
 	memset(&g_opt, 0, sizeof(g_opt));
+
+	/* get timeout */
+	g_opt.timeout = (int)strtoul(timeout, NULL, 10);
+	if (g_opt.timeout < 0 || g_opt.timeout > 60) {
+		fprintf(stderr, "Invalid timeout value '%d'. Please specify a value in [0 ~ 60] seconds.\n",
+				g_opt.timeout);
+		return -1;
+	}
+
+	/* get command list from file */
+	cmd_fp = fopen(cmd_file, "r");
+	if (!cmd_fp) {
+		fprintf(stderr, "Could not open command file '%s' for reading\n", cmd_file);
+		exit(1);
+	}
+
+	while (!feof(cmd_fp)) {
+		char *line = NULL;
+		size_t len = 0, ret;
+
+		/* get command line */
+		ret = getline(&line, &len, cmd_fp);
+		if (ret < 0) {
+			if (line)
+				free(line);
+			break;
+		}
+
+		/* chop endline */
+		if (line[strlen(line) - 1] == '\n')
+			line[strlen(line) - 1] = '\0';
+
+		/* check the length of line and comment */
+		if (strlen(line) == 0 || line[0] == '#') {
+			free(line);
+			continue;
+		}
+
+		/* add new command to list */
+		g_opt.cmd_list = (struct spawn_cmd *) realloc(g_opt.cmd_list,
+								(g_opt.num_of_cmds + 1) * sizeof(struct spawn_cmd));
+		if (!g_opt.cmd_list) {
+			fprintf(stderr, "Out of memory!\n");
+			free(line);
+			break;
+		}
+
+		memset(&g_opt.cmd_list[g_opt.num_of_cmds], 0, sizeof(struct spawn_cmd));
+		g_opt.cmd_list[g_opt.num_of_cmds++].cmd = line;
+	}
+
+	fclose(cmd_fp);
+
+	/* check count of commands */
+	if (g_opt.num_of_cmds == 0) {
+		fprintf(stderr, "Invalid command file '%s'\n", cmd_file);
+		exit(1);
+	}
+
+	/* get forks count */
+	g_opt.num_of_forks = strtoul(num_of_forks, NULL, 10);
+	if (g_opt.num_of_forks > g_opt.num_of_cmds)
+		g_opt.num_of_forks = g_opt.num_of_cmds;
+
+	/* init mutex */
 	pthread_mutex_init(&g_opt.mt, NULL);
+
+	return 0;
 }
 
 /*
@@ -122,86 +191,6 @@ static void finalize_options(void)
 }
 
 /*
- * parse options
- */
-
-static int parse_options(const char *timeout, const char *num_of_forks, const char *cmd_file)
-{
-	FILE *cmd_fp;
-
-	/* get timeout */
-	g_opt.timeout = (int)strtoul(timeout, NULL, 10);
-	if (g_opt.timeout < 0 || g_opt.timeout > 60) {
-		fprintf(stderr, "Invalid timeout value '%d'. Please specify a value in [0 ~ 60] seconds.\n",
-				g_opt.timeout);
-		return -1;
-	}
-
-	/* get command list from file */
-	cmd_fp = fopen(cmd_file, "r");
-	if (!cmd_fp) {
-		fprintf(stderr, "Could not open command file '%s' for reading\n", cmd_file);
-		exit(1);
-	}
-
-	while (!feof(cmd_fp)) {
-		char *line = NULL;
-		size_t len = 0, ret;
-
-		/* get command line */
-		ret = getline(&line, &len, cmd_fp);
-		if (ret < 0) {
-			if (line)
-				free(line);
-			break;
-		}
-		line[ret] = '\0';
-
-		/* chop endline */
-		if (strstr(line, "\r\n"))						/* windows format */
-			line[strlen(line) - 2] = '\0';
-		else if (line[strlen(line) - 1] == '\n')
-			line[strlen(line) - 1] = '\0';
-
-		/* check the length of line and comment */
-		if (strlen(line) == 0 || line[0] == '#') {
-			free(line);
-			continue;
-		}
-
-		/* add new command to list */
-		g_opt.cmd_list = (struct spawn_cmd *) realloc(g_opt.cmd_list,
-								(g_opt.num_of_cmds + 1) * sizeof(struct spawn_cmd));
-		if (!g_opt.cmd_list) {
-			fprintf(stderr, "Out of memory!\n");
-			free(line);
-			break;
-		}
-
-		memset(&g_opt.cmd_list[g_opt.num_of_cmds], 0, sizeof(struct spawn_cmd));
-		g_opt.cmd_list[g_opt.num_of_cmds++].cmd = line;
-	}
-
-	/* close file */
-	fclose(cmd_fp);
-
-	/* check count of commands */
-	if (g_opt.num_of_cmds == 0) {
-		fprintf(stderr, "Invalid command file '%s'\n", cmd_file);
-		exit(1);
-	}
-
-	/* get forks count */
-	g_opt.num_of_forks = strtoul(num_of_forks, NULL, 10);
-	if (g_opt.num_of_forks <= 0 || g_opt.num_of_forks > g_opt.num_of_cmds) {
-		fprintf(stderr, "The number of forks should be value in [1...%d]\n", g_opt.num_of_cmds);
-		exit(1);
-	}
-
-	return 0;
-}
-
-/*
  * fork new process with command
  */
 
@@ -215,10 +204,8 @@ static int fork_cmd(struct fork_info *fi)
 	char *tok, **args = NULL;
 	int tok_count = 0;
 
-	int fd_null;
 	int ret = 1;
 
-	/* lock mutex */
 	pthread_mutex_lock(&g_opt.mt);
 
 	/* check if command to be forked is exist */
@@ -231,7 +218,6 @@ static int fork_cmd(struct fork_info *fi)
 		}
 	}
 
-	/* unlock mutex */
 	pthread_mutex_unlock(&g_opt.mt);
 
 	if (!cmd) {
@@ -243,8 +229,12 @@ static int fork_cmd(struct fork_info *fi)
 
 	/* parse command arguments */
 	tok = strtok(cmd, " ");
+	if (!tok) {
+		fprintf(stderr, "Invalid command line '%s' at thread[#%d],\n", fi->cmd, fi->index);
+		return -1;
+	}
+
 	while (tok) {
-		/* allocate args */
 		args = realloc(args, (tok_count + 2) * sizeof(char *));
 		if (!args) {
 			fprintf(stderr, "Out of memory.\n");
@@ -253,7 +243,6 @@ static int fork_cmd(struct fork_info *fi)
 			return -1;
 		}
 
-		/* set args */
 		args[tok_count] = tok;
 		tok_count++;
 
@@ -261,12 +250,13 @@ static int fork_cmd(struct fork_info *fi)
 	}
 	args[tok_count] = NULL;
 
-	/* open /dev/null for redirecting output */
-	fd_null = open("/dev/null", O_WRONLY);
-
 	/* fork new process */
 	pid = fork();
 	if (pid == 0) {
+		int fd_null;
+
+		/* open /dev/null for redirecting output */
+		fd_null = open("/dev/null", O_WRONLY);
 		if (fd_null > 0) {
 			dup2(fd_null, STDOUT_FILENO);
 			dup2(fd_null, STDERR_FILENO);
@@ -280,13 +270,9 @@ static int fork_cmd(struct fork_info *fi)
 		ret = -1;
 	}
 
-	/* free args */
 	free(args);
-
-	/* free command */
 	free(cmd);
 
-	/* set pid */
 	fi->pid = pid;
 
 	return ret;
@@ -373,10 +359,7 @@ int main(int argc, char *argv[])
 
 	/* check arguments */
 	if (argc != 4)
-		usage();
-
-	/* init options */
-	init_options();
+		usage(argv[0]);
 
 	/* parse options */
 	if (parse_options(argv[1], argv[2], argv[3]) != 0)
@@ -397,10 +380,7 @@ int main(int argc, char *argv[])
 		struct fork_info *fi = &g_opt.fork_list[i];
 		int ret;
 
-		/* set index */
 		fi->index = i;
-
-		/* create thread */
 		if (pthread_create(&fi->th, NULL, fork_cmd_proc, (void *)fi) != 0) {
 			fprintf(stderr, "pthread_create() failed.\n");
 			fi->th = -1;
