@@ -6,6 +6,9 @@ libretrace_la_LDFLAGS= -no-undefined -avoid-version
 libretrace_la_CFLAGS= $(AM_CFLAGS) $(OPENSSL_INCLUDES)
 libretrace_la_LDFLAGS+= $(OPENSSL_LDFLAGS)
 
+bin_PROGRAMS=retrace
+retrace_SOURCES=retrace.c
+
 # include all headers here
 noinst_HEADERS= \
 	char.h \
