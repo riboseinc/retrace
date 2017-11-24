@@ -34,79 +34,52 @@
 #include <signal.h>
 #include <unistd.h>
 
-#define MAX_TIMEOUT                    60          /* 60 seconds */
+#include "spawn.h"
+
+#define RTR_SPAWN_LOG(...)           { if (!spawn_opt->silent) printf(__VA_ARGS__); }
 
 /*
- * spawn context structure
+ * free command list
  */
 
-struct spawn_cmd {
-	char *cmd;
-	int status;                       /* 0 - not forked, 1 - forked */
-};
-
-struct fork_info {
-	int index;
-	pthread_t th;
-
-	pid_t pid;
-	const char *cmd;
-};
-
-struct spawn_opt {
-	int timeout;
-
-	int num_of_cmds;
-	struct spawn_cmd *cmd_list;
-
-	int num_of_forks;
-	struct fork_info *fork_list;
-
-	pthread_mutex_t mt;
-};
-
-static struct spawn_opt g_opt;
-
-/*
- * show usage
- */
-
-static void usage(const char *prog_name)
+static void free_cmd_list(struct rtr_spawn_opt *spawn_opt)
 {
-	fprintf(stderr, "Usage: %s <timeout in seconds> <number of forks> <command file>\n",
-						prog_name);
-	exit(-1);
+	int i;
+
+	/* free command buffer and list */
+	if (!spawn_opt->cmd_list)
+		return;
+
+	for (i = 0; i < spawn_opt->num_of_cmds; i++)
+		free(spawn_opt->cmd_list[i].cmd);
+
+	free(spawn_opt->cmd_list);
 }
 
 /*
- * parse options
+ * init spawn
  */
 
-static int parse_options(const char *timeout, const char *num_of_forks, const char *cmd_file)
+int rtr_spawn_init(int timeout, int num_of_forks, const char *cmd_file, int silent, struct rtr_spawn_opt *spawn_opt)
 {
 	FILE *cmd_fp;
 
 	/* init options */
-	memset(&g_opt, 0, sizeof(g_opt));
-
-	/* get timeout */
-	g_opt.timeout = (int)strtoul(timeout, NULL, 10);
-	if (g_opt.timeout < 0 || g_opt.timeout > 60) {
-		fprintf(stderr, "Invalid timeout value '%d'. Please specify a value in [0 ~ 60] seconds.\n",
-				g_opt.timeout);
-		return -1;
-	}
+	memset(spawn_opt, 0, sizeof(struct rtr_spawn_opt));
+	spawn_opt->timeout = timeout;
+	spawn_opt->silent = silent;
 
 	/* get command list from file */
 	cmd_fp = fopen(cmd_file, "r");
 	if (!cmd_fp) {
-		fprintf(stderr, "Could not open command file '%s' for reading\n", cmd_file);
-		exit(1);
+		RTR_SPAWN_LOG("Could not open command file '%s' for reading\n", cmd_file);
+		return -1;
 	}
 
 	while (!feof(cmd_fp)) {
 		char *line = NULL;
-		size_t len = 0, ret;
+		size_t len = 0;
+		ssize_t ret;
 
 		/* get command line */
 		ret = getline(&line, &len, cmd_fp);
@@ -127,74 +100,51 @@ static int parse_options(const char *timeout, const char *num_of_forks, const ch
 		}
 
 		/* add new command to list */
-		g_opt.cmd_list = (struct spawn_cmd *) realloc(g_opt.cmd_list,
-								(g_opt.num_of_cmds + 1) * sizeof(struct spawn_cmd));
-		if (!g_opt.cmd_list) {
-			fprintf(stderr, "Out of memory!\n");
+		spawn_opt->cmd_list = (struct spawn_cmd *) realloc(spawn_opt->cmd_list,
+								(spawn_opt->num_of_cmds + 1) * sizeof(struct spawn_cmd));
+		if (!spawn_opt->cmd_list) {
+			RTR_SPAWN_LOG("Out of memory!\n");
 			free(line);
 			break;
 		}
 
-		memset(&g_opt.cmd_list[g_opt.num_of_cmds], 0, sizeof(struct spawn_cmd));
-		g_opt.cmd_list[g_opt.num_of_cmds++].cmd = line;
+		memset(&spawn_opt->cmd_list[spawn_opt->num_of_cmds], 0, sizeof(struct spawn_cmd));
+		spawn_opt->cmd_list[spawn_opt->num_of_cmds++].cmd = line;
 	}
-
 	fclose(cmd_fp);
 
 	/* check count of commands */
-	if (g_opt.num_of_cmds == 0) {
-		fprintf(stderr, "Invalid command file '%s'\n", cmd_file);
-		exit(1);
+	if (spawn_opt->num_of_cmds == 0) {
+		RTR_SPAWN_LOG("Invalid command file '%s'\n", cmd_file);
+		return -1;
 	}
 
 	/* get forks count */
-	g_opt.num_of_forks = strtoul(num_of_forks, NULL, 10);
-	if (g_opt.num_of_forks > g_opt.num_of_cmds)
-		g_opt.num_of_forks = g_opt.num_of_cmds;
+	if (num_of_forks == -1 || num_of_forks > spawn_opt->num_of_cmds)
+		spawn_opt->num_of_forks = spawn_opt->num_of_cmds;
+	else
+		spawn_opt->num_of_forks = num_of_forks;
+
+	/* create thread to fork commands */
+	spawn_opt->fork_list = (struct fork_info *) malloc(spawn_opt->num_of_forks * sizeof(struct fork_info));
+	if (!spawn_opt->fork_list) {
+		RTR_SPAWN_LOG("Out of memory!\n");
+		free_cmd_list(spawn_opt);
+		return -1;
+	}
+	memset(spawn_opt->fork_list, 0, spawn_opt->num_of_forks * sizeof(struct fork_info));
 
 	/* init mutex */
-	pthread_mutex_init(&g_opt.mt, NULL);
+	pthread_mutex_init(&spawn_opt->mt, NULL);
 
 	return 0;
-}
-
-/*
- * finalize options
- */
-
-static void finalize_options(void)
-{
-	int i;
-
-	/* wait until forking threads has been terminated */
-	for (i = 0; i < g_opt.num_of_forks; i++) {
-		if (g_opt.fork_list[i].th < 0)
-			continue;
-
-		pthread_join(g_opt.fork_list[i].th, NULL);
-	}
-
-	/* free forking info list */
-	free(g_opt.fork_list);
-
-	/* destroy mutex */
-	pthread_mutex_destroy(&g_opt.mt);
-
-	/* free command buffer and list */
-	if (!g_opt.cmd_list)
-		return;
-
-	for (i = 0; i < g_opt.num_of_cmds; i++)
-		free(g_opt.cmd_list[i].cmd);
-
-	free(g_opt.cmd_list);
 }
 
 /*
  * fork new process with command
  */
 
-static int fork_cmd(struct fork_info *fi)
+static int fork_cmd(struct rtr_spawn_opt *spawn_opt, struct fork_info *fi)
 {
 	pid_t pid;
 	int i;
@@ -206,38 +156,38 @@ static int fork_cmd(struct fork_info *fi)
 
 	int ret = 1;
 
-	pthread_mutex_lock(&g_opt.mt);
+	pthread_mutex_lock(&spawn_opt->mt);
 
 	/* check if command to be forked is exist */
-	for (i = 0; i < g_opt.num_of_cmds; i++) {
-		if (!g_opt.cmd_list[i].status) {
-			cmd = strdup(g_opt.cmd_list[i].cmd);
-			fi->cmd = g_opt.cmd_list[i].cmd;
-			g_opt.cmd_list[i].status = 1;
+	for (i = 0; i < spawn_opt->num_of_cmds; i++) {
+		if (!spawn_opt->cmd_list[i].status) {
+			cmd = strdup(spawn_opt->cmd_list[i].cmd);
+			fi->cmd = spawn_opt->cmd_list[i].cmd;
+			spawn_opt->cmd_list[i].status = 1;
 			break;
 		}
 	}
 
-	pthread_mutex_unlock(&g_opt.mt);
+	pthread_mutex_unlock(&spawn_opt->mt);
 
 	if (!cmd) {
-		fprintf(stderr, "No left command to be executed at thread[#%d].\n", fi->index);
+		RTR_SPAWN_LOG("No command to be executed at thread[#%d].\n", fi->index);
 		return 0;
 	}
 
-	fprintf(stderr, "Running command '%s' at thread[#%d]\n", fi->cmd, fi->index);
+	RTR_SPAWN_LOG("Running command '%s' at thread[#%d]\n", fi->cmd, fi->index);
 
 	/* parse command arguments */
 	tok = strtok(cmd, " ");
 	if (!tok) {
-		fprintf(stderr, "Invalid command line '%s' at thread[#%d],\n", fi->cmd, fi->index);
+		RTR_SPAWN_LOG("Invalid command '%s' at thread[#%d],\n", fi->cmd, fi->index);
 		return -1;
 	}
 
 	while (tok) {
 		args = realloc(args, (tok_count + 2) * sizeof(char *));
 		if (!args) {
-			fprintf(stderr, "Out of memory.\n");
+			RTR_SPAWN_LOG("Out of memory.\n");
 			free(cmd);
 
 			return -1;
@@ -266,7 +216,7 @@ static int fork_cmd(struct fork_info *fi)
 
 		exit(execvp(args[0], args));
 	} else if (pid < 0) {
-		fprintf(stderr, "Couldn't fork new process to execute command '%s'\n", fi->cmd);
+		RTR_SPAWN_LOG("Couldn't fork new process to execute command '%s'\n", fi->cmd);
 		ret = -1;
 	}
 
@@ -282,7 +232,7 @@ static int fork_cmd(struct fork_info *fi)
  * wait for command has finished or timeout
  */
 
-static void wait_for_cmd(struct fork_info *fi)
+static void wait_for_cmd(struct rtr_spawn_opt *spawn_opt, struct fork_info *fi)
 {
 	int timeout = 0;
 
@@ -292,12 +242,12 @@ static void wait_for_cmd(struct fork_info *fi)
 		/* wait until process has terminated */
 		w = waitpid(fi->pid, &status, WNOHANG);
 		if (w < 0) {
-			fprintf(stderr, "waitpid() error for command '%s' at thread[#%d]\n",
+			RTR_SPAWN_LOG("waitpid() error for command '%s' at thread[#%d]\n",
 					fi->cmd, fi->index);
 			break;
 		} else if (w == 0) {
-			if (timeout >= g_opt.timeout) {
-				fprintf(stderr, "The command '%s' has killed by timeout at thread[#%d]\n",
+			if (timeout >= spawn_opt->timeout) {
+				RTR_SPAWN_LOG("The command '%s' was killed (timeout at thread[#%d])\n",
 						fi->cmd, fi->index);
 				kill(fi->pid, SIGTERM);
 				break;
@@ -310,7 +260,7 @@ static void wait_for_cmd(struct fork_info *fi)
 
 		/* set exit status */
 		if (WIFEXITED(status)) {
-			fprintf(stderr, "The command '%s' has exited with status '%d' at thread[#%d]\n",
+			RTR_SPAWN_LOG("The command '%s' has exited with status '%d' at thread[#%d]\n",
 					fi->cmd, WEXITSTATUS(status), fi->index);
 			break;
 		}
@@ -324,8 +274,9 @@ static void wait_for_cmd(struct fork_info *fi)
 static void *fork_cmd_proc(void *p)
 {
 	struct fork_info *fi = (struct fork_info *)p;
+	struct rtr_spawn_opt *spawn_opt = fi->spawn_opt;
 
-	fprintf(stderr, "Started forking thread[#%d]\n", fi->index);
+	RTR_SPAWN_LOG("Started forking thread[#%d]\n", fi->index);
 
 	while (1) {
 		char *cmd;
@@ -334,61 +285,67 @@ static void *fork_cmd_proc(void *p)
 		pid_t pid;
 
 		/* fork command */
-		ret = fork_cmd(fi);
+		ret = fork_cmd(spawn_opt, fi);
 		if (ret == 0)             /* no left command */
 			break;
 		else if (ret < 0)         /* fork() failed */
 			continue;
 
 		/* wait until command has been terminated or for timeout */
-		wait_for_cmd(fi);
+		wait_for_cmd(spawn_opt, fi);
 	}
 
-	fprintf(stderr, "Ended forking thread[#%d]\n", fi->index);
+	RTR_SPAWN_LOG("Ended forking thread[#%d]\n", fi->index);
 
 	return 0;
 }
 
 /*
- * main function
+ * run spawn
  */
 
-int main(int argc, char *argv[])
+int rtr_spawn_run(struct rtr_spawn_opt *spawn_opt)
 {
 	int i;
 
-	/* check arguments */
-	if (argc != 4)
-		usage(argv[0]);
-
-	/* parse options */
-	if (parse_options(argv[1], argv[2], argv[3]) != 0)
-		exit(1);
-
-	/* create thread to fork commands */
-	g_opt.fork_list = (struct fork_info *) malloc(g_opt.num_of_forks * sizeof(struct fork_info));
-	if (!g_opt.fork_list) {
-		fprintf(stderr, "Out of memory!\n");
-		finalize_options();
-
-		exit(1);
-	}
-	memset(g_opt.fork_list, 0, g_opt.num_of_forks * sizeof(struct fork_info));
-
 	/* create threads to fork commands */
-	for (i = 0; i < g_opt.num_of_forks; i++) {
-		struct fork_info *fi = &g_opt.fork_list[i];
+	for (i = 0; i < spawn_opt->num_of_forks; i++) {
+		struct fork_info *fi = &spawn_opt->fork_list[i];
 		int ret;
 
 		fi->index = i;
+		fi->spawn_opt = spawn_opt;
 		if (pthread_create(&fi->th, NULL, fork_cmd_proc, (void *)fi) != 0) {
-			fprintf(stderr, "pthread_create() failed.\n");
+			RTR_SPAWN_LOG("pthread_create() failed with fork(#%d).\n", i);
 			fi->th = -1;
 		}
 	}
 
-	/* finalize options */
-	finalize_options();
-
 	return 0;
+}
+
+/*
+ * free spawn options
+ */
+
+int rtr_spawn_finalize(struct rtr_spawn_opt *spawn_opt)
+{
+	int i;
+
+	/* wait until forking threads has been terminated */
+	for (i = 0; i < spawn_opt->num_of_forks; i++) {
+		if (spawn_opt->fork_list[i].th < 0)
+			continue;
+
+		pthread_join(spawn_opt->fork_list[i].th, NULL);
+	}
+
+	/* free forking info list */
+	free(spawn_opt->fork_list);
+
+	/* destroy mutex */
+	pthread_mutex_destroy(&spawn_opt->mt);
+
+	/* free command list */
+	free_cmd_list(spawn_opt);
 }

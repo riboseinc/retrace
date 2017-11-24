@@ -1,3 +1,3 @@
 
 bin_PROGRAMS = spawn
-spawn_SOURCES = spawn.c
+spawn_SOURCES = main.c spawn.c
