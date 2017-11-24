@@ -44,6 +44,6 @@ struct rtr_spawn_opt {
 
 int rtr_spawn_init(int timeout, int num_of_forks, const char *cmd_file, int silent, struct rtr_spawn_opt *spawn_opt);
 int rtr_spawn_run(struct rtr_spawn_opt *spawn_opt);
-int rtr_spawn_finalize(struct rtr_spawn_opt *spawn_opt);
+void rtr_spawn_finalize(struct rtr_spawn_opt *spawn_opt);
 
 #endif // __SPAWN_H__
