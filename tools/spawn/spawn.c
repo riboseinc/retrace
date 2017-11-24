@@ -311,13 +311,11 @@ int rtr_spawn_run(struct rtr_spawn_opt *spawn_opt)
 	/* create threads to fork commands */
 	for (i = 0; i < spawn_opt->num_of_forks; i++) {
 		struct fork_info *fi = &spawn_opt->fork_list[i];
-		int ret;
 
 		fi->index = i;
 		fi->spawn_opt = spawn_opt;
 		if (pthread_create(&fi->th, NULL, fork_cmd_proc, (void *)fi) != 0) {
 			RTR_SPAWN_LOG("pthread_create() failed with fork(#%d).\n", i);
-			fi->th = -1;
 		}
 	}
 
@@ -328,7 +326,7 @@ int rtr_spawn_run(struct rtr_spawn_opt *spawn_opt)
  * free spawn options
  */
 
-int rtr_spawn_finalize(struct rtr_spawn_opt *spawn_opt)
+void rtr_spawn_finalize(struct rtr_spawn_opt *spawn_opt)
 {
 	int i;
 
