@@ -3,6 +3,9 @@
 # make sure ../retrace itself can fail
 ../retrace -f nonexistent ls || ../retrace nonexistent || echo ok
 
+# retrace configuration var
+RTR_CONF_VAR=`cat ../retrace.conf.example`
+
 ./strinject.sh
 LC_ALL="POSIX" ../retrace ./setlocale
 ../retrace ./exec
@@ -31,4 +34,6 @@ LC_ALL="POSIX" ../retrace ./setlocale
 ../retrace ./log
 ../retrace ./writev
 ../retrace ./readv
+export RETRACE_CONFIG_VAR="${RTR_CONF_VAR}"
+../retrace ./config
 ../retrace -f ../retrace.conf.example ./config

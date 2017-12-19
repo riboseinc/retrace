@@ -1576,39 +1576,41 @@ get_config_file()
 	char *file_path;
 	int olderrno;
 
+	char *file_path_user;
+	char *file_name_user = ".retrace.conf";
+
+	/* save latest errno */
 	olderrno = errno;
 
 	/* If we have a RETRACE_CONFIG env var, try to open the config file from there. */
 	file_path = real_getenv(RETRACE_ENV_CONFIG_FILE);
-
-	if (file_path)
+	if (file_path) {
 		config_file = real_fopen(file_path, "r");
-
-	/* If we couldn't open the file from the env var try to home it from ~/.retrace.conf */
-	if (!config_file) {
-		file_path = real_getenv("HOME");
-
-		if (file_path) {
-			char *file_path_user;
-			char *file_name_user = ".retrace.conf";
-
-			file_path_user = (char *)real_malloc(real_strlen(file_path) + real_strlen(file_name_user) + 2);
-
-			if (file_path_user) {
-				real_strcpy(file_path_user, file_path);
-				real_strcat(file_path_user, "/");
-				real_strcat(file_path_user, file_name_user);
-
-				config_file = real_fopen(file_path_user, "r");
-
-				real_free(file_path_user);
-			}
-		}
+		if (config_file)
+			return config_file;
 	}
 
-	/* Finally if the above failed try to open /etc/retrace.conf */
-	if (!config_file)
-		config_file = real_fopen("/etc/retrace.conf", "r");
+	/* If we couldn't open the file from the env var try to home it from ~/.retrace.conf */
+	file_path = real_getenv("HOME");
+	if (!file_path)
+		return NULL;
+
+	/* build file path */
+	file_path_user = (char *)real_malloc(real_strlen(file_path) + real_strlen(file_name_user) + 2);
+	if (!file_path_user)
+		return NULL;
+
+	real_strcpy(file_path_user, file_path);
+	real_strcat(file_path_user, "/");
+	real_strcat(file_path_user, file_name_user);
+
+	/* create configuration file by configuration environment */
+	config_file = real_fopen(file_path_user, "r");
+	if (config_file)
+		return config_file;
+
+	/* free file path for user */
+	real_free(file_path_user);
 
 	errno = olderrno;
 

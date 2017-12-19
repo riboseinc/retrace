@@ -301,6 +301,34 @@ FILE *RETRACE_IMPLEMENTATION(fopen)(const char *file, const char *mode)
 
 RETRACE_REPLACE(fopen, FILE *, (const char *file, const char *mode), (file, mode))
 
+FILE *RETRACE_IMPLEMENTATION(fdopen)(int fd, const char *mode)
+{
+	FILE *ret;
+	struct rtr_event_info event_info;
+	unsigned int parameter_types[] = {PARAMETER_TYPE_INT, PARAMETER_TYPE_STRING, PARAMETER_TYPE_END};
+	void const *parameter_values[] = {&fd, &mode};
+
+	memset(&event_info, 0, sizeof(event_info));
+	event_info.function_name = "fdopen";
+	event_info.function_group = RTR_FUNC_GRP_FILE;
+	event_info.parameter_types = parameter_types;
+	event_info.parameter_values = (void **) parameter_values;
+	event_info.return_value_type = PARAMETER_TYPE_FILE_STREAM;
+	event_info.return_value = &ret;
+	event_info.logging_level = RTR_LOG_LEVEL_NOR;
+	retrace_log_and_redirect_before(&event_info);
+
+	ret = real_fdopen(fd, mode);
+	if (!ret)
+		event_info.logging_level |= RTR_LOG_LEVEL_ERR;
+
+	retrace_log_and_redirect_after(&event_info);
+
+	return ret;
+}
+
+RETRACE_REPLACE(fdopen, FILE *, (int fd, const char *mode), (fd, mode))
+
 int RETRACE_IMPLEMENTATION(close)(int fd)
 {
 	struct rtr_event_info event_info;
