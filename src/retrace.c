@@ -52,8 +52,9 @@ usage(void)
 {
 	fprintf(stderr, "Usage: retrace [options] <command line>\n"
 					"[options]:\n"
-					"\t--lib <library path>     The path of libretrace.so library\n"
-					"\t--config <config path>   The path of configuration\n");
+					"\t--lib <library path>     The path of '%s' library\n"
+					"\t--config <config path>   The path of configuration\n",
+					RETRACE_LIB_NAME);
 	exit(1);
 }
 
