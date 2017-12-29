@@ -432,7 +432,7 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
 	size_t read_total = 0;
 	int inject_completed = 0;
 
-	char *inject;
+	char *inject = NULL;
 	int i, count;
 
 	size_t total_inject_bytes = 0;
@@ -498,19 +498,14 @@ static void str_inject_func_t34(const char *src_fpath, const char *dst_fpath, co
 			/* inject multiple hex values */
 			inject_multiple_hex(fp, dst_fp, buffer, read_total, read_bytes,
 				inject, total_inject_bytes, pos, replace);
-
-			/* free inject buffer */
-			free(inject);
-
 			inject_completed = 1;
 		}
 	}
 
-	/* close destination file */
 	fclose(dst_fp);
-
-	/* close source file */
 	fclose(fp);
+
+	free(inject);
 }
 
 /*
@@ -543,7 +538,7 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 
 	/* open file which has inject lines */
 	inject_fp = open_file(inject_fpath, 1);
-	if (!inject_fpath) {
+	if (!inject_fp) {
 		fprintf(stderr, "Couln't open file '%s' which has inject lines\n", inject_fpath);
 
 		fclose(fp);
@@ -576,10 +571,8 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 		/* open destination file */
 		snprintf(dst_fpath, sizeof(dst_fpath), "%s.%d", dst_fpath_templ, inject_fcount);
 		dst_fp = open_file(dst_fpath, 0);
-		if (!dst_fp) {
-			fclose(fp);
+		if (!dst_fp)
 			continue;
-		}
 
 		while (!feof(fp)) {
 			size_t read_bytes;
@@ -609,8 +602,8 @@ static void str_inject_func_t5(const char *src_fpath, const char *dst_fpath_temp
 		inject_fcount++;
 	}
 
-	/* close source file */
 	fclose(fp);
+	fclose(inject_fp);
 }
 
 /*

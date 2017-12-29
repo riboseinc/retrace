@@ -237,14 +237,13 @@ void *RETRACE_IMPLEMENTATION(realloc)(void *ptr, size_t size)
 	double fail_chance;
 	int redirect = 0;
 
+	memset(&event_info, 0, sizeof(event_info));
 	if (ptr != NULL) {
 		if (map_bit(ptr, 0) != 1) {
 			event_info.extra_info = "Bad realloc (possibly already free)";
 			event_info.event_flags |= EVENT_FLAGS_PRINT_BEFORE;
 		}
 	}
-
-	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "realloc";
 	event_info.function_group = RTR_FUNC_GRP_MEM;
 	event_info.parameter_types = parameter_types;

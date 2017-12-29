@@ -617,7 +617,7 @@ inject(struct rtr_strinject_info *info, const void *buffer, size_t len,
 
 	*inject_len = offset + addlen + taillen;
 	*inject_buffer = real_malloc(*inject_len);
-	if (inject_buffer == 0)
+	if (*inject_buffer == NULL)
 		goto done;
 	real_memcpy(*inject_buffer, buffer, headlen);
 	real_memcpy(*inject_buffer + offset + addlen,
@@ -729,7 +729,7 @@ static size_t merge_iov_buffers(const struct iovec *iov, int iovcount, void **mb
 	for (i = 0; i < iovcount; i++) {
 		p = real_realloc(p, msize + iov[i].iov_len);
 		if (!p)
-			return -1;
+			return 0;
 
 		real_memcpy((char *) p + msize, iov[i].iov_base, iov[i].iov_len);
 		msize += iov[i].iov_len;
@@ -820,7 +820,7 @@ int rtr_str_inject_v(enum RTR_STRINJECT_FUNC_ID func_id, const struct iovec *iov
 
 	/* merge iov buffers */
 	msize = merge_iov_buffers(iov, iovcount, &mbuf);
-	if (msize < 0)
+	if (msize == 0)
 		return 0;
 
 	/* perform injection for selected buffer */

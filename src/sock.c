@@ -627,7 +627,6 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 	struct iovec *inject_iov = NULL;
 	int inject_idx;
 
-	int redirected = 0;
 	int enable_inject = 0;
 
 	memset(&event_info, 0, sizeof(event_info));
@@ -677,13 +676,6 @@ ssize_t RETRACE_IMPLEMENTATION(sendmsg)(int sockfd, const struct msghdr *msg, in
 		if (ret < 0)
 			event_info.logging_level |= RTR_LOG_LEVEL_ERR;
 	}
-
-	if (redirected) {
-		event_info.extra_info = "[redirected]";
-		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
-		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
-	}
-
 	retrace_log_and_redirect_after(&event_info);
 
 	if (enable_inject) {

@@ -797,10 +797,10 @@ fcntl_v(int fildes, int cmd, va_list ap)
 		r = real_fcntl(fildes, cmd, va_arg(ap, int));
 		if (r >= 0) {
 			di = file_descriptor_get(fildes);
-			if (di->location != NULL)
+			if (di && di->location != NULL) {
 				old_location = di->location;
-
-			file_descriptor_update(r, di->type, old_location);
+				file_descriptor_update(r, di->type, old_location);
+			}
 		}
 		break;
 
