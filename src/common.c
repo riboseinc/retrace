@@ -237,7 +237,7 @@ retrace_get_thread_file(void)
 
 
 	if (pthread_getspecific(per_thread_logging) == NULL) {
-		FILE *out_file_tmp;
+		FILE *out_file_tmp = NULL;
 
 		if (output_file_path) {
 			char new_path[PATH_MAX + 1];
@@ -249,10 +249,9 @@ retrace_get_thread_file(void)
 				real_snprintf(new_path, PATH_MAX, "%s.%u.%u", output_file_path, real_getpid(), pthread_self());
 
 			out_file_tmp = real_fopen(new_path, "a");
+			if (out_file_tmp)
+				pthread_setspecific(per_thread_logging, (void *) out_file_tmp);
 		}
-
-		pthread_setspecific(per_thread_logging, (void *) out_file_tmp);
-
 	}
 
 	return (FILE *) pthread_getspecific(per_thread_logging);

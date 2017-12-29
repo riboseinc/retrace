@@ -181,6 +181,7 @@ static int fork_cmd(struct rtr_spawn_opt *spawn_opt, struct fork_info *fi)
 	tok = strtok(cmd, " ");
 	if (!tok) {
 		RTR_SPAWN_LOG("Invalid command '%s' at thread[#%d],\n", fi->cmd, fi->index);
+		free(cmd);
 		return -1;
 	}
 
@@ -332,9 +333,8 @@ void rtr_spawn_finalize(struct rtr_spawn_opt *spawn_opt)
 
 	/* wait until forking threads has been terminated */
 	for (i = 0; i < spawn_opt->num_of_forks; i++) {
-		if (spawn_opt->fork_list[i].th < 0)
+		if (spawn_opt->fork_list[i].th == 0)
 			continue;
-
 		pthread_join(spawn_opt->fork_list[i].th, NULL);
 	}
 

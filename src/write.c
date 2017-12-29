@@ -156,29 +156,28 @@ ssize_t RETRACE_IMPLEMENTATION(writev)(int fd, const struct iovec *iov, int iovc
 	for (i = 0; i < iovcnt; i++)
 		total_nbytes += iov[i].iov_len;
 
-	if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &incompleteio_limit)) {
-		incompleteio = 1;
-		real_nbytes = rtr_get_fuzzing_random() % total_nbytes;
-		if (real_nbytes <= incompleteio_limit)
-			real_nbytes = incompleteio_limit;
+	if (total_nbytes > 0) {
+		if (rtr_get_config_single("incompleteio", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &incompleteio_limit)) {
+			incompleteio = 1;
+			real_nbytes = rtr_get_fuzzing_random() % total_nbytes;
+			if (real_nbytes <= incompleteio_limit)
+				real_nbytes = incompleteio_limit;
+			if (real_nbytes > total_nbytes)
+				real_nbytes = total_nbytes;
+			redirected = 1;
+		} else if (rtr_str_inject_v(STRINJECT_FUNC_WRITEV, iov, iovcnt, &inject_iov, &inject_idx)) {
+			redirected = 1;
+			enable_inject = 1;
 
-		if (real_nbytes > total_nbytes)
-			real_nbytes = total_nbytes;
+			parameter_values[2] = &inject_iov;
+		}
 
-		redirected = 1;
-	} else if (rtr_str_inject_v(STRINJECT_FUNC_WRITEV, iov, iovcnt, &inject_iov, &inject_idx)) {
-		redirected = 1;
-		enable_inject = 1;
-
-		parameter_values[2] = &inject_iov;
+		if (redirected) {
+			event_info.extra_info = "[redirected]";
+			event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
+			event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
+		}
 	}
-
-	if (redirected) {
-		event_info.extra_info = "[redirected]";
-		event_info.event_flags = EVENT_FLAGS_PRINT_RAND_SEED | EVENT_FLAGS_PRINT_BACKTRACE;
-		event_info.logging_level |= RTR_LOG_LEVEL_FUZZ;
-	}
-
 	retrace_log_and_redirect_before(&event_info);
 
 	ret = real_writev(fd, enable_inject ? inject_iov : iov, iovcnt);

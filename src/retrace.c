@@ -27,6 +27,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <signal.h>
 #include <dlfcn.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -159,7 +160,7 @@ check_executable(const char *bin_path, struct stat *st)
 static int
 check_binary_avail(const char *cmd_name, char **_bin_path)
 {
-	char *bin_path;
+	char *bin_path = NULL;
 	struct stat st;
 
 	int ret = -1;
@@ -195,13 +196,20 @@ check_binary_avail(const char *cmd_name, char **_bin_path)
 				break;
 
 			tok = strtok(NULL, ":");
+
+			free(bin_path);
+			bin_path = NULL;
 		}
 	} else
 		bin_path = strdup(cmd_name);
 
+	if (!bin_path)
+		return -1;
+
 	/* check avaiability of binary */
 	if (stat(bin_path, &st) != 0) {
 		fprintf(stderr, "Coudln't find binary '%s' in system\n", cmd_name);
+		free(bin_path);
 		return -1;
 	}
 
@@ -210,6 +218,8 @@ check_binary_avail(const char *cmd_name, char **_bin_path)
 		*_bin_path = bin_path;
 		return 0;
 	}
+
+	free(bin_path);
 
 	return -1;
 }
