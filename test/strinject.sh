@@ -13,7 +13,7 @@ strinject () {
 		echo "(ABCD)" -\> "($3)"
 		echo logtofile,/dev/null >strinject.conf
 		echo stringinject,$1,$fn,$2,1 >>strinject.conf
-		../retrace -f strinject.conf ./strinject ABCD "$3"
+		retrace --config strinject.conf ./strinject ABCD "$3"
 	done
 }
 
@@ -23,7 +23,7 @@ strinject_1 () {
 		echo "(ABCD)" -\> "($3)"
 		echo logtofile,/dev/null >strinject.conf
 		echo stringinject,$fn,$1,$2,1 >>strinject.conf
-		../retrace -f strinject.conf ./strinject ABCD "$3"
+		retrace --config strinject.conf ./strinject ABCD "$3"
 	done
 }
 

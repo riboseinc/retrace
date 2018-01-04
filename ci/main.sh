@@ -47,12 +47,12 @@ function checkpatch() {
 sh autogen.sh && \
 	./configure \
 		--disable-silent-rules \
-		--enable-tests \
 		--with-cmocka=${CMOCKA_INSTALL} \
-		--enable-rpc && \
+		--enable-tests && \
 	make clean && \
 	make
 
+sudo make install
 make check
 
 # checkpatch

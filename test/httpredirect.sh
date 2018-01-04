@@ -4,7 +4,7 @@ set -e
 
 PYTHON=/usr/bin/python
 CURL=/usr/bin/curl
-RETRACE=../retrace
+RETRACE=retrace
 CONFIG=httpredirect.config
 URL1=http://127.0.0.1:8000/hello.txt
 URL2=http://127.0.0.1:8000/index.txt
@@ -21,10 +21,10 @@ PYTHONPID=$!
 RESPONSE1=$($RETRACE $CURL $URL1 2>/dev/null)
 
 # RESPONSE2 redirected url with http redirection
-RESPONSE2=$($RETRACE -f $CONFIG $CURL $URL1 2>/dev/null)
+RESPONSE2=$($RETRACE --config $CONFIG $CURL $URL1 2>/dev/null)
 
 # RESPONSE3 non-redirected url with http redirection
-RESPONSE3=$($RETRACE -f $CONFIG $CURL $URL2 2>/dev/null)
+RESPONSE3=$($RETRACE --config $CONFIG $CURL $URL2 2>/dev/null)
 
 kill $PYTHONPID
 
