@@ -23,6 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -54,11 +58,27 @@ static int g_prog_exit;
 static void
 usage(void)
 {
-	fprintf(stderr, "Usage: retrace [options] <command line>\n"
+	fprintf(stderr, "Usage: %s [options] <command line>\n"
 					"[options]:\n"
 					"\t--lib <library path>     The path of '%s' library\n"
-					"\t--config <config path>   The path of configuration\n",
+					"\t--config <config path>   The path of configuration\n"
+					"\t--version                Print version\n"
+					"\t--help                   Print help message\n",
+					PACKAGE_NAME,
 					RETRACE_LIB_NAME);
+}
+
+/*
+ * print version
+ */
+
+static void
+print_version(void)
+{
+	printf("%s - %s, Copyright 2017 Ribose Inc <https://www.ribose.com>\n",
+			PACKAGE_NAME,
+			PACKAGE_VERSION);
+	exit(0);
 }
 
 /*
@@ -285,7 +305,7 @@ parse_options(int argc, char *argv[], struct rtr_options *opt)
 	/* parse options */
 	if (argc < 2) {
 		usage();
-		return -1;
+		exit(-1);
 	}
 
 	do {
@@ -293,7 +313,12 @@ parse_options(int argc, char *argv[], struct rtr_options *opt)
 			opt->lib_path = strdup(argv[++i]);
 		else if (strcmp(argv[i], "--config") == 0)
 			opt->config_path = strdup(argv[++i]);
-		else
+		else if (strcmp(argv[i], "--version") == 0)
+			print_version();
+		else if (strcmp(argv[i], "--help") == 0) {
+			usage();
+			exit(0);
+		} else
 			break;
 		i++;
 	} while (1);
