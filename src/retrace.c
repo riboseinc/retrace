@@ -23,6 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -32,7 +36,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 #include <unistd.h>
+
+#include "retrace.h"
 
 #ifndef __APPLE__
 #define RETRACE_LIB_NAME             "libretrace.so"
@@ -51,12 +58,27 @@ static int g_prog_exit;
 static void
 usage(void)
 {
-	fprintf(stderr, "Usage: retrace [options] <command line>\n"
+	fprintf(stderr, "Usage: %s [options] <command line>\n"
 					"[options]:\n"
 					"\t--lib <library path>     The path of '%s' library\n"
-					"\t--config <config path>   The path of configuration\n",
+					"\t--config <config path>   The path of configuration\n"
+					"\t--version                Print version\n"
+					"\t--help                   Print help message\n",
+					PACKAGE_NAME,
 					RETRACE_LIB_NAME);
-	exit(1);
+}
+
+/*
+ * print version
+ */
+
+static void
+print_version(void)
+{
+	printf("%s - %s, Copyright 2017 Ribose Inc <https://www.ribose.com>\n",
+			PACKAGE_NAME,
+			PACKAGE_VERSION);
+	exit(0);
 }
 
 /*
@@ -82,6 +104,23 @@ init_signal(void)
 }
 
 /*
+ * free options
+ */
+
+static void
+free_options(struct rtr_options *opt)
+{
+	if (opt->lib_path)
+		free(opt->lib_path);
+
+	if (opt->config_path)
+		free(opt->config_path);
+
+	if (opt->bin_path)
+		free(opt->bin_path);
+}
+
+/*
  * try to find libretrace.so in system path
  */
 
@@ -91,50 +130,53 @@ static const char *g_syslib_dirs[] = {
 	NULL
 };
 
-static const char *
-find_lib(const char *lib_path)
+static char *
+find_lib_in_sys()
 {
-	void *handle;
+	char path[MAX_PATH];
+	int find_lib = 0;
+
 	int i;
 
-	static char path[MAX_PATH];
-	int find_lib = 1;
-
+	/* try to find the path of retrace library */
 	memset(path, 0, sizeof(path));
+	for (i = 0; g_syslib_dirs[i] != NULL; i++) {
+		struct stat st;
 
-	if (lib_path) {
-		if (strlen(lib_path) > MAX_PATH - 1)
-			strncpy(path, lib_path, MAX_PATH - 1);
-		else
-			strcpy(path, lib_path);
-	} else {
-		find_lib = 0;
-		for (i = 0; g_syslib_dirs[i] != NULL; i++) {
-			struct stat st;
-
-			snprintf(path, sizeof(path), "%s/%s", g_syslib_dirs[i], RETRACE_LIB_NAME);
-			if (stat(path, &st) == 0) {
-				find_lib = 1;
-				break;
-			}
+		snprintf(path, sizeof(path), "%s/%s", g_syslib_dirs[i], RETRACE_LIB_NAME);
+		if (stat(path, &st) == 0) {
+			find_lib = 1;
+			break;
 		}
 	}
-
 	if (!find_lib)
 		return NULL;
 
-	printf("Try to load '%s'... ", path);
+	return strdup(path);
+}
 
-	handle = dlopen(path, RTLD_NOW);
+/*
+ * check whether library is able to be loaded dynamically
+ */
+
+static int
+check_dynamic_loadable(const char *lib_path)
+{
+	void *handle;
+
+	printf("Try to load '%s'... ", lib_path);
+
+	/* try to load library for testing purpose */
+	handle = dlopen(lib_path, RTLD_NOW);
 	if (!handle) {
 		printf("Failed\n");
-		return NULL;
+		return -1;
 	}
 
 	printf("Success\n");
 	dlclose(handle);
 
-	return path;
+	return 0;
 }
 
 /*
@@ -158,7 +200,7 @@ check_executable(const char *bin_path, struct stat *st)
  */
 
 static int
-check_binary_avail(const char *cmd_name, char **_bin_path)
+check_binary_avail(const char *cmd_name, struct rtr_options *opt)
 {
 	char *bin_path = NULL;
 	struct stat st;
@@ -188,7 +230,6 @@ check_binary_avail(const char *cmd_name, char **_bin_path)
 				strcpy(bin_path, tok);
 				strcat(bin_path, "/");
 			}
-
 			strcat(bin_path, cmd_name);
 
 			/* check if path is exist */
@@ -215,10 +256,9 @@ check_binary_avail(const char *cmd_name, char **_bin_path)
 
 	if ((st.st_mode & S_IXUSR) &&
 		 check_executable(bin_path, &st) == 0) {
-		*_bin_path = bin_path;
+		opt->bin_path = bin_path;
 		return 0;
 	}
-
 	free(bin_path);
 
 	return -1;
@@ -229,7 +269,7 @@ check_binary_avail(const char *cmd_name, char **_bin_path)
  */
 
 static pid_t
-fork_cmd(const char *lib_path, const char *config_path, const char *bin_path, char **cmd_args)
+fork_cmd(struct rtr_options *opt)
 {
 	pid_t pid;
 
@@ -237,15 +277,15 @@ fork_cmd(const char *lib_path, const char *config_path, const char *bin_path, ch
 	if (pid == 0) {
 		/* set environments */
 #ifdef __APPLE__
-		setenv("DYLD_FORCE_FLAG_NAMESPACE", "1", 1);
-		setenv("DYLD_INSERT_LIBRARIES", lib_path, 1);
+		setenv("DYLD_FORCE_FLAT_NAMESPACE", "1", 1);
+		setenv("DYLD_INSERT_LIBRARIES", opt->lib_path, 1);
 #else
-		setenv("LD_PRELOAD", lib_path, 1);
+		setenv("LD_PRELOAD", opt->lib_path, 1);
 #endif
-		if (config_path)
-			setenv("RETRACE_CONFIG", config_path, 1);
+		if (opt->config_path)
+			setenv("RETRACE_CONFIG", opt->config_path, 1);
 
-		execv(bin_path, cmd_args);
+		execv(opt->bin_path, opt->bin_args);
 		exit(1);
 	} else if (pid < 0)
 		return -1;
@@ -254,56 +294,66 @@ fork_cmd(const char *lib_path, const char *config_path, const char *bin_path, ch
 }
 
 /*
- * main function
+ * parse retrace options
  */
 
-int
-main(int argc, char *argv[])
+static int
+parse_options(int argc, char *argv[], struct rtr_options *opt)
 {
-	const char *lib_path = NULL;
-	const char *config_path = NULL;
-
-	char *bin_path = NULL;
 	int i = 1;
 
-	pid_t child_pid;
-	int w, status;
-
-	/* parse arguments */
-	if (argc < 2)
+	/* parse options */
+	if (argc < 2) {
 		usage();
+		exit(-1);
+	}
 
 	do {
 		if (strcmp(argv[i], "--lib") == 0)
-			lib_path = argv[++i];
+			opt->lib_path = strdup(argv[++i]);
 		else if (strcmp(argv[i], "--config") == 0)
-			config_path = argv[++i];
-		else
+			opt->config_path = strdup(argv[++i]);
+		else if (strcmp(argv[i], "--version") == 0)
+			print_version();
+		else if (strcmp(argv[i], "--help") == 0) {
+			usage();
+			exit(0);
+		} else
 			break;
+		i++;
 	} while (1);
 
 	/* find library path */
-	lib_path = find_lib(lib_path);
-	if (!lib_path) {
+	if (!opt->lib_path)
+		opt->lib_path = find_lib_in_sys();
+	if (!opt->lib_path || check_dynamic_loadable(opt->lib_path) != 0) {
 		fprintf(stderr, "Please specify valid path of %s library file\n", RETRACE_LIB_NAME);
-		exit(1);
+		return -1;
 	}
 
 	/* check avaiability of command */
-	if (check_binary_avail(argv[i], &bin_path) < 0) {
+	if (check_binary_avail(argv[i], opt) < 0) {
 		fprintf(stderr, "Invalid command '%s'\n", argv[i]);
-		exit(1);
+		return -1;
 	}
+	opt->bin_args = &argv[i];
 
-	/* init signal */
-	init_signal();
+	return 0;
+}
 
-	/* fork command */
-	child_pid = fork_cmd(lib_path, config_path, bin_path, &argv[i]);
-	if (child_pid > 0) {
-		free(bin_path);
-		exit(1);
-	}
+/*
+ * trace command
+ */
+
+static void
+trace_cmd(struct rtr_options *opt)
+{
+	pid_t child_pid;
+	int w, status;
+
+	child_pid = fork_cmd(opt);
+	if (child_pid < 0)
+		return;
 
 	do {
 		w = waitpid(-1, &status, WNOHANG);
@@ -313,8 +363,32 @@ main(int argc, char *argv[])
 		if (g_prog_exit)
 			kill(-1, SIGTERM);
 	} while (!WIFEXITED(status) && !WIFSIGNALED(status));
+}
 
-	free(bin_path);
+/*
+ * main function
+ */
+
+int
+main(int argc, char *argv[])
+{
+	struct rtr_options opt;
+
+	/* parse arguments */
+	memset(&opt, 0, sizeof(struct rtr_options));
+	if (parse_options(argc, argv, &opt) != 0) {
+		free_options(&opt);
+		exit(1);
+	}
+
+	/* init signal */
+	init_signal();
+
+	/* trace command */
+	trace_cmd(&opt);
+
+	/* free options */
+	free_options(&opt);
 
 	return 0;
 }
