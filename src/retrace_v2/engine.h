@@ -30,6 +30,7 @@
 
 #include "funcs.h"
 
+#if 0
 enum InterceptActions {
 	IA_INVALID,
 
@@ -47,6 +48,7 @@ enum InterceptActions {
 	IA_COUNT
 };
 
+
 enum ArrayCountMethods {
 	ACM_INVALID,
 
@@ -56,19 +58,18 @@ enum ArrayCountMethods {
 	/* Known during compile time */
 	ACM_STATIC
 };
+#endif
 
 struct ThreadContext {
 	const struct FuncPrototype *prototype;
 	void *real_impl;
 	long int ret_val;
-
-	/* pointers to the params */
-	void *params[MAXCOUNT_PARAMS];
-
-	/* TODO: This should be function specific */
-	enum InterceptActions actions[IA_COUNT];
-
+	/* values of the params */
+	long int params[MAXCOUNT_PARAMS];
+	char *new_params[MAXCOUNT_PARAMS];
+	int new_params_cnt;
 	void *arch_spec_ctx;
+	void *ret_addr;
 };
 
 extern int retrace_inited;

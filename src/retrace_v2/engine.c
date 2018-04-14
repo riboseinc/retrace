@@ -37,6 +37,8 @@
 #include "real_impls.h"
 #include "arch_spec.h"
 #include "actions.h"
+#include "conf.h"
+
 
 #define retrace_engine_warn(fmt, ...) \
 	printf("[WARN] " fmt "\n", ## __VA_ARGS__)
@@ -45,7 +47,7 @@
 	printf("[INFO] " fmt "\n", ## __VA_ARGS__)
 
 #define retrace_engine_error(fmt, ...) \
-	printf("[ERROR]" fmt "\n", ## __VA_ARGS__)
+	printf("[ERROR] " fmt "\n", ## __VA_ARGS__)
 
 static pthread_key_t thread_ctx_key;
 
@@ -54,6 +56,7 @@ static void thread_ctx_destructor(void *thread_ctx)
 	retrace_real_impls.free(thread_ctx);
 	retrace_real_impls.pthread_key_delete(thread_ctx_key);
 }
+
 static inline struct ThreadContext *get_thread_context(void)
 {
 	struct ThreadContext *thread_ctx;
@@ -77,17 +80,27 @@ static inline struct ThreadContext *get_thread_context(void)
 			return NULL;
 		}
 
-		/* TODO: init thread_ctx */
+		/* reset context data */
 		retrace_real_impls.memset(thread_ctx, 0, sizeof(*thread_ctx));
 
-		/* set default actions */
-		thread_ctx->actions[0] = IA_LOG_PARAMS;
-		thread_ctx->actions[1] = IA_CALL_REAL;
-		thread_ctx->actions[2] = IA_INVALID;
 	}
 
 	return thread_ctx;
 }
+
+static inline void clear_context(struct ThreadContext *thread_ctx)
+{
+
+	/* free new params */
+	while (thread_ctx->new_params_cnt >= 0) {
+		retrace_real_impls.free(
+			thread_ctx->new_params[thread_ctx->new_params_cnt]);
+		thread_ctx->new_params_cnt--;
+	}
+
+	retrace_real_impls.memset(thread_ctx, 0, sizeof(*thread_ctx));
+}
+
 
 const struct FuncPrototype
 *retrace_engine_get_func_prototype(
@@ -110,6 +123,82 @@ const struct FuncPrototype
 	return NULL;
 }
 
+static const JSON_Object *get_i_script(const JSON_Array *i_array,
+	const char *func_name,
+	void *ret_addr)
+{
+	int i;
+	const JSON_Object *i_script;
+	const char *i_func;
+	double i_ret_addr;
+	const JSON_Object *ret_cand;
+
+	ret_cand = NULL;
+	for (i = 0; i < json_array_get_count(i_array); i++) {
+		i_script = json_array_get_object(i_array, i);
+
+		/* find function name */
+		i_func = json_object_get_string(i_script, "func_name");
+		if (i_func == NULL) {
+			retrace_engine_error(
+				"i_script idx: %d has no func_name member",
+				i);
+			continue;
+		}
+
+		/* check for match-all */
+		if (!retrace_real_impls.strcmp(i_func, "*"))
+			return i_script;
+
+		/* func_name match? */
+		if (!retrace_real_impls.strcmp(i_func, func_name)) {
+			if (!ret_addr)
+				return i_script;
+
+			i_ret_addr = json_object_get_number(i_script, "return_addr");
+
+			if (!i_ret_addr) {
+				/* ret_addr not specified */
+				if (ret_cand == NULL)
+					ret_cand = i_script;
+			} else {
+				/* ret_addr match? */
+				if ((long long) ret_addr == ((long long) i_ret_addr))
+					return i_script;
+			}
+		}
+	}
+
+	return ret_cand;
+}
+
+
+struct WrapperSystemVFrame {
+	/* this flag will cause the assembly portion to call the real impl */
+	long int call_real_flag;
+
+	/* In case call_real_flag is 1,
+	 * the assembly portion will jmp to this address
+	 */
+	void *real_impl;
+
+	/* return value for the function,
+	 * used in case call_real_flag == 0
+	 */
+	long int ret_val;
+
+	/* original values of the param regs,
+	 * as seen by the assembly portion
+	 */
+	long int real_r9;
+	long int real_r8;
+	long int real_rcx;
+	long int real_rdx;
+	long int real_rsi;
+	long int real_rdi;
+	long int real_rsp;
+};
+
 /* The purpose of this function is to continue the work of the assembly wrapper.
  * The separation exists to allow for an easy support of different archs/ABIs
  * Assembly wrapper should call this function as soon as it saves
@@ -121,6 +210,13 @@ void retrace_engine_wrapper(char *func_name,
 	void *real_impl;
 	int i;
 	struct ThreadContext *thread_ctx;
+	const JSON_Object *i_script;
+	const JSON_Array *i_actions;
+	const JSON_Object *i_action;
+	int (*action_func)(struct ThreadContext *t_ctx,
+		const JSON_Object *action_params);
+	const char *i_action_name;
+	const JSON_Array *i_scripts;
 
 	if (!retrace_inited) {
 		/* This can happen if constructor was not
@@ -138,36 +234,43 @@ void retrace_engine_wrapper(char *func_name,
 		retrace_as_sched_real(arch_spec_ctx, real_impl);
 		return;
 	}
+
 	/* get/create retrace context for thread */
 	thread_ctx = get_thread_context();
+	if (thread_ctx == NULL) {
+		retrace_engine_error(
+			"%s() intercept failed - could not get context",
+			func_name);
+
+		return;
+	}
 
 	/* get real implementation */
 	//real_impl = retrace_engine_get_real_impl_safe(func_name);
 	real_impl = retrace_real_impls.dlsym(RTLD_NEXT, func_name);
 
-	if (thread_ctx == NULL ||
-			real_impl == NULL) {
-		/* cannot process */
-
-		if (real_impl == NULL)
-			/* abort call with return val -1,
-			 * -1 is chosen for the best chance of
-			 * signaling an error for CRT funcs
-			 * The caller will probably crash anyway...
-			 */
-			retrace_as_abort(arch_spec_ctx, -1);
-		else
-			retrace_as_sched_real(arch_spec_ctx, real_impl);
-
+	if (real_impl == NULL) {
+		/* cannot process
+		 * abort call with return val -1,
+		 * -1 is chosen for the best chance of
+		 * signaling an error for CRT funcs
+		 * The caller will probably crash anyway...
+		 */
+		retrace_as_set_ret_val(arch_spec_ctx, -1);
 		return;
 	}
 
-	/* Up to this point only safe funcs can be used */
-	asm volatile ("":::"memory");
+	char *name = (char *) ((struct WrapperSystemVFrame *) arch_spec_ctx)->real_rdi;
 
-	/* do not intervene if already intercepting */
+	//printf("real_rdi* %s", name);
+
+	/* set default to call real impl */
+	retrace_as_sched_real(arch_spec_ctx, real_impl);
+
+	/* do not intervene if already intercepting,
+	 * should not happen since we always use real funcs
+	 */
 	if (thread_ctx->real_impl != NULL) {
-		retrace_as_sched_real(arch_spec_ctx, real_impl);
 		return;
 	}
 
@@ -186,8 +289,7 @@ void retrace_engine_wrapper(char *func_name,
 			"%s() is intercepted but not prototyped, will not intervene",
 			func_name);
 
-		retrace_as_sched_real(arch_spec_ctx, real_impl);
-		goto end_intercept;
+		return;
 	}
 
 	/* setup params */
@@ -195,26 +297,98 @@ void retrace_engine_wrapper(char *func_name,
 		thread_ctx->prototype->params,
 		thread_ctx->params);
 
-	/* run the script */
-	i = 0;
-	while (thread_ctx->actions[i] != IA_INVALID) {
-		retrace_engine_info("Running action %d, for %s(), tpid 0x%llx...",
-				thread_ctx->actions[i],
-				func_name,
-				(unsigned long long) pthread_self());
+	char *param_ptr = (char *) thread_ctx->params[0];
 
-		if (!retrace_intercept_actions[thread_ctx->actions[i]](
-			thread_ctx))
-			break;
-
-		i++;
+	/* find intercept script for the func and return addr */
+	i_scripts = json_object_get_array(retrace_conf, "intercept_scripts");
+	if (!i_scripts) {
+		retrace_engine_warn(
+			"%s() config does not contain intercept_scripts",
+			func_name);
+		return;
 	}
 
-end_intercept:
-	thread_ctx->real_impl = NULL;
+	i_script = get_i_script(i_scripts, func_name,
+		thread_ctx->ret_addr);
 
-	retrace_as_intercept_done(thread_ctx->arch_spec_ctx,
-		thread_ctx->ret_val);
+	if (!i_script) {
+		/* no script defined for this func, call real */
+		return;
+	}
+
+	i_actions = json_object_get_array(i_script, "actions");
+	if (i_actions == NULL) {
+		retrace_engine_warn(
+			"i_script for %s:%p does not contain actions array",
+			func_name,
+			thread_ctx->ret_addr);
+		return;
+	}
+
+	if (!json_array_get_count(i_actions)) {
+		retrace_engine_warn(
+			"i_script for %s:%p contains empty actions array",
+			func_name,
+			thread_ctx->ret_addr);
+		return;
+	}
+
+	/* we have script, do not call real impl by default */
+	retrace_as_cancel_sched_real(arch_spec_ctx);
+
+	for (i = 0; i < json_array_get_count(i_actions); i++) {
+
+		i_action = json_array_get_object(i_actions, i);
+		i_action_name = json_object_get_string(i_action, "action_name");
+		if (i_action_name == NULL) {
+			retrace_engine_error(
+				"action idx: %d for %s:%p has no action_name "
+				"aborting script",
+				i,
+				func_name,
+				thread_ctx->ret_addr);
+
+			break;
+		}
+
+		action_func = retrace_actions_get(i_action_name);
+
+		if (!action_func) {
+			retrace_engine_error("action idx: %d for %s:%p "
+				"is not supported '%s', aborting script",
+				i,
+				func_name,
+				thread_ctx->ret_addr,
+				i_action_name);
+
+			break;
+		}
+
+		retrace_engine_info("Running action %s, for %s:%p, tpid 0x%llx...",
+				i_action_name,
+				func_name,
+				thread_ctx->ret_addr,
+				(unsigned long long) pthread_self());
+
+		if (action_func(thread_ctx,
+			json_object_get_object(i_action, "action_params"))) {
+
+			retrace_engine_warn("action %s, for %s:%p, tpid 0x%llx aborted"
+				" the script",
+				i_action_name,
+				func_name,
+				thread_ctx->ret_addr,
+				(unsigned long long) pthread_self());
+
+			break;
+		}
+	}
+
+	/* write back to arch spec. portion */
+	retrace_as_set_ret_val(arch_spec_ctx, thread_ctx->ret_val);
+
+	/* mark hi-level intercept done */
+	clear_context(thread_ctx);
 }
 
 /* not thread safe */

@@ -32,7 +32,7 @@ CHECKPATCH_FLAGS+=" --ignore MULTISTATEMENT_MACRO_USE_DO_WHILE"
 CHECKPATCH_FLAGS+=" --ignore STORAGE_CLASS"
 
 # checkpatch.pl will ignore the following paths
-CHECKPATCH_IGNORE+=" checkpatch.pl.patch Makefile test/Makefile test/http.redirect/hello.txt src/retrace_v2/parson.c src/retrace_v2/parson.h"
+CHECKPATCH_IGNORE+=" checkpatch.pl.patch Makefile test/Makefile test/http.redirect/hello.txt src/retrace_v2/parson.c src/retrace_v2/parson.h *.json"
 CHECKPATCH_EXCLUDE=$(for p in $CHECKPATCH_IGNORE; do echo ":(exclude)$p" ; done)
 
 function _checkpatch() {

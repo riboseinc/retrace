@@ -1,0 +1,46 @@
+/* this JSON demonstrates the logging of writev() call.
+The use of omit param is also demonstrated.
+In addition, in case iovcnt == 3 it will be set to 1
+*/
+
+{
+	"intercept_scripts": [	
+		{
+			"func_name": "writev",
+			"actions": [
+				{
+					"action_name": "log_params"
+				},
+				{
+					"action_name": "modify_in_param_int",
+					"action_params": {
+						"param_name" : "iovcnt",								
+						"match_int" : 3,
+						"new_int" : 1
+					}
+				},			
+				{
+					"action_name": "log_params",
+					"action_params": {
+						"omit_params" : [
+							"fd"
+						]
+					}
+				},		
+		        {
+					"action_name": "call_real"
+				}
+			]
+		},
+		
+		/* default script for known functions */
+		{
+			"func_name": "*",
+			"actions": [
+		        {
+					"action_name": "call_real"
+				}
+			]
+		}
+	]
+};

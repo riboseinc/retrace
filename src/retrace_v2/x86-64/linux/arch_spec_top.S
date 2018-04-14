@@ -48,6 +48,11 @@ pushq %r9
 # for call_real_flag, real_impl, ret_val
 subq $24, %rsp
 
+#reset WrapperSystemVFrame_t members
+#they are to be filled by the intercept logic
+movq $0, OFFS_CALL_REAL_FLAG(%rsp)
+movq $0, OFFS_REAL_IMPL(%rsp)
+movq $0, OFFS_RET_VAL(%rsp)
 #pass function name as first param
 leaq \func_name\()_real_name(%rip), %rdi
 

@@ -52,9 +52,9 @@ struct WrapperSystemVFrame {
 	long int real_rsp;
 };
 
-long int retrace_as_call_real_ret(void *real_impl,
+long int retrace_as_call_real(const void *real_impl,
 	const struct ParamMeta *params_meta,
-	void *params[])
+	long int params[])
 {
 	long int ret_val;
 	unsigned long int params_cnt;
@@ -132,48 +132,54 @@ long int retrace_as_call_real_ret(void *real_impl,
 				/* load first param void**,
 				 * use rax for redirect
 				 */
-				"movq (%%r13), %%rax;"
-				"movq (%%rax), %%rdi;"
+				//"movq (%%r13), %%rax;"
+				//"movq (%%rax), %%rdi;"
+				"movq (%%r13), %%rdi;"
 
 				/* more params? */
 				"decq %%r10;"
 				"jz _call_ret_ParamSetupDone;"
 
 				/* load second param */
-				"movq 8(%%r13), %%rax;"
-				"movq (%%rax), %%rsi;"
+				//"movq 8(%%r13), %%rax;"
+				//"movq (%%rax), %%rsi;"
+				"movq 8(%%r13), %%rsi;"
 
 				/* more params? */
 				"decq %%r10;"
 				"jz _call_ret_ParamSetupDone;"
 
 				/* load third param */
-				"movq 16(%%r13), %%rax;"
-				"movq (%%rax), %%rdx;"
+				//"movq 16(%%r13), %%rax;"
+				//"movq (%%rax), %%rdx;"
+				"movq 16(%%r13), %%rdx;"
 
 				/* more params? */
 				"decq %%r10;"
 				"jz _call_ret_ParamSetupDone;"
 
 				/* load forth param */
-				"movq 24(%%r13), %%rax;"
-				"movq (%%rax), %%rcx;"
+				//"movq 24(%%r13), %%rax;"
+				//"movq (%%rax), %%rcx;"
+				"movq 24(%%r13), %%rcx;"
 
 				/* more params? */
 				"decq %%r10;"
 				"jz _call_ret_ParamSetupDone;"
 
 				/* load fifth param */
-				"movq 32(%%r13), %%rax;"
-				"movq (%%rax), %%r8;"
+				//"movq 32(%%r13), %%rax;"
+				//"movq (%%rax), %%r8;"
+				"movq 32(%%r13), %%r8;"
 
 				/* more params? */
 				"decq %%r10;"
 				"jz _call_ret_ParamSetupDone;"
 
 				/* load sixth param */
-				"movq 40(%%r13), %%rax;"
-				"movq (%%rax), %%r9;"
+				//"movq 40(%%r13), %%rax;"
+				//"movq (%%rax), %%r9;"
+				"movq 40(%%r13), %%r9;"
 
 				/* more params? */
 				"decq %%r10;"
@@ -185,7 +191,8 @@ long int retrace_as_call_real_ret(void *real_impl,
 
 				"_call_ret_MoreParams:;"
 				"movq (%%r11), %%rax;"
-				"pushq (%%rax);"
+				//"pushq (%%rax);"
+				"pushq %%rax;"
 
 				"decq %%r10;"
 				"jz _call_ret_ParamSetupDone;"
@@ -204,7 +211,7 @@ long int retrace_as_call_real_ret(void *real_impl,
 				"addq $8, %%rsp;"
 
 				"_call_ret_Restore:;"
-				/* load param count */
+				/* pop params from stack if any */
 				"movq %%r12, %%r10;"
 				"subq $6, %%r10;"
 				"jb _call_ret_NoParamsOnStack;"
@@ -258,7 +265,7 @@ void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl)
 void retrace_as_setup_params(
 	void *arch_spec_ctx,
 	const struct ParamMeta *params_meta,
-	void **params)
+	long int params[])
 {
 	int i;
 	int params_on_stack;
@@ -283,27 +290,27 @@ void retrace_as_setup_params(
 			switch (i) {
 			case 0:
 				params[i] =
-					&wrapper_frame_top->real_rdi;
+					wrapper_frame_top->real_rdi;
 				break;
 			case 1:
 				params[i] =
-					&wrapper_frame_top->real_rsi;
+					wrapper_frame_top->real_rsi;
 				break;
 			case 2:
 				params[i] =
-					&wrapper_frame_top->real_rdx;
+					wrapper_frame_top->real_rdx;
 				break;
 			case 3:
 				params[i] =
-					&wrapper_frame_top->real_rcx;
+					wrapper_frame_top->real_rcx;
 				break;
 			case 4:
 				params[i] =
-					&wrapper_frame_top->real_r8;
+					wrapper_frame_top->real_r8;
 				break;
 			case 5:
 				params[i] =
-					&wrapper_frame_top->real_r9;
+					wrapper_frame_top->real_r9;
 				break;
 			}
 		} else {
@@ -311,7 +318,7 @@ void retrace_as_setup_params(
 			params_on_stack = params_cnt - 6;
 
 			/* assume sizeof(void*) == sizeof(long int) */
-			params[i] = (void *)
+			params[i] =
 				(wrapper_frame_top->real_rsp +
 					sizeof(void *) * (params_on_stack - i));
 		}
@@ -324,4 +331,15 @@ void retrace_as_intercept_done(void *arch_spec_ctx,
 	((struct WrapperSystemVFrame *) arch_spec_ctx)->ret_val = ret_val;
 
 	((struct WrapperSystemVFrame *) arch_spec_ctx)->call_real_flag = 0;
+}
+
+void retrace_as_cancel_sched_real(void *arch_spec_ctx)
+{
+	((struct WrapperSystemVFrame *) arch_spec_ctx)->call_real_flag = 0;
+}
+
+void retrace_as_set_ret_val(void *arch_spec_ctx,
+	long int ret_val)
+{
+	((struct WrapperSystemVFrame *) arch_spec_ctx)->ret_val = ret_val;
 }

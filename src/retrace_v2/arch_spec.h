@@ -26,20 +26,44 @@
 #ifndef ARCH_SPEC_H_
 #define ARCH_SPEC_H_
 
-long int retrace_as_call_real_ret(void *real_impl,
+/* calls real_impls passing params accordingly to params_meta */
+long int retrace_as_call_real(const void *real_impl,
 	const struct ParamMeta *params_meta,
-	void *params[]);
+	long int params[]);
 
+/*
 void retrace_as_abort(void *arch_spec_ctx, long int ret_val);
+*/
 
+/* this function is an entry point for the hi level logic
+ * it will be called from assembly interceptor.
+ * must be implemented outside arch_spec
+ *
+ * retrace_as_sched_real() must be called if invocation of
+ * real impl is required
+ */
+extern void retrace_engine_wrapper(char *func_name,
+	void *arch_spec_ctx);
+
+/* schedules real_impl to run after retrace_engine_wrapper */
 void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl);
 
+/* cancels real_impl to run after retrace_engine_wrapper */
+void retrace_as_cancel_sched_real(void *arch_spec_ctx);
+
+/* should be called by retrace_engine_wrapper to setup params */
 void retrace_as_setup_params(
 	void *arch_spec_ctx,
 	const struct ParamMeta *params_meta,
-	void **params);
+	long int params[]);
 
+/*
 void retrace_as_intercept_done(void *arch_spec_ctx,
+	long int ret_val);
+*/
+
+/* schedules real_impl to run after retrace_engine_wrapper */
+void retrace_as_set_ret_val(void *arch_spec_ctx,
 	long int ret_val);
 
 #endif /* ARCH_SPEC_H_ */

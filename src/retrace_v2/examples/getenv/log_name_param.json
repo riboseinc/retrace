@@ -1,0 +1,25 @@
+/* this JSON demonstrates the logging of 
+the 'name' param for getnev() call. */
+
+{
+	"intercept_scripts": [
+		{
+			"func_name": "getenv",
+			"actions": [
+				{
+					"action_name": "log_params"
+				}
+			]
+		},		
+
+		/* default script for known functions */
+		{
+			"func_name": "*",
+			"actions": [
+		        {
+					"action_name": "call_real"
+				}
+			]
+		}
+	]
+};

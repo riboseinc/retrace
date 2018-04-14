@@ -23,51 +23,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SRC_RETRACE_V2_FUNCS_H_
-#define SRC_RETRACE_V2_FUNCS_H_
+#include "parson.h"
 
-#include "data_types.h"
+extern JSON_Object *retrace_conf;
 
-#define MAXLEN_FUNC_NAME 64
-#define MAXLEN_PARAM_NAME 64
-#define MAXCOUNT_PARAMS 16
-
-enum CallingConventions {
-	CC_INVALID,
-	CC_SYSTEM_V,
-	CC_MICROSOFT,
-	CC_CNT
-};
-
-enum ParamDirections {
-	PDIR_IN,
-	PDIR_OUT,
-	PDIR_INOUT,
-	PDIR_CNT
-};
-
-struct ParamMeta {
-	char name[MAXLEN_PARAM_NAME + 1];
-	char type_name[MAXLEN_DATATYPE_NAME + 1];
-	enum CDataModifiers modifiers;
-	enum ParamDirections direction;
-
-	/* in case modifiers & CDM_POINTER, this is the referenced type
-	 */
-	char ref_type_name[MAXLEN_DATATYPE_NAME + 1];
-
-	/* in case modifiers & (CDM_POINTER | CDM_ARRAY), this param
-	 * holds the number of elements
-	 */
-	char array_cnt_param[MAXLEN_PARAM_NAME + 1];
-};
-
-struct FuncPrototype {
-	enum CallingConventions conv;
-	char name[MAXLEN_FUNC_NAME + 1];
-	struct ParamMeta params[MAXCOUNT_PARAMS];
-};
-
-extern const struct FuncPrototype retrace_funcs[];
-
-#endif /* SRC_RETRACE_V2_FUNCS_H_ */
+int retrace_conf_init(void);

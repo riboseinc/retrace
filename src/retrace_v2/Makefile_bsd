@@ -1,2 +1,2 @@
 all:
-	gcc -fPIC -pthread -shared -g -o "retrace_v2.so"  ./x86-64/linux/arch_spec_bottom.c ./x86-64/linux/arch_spec_top.S  ./actions.c ./data_types.c ./engine.c ./funcs.c ./main.c ./parson.c ./real_impls.c
+	gcc -fPIC -pthread -shared -g -o "retrace_v2.so"  ./x86-64/linux/arch_spec_bottom.c ./x86-64/linux/arch_spec_top.S  ./actions.c ./data_types.c ./engine.c ./funcs.c ./main.c ./parson.c ./real_impls.c ./conf.c

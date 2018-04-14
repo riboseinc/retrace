@@ -1,0 +1,105 @@
+/* this JSON demonstrates the modification of 
+the 'name' param for getnev() call. The modification
+will happen only in case name == "PATH" and will be changed
+to "PWD" */
+
+{
+	"intercept_scripts": [
+		{
+			"func_name": "getenv",
+			"actions": [
+				{
+					"action_name": "log_params"
+				},
+				{
+					"action_name": "modify_in_param_str",
+					"action_params": {
+					
+						/* name of the param, must be a pointer to C string */
+						"param_name" : "name",
+						
+						/* match_str is optional, if omitted,
+						new_str will be always assigned */
+						"match_str" : "PATH",
+						
+						/* new_str is mandatory, specifies new value for
+						param */
+						"new_str" : "PWD"				
+					}
+				},
+				{
+					"action_name": "modify_in_param_arr",
+					"action_params": {
+						"param_name" : "name",								
+						"match_arr" : [
+                  			80,
+							65,
+                  			84,
+                  			72,
+                  			0
+                		],
+						"new_arr" : [
+                  			80,
+                  			87,
+                  			68,
+                  			0
+                		]
+					}
+				},
+				{
+					"action_name": "log_params"
+				},
+		        {
+					"action_name": "call_real",
+					"action_params": {
+          			}
+				}
+			]
+		},		
+		{
+			"func_name": "write",
+			"actions": [
+				{
+					"action_name": "log_params"
+				},
+				{
+					"action_name": "modify_in_param_int",
+					"action_params": {
+						"param_name" : "count",
+						"new_int" : 5				
+					}
+				},
+				{
+					"action_name": "modify_in_param_int",
+					"action_params": {
+						"param_name" : "fd",
+						"match_int" : 1,
+						"new_int" : 2				
+					}
+				},				
+				{
+					"action_name": "log_params",
+					"action_params": {
+						"omit_params" : ["fd"]		
+					}
+				},				
+		        {
+					"action_name": "call_real"
+				}
+			]
+		},
+		
+		/* default script for known functions */
+		{
+			"func_name": "*",
+			"actions": [
+				{
+					"action_name": "log_params"
+				},
+		        {
+					"action_name": "call_real"
+				}
+			]
+		}
+	]
+};

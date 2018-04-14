@@ -127,6 +127,10 @@ struct DataType {
 	int (*get_size)(const void *data,
 		const struct DataType *data_type,
 		size_t *dst_size_t);
+
+	int (*compare)(const void *a,
+		const void *b,
+		const struct DataType *data_type);
 };
 
 extern const struct DataType retrace_data_types[];

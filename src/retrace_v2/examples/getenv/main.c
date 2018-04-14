@@ -23,51 +23,31 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SRC_RETRACE_V2_FUNCS_H_
-#define SRC_RETRACE_V2_FUNCS_H_
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 
-#include "data_types.h"
+void print_usage(void)
+{
+	printf("Usage: getenv_exmpl $ENVAR\n"
+		"$ENVAR: Environment var to display\n"
+		"e.g. \"getenv_exmpl USER\"\n");
+}
 
-#define MAXLEN_FUNC_NAME 64
-#define MAXLEN_PARAM_NAME 64
-#define MAXCOUNT_PARAMS 16
+int main(int argc, char *argv[])
+{
+	char *env_var;
 
-enum CallingConventions {
-	CC_INVALID,
-	CC_SYSTEM_V,
-	CC_MICROSOFT,
-	CC_CNT
-};
+	if (argc != 2) {
+		print_usage();
+		return -1;
+	}
 
-enum ParamDirections {
-	PDIR_IN,
-	PDIR_OUT,
-	PDIR_INOUT,
-	PDIR_CNT
-};
+	env_var = getenv(argv[1]);
+	if (env_var == NULL)
+		printf("variable '%s' is not defined", argv[1]);
+	else
+		printf("'%s' = '%s'", argv[1], env_var);
 
-struct ParamMeta {
-	char name[MAXLEN_PARAM_NAME + 1];
-	char type_name[MAXLEN_DATATYPE_NAME + 1];
-	enum CDataModifiers modifiers;
-	enum ParamDirections direction;
-
-	/* in case modifiers & CDM_POINTER, this is the referenced type
-	 */
-	char ref_type_name[MAXLEN_DATATYPE_NAME + 1];
-
-	/* in case modifiers & (CDM_POINTER | CDM_ARRAY), this param
-	 * holds the number of elements
-	 */
-	char array_cnt_param[MAXLEN_PARAM_NAME + 1];
-};
-
-struct FuncPrototype {
-	enum CallingConventions conv;
-	char name[MAXLEN_FUNC_NAME + 1];
-	struct ParamMeta params[MAXCOUNT_PARAMS];
-};
-
-extern const struct FuncPrototype retrace_funcs[];
-
-#endif /* SRC_RETRACE_V2_FUNCS_H_ */
+	return 0;
+}
