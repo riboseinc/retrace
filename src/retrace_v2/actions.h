@@ -26,20 +26,10 @@
 #ifndef SRC_RETRACE_V2_ACTIONS_H_
 #define SRC_RETRACE_V2_ACTIONS_H_
 
-enum InterceptResults {
-	/* Invalid result, should not happen */
-	IR_INVALID,
+#include "parson.h"
 
-	/* Run next action */
-	IR_NEXT,
-
-	/* Abort running script */
-	IR_STOP
-};
-
-extern enum InterceptResults(*retrace_intercept_actions[])
-	(struct ThreadContext *t_ctx);
-
-//extern InterceptActionFunc retrace_intercept_actions[];
+int(*retrace_actions_get(const char *action_name))
+	(struct ThreadContext *t_ctx,
+		const JSON_Object *action_params);
 
 #endif /* SRC_RETRACE_V2_ACTIONS_H_ */

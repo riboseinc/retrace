@@ -29,6 +29,8 @@
 
 #include "real_impls.h"
 #include "engine.h"
+#include "parson.h"
+#include "conf.h"
 
 #if 0
 
@@ -130,6 +132,13 @@ __attribute__((constructor(101)))
 static void retrace_main(void)
 {
 	if (retrace_real_impls_init_safe())
+		return;
+
+	/* init parson code which is used by various modules */
+	json_set_allocation_functions(retrace_real_impls.malloc,
+			retrace_real_impls.free);
+
+	if (retrace_conf_init())
 		return;
 
 	if (retrace_engine_init())

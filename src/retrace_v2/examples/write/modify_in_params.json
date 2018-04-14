@@ -1,0 +1,64 @@
+/* this JSON demonstrates the modification of 
+the input params for write() call. The modification
+will happen as follows:
+1. fd param will always be modified to 1 (stdout)
+2. In case buf == "Hello" it will be changed to "Bye",
+modifying count param accordingly
+Parameters will be logged before and after the modifications.
+*/
+
+{
+	"intercept_scripts": [	
+		{
+			"func_name": "write",
+			"actions": [
+				{
+					"action_name": "log_params"
+				},
+				{
+					"action_name": "modify_in_param_arr",
+					"action_params": {
+						"param_name" : "buff",								
+						"match_arr" : [
+                  			72,
+							101,
+                  			108,
+                  			108,
+                  			111
+                		],
+						"new_arr" : [
+                  			66,
+                  			121,
+                  			101
+                		]
+					}
+				},
+				{
+					"action_name": "modify_in_param_int",
+					"action_params": {
+						"param_name" : "fd",
+						"new_int" : 1		
+					}
+				},				
+				{
+					"action_name": "log_params",
+					"action_params": {
+					}
+				},				
+		        {
+					"action_name": "call_real"
+				}
+			]
+		},
+		
+		/* default script for known functions */
+		{
+			"func_name": "*",
+			"actions": [
+		        {
+					"action_name": "call_real"
+				}
+			]
+		}
+	]
+};

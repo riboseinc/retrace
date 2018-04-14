@@ -25,6 +25,7 @@
 
 #include <stdlib.h>
 #include <pthread.h>
+#include <stdio.h>
 
 struct RetraceRealImpls {
 	int (*pthread_key_create)(pthread_key_t *key,
@@ -35,7 +36,7 @@ struct RetraceRealImpls {
 	int (*pthread_key_delete)(pthread_key_t key);
 
 	void *(*malloc)(size_t size);
-	void *(*free)(void *ptr);
+	void (*free)(void *ptr);
 
 	int (*atoi)(const char *nptr);
 
@@ -51,6 +52,15 @@ struct RetraceRealImpls {
 
 	int (*sprintf)(char *str, const char *format, ...);
 	int (*snprintf)(char *str, size_t size, const char *format, ...);
+
+	char *(*getenv)(const char *name);
+
+	FILE *(*fopen)(const char *path, const char *mode);
+	int (*fclose)(FILE *fp);
+	size_t (*fread)(void *ptr, size_t size, size_t nmemb, FILE *stream);
+	int (*fseek)(FILE *stream, long offset, int whence);
+	long (*ftell)(FILE *stream);
+
 };
 
 extern struct RetraceRealImpls retrace_real_impls;

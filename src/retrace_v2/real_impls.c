@@ -135,6 +135,30 @@ int retrace_real_impls_init_safe(void)
 	if (retrace_real_impls.snprintf == NULL)
 		return -18;
 
+	retrace_real_impls.getenv = real_impls_safe("getenv");
+	if (retrace_real_impls.getenv == NULL)
+		return -19;
+
+	retrace_real_impls.fopen = real_impls_safe("fopen");
+	if (retrace_real_impls.fopen == NULL)
+		return -20;
+
+	retrace_real_impls.fread = real_impls_safe("fread");
+	if (retrace_real_impls.fread == NULL)
+		return -21;
+
+	retrace_real_impls.fseek = real_impls_safe("fseek");
+	if (retrace_real_impls.fseek == NULL)
+		return -22;
+
+	retrace_real_impls.ftell = real_impls_safe("ftell");
+	if (retrace_real_impls.ftell == NULL)
+		return -23;
+
+	retrace_real_impls.fclose = real_impls_safe("fclose");
+	if (retrace_real_impls.fclose == NULL)
+		return -24;
+
 	return 0;
 }
 

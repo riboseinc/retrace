@@ -23,51 +23,43 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SRC_RETRACE_V2_FUNCS_H_
-#define SRC_RETRACE_V2_FUNCS_H_
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/uio.h>
 
-#include "data_types.h"
+void print_usage(void)
+{
+	printf("Usage: writev_exmpl $FD $STR $SIZE $IOVCNT\n"
+			"$FD: File descriptor number\n"
+			"$STR: String to write\n"
+			"$SIZE: Number of bytes of $STR to write\n"
+			"$IOVCNT: IO vector size\n"
+			"e.g. \"writev_exmpl 1 Hello 5 2\"\n");
+}
 
-#define MAXLEN_FUNC_NAME 64
-#define MAXLEN_PARAM_NAME 64
-#define MAXCOUNT_PARAMS 16
+int main(int argc, char *argv[])
+{
+	struct iovec *iovec;
+	struct iovec *p;
+	int iovcnt;
+	int i;
 
-enum CallingConventions {
-	CC_INVALID,
-	CC_SYSTEM_V,
-	CC_MICROSOFT,
-	CC_CNT
-};
+	if (argc != 5) {
+		print_usage();
+		return -1;
+	}
 
-enum ParamDirections {
-	PDIR_IN,
-	PDIR_OUT,
-	PDIR_INOUT,
-	PDIR_CNT
-};
+	iovcnt = atoi(argv[4]);
+	p = iovec = (struct iovec *) malloc(sizeof(struct iovec) * iovcnt);
 
-struct ParamMeta {
-	char name[MAXLEN_PARAM_NAME + 1];
-	char type_name[MAXLEN_DATATYPE_NAME + 1];
-	enum CDataModifiers modifiers;
-	enum ParamDirections direction;
+	for (i = 0; i != iovcnt; i++) {
+		p->iov_base = argv[2];
+		p->iov_len = atoi(argv[3]);
+		p++;
+	}
 
-	/* in case modifiers & CDM_POINTER, this is the referenced type
-	 */
-	char ref_type_name[MAXLEN_DATATYPE_NAME + 1];
-
-	/* in case modifiers & (CDM_POINTER | CDM_ARRAY), this param
-	 * holds the number of elements
-	 */
-	char array_cnt_param[MAXLEN_PARAM_NAME + 1];
-};
-
-struct FuncPrototype {
-	enum CallingConventions conv;
-	char name[MAXLEN_FUNC_NAME + 1];
-	struct ParamMeta params[MAXCOUNT_PARAMS];
-};
-
-extern const struct FuncPrototype retrace_funcs[];
-
-#endif /* SRC_RETRACE_V2_FUNCS_H_ */
+	return writev(atoi(argv[1]),
+		iovec,
+		iovcnt);
+}
