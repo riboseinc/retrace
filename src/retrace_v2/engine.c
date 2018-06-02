@@ -38,16 +38,19 @@
 #include "arch_spec.h"
 #include "actions.h"
 #include "conf.h"
+#include "logger.h"
 
+#define log_err(fmt, ...) \
+	retrace_logger_log(ENGINE, ERROR, fmt, ##__VA_ARGS__)
 
-#define retrace_engine_warn(fmt, ...) \
-	printf("[WARN] " fmt "\n", ## __VA_ARGS__)
+#define log_info(fmt, ...) \
+	retrace_logger_log(ENGINE, INFO, fmt, ##__VA_ARGS__)
 
-#define retrace_engine_info(fmt, ...) \
-	printf("[INFO] " fmt "\n", ## __VA_ARGS__)
+#define log_warn(fmt, ...) \
+	retrace_logger_log(ENGINE, WARN, fmt, ##__VA_ARGS__)
 
-#define retrace_engine_error(fmt, ...) \
-	printf("[ERROR] " fmt "\n", ## __VA_ARGS__)
+#define log_dbg(fmt, ...) \
+	retrace_logger_log(ENGINE, DEBUG, fmt, ##__VA_ARGS__)
 
 static pthread_key_t thread_ctx_key;
 
@@ -101,7 +104,7 @@ static inline void clear_context(struct ThreadContext *thread_ctx)
 	retrace_real_impls.memset(thread_ctx, 0, sizeof(*thread_ctx));
 }
 
-
+#if 0
 const struct FuncPrototype
 *retrace_engine_get_func_prototype(
 	const char *func_name)
@@ -111,7 +114,7 @@ const struct FuncPrototype
 	/* TODO: Make a faster search - not O(n) like this */
 
 	/* end of func tables are marked by empty string */
-	p = retrace_funcs;
+//	p = retrace_funcs;
 	while (p->name[0]) {
 		if (!retrace_real_impls.strncmp(func_name,
 			p->name, MAXLEN_DATATYPE_NAME))
@@ -122,6 +125,7 @@ const struct FuncPrototype
 
 	return NULL;
 }
+#endif
 
 static const JSON_Object *get_i_script(const JSON_Array *i_array,
 	const char *func_name,
@@ -140,7 +144,7 @@ static const JSON_Object *get_i_script(const JSON_Array *i_array,
 		/* find function name */
 		i_func = json_object_get_string(i_script, "func_name");
 		if (i_func == NULL) {
-			retrace_engine_error(
+			log_err(
 				"i_script idx: %d has no func_name member",
 				i);
 			continue;
@@ -204,6 +208,25 @@ struct WrapperSystemVFrame {
  * Assembly wrapper should call this function as soon as it saves
  * original parameters to its context
  */
+
+#include <dlfcn.h>
+#include <stddef.h>
+
+//__attribute__((regparm (3))) extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
+
+#ifdef HAVE_ATOMIC_BUILTINS
+
+#define RETRACE_FIXUP(func) __atomic_store_n(&real_##func,		\
+	_dl_sym(RTLD_NEXT, #func, rtr_fixup_##func), __ATOMIC_RELAXED)	\
+
+#else /* !HAVE_ATOMIC_BUILTINS */
+
+#define RETRACE_FIXUP(func) real_##func =				\
+	_dl_sym(RTLD_NEXT, #func, __func__)				\
+
+#endif /* HAVE_ATOMIC_BUILTINS */
+
+
 void retrace_engine_wrapper(char *func_name,
 		void *arch_spec_ctx)
 {
@@ -218,18 +241,21 @@ void retrace_engine_wrapper(char *func_name,
 	const char *i_action_name;
 	const JSON_Array *i_scripts;
 
+
+	/*
+	 * get real implementation
+	 * This is very sensitive code, no function calls are allowed.
+	 *
+	 */
+	real_impl = retrace_as_get_real_safe(func_name);
 	if (!retrace_inited) {
 		/* This can happen if constructor was not
 		 * called yet or it failed to initialize
 		 * retrace module. For example, on FreeBSD, getenv()
 		 * gets called before the constructor.
-		 * All we can do is to call the real implementation
+		 * All we can do is to call the real implementation.
+		 *
 		 */
-
-		/* FIXME: calling dlsym directly!
-		 * will crash if dlsym is a interceptable itself
-		 */
-		real_impl = dlsym(RTLD_NEXT, func_name);
 
 		retrace_as_sched_real(arch_spec_ctx, real_impl);
 		return;
@@ -238,16 +264,12 @@ void retrace_engine_wrapper(char *func_name,
 	/* get/create retrace context for thread */
 	thread_ctx = get_thread_context();
 	if (thread_ctx == NULL) {
-		retrace_engine_error(
+		log_err(
 			"%s() intercept failed - could not get context",
 			func_name);
 
 		return;
 	}
-
-	/* get real implementation */
-	//real_impl = retrace_engine_get_real_impl_safe(func_name);
-	real_impl = retrace_real_impls.dlsym(RTLD_NEXT, func_name);
 
 	if (real_impl == NULL) {
 		/* cannot process
@@ -262,13 +284,10 @@ void retrace_engine_wrapper(char *func_name,
 
 	char *name = (char *) ((struct WrapperSystemVFrame *) arch_spec_ctx)->real_rdi;
 
-	//printf("real_rdi* %s", name);
-
 	/* set default to call real impl */
 	retrace_as_sched_real(arch_spec_ctx, real_impl);
 
-	/* do not intervene if already intercepting,
-	 * should not happen since we always use real funcs
+	/* do not intervene if already intercepting
 	 */
 	if (thread_ctx->real_impl != NULL) {
 		return;
@@ -280,16 +299,12 @@ void retrace_engine_wrapper(char *func_name,
 	/* Mark active interception for cases of nested calls */
 	thread_ctx->real_impl = real_impl;
 
-	thread_ctx->prototype =
-		retrace_engine_get_func_prototype(func_name);
+	thread_ctx->prototype = retrace_func_get(func_name);
 
 	/* if func is not prototyped - do not intervene */
 	if (thread_ctx->prototype == NULL) {
-		retrace_engine_warn(
-			"%s() is intercepted but not prototyped, will not intervene",
-			func_name);
-
-		return;
+		/* Silently call real impl */
+		goto clean_up;
 	}
 
 	/* setup params */
@@ -302,10 +317,10 @@ void retrace_engine_wrapper(char *func_name,
 	/* find intercept script for the func and return addr */
 	i_scripts = json_object_get_array(retrace_conf, "intercept_scripts");
 	if (!i_scripts) {
-		retrace_engine_warn(
+		log_warn(
 			"%s() config does not contain intercept_scripts",
 			func_name);
-		return;
+		goto clean_up;
 	}
 
 	i_script = get_i_script(i_scripts, func_name,
@@ -313,24 +328,24 @@ void retrace_engine_wrapper(char *func_name,
 
 	if (!i_script) {
 		/* no script defined for this func, call real */
-		return;
+		goto clean_up;
 	}
 
 	i_actions = json_object_get_array(i_script, "actions");
 	if (i_actions == NULL) {
-		retrace_engine_warn(
+		log_warn(
 			"i_script for %s:%p does not contain actions array",
 			func_name,
 			thread_ctx->ret_addr);
-		return;
+		goto clean_up;
 	}
 
 	if (!json_array_get_count(i_actions)) {
-		retrace_engine_warn(
+		log_warn(
 			"i_script for %s:%p contains empty actions array",
 			func_name,
 			thread_ctx->ret_addr);
-		return;
+		goto clean_up;
 	}
 
 	/* we have script, do not call real impl by default */
@@ -341,7 +356,7 @@ void retrace_engine_wrapper(char *func_name,
 		i_action = json_array_get_object(i_actions, i);
 		i_action_name = json_object_get_string(i_action, "action_name");
 		if (i_action_name == NULL) {
-			retrace_engine_error(
+			log_err(
 				"action idx: %d for %s:%p has no action_name "
 				"aborting script",
 				i,
@@ -354,7 +369,7 @@ void retrace_engine_wrapper(char *func_name,
 		action_func = retrace_actions_get(i_action_name);
 
 		if (!action_func) {
-			retrace_engine_error("action idx: %d for %s:%p "
+			log_err("action idx: %d for %s:%p "
 				"is not supported '%s', aborting script",
 				i,
 				func_name,
@@ -364,7 +379,7 @@ void retrace_engine_wrapper(char *func_name,
 			break;
 		}
 
-		retrace_engine_info("Running action %s, for %s:%p, tpid 0x%llx...",
+		log_dbg("Running action %s, for %s:%p, tpid 0x%llx...",
 				i_action_name,
 				func_name,
 				thread_ctx->ret_addr,
@@ -373,7 +388,7 @@ void retrace_engine_wrapper(char *func_name,
 		if (action_func(thread_ctx,
 			json_object_get_object(i_action, "action_params"))) {
 
-			retrace_engine_warn("action %s, for %s:%p, tpid 0x%llx aborted"
+			log_warn("action %s, for %s:%p, tpid 0x%llx aborted"
 				" the script",
 				i_action_name,
 				func_name,
@@ -387,6 +402,7 @@ void retrace_engine_wrapper(char *func_name,
 	/* write back to arch spec. portion */
 	retrace_as_set_ret_val(arch_spec_ctx, thread_ctx->ret_val);
 
+clean_up:
 	/* mark hi-level intercept done */
 	clear_context(thread_ctx);
 }

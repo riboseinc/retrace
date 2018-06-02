@@ -23,32 +23,40 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
+#include "logger.h"
+#include "real_impls.h"
 
-#include "../../prototypes/unistd.c"
+int retrace_sev_ena[SEVERITY_CNT] = {
+	[DEBUG] = 1,
+	[INFO] = 1,
+	[WARN] = 1,
+	[ERROR] = 1
+};
 
-void print_usage(void)
+int retrace_mod_ena[MODULES_CNT] = {
+	[ACTIONS] = 1,
+	[CONF] = 1,
+	[DATA_TYPES] = 1,
+	[ENGINE] = 1,
+	[FUNCS] = 1,
+	[MAIN] = 1
+};
+
+char *retrace_module_pref[MODULES_CNT] = {"ACT",
+	"CONF",
+	"TYPES",
+	"ENGINE",
+	"FUNCS",
+	"MAIN"
+};
+
+char *retrace_severities[SEVERITY_CNT] = {"DEBUG",
+	"INFO",
+	"WARN",
+	"ERROR"
+};
+
+int retrace_logger_init(void)
 {
-	printf("Usage: getenv_exmpl $ENVAR\n"
-		"$ENVAR: Environment var to display\n"
-		"e.g. \"getenv_exmpl USER\"\n");
-}
-
-int main(int argc, char *argv[])
-{
-	char *env_var;
-
-	if (argc != 2) {
-		print_usage();
-		return -1;
-	}
-
-	env_var = getenv(argv[1]);
-	if (env_var == NULL)
-		printf("variable '%s' is not defined", argv[1]);
-	else
-		printf("'%s' = '%s'", argv[1], env_var);
-
 	return 0;
 }

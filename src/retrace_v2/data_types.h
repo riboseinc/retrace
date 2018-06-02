@@ -27,6 +27,7 @@
 #define SRC_RETRACE_V2_DATA_TYPES_H_
 
 #include <stdlib.h>
+#include "arch_spec_macros.h"
 
 #define MAXLEN_DATATYPE_NAME 32
 #define MAXLEN_STRUCT_MEMBER_NAME MAXLEN_DATATYPE_NAME
@@ -95,7 +96,7 @@ struct StructMember {
 	size_t array_cnt;
 };
 
-//struct DataType;
+
 struct DataType {
 	char name[MAXLEN_DATATYPE_NAME + 1];
 
@@ -133,6 +134,16 @@ struct DataType {
 		const struct DataType *data_type);
 };
 
-extern const struct DataType retrace_data_types[];
+//extern const struct DataType retrace_data_types[];
+const struct DataType *retrace_datatype_get(const char *datatype_name);
+int retrace_datatypes_init(void);
+
+/* aligned 1 is used because i group all DataType in the same
+ * section, creating an array
+ */
+#define retrace_datatype_define_prototypes(datatype_name) \
+	retrace_as_define_var_in_sec(const struct DataType,\
+		retrace_dt_##datatype_name[], \
+			"__DATA", "__retrace_dt")__attribute__((aligned(1)))
 
 #endif /* SRC_RETRACE_V2_DATA_TYPES_H_ */

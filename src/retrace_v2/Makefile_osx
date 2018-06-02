@@ -1,2 +1,29 @@
+SRC=./prototypes/locale.c
+SRC+=./prototypes/ctype.c
+SRC+=./prototypes/signal.c
+SRC+=./prototypes/stdio.c
+SRC+=./prototypes/stdlib.c
+SRC+=./prototypes/uio.c
+SRC+=./prototypes/unistd.c
+
+SRC+=./actions/basic.c
+
+SRC+=./datatypes/basic.c
+SRC+=./datatypes/uio.c
+SRC+=./datatypes/unistd.c
+
+SRC+=./arch/x86-64/osx/arch_spec_bottom.c
+SRC+=./arch/x86-64/osx/arch_spec_top.S
+SRC+=./actions.c
+SRC+=./data_types.c
+SRC+=./engine.c
+SRC+=./funcs.c
+SRC+=./main.c
+SRC+=./parson.c
+SRC+=./real_impls.c
+SRC+=./conf.c
+SRC+=./logger.c
+SRC+=./funcs_symbols.S
+
 all:
-	gcc -dynamiclib -g -o "retrace_v2.so" -D_FORTIFY_SOURCE=0 -I"./" x86-64/osx/arch_spec_bottom.c x86-64/osx/arch_spec_top.S actions.c data_types.c engine.c funcs.c main.c parson.c real_impls.c conf.c
+	gcc -dynamiclib -g -o "retrace_v2.dylib" -D_FORTIFY_SOURCE=0 -I"./" -I"./arch/x86-64/osx" $(SRC)

@@ -26,6 +26,12 @@
 #include "engine.h"
 #include "real_impls.h"
 
+#define log_err(fmt, ...) \
+	retrace_real_impls.printf("[AS ERROR] " fmt "\n", ##__VA_ARGS__)
+
+#define log_info(fmt, ...) \
+	retrace_real_impls.printf("[AS INFO] " fmt "\n", ##__VA_ARGS__)
+
 struct WrapperSystemVFrame {
 	/* this flag will cause the assembly portion to call the real impl */
 	long int call_real_flag;
@@ -51,6 +57,15 @@ struct WrapperSystemVFrame {
 	long int real_rdi;
 	long int real_rsp;
 };
+
+struct RealImpls {
+	char* (*getsectdata)(
+	   const char *segname,
+	   const char *sectname,
+	   unsigned long *size);
+};
+
+static struct RealImpls retrace_as_real_impls;
 
 long int retrace_as_call_real(const void *real_impl,
 	const struct ParamMeta *params_meta,
@@ -259,6 +274,7 @@ void retrace_as_abort(void *arch_spec_ctx, long int ret_val)
 }
 
 void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl)
+//void retrace_as_sched_real(void *arch_spec_ctx, const char *func_name)
 {
 	struct WrapperSystemVFrame *wrapper_frame_top;
 
@@ -347,4 +363,53 @@ void retrace_as_set_ret_val(void *arch_spec_ctx,
 	long int ret_val)
 {
 	((struct WrapperSystemVFrame *) arch_spec_ctx)->ret_val = ret_val;
+}
+
+#if 0
+char *retrace_as_get_funcs_sec(unsigned long *size)
+{
+	extern char start_mysection __asm("section$start$__DATA$__retrace_funcs");
+	extern char stop_mysection __asm("section$end$__DATA$__retrace_funcs");
+
+	*size = (&stop_mysection)-(&start_mysection);
+
+	return (char *) &start_mysection;
+}
+#endif
+
+int retrace_as_init(void)
+{
+	return 0;
+}
+
+void *retrace_as_get_real_safe(const char *real_impl)
+{
+	unsigned long size;
+	int i;
+
+	/* This has to be aligned with __retrace_rimpls */
+	struct __retrace_rimpls {
+		const char func_name[MAXLEN_FUNC_NAME];
+		void *real_impl;
+	} *p, *eos;
+
+	retrace_as_get_section_info("__DATA", "__retrace_rimpls", &p, &size);
+
+	//log_info("Seraching for real impl for '%s'", real_impl);
+
+	eos = (struct __retrace_rimpls *) (((char *) p) + size);
+	while (p && p != eos) {
+		i = 0;
+		while (p->func_name[i] &&
+			p->func_name[i] == real_impl[i]) {
+			i++;
+		}
+
+		if (p->func_name[i] == real_impl[i])
+			return p->real_impl;
+
+		p++;
+	}
+
+	return 0;
 }

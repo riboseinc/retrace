@@ -27,11 +27,11 @@
 .set OFFS_REAL_IMPL, 8
 .set OFFS_RET_VAL, 16
 
+#This has to equal to MAXLEN_FUNC_NAME from funcs.h
+.set MAXLEN_FUNC_NAME, 64
+
 .macro WRAPPER_ENTRY_SYSTEM_V func_name
 .section __TEXT, __text
-.global _\func_name\()_retrace_wrapper
-.global _\func_name\()
-_\func_name\():
 _\func_name\()_retrace_wrapper:
 
 #prep WrapperSystemVFrame_t struct starts on this rsp, alignment needed
@@ -53,7 +53,7 @@ movq $0, OFFS_REAL_IMPL(%rsp)
 movq $0, OFFS_RET_VAL(%rsp)
 
 #pass function name as first param
-leaq L\func_name\()_real_name(%rip), %rdi
+leaq L\func_name\()_retrace_real_name(%rip), %rdi
 
 #pass WrapperSystemVFrame_t as second param
 movq %rsp, %rsi
@@ -69,7 +69,7 @@ addq $8, %rsp
 
 #check call_real_flag, 1 marks the call is needed
 cmpq $0, OFFS_CALL_REAL_FLAG(%rsp)
-jz L\func_name\()_no_real
+jz L\func_name\()_retrace_no_real
 
 #load registers and restore stack, jmp to real
 #note params values may be modified
@@ -85,7 +85,7 @@ popq %rsp
 #jump to real, the real will return to the caller
 jmpq *-72(%rsp)
 
-L\func_name\()_no_real:
+L\func_name\()_retrace_no_real:
 #TODO write back params?
 
 # set return value. TODO: support long long return
@@ -93,19 +93,17 @@ movq OFFS_RET_VAL(%rsp), %rax
 addq $80, %rsp
 retq
 
-.data
-L\func_name\()_real_name:
+.section __DATA, __retrace_rimpls
+#.data
+L\func_name\()_retrace_real_name:
 .string "\func_name"
+L\func_name\()_retrace_real_name_size:
+.set \func_name\()_SIZE, L\func_name\()_retrace_real_name_size - L\func_name\()_retrace_real_name
+.zero MAXLEN_FUNC_NAME - \func_name\()_SIZE
+.quad _\func_name
+
+.section __DATA, __interpose
+.quad _\func_name\()_retrace_wrapper
+.quad _\func_name
+
 .endm
-
-#TODO: Change it to real-time override using elf lib
-WRAPPER_ENTRY_SYSTEM_V getenv
-WRAPPER_ENTRY_SYSTEM_V write
-WRAPPER_ENTRY_SYSTEM_V writev
-#WRAPPER_ENTRY_SYSTEM_V dummy_func5
-#WRAPPER_ENTRY_SYSTEM_V dummy_func6
-#WRAPPER_ENTRY_SYSTEM_V dummy_func7
-#WRAPPER_ENTRY_SYSTEM_V dummy_func0_no_ret
-#WRAPPER_ENTRY_SYSTEM_V dummy_func0
-
-

@@ -23,48 +23,100 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
 
-struct RetraceRealImpls {
-	int (*pthread_key_create)(pthread_key_t *key,
-		void (*destructor)(void *));
+void print_usage(void)
+{
+	printf("Usage: ctype_exmpl $CHAR\n"
+		"$CHAR: Character value in decimal to pass to ctype funcs\n"
+		"e.g. \"ctype_exmpl 123\"\n");
+}
 
-	void *(*pthread_getspecific)(pthread_key_t key);
-	int (*pthread_setspecific)(pthread_key_t key, const void *value);
-	int (*pthread_key_delete)(pthread_key_t key);
-
-	void *(*malloc)(size_t size);
-	void (*free)(void *ptr);
-
-	int (*atoi)(const char *nptr);
-
-	void *(*memset)(void *s, int c, size_t n);
-	int (*strncmp)(const char *s1, const char *s2, size_t n);
-	void *(*memcpy)(void *dest, const void *src, size_t n);
-	size_t (*strlen)(const char *s);
-	int (*strcmp)(const char *s1, const char *s2);
-	char *(*strcpy)(char *dest, const char *src);
-
-	void *(*dlopen)(const char *filename, int flag);
-	void *(*dlsym)(void *handle, const char *symbol);
-
-	int (*sprintf)(char *str, const char *format, ...);
-	int (*snprintf)(char *str, size_t size, const char *format, ...);
-
-	char *(*getenv)(const char *name);
-
-	FILE *(*fopen)(const char *path, const char *mode);
-	int (*fclose)(FILE *fp);
-	size_t (*fread)(void *ptr, size_t size, size_t nmemb, FILE *stream);
-	int (*fseek)(FILE *stream, long offset, int whence);
-	long (*ftell)(FILE *stream);
-
-	int (*printf)(const char *format, ...);
+struct {
+	int (*ctypef)(int c);
+	char *fname;
+} ctype_funcs[] = {
+	{
+		.ctypef = isalnum,
+		.fname = "isalnum"
+	},
+	{
+		.ctypef = isalpha,
+		.fname = "isalpha"
+	},
+	{
+		.ctypef = isblank,
+		.fname = "isblank"
+	},
+	{
+		.ctypef = iscntrl,
+		.fname = "iscntrl"
+	},
+	{
+		.ctypef = isdigit,
+		.fname = "isdigit"
+	},
+	{
+		.ctypef = isgraph,
+		.fname = "isgraph"
+	},
+	{
+		.ctypef = islower,
+		.fname = "islower"
+	},
+	{
+		.ctypef = isprint,
+		.fname = "isprint"
+	},
+	{
+		.ctypef = ispunct,
+		.fname = "ispunct"
+	},
+	{
+		.ctypef = isspace,
+		.fname = "isspace"
+	},
+	{
+		.ctypef = isupper,
+		.fname = "isupper"
+	},
+	{
+		.ctypef = isxdigit,
+		.fname = "isxdigit"
+	},
+	{
+		.ctypef = tolower,
+		.fname = "tolower"
+	},
+	{
+		.ctypef = toupper,
+		.fname = "toupper"
+	},
+	{
+		.fname = NULL
+	}
 };
 
-extern struct RetraceRealImpls retrace_real_impls;
+int main(int argc, char *argv[])
+{
+	int usr_char;
+	int i;
 
-int retrace_real_impls_init(void);
-void *retrace_real_impls_get(const char *func_name);
+	if (argc != 2) {
+		print_usage();
+		return -1;
+	}
+
+	usr_char = atoi(argv[1]);
+
+	while (ctype_funcs[i].fname != NULL) {
+		printf("%s(%d) = %d\n", ctype_funcs[i].fname,
+			usr_char, ctype_funcs[i].ctypef(usr_char));
+
+		i++;
+	}
+
+	return 0;
+}

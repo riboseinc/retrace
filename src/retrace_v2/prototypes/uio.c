@@ -22,33 +22,69 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "funcs.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-
-#include "../../prototypes/unistd.c"
-
-void print_usage(void)
-{
-	printf("Usage: getenv_exmpl $ENVAR\n"
-		"$ENVAR: Environment var to display\n"
-		"e.g. \"getenv_exmpl USER\"\n");
-}
-
-int main(int argc, char *argv[])
-{
-	char *env_var;
-
-	if (argc != 2) {
-		print_usage();
-		return -1;
+retrace_func_define_prototypes(uio) = {
+	{
+		.name = "writev",
+		.conv = CC_SYSTEM_V,
+		.type_name = "size_t",
+		.params = {
+			{
+				.name = "fd",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "iovec",
+				.type_name = "ptr",
+				.modifiers =
+					CDM_POINTER | CDM_CONST | CDM_ARRAY,
+				.array_cnt_param = "iovcnt",
+				.ref_type_name = "iovec",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "iovcnt",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = ""
+			}
+		}
+	},
+	{
+		.name = "readv",
+		.conv = CC_SYSTEM_V,
+		.type_name = "size_t",
+		.params = {
+			{
+				.name = "fd",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "iovec",
+				.type_name = "ptr",
+				.modifiers =
+					CDM_POINTER | CDM_CONST | CDM_ARRAY,
+				.array_cnt_param = "iovcnt",
+				.ref_type_name = "iovec",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "iovcnt",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = ""
+			}
+		}
 	}
-
-	env_var = getenv(argv[1]);
-	if (env_var == NULL)
-		printf("variable '%s' is not defined", argv[1]);
-	else
-		printf("'%s' = '%s'", argv[1], env_var);
-
-	return 0;
-}
+};
