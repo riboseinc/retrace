@@ -22,33 +22,39 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "funcs.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-
-#include "../../prototypes/unistd.c"
-
-void print_usage(void)
-{
-	printf("Usage: getenv_exmpl $ENVAR\n"
-		"$ENVAR: Environment var to display\n"
-		"e.g. \"getenv_exmpl USER\"\n");
-}
-
-int main(int argc, char *argv[])
-{
-	char *env_var;
-
-	if (argc != 2) {
-		print_usage();
-		return -1;
+retrace_func_define_prototypes(locale) = {
+	{
+		.name = "setlocale",
+		.conv = CC_SYSTEM_V,
+		.type_name = "ptr",
+		.params = {
+			{
+				.name = "category",
+				.type_name = "int",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "locale",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = ""
+			}
+		}
+	},
+	{
+		.name = "localeconv",
+		.conv = CC_SYSTEM_V,
+		.type_name = "ptr",
+		.params = {
+			{
+				.name = ""
+			}
+		}
 	}
-
-	env_var = getenv(argv[1]);
-	if (env_var == NULL)
-		printf("variable '%s' is not defined", argv[1]);
-	else
-		printf("'%s' = '%s'", argv[1], env_var);
-
-	return 0;
-}
+};

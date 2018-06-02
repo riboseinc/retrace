@@ -23,32 +23,32 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
+#include "data_types.h"
+#include "basic.h"
 
-#include "../../prototypes/unistd.c"
+retrace_datatype_define_prototypes(uio) = {
+	{
+		.name = "iovec",
+		.struct_members = {
+			{
+				.name = "iov_base",
+				.type = "ptr",
 
-void print_usage(void)
-{
-	printf("Usage: getenv_exmpl $ENVAR\n"
-		"$ENVAR: Environment var to display\n"
-		"e.g. \"getenv_exmpl USER\"\n");
-}
-
-int main(int argc, char *argv[])
-{
-	char *env_var;
-
-	if (argc != 2) {
-		print_usage();
-		return -1;
+				/* do not process as pointer */
+				.modifiers = CDM_NOMOD
+			},
+			{
+				.name = "iov_len",
+				.type = "size_t",
+				.modifiers = CDM_NOMOD
+			},
+			{
+				.name = ""
+			}
+		},
+		.to_sz = retrace_struct_to_sz,
+		.get_sz_size = retrace_struct_get_sz_size,
+		.to_size_t = retrace_struct_to_size_t,
+		.get_size = retrace_struct_get_size
 	}
-
-	env_var = getenv(argv[1]);
-	if (env_var == NULL)
-		printf("variable '%s' is not defined", argv[1]);
-	else
-		printf("'%s' = '%s'", argv[1], env_var);
-
-	return 0;
-}
+};

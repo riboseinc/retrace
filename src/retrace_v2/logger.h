@@ -23,32 +23,37 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
+enum Modules {
+	ACTIONS,
+	CONF,
+	DATA_TYPES,
+	ENGINE,
+	FUNCS,
+	MAIN,
+	MODULES_CNT
+};
 
-#include "../../prototypes/unistd.c"
+enum Severity {
+	DEBUG,
+	INFO,
+	WARN,
+	ERROR,
+	SEVERITY_CNT
+};
 
-void print_usage(void)
-{
-	printf("Usage: getenv_exmpl $ENVAR\n"
-		"$ENVAR: Environment var to display\n"
-		"e.g. \"getenv_exmpl USER\"\n");
-}
+extern int retrace_sev_ena[SEVERITY_CNT];
+extern int retrace_mod_ena[MODULES_CNT];
 
-int main(int argc, char *argv[])
-{
-	char *env_var;
+extern char *retrace_severities[SEVERITY_CNT];
+extern char *retrace_module_pref[MODULES_CNT];
 
-	if (argc != 2) {
-		print_usage();
-		return -1;
-	}
+int retrace_logger_init(void);
 
-	env_var = getenv(argv[1]);
-	if (env_var == NULL)
-		printf("variable '%s' is not defined", argv[1]);
-	else
-		printf("'%s' = '%s'", argv[1], env_var);
+#define retrace_logger_log(module, sev, fmt, ...) \
+do { \
+	if (retrace_sev_ena[(sev)] && retrace_mod_ena[(module)]) \
+		retrace_real_impls.printf("[%s][%s]: " fmt "\n", \
+			retrace_module_pref[(module)], \
+				retrace_severities[(sev)], ##__VA_ARGS__); \
+} while (0)
 
-	return 0;
-}

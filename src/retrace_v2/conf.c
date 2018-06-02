@@ -26,9 +26,19 @@
 
 #include "conf.h"
 #include "real_impls.h"
+#include "logger.h"
 
-#define log_err(fmt, ...) printf("[CONF ERROR] " fmt "\n", ##__VA_ARGS__)
-#define log_info(fmt, ...) printf("[CONF INFO] " fmt "\n", ##__VA_ARGS__)
+#define log_err(fmt, ...) \
+	retrace_logger_log(CONF, ERROR, fmt, ##__VA_ARGS__)
+
+#define log_info(fmt, ...) \
+	retrace_logger_log(CONF, INFO, fmt, ##__VA_ARGS__)
+
+#define log_warn(fmt, ...) \
+	retrace_logger_log(CONF, WARN, fmt, ##__VA_ARGS__)
+
+#define log_dbg(fmt, ...) \
+	retrace_logger_log(CONF, DEBUG, fmt, ##__VA_ARGS__)
 
 #define ENVAR_JSON_CONFIG_FN "RETRACE_JSON_CONFIG"
 
@@ -121,7 +131,7 @@ int retrace_conf_init(void)
 
 		retrace_real_impls.fclose(f);
 	} else
-		log_info("config file not set, using the default conf");
+		log_warn("config file not set, using the default conf");
 
 parse_json:
 

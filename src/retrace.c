@@ -37,7 +37,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include "retrace_v2/prototypes/unistd.c"
 
 #include "retrace.h"
 

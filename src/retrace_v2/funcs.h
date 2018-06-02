@@ -27,9 +27,10 @@
 #define SRC_RETRACE_V2_FUNCS_H_
 
 #include "data_types.h"
+#include "arch_spec.h"
 
 #define MAXLEN_FUNC_NAME 64
-#define MAXLEN_PARAM_NAME 64
+#define MAXLEN_PARAM_NAME 32
 #define MAXCOUNT_PARAMS 16
 
 enum CallingConventions {
@@ -63,11 +64,23 @@ struct ParamMeta {
 };
 
 struct FuncPrototype {
-	enum CallingConventions conv;
 	char name[MAXLEN_FUNC_NAME + 1];
+	enum CallingConventions conv;
 	struct ParamMeta params[MAXCOUNT_PARAMS];
+	char type_name[MAXLEN_DATATYPE_NAME + 1];
 };
 
-extern const struct FuncPrototype retrace_funcs[];
+//extern const struct FuncPrototype retrace_funcs[];
+
+const struct FuncPrototype *retrace_func_get(const char *func_name);
+int retrace_funcs_init(void);
+
+/* aligned 1 is used because i group all FuncPrototype in the same
+ * section, creating an array
+ */
+#define retrace_func_define_prototypes(lib_name) \
+	retrace_as_define_var_in_sec(const struct FuncPrototype,\
+		retrace_proto_##lib_name[], \
+			"__DATA", "__retrace_funcs")__attribute__((aligned(1)))
 
 #endif /* SRC_RETRACE_V2_FUNCS_H_ */

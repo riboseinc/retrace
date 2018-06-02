@@ -26,11 +26,15 @@
 #ifndef ARCH_SPEC_H_
 #define ARCH_SPEC_H_
 
+#include "arch/x86-64/osx/arch_spec_macros.h"
+//#include "funcs.h"
+
+struct ParamMeta;
+
 /* calls real_impls passing params accordingly to params_meta */
 long int retrace_as_call_real(const void *real_impl,
 	const struct ParamMeta *params_meta,
 	long int params[]);
-
 /*
 void retrace_as_abort(void *arch_spec_ctx, long int ret_val);
 */
@@ -47,6 +51,9 @@ extern void retrace_engine_wrapper(char *func_name,
 
 /* schedules real_impl to run after retrace_engine_wrapper */
 void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl);
+//int retrace_as_sched_real(void *arch_spec_ctx, const char *func_name);
+
+void *retrace_as_get_real_safe(const char *real_impl);
 
 /* cancels real_impl to run after retrace_engine_wrapper */
 void retrace_as_cancel_sched_real(void *arch_spec_ctx);
@@ -57,13 +64,10 @@ void retrace_as_setup_params(
 	const struct ParamMeta *params_meta,
 	long int params[]);
 
-/*
-void retrace_as_intercept_done(void *arch_spec_ctx,
-	long int ret_val);
-*/
-
 /* schedules real_impl to run after retrace_engine_wrapper */
 void retrace_as_set_ret_val(void *arch_spec_ctx,
 	long int ret_val);
+
+int retrace_as_init(void);
 
 #endif /* ARCH_SPEC_H_ */

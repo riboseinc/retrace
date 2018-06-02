@@ -31,6 +31,23 @@
 #include "engine.h"
 #include "parson.h"
 #include "conf.h"
+#include "arch_spec.h"
+#include "logger.h"
+#include "funcs.h"
+#include "actions.h"
+#include "data_types.h"
+
+#define log_err(fmt, ...) \
+	retrace_logger_log(MAIN, ERROR, fmt, ##__VA_ARGS__)
+
+#define log_info(fmt, ...) \
+	retrace_logger_log(MAIN, INFO, fmt, ##__VA_ARGS__)
+
+#define log_warn(fmt, ...) \
+	retrace_logger_log(MAIN, WARN, fmt, ##__VA_ARGS__)
+
+#define log_dbg(fmt, ...) \
+	retrace_logger_log(MAIN, DEBUG, fmt, ##__VA_ARGS__)
 
 #if 0
 
@@ -131,35 +148,57 @@ int retrace_inited;
 __attribute__((constructor(101)))
 static void retrace_main(void)
 {
-	if (retrace_real_impls_init_safe())
+	/* The order of module inits is strict */
+	//__asm("int $3;");
+	int ret;
+
+	if (retrace_as_init())
+		/* cant report error... */
+		return;
+
+	if (retrace_real_impls_init())
+		/* cant report error... */
+		return;
+
+	if (retrace_logger_init())
+		/* cant report error... */
 		return;
 
 	/* init parson code which is used by various modules */
 	json_set_allocation_functions(retrace_real_impls.malloc,
 			retrace_real_impls.free);
 
-	if (retrace_conf_init())
+	ret = retrace_conf_init();
+	if (ret) {
+		log_err("retrace_conf_init() failed, ret = %d", ret);
 		return;
+	}
 
-	if (retrace_engine_init())
+	ret = retrace_engine_init();
+	if (ret) {
+		log_err("retrace_engine_init() failed, ret = %d", ret);
 		return;
+	}
+
+	ret = retrace_funcs_init();
+	if (ret) {
+		log_err("retrace_funcs_init() failed, ret = %d", ret);
+		return;
+	}
+
+	ret = retrace_datatypes_init();
+	if (ret) {
+		log_err("retrace_datatypes_init() failed, ret = %d", ret);
+		return;
+	}
+
+	ret = retrace_actions_init();
+	if (ret) {
+		log_err("retrace_actions_init() failed, ret = %d", ret);
+		return;
+	}
+
+	log_info("retrace init success");
 
 	retrace_inited = 1;
 }
-
-#ifndef RETRACE_SIMULATE_INTERCEPT
-/* Simulation of LD_PRELOAD substitution */
-
-/*
- * char *getenv_wrapper(char *env_name);
- * char *write_wrapper(int fd, const void *buf, size_t count);
- * size_t writev_wrapper(int fd, const struct iovec *iov, int iovcnt);
- */
-
-#else
-
-#define getenv_wrapper(env_name) getenv(env_name)
-#define write_wrapper(fd, buf, count) write(fd, buf, count)
-#define writev_wrapper(fd, iov, iovcnt) writev(fd, iov, iovcnt)
-
-#endif

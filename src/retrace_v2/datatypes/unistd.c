@@ -23,32 +23,49 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
+#include "data_types.h"
+#include "basic.h"
 
-#include "../../prototypes/unistd.c"
-
-void print_usage(void)
-{
-	printf("Usage: getenv_exmpl $ENVAR\n"
-		"$ENVAR: Environment var to display\n"
-		"e.g. \"getenv_exmpl USER\"\n");
-}
-
-int main(int argc, char *argv[])
-{
-	char *env_var;
-
-	if (argc != 2) {
-		print_usage();
-		return -1;
+retrace_datatype_define_prototypes(unistd) = {
+	{
+		.name = "useconds_t",
+		.struct_members[0] = {.name = ""},
+		.to_sz = retrace_ulong_to_sz,
+		.get_sz_size = retrace_ulong_get_sz_size,
+		.to_size_t = retrace_ulong_to_size_t,
+		.get_size = retrace_ulong_get_size
+	},
+	{
+		.name = "gid_t",
+		.struct_members[0] = {.name = ""},
+		.to_sz = retrace_uint_to_sz,
+		.get_sz_size = retrace_uint_get_sz_size,
+		.to_size_t = retrace_uint_to_size_t,
+		.get_size = retrace_uint_get_size
+	},
+	{
+		.name = "pid_t",
+		.struct_members[0] = {.name = ""},
+		.to_sz = retrace_uint_to_sz,
+		.get_sz_size = retrace_uint_get_sz_size,
+		.to_size_t = retrace_uint_to_size_t,
+		.get_size = retrace_uint_get_size
+	},
+	{
+		.name = "uid_t",
+		.struct_members[0] = {.name = ""},
+		.to_sz = retrace_uint_to_sz,
+		.get_sz_size = retrace_uint_get_sz_size,
+		.to_size_t = retrace_uint_to_size_t,
+		.get_size = retrace_uint_get_size
+	},
+	{
+		.name = "off_t",
+		.struct_members[0] = {.name = ""},
+		/* FIXME: This is probably a bug, need to define spec funcs */
+		.to_sz = retrace_int_to_sz,
+		.get_sz_size = retrace_int_get_sz_size,
+		.to_size_t = retrace_int_to_size_t,
+		.get_size = retrace_int_get_size
 	}
-
-	env_var = getenv(argv[1]);
-	if (env_var == NULL)
-		printf("variable '%s' is not defined", argv[1]);
-	else
-		printf("'%s' = '%s'", argv[1], env_var);
-
-	return 0;
-}
+};

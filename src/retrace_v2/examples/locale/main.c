@@ -23,48 +23,69 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <locale.h>
+#include <string.h>
 
-struct RetraceRealImpls {
-	int (*pthread_key_create)(pthread_key_t *key,
-		void (*destructor)(void *));
 
-	void *(*pthread_getspecific)(pthread_key_t key);
-	int (*pthread_setspecific)(pthread_key_t key, const void *value);
-	int (*pthread_key_delete)(pthread_key_t key);
+void print_usage(void)
+{
+	printf("Usage: ctype_exmpl $CAREGORY $LOCALE\n"
+		"$CAREGORY: One of the following:\n"
+		"\tLC_ALL\n"
+		"\tLC_COLLATE\n"
+		"\tLC_CTYPE\n"
+		"\tLC_MONETARY\n"
+		"\tLC_NUMERIC\n"
+		"\tLC_TIME\n"
+		"\tLC_MESSAGES\n"
+		"$LOCALE: required setting of category.\n"
+		"e.g. \"locale_exmpl LC_ALL da_DK\"\n"
+		"\nRefer to locale.h documentation for additional info.\n"
+		);
+}
 
-	void *(*malloc)(size_t size);
-	void (*free)(void *ptr);
 
-	int (*atoi)(const char *nptr);
+int main(int argc, char *argv[])
+{
+	int i;
+	char *ret;
+	struct lconv *p;
 
-	void *(*memset)(void *s, int c, size_t n);
-	int (*strncmp)(const char *s1, const char *s2, size_t n);
-	void *(*memcpy)(void *dest, const void *src, size_t n);
-	size_t (*strlen)(const char *s);
-	int (*strcmp)(const char *s1, const char *s2);
-	char *(*strcpy)(char *dest, const char *src);
+	static const struct {
+		char *cat_str;
+		int cat;
+	} cats[] = {
+		{"LC_ALL", LC_ALL},
+		{"LC_COLLATE", LC_COLLATE},
+		{"LC_CTYPE", LC_CTYPE},
+		{"LC_MONETARY", LC_CTYPE},
+		{"LC_NUMERIC", LC_NUMERIC},
+		{"LC_TIME", LC_TIME},
+		{"LC_MESSAGES", LC_MESSAGES},
+		{"", 0}
+	};
 
-	void *(*dlopen)(const char *filename, int flag);
-	void *(*dlsym)(void *handle, const char *symbol);
+	if (argc != 3) {
+		print_usage();
+		return -1;
+	}
 
-	int (*sprintf)(char *str, const char *format, ...);
-	int (*snprintf)(char *str, size_t size, const char *format, ...);
+	i = 0;
+	while (strlen(cats[i].cat_str) && strcmp(cats[i].cat_str, argv[1]))
+		i++;
+	if (!strlen(cats[i].cat_str)) {
+		print_usage();
+		return -1;
+	}
 
-	char *(*getenv)(const char *name);
+	ret = setlocale(cats[i].cat, argv[2]);
+	printf("setlocale(%d, %s) = %p\n", cats[i].cat,
+			argv[2], ret);
 
-	FILE *(*fopen)(const char *path, const char *mode);
-	int (*fclose)(FILE *fp);
-	size_t (*fread)(void *ptr, size_t size, size_t nmemb, FILE *stream);
-	int (*fseek)(FILE *stream, long offset, int whence);
-	long (*ftell)(FILE *stream);
+	p = localeconv();
+	printf("localeconv() = %p\n", p);
 
-	int (*printf)(const char *format, ...);
-};
-
-extern struct RetraceRealImpls retrace_real_impls;
-
-int retrace_real_impls_init(void);
-void *retrace_real_impls_get(const char *func_name);
+	return 0;
+}
