@@ -16,11 +16,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 #include <string.h>
 #include <errno.h>
 
 #include "httpredirect.h"
-#include "retrace_v2/prototypes/unistd.c"
 
 #define MAXLEN		40
 
