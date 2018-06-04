@@ -23,22 +23,23 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* for RTLD_NEXT, may not fork on other platforms */
-
-#ifndef __GNUC__
-#error GNU extensions are required!
-#endif
-
+#ifdef __linux__
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#endif
+
+#include <stddef.h>
 
 #include "real_impls.h"
 #include "arch_spec.h"
 
 struct RetraceRealImpls retrace_real_impls = {0};
+/*
 void *__libc_dlsym(void *__map, const char *__name);
 void *_dl_sym(void *handle, const char *name, void *dl_caller);
+*/
 
+#if 0
 void *retrace_real_impls_get(const char *func_name)
 {
 	/* This assumes there will be no interceptions for __libc_dlsym */
@@ -50,15 +51,12 @@ void *retrace_real_impls_get(const char *func_name)
 	//return dlsym(RTLD_DEFAULT, func_name);
 	return retrace_as_get_real_safe(func_name);
 }
+#endif
 
-/* This should be the absolutely the first module to be inited,
- * We can use here only except retrace_real_impls_get()
- */
+/* This should be the absolutely the first module to be inited */
 int retrace_real_impls_init(void)
 {
-	void *handle;
-
-	retrace_real_impls.dlopen = retrace_real_impls_get("dlopen");
+	retrace_real_impls.dlopen = retrace_as_get_real_safe("dlopen");
 	if (retrace_real_impls.dlopen == NULL)
 		return -1;
 
@@ -66,6 +64,8 @@ int retrace_real_impls_init(void)
 	/* load all libs that are used in safe mode,
 	 *  since the linker wont link them
 	 */
+	void *handle;
+
 	handle = retrace_real_impls.dlopen(
 			"libpthread.so.0", RTLD_NOW | RTLD_GLOBAL);
 	if (handle == NULL)
@@ -73,98 +73,98 @@ int retrace_real_impls_init(void)
 #endif
 
 	retrace_real_impls.pthread_key_create =
-		retrace_real_impls_get("pthread_key_create");
+		retrace_as_get_real_safe("pthread_key_create");
 	if (retrace_real_impls.pthread_key_create == NULL)
 		return -3;
 
 	retrace_real_impls.pthread_getspecific =
-		retrace_real_impls_get("pthread_getspecific");
+		retrace_as_get_real_safe("pthread_getspecific");
 	if (retrace_real_impls.pthread_getspecific == NULL)
 		return -4;
 
 	retrace_real_impls.pthread_setspecific =
-		retrace_real_impls_get("pthread_setspecific");
+		retrace_as_get_real_safe("pthread_setspecific");
 	if (retrace_real_impls.pthread_setspecific == NULL)
 		return -5;
 
 	retrace_real_impls.pthread_key_delete
-		= retrace_real_impls_get("pthread_key_delete");
+		= retrace_as_get_real_safe("pthread_key_delete");
 	if (retrace_real_impls.pthread_key_delete == NULL)
 		return -6;
 
-	retrace_real_impls.free = retrace_real_impls_get("free");
+	retrace_real_impls.free = retrace_as_get_real_safe("free");
 	if (retrace_real_impls.free == NULL)
 		return -7;
 
-	retrace_real_impls.malloc = retrace_real_impls_get("malloc");
+	retrace_real_impls.malloc = retrace_as_get_real_safe("malloc");
 	if (retrace_real_impls.malloc == NULL)
 		return -8;
 
-	retrace_real_impls.dlsym = retrace_real_impls_get("dlsym");
+	retrace_real_impls.dlsym = retrace_as_get_real_safe("dlsym");
 	if (retrace_real_impls.dlsym == NULL)
 		return -9;
 
-	retrace_real_impls.memset = retrace_real_impls_get("memset");
+	retrace_real_impls.memset = retrace_as_get_real_safe("memset");
 	if (retrace_real_impls.memset == NULL)
 		return -10;
 
-	retrace_real_impls.memcpy = retrace_real_impls_get("memcpy");
+	retrace_real_impls.memcpy = retrace_as_get_real_safe("memcpy");
 	if (retrace_real_impls.memcpy == NULL)
 		return -11;
 
-	retrace_real_impls.strncmp = retrace_real_impls_get("strncmp");
+	retrace_real_impls.strncmp = retrace_as_get_real_safe("strncmp");
 	if (retrace_real_impls.strncmp == NULL)
 		return -12;
 
-	retrace_real_impls.strcmp = retrace_real_impls_get("strcmp");
+	retrace_real_impls.strcmp = retrace_as_get_real_safe("strcmp");
 	if (retrace_real_impls.strcmp == NULL)
 		return -13;
 
-	retrace_real_impls.strlen = retrace_real_impls_get("strlen");
+	retrace_real_impls.strlen = retrace_as_get_real_safe("strlen");
 	if (retrace_real_impls.strlen == NULL)
 		return -14;
 
-	retrace_real_impls.strcpy = retrace_real_impls_get("strcpy");
+	retrace_real_impls.strcpy = retrace_as_get_real_safe("strcpy");
 	if (retrace_real_impls.strcpy == NULL)
 		return -15;
 
-	retrace_real_impls.atoi = retrace_real_impls_get("atoi");
+	retrace_real_impls.atoi = retrace_as_get_real_safe("atoi");
 	if (retrace_real_impls.atoi == NULL)
 		return -16;
 
-	retrace_real_impls.sprintf = retrace_real_impls_get("sprintf");
+	retrace_real_impls.sprintf = retrace_as_get_real_safe("sprintf");
 	if (retrace_real_impls.sprintf == NULL)
 		return -17;
 
-	retrace_real_impls.snprintf = retrace_real_impls_get("snprintf");
+	retrace_real_impls.snprintf = retrace_as_get_real_safe("snprintf");
 	if (retrace_real_impls.snprintf == NULL)
 		return -18;
 
-	retrace_real_impls.getenv = retrace_real_impls_get("getenv");
+	retrace_real_impls.getenv = retrace_as_get_real_safe("getenv");
 	if (retrace_real_impls.getenv == NULL)
 		return -19;
 
-	retrace_real_impls.fopen = retrace_real_impls_get("fopen");
+	retrace_real_impls.fopen = retrace_as_get_real_safe("fopen");
 	if (retrace_real_impls.fopen == NULL)
 		return -20;
 
-	retrace_real_impls.fread = retrace_real_impls_get("fread");
+	retrace_real_impls.fread = retrace_as_get_real_safe("fread");
 	if (retrace_real_impls.fread == NULL)
 		return -21;
 
-	retrace_real_impls.fseek = retrace_real_impls_get("fseek");
+	retrace_real_impls.fseek = retrace_as_get_real_safe("fseek");
 	if (retrace_real_impls.fseek == NULL)
 		return -22;
 
-	retrace_real_impls.ftell = retrace_real_impls_get("ftell");
+	retrace_real_impls.ftell = retrace_as_get_real_safe("ftell");
 	if (retrace_real_impls.ftell == NULL)
 		return -23;
 
-	retrace_real_impls.fclose = retrace_real_impls_get("fclose");
+	retrace_real_impls.fclose = retrace_as_get_real_safe("fclose");
 	if (retrace_real_impls.fclose == NULL)
 		return -24;
 
-	retrace_real_impls.printf = retrace_real_impls_get("printf");
+	retrace_real_impls.printf = retrace_as_get_real_safe("printf");
 	if (retrace_real_impls.printf == NULL)
 		return -25;
 

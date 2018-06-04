@@ -209,24 +209,6 @@ struct WrapperSystemVFrame {
  * original parameters to its context
  */
 
-#include <dlfcn.h>
-#include <stddef.h>
-
-//__attribute__((regparm (3))) extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
-
-#ifdef HAVE_ATOMIC_BUILTINS
-
-#define RETRACE_FIXUP(func) __atomic_store_n(&real_##func,		\
-	_dl_sym(RTLD_NEXT, #func, rtr_fixup_##func), __ATOMIC_RELAXED)	\
-
-#else /* !HAVE_ATOMIC_BUILTINS */
-
-#define RETRACE_FIXUP(func) real_##func =				\
-	_dl_sym(RTLD_NEXT, #func, __func__)				\
-
-#endif /* HAVE_ATOMIC_BUILTINS */
-
-
 void retrace_engine_wrapper(char *func_name,
 		void *arch_spec_ctx)
 {
@@ -240,7 +222,6 @@ void retrace_engine_wrapper(char *func_name,
 		const JSON_Object *action_params);
 	const char *i_action_name;
 	const JSON_Array *i_scripts;
-
 
 	/*
 	 * get real implementation

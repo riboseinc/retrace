@@ -245,9 +245,12 @@ WRAPPER_ENTRY_SYSTEM_V pthread_attr_setscope
 WRAPPER_ENTRY_SYSTEM_V pthread_attr_setstackaddr
 WRAPPER_ENTRY_SYSTEM_V pthread_attr_setstacksize
 WRAPPER_ENTRY_SYSTEM_V pthread_cancel
-#move arch-spec
-#WRAPPER_ENTRY_SYSTEM_V pthread_cleanup_push
-#WRAPPER_ENTRY_SYSTEM_V pthread_cleanup_pop
+
+#ifdef __linux__
+WRAPPER_ENTRY_SYSTEM_V pthread_cleanup_push
+WRAPPER_ENTRY_SYSTEM_V pthread_cleanup_pop
+#endif
+
 WRAPPER_ENTRY_SYSTEM_V pthread_cond_broadcast
 WRAPPER_ENTRY_SYSTEM_V pthread_cond_destroy
 WRAPPER_ENTRY_SYSTEM_V pthread_cond_init
