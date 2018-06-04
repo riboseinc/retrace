@@ -67,4 +67,4 @@ struct RetraceRealImpls {
 extern struct RetraceRealImpls retrace_real_impls;
 
 int retrace_real_impls_init(void);
-void *retrace_real_impls_get(const char *func_name);
+//void *retrace_real_impls_get(const char *func_name);

@@ -100,14 +100,4 @@ retq
 .string "\func_name"
 .endm
 
-#TODO: Change it to real-time override using elf lib
-WRAPPER_ENTRY_SYSTEM_V getenv
-WRAPPER_ENTRY_SYSTEM_V write
-WRAPPER_ENTRY_SYSTEM_V writev
-#WRAPPER_ENTRY_SYSTEM_V dummy_func5
-#WRAPPER_ENTRY_SYSTEM_V dummy_func6
-#WRAPPER_ENTRY_SYSTEM_V dummy_func7
-#WRAPPER_ENTRY_SYSTEM_V dummy_func0_no_ret
-#WRAPPER_ENTRY_SYSTEM_V dummy_func0
-
 

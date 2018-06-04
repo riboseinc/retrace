@@ -26,8 +26,7 @@
 #ifndef ARCH_SPEC_H_
 #define ARCH_SPEC_H_
 
-#include "arch/x86-64/osx/arch_spec_macros.h"
-//#include "funcs.h"
+#include "arch_spec_macros.h"
 
 struct ParamMeta;
 

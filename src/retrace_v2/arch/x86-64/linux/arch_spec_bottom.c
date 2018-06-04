@@ -22,6 +22,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#define _GNU_SOURCE
+#include <dlfcn.h>
 
 #include "engine.h"
 #include "real_impls.h"
@@ -343,3 +345,16 @@ void retrace_as_set_ret_val(void *arch_spec_ctx,
 {
 	((struct WrapperSystemVFrame *) arch_spec_ctx)->ret_val = ret_val;
 }
+
+int retrace_as_init(void)
+{
+	return 0;
+}
+
+extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
+
+void *retrace_as_get_real_safe(const char *real_impl)
+{
+	return _dl_sym(RTLD_NEXT, real_impl, __func__);
+}
+

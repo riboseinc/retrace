@@ -23,31 +23,21 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
+#ifndef ARCH_SPEC_MACROS_H_
+#define ARCH_SPEC_MACROS_H_
 
-void print_usage(void)
-{
-	printf("Usage: getenv_exmpl $ENVAR\n"
-		"$ENVAR: Environment var to display\n"
-		"e.g. \"getenv_exmpl USER\"\n");
-}
+#define retrace_as_define_var_in_sec(type, name, seg_name, sec_name) \
+	static type name __attribute__ ((used, section(seg_name""sec_name)))
 
-int main(int argc, char *argv[])
-{
-	char *env_var;
+#define retrace_as_get_section_info(seg_name, sec_name, addr_ptr, size_ptr) \
+do { \
+	extern char start_mysection \
+		__asm("__start_"seg_name""sec_name); \
+	extern char stop_mysection \
+		__asm("__stop_"seg_name""sec_name); \
+\
+	*size_ptr = (&stop_mysection)-(&start_mysection); \
+	*addr_ptr = (void *) &start_mysection; \
+} while (0)
 
-	if (argc != 2) {
-		print_usage();
-		return -1;
-	}
-
-	env_var = getenv(argv[1]);
-	if (env_var == NULL)
-		printf("variable '%s' is not defined", argv[1]);
-	else
-		printf("'%s' = '%s'", argv[1], env_var);
-
-	return 0;
-}
+#endif
