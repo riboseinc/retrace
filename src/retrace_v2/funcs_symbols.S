@@ -222,9 +222,13 @@ WRAPPER_ENTRY_SYSTEM_V readv
 #dlfcn
 WRAPPER_ENTRY_SYSTEM_V dlopen
 WRAPPER_ENTRY_SYSTEM_V dlerror
+#if !defined(__OpenBSD__)\
+ && !defined(__FreeBSD__)\
+ && !defined(__NetBSD__)
+#No suitable method besides dlsym, thus cannot shim it
 WRAPPER_ENTRY_SYSTEM_V dlsym
+#endif
 WRAPPER_ENTRY_SYSTEM_V dlclose
-
 #pthreads
 WRAPPER_ENTRY_SYSTEM_V pthread_attr_destroy
 WRAPPER_ENTRY_SYSTEM_V pthread_attr_getdetachstate
@@ -313,7 +317,13 @@ WRAPPER_ENTRY_SYSTEM_V memchr
 WRAPPER_ENTRY_SYSTEM_V memcmp
 WRAPPER_ENTRY_SYSTEM_V memcpy
 WRAPPER_ENTRY_SYSTEM_V memmove
+
+#if !defined(__OpenBSD__)\
+ && !defined(__FreeBSD__)\
+ && !defined(__NetBSD__)
+#apparently dlsym uses memset, which leads to a loop and crash
 WRAPPER_ENTRY_SYSTEM_V memset
+#endif
 WRAPPER_ENTRY_SYSTEM_V strcat
 WRAPPER_ENTRY_SYSTEM_V strncat
 WRAPPER_ENTRY_SYSTEM_V strchr
