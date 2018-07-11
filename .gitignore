@@ -51,3 +51,11 @@ retrace
 retrace.la
 libretrace.la
 gmon.out
+
+src/retrace_v2/actions/.dirstamp
+src/retrace_v2/arch/x86-64/osx/.dirstamp
+src/retrace_v2/datatypes/.dirstamp
+src/retrace_v2/libretrace_v2.la
+src/retrace_v2/prototypes/.dirstamp
+src/retrace_v2/retrace_v2.dylib
+src/retrace_v2/retrace_v2.dylib.dSYM/

@@ -1,5 +1,5 @@
 AC_PREREQ(2.60)
-AC_INIT([retrace], [1.0.1], [https://github.com/riboseinc/retrace/issues])
+AC_INIT([retrace], [2.0.1], [https://github.com/riboseinc/retrace/issues])
 AM_INIT_AUTOMAKE([foreign subdir-objects -Wall])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AC_CONFIG_MACRO_DIR([m4])
@@ -15,6 +15,7 @@ AC_USE_SYSTEM_EXTENSIONS
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 AC_PROG_LIBTOOL
 AC_PROG_INSTALL
+AM_PROG_AS
 
 LT_INIT
 AC_ENABLE_SHARED
@@ -214,6 +215,16 @@ if test "x$enable_profiling" = "xyes" ; then
     CFLAGS="$CFLAGS -pg"
 fi
 
+AC_ARG_ENABLE(
+  [v2],
+  [AS_HELP_STRING([--enable-v2], [enable retrace version 2 @<:@default=no@:>@])],
+  ,
+  [enable_v2="yes"]
+)
+if test "x$enable_v2" = "xyes" ; then
+    CFLAGS="$CFLAGS -g3 -O0 -DENABLE_V2"
+fi
+
 AC_MSG_CHECKING(whether to enable rpc)
 AC_ARG_ENABLE(rpc,
      AS_HELP_STRING(--enable-rpc, turn on rpc (disabled by default)),
@@ -237,6 +248,7 @@ fi
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
+                 src/retrace_v2/Makefile
                  test/Makefile
                  rpc/Makefile
                  tools/Makefile
