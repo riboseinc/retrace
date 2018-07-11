@@ -1,4 +1,6 @@
 
+SUBDIRS = . retrace_v2
+
 ACLOCAL_AMFLAGS = -I ../m4
 
 lib_LTLIBRARIES= libretrace.la
