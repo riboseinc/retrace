@@ -1,0 +1,27 @@
+
+globals {
+	bin_path = /bin/ls
+	log_path = /var/log/retrace_v2.log
+	log_level = 1                                    # default log level
+}
+
+interception_scripts <func_name> {
+	action <action-name> {
+		param_name = <param name>
+		match_type = <match type>                     # string, array, int ...
+
+		match_str = <match string>
+		new_str = <new string>
+
+		match_arr = [a1, a2, a3 ...]
+		new_arr = [n1, n2, n3 ...]
+	}
+
+	log_level = <logging level>
+}
+
+interception_scripts default {
+	action <action-name>
+
+	log_level = <logging level>
+}
