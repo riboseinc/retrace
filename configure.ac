@@ -222,8 +222,12 @@ AC_ARG_ENABLE(
   [enable_v2="yes"]
 )
 if test "x$enable_v2" = "xyes" ; then
-    CFLAGS="$CFLAGS -g3 -O0 -DENABLE_V2"
+    AX_CHECK_NEREON([], AC_MSG_ERROR([]))
+    AC_DEFINE(RTR_V2, [1], [Define to use retrace v2])
+else
+    AC_DEFINE(RTR_V2, [1], [Define to use retrace v2])
 fi
+AM_CONDITIONAL([RTR_V2], [test "x$enable_v2" = "xyes"])
 
 AC_MSG_CHECKING(whether to enable rpc)
 AC_ARG_ENABLE(rpc,
@@ -248,7 +252,8 @@ fi
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
-                 src/retrace_v2/Makefile
+                 src/v1/Makefile
+                 src/v2/Makefile
                  test/Makefile
                  rpc/Makefile
                  tools/Makefile
