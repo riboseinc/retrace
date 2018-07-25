@@ -1,0 +1,102 @@
+
+# NOS configuration for retrace v2
+
+config_option config_file {
+	type = config
+
+	cmdline switch {
+		short = "-c"
+	}
+
+	cmdline description {
+		short = "config file"
+		long  = "set configuration file"
+	}
+
+	env = RETRACE_V2_CONFIG
+}
+
+config_option bin_path {
+	type = string
+
+	cmdline switch {
+		short = "-b"
+	}
+
+	cmdline description {
+		short = "binary path"
+		long  = "set binary path to be traced"
+	}
+
+	env = RETRACE_V2_TRACE_BIN
+}
+
+config_option lib_path {
+	type = string
+
+	cmdline switch {
+		short = "-l"
+	}
+
+	cmdline description {
+		short = "retrace v2 library path"
+		long  = "set retrace v2 library path"
+	}
+
+	env = RETRACE_V2_LIBRARY
+}
+
+config_option verbose {
+	type = int
+
+	cmdline switch {
+		short = "-d"
+	}
+
+	cmdline description {
+		short = "log level"
+		long  = "set log verbosity level(0 : SILENT, 1 : NORMAL, 2 : VERBOSE, 3 : DEBUG)"
+	}
+
+	default = 1
+}
+
+config_option log_path {
+	type = string
+
+	cmdline switch {
+		short = "-l"
+	}
+
+	cmdline description {
+		short = "log file"
+		long  = "specify log file"
+	}
+
+	env = RETRACE_V2_LOG_FILE
+	default = /var/log/retrace_v2.log
+}
+
+config_option print_version {
+	type = bool
+
+	cmdline switch {
+		short = "-v"
+	}
+
+	cmdline description {
+		long  = "print version"
+	}
+}
+
+config_option helper {
+	type = helper
+
+	cmdline switch {
+		short = "-h"
+	}
+
+	cmdline description {
+		long = "print help message"
+	}
+}

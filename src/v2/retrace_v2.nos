@@ -5,7 +5,7 @@ config_option config_file {
 	type = config
 
 	cmdline switch {
-		short = c
+		short = "-c"
 	}
 
 	cmdline description {
@@ -20,7 +20,7 @@ config_option bin_path {
 	type = string
 
 	cmdline switch {
-		short = b
+		short = "-b"
 	}
 
 	cmdline description {
@@ -35,7 +35,7 @@ config_option lib_path {
 	type = string
 
 	cmdline switch {
-		short = l
+		short = "-l"
 	}
 
 	cmdline description {
@@ -50,7 +50,7 @@ config_option verbose {
 	type = int
 
 	cmdline switch {
-		short = d
+		short = "-d"
 	}
 
 	cmdline description {
@@ -65,7 +65,7 @@ config_option log_path {
 	type = string
 
 	cmdline switch {
-		short = l
+		short = "-l"
 	}
 
 	cmdline description {
@@ -81,7 +81,7 @@ config_option print_version {
 	type = bool
 
 	cmdline switch {
-		short = v
+		short = "-v"
 	}
 
 	cmdline description {
@@ -93,7 +93,7 @@ config_option helper {
 	type = helper
 
 	cmdline switch {
-		short = h
+		short = "-h"
 	}
 
 	cmdline description {
