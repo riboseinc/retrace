@@ -215,19 +215,21 @@ if test "x$enable_profiling" = "xyes" ; then
     CFLAGS="$CFLAGS -pg"
 fi
 
+AC_MSG_CHECKING(whether to enable retrace v2)
 AC_ARG_ENABLE(
   [v2],
   [AS_HELP_STRING([--enable-v2], [enable retrace version 2 @<:@default=no@:>@])],
   ,
-  [enable_v2="yes"]
+  [enable_v2="no"]
 )
+AC_MSG_RESULT($enable_v2)
+AM_CONDITIONAL([RTR_V2], [test "x$enable_v2" = "xyes"])
 if test "x$enable_v2" = "xyes" ; then
     AX_CHECK_NEREON([], AC_MSG_ERROR([]))
     AC_DEFINE(RTR_V2, [1], [Define to use retrace v2])
 else
-    AC_DEFINE(RTR_V2, [1], [Define to use retrace v2])
+    AC_DEFINE(RTR_V2, [0], [Define to use retrace v2])
 fi
-AM_CONDITIONAL([RTR_V2], [test "x$enable_v2" = "xyes"])
 
 AC_MSG_CHECKING(whether to enable rpc)
 AC_ARG_ENABLE(rpc,

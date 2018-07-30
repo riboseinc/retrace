@@ -2,7 +2,7 @@
 ACLOCAL_AMFLAGS = -I m4
 
 if RTR_V2
-SUBDIRS= v2
+SUBDIRS=v2
 else
-SUBDIRS= v1
+SUBDIRS=v1
 endif

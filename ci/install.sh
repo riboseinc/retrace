@@ -33,3 +33,12 @@ if [ ! -e "${CHECKPATCH_INSTALL}/checkpatch.pl" ]; then
 	patch -p0 < $SPWD/checkpatch.pl.patch
 	echo "invalid.struct.name" > const_structs.checkpatch
 fi
+
+# install libnereon
+git clone -b v0.9.4 https://github.com/riboseinc/libnereon
+cd libnereon
+mkdir build
+cd build
+cmake ..
+make
+sudo make install

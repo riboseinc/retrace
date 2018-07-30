@@ -26,7 +26,7 @@ libretrace_v2_la_SOURCES = \
 	logger.c            \
 	funcs_symbols.S
 
-libretrace_v2_la_CFLAGS = $(NEREON_INCLUDES) -Wall -Wextra
+libretrace_v2_la_CFLAGS = $(NEREON_INCLUDES) -Wall -Wextra -shared -fPIC
 libretrace_v2_la_LIBADD = $(NEREON_LIBDIR)/libnereon.a
 
 if DARWIN
@@ -61,11 +61,14 @@ endif
 bin_PROGRAMS=retrace2
 
 retrace2_SOURCES = \
-	retrace_v2.c   \
-	retrace_v2.nos.c
+	retrace_v2.nos.c \
+	retrace_v2.c
 
 retrace_v2.nos.c: retrace_v2.nos
-	$(NEREON_TO_CC) retrace_v2.nos ./ retrace2
+	$(NEREON_TO_CC) retrace_v2.nos ./ rtr2
+
+clean-local:
+	rm -rf retrace_v2.nos.c retrace_v2.nos.h
 
 retrace2_CFLAGS = $(NEREON_INCLUDES) -Wall -Wextra
 retrace2_LDADD = $(NEREON_LIBDIR)/libnereon.a
