@@ -1,4 +1,4 @@
-AM_CFLAGS = $(TESTS_CFLAGS) -I../src/ -g
+AM_CFLAGS = $(TESTS_CFLAGS) -I../src/v1 -g
 
 dist_check_SCRIPTS = runtests.sh
 noinst_PROGRAMS =
@@ -9,7 +9,7 @@ if CMOCKA
 if LINUX
 noinst_PROGRAMS += cmockatest
 TESTS += cmockatest
-cmockatest_CFLAGS = $(CMOCKA_CFLAGS) -I../src/
+cmockatest_CFLAGS = $(CMOCKA_CFLAGS) -I../src/v1
 cmockatest_LDADD = $(CMOCKA_LDFLAGS) $(CMOCKA_LIBS)
 endif
 endif

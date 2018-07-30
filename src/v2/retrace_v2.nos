@@ -9,26 +9,27 @@ config_option config_file {
 	}
 
 	cmdline description {
-		short = "config file"
+		short = "<config file>"
 		long  = "set configuration file"
 	}
 
 	env = RETRACE_V2_CONFIG
 }
 
-config_option bin_path {
+config_option proc_cmdline {
 	type = string
+	mandatory = true
 
 	cmdline switch {
-		short = "-b"
+		short = "-p"
 	}
 
 	cmdline description {
-		short = "binary path"
-		long  = "set binary path to be traced"
+		short = "<process command line>"
+		long  = "set process command line to be traced"
 	}
 
-	env = RETRACE_V2_TRACE_BIN
+	env = RETRACE_V2_CMDLINE
 }
 
 config_option lib_path {
@@ -39,7 +40,7 @@ config_option lib_path {
 	}
 
 	cmdline description {
-		short = "retrace v2 library path"
+		short = "<retrace v2 library path>"
 		long  = "set retrace v2 library path"
 	}
 
@@ -54,7 +55,7 @@ config_option verbose {
 	}
 
 	cmdline description {
-		short = "log level"
+		short = "<log level>"
 		long  = "set log verbosity level(0 : SILENT, 1 : NORMAL, 2 : VERBOSE, 3 : DEBUG)"
 	}
 
@@ -69,7 +70,7 @@ config_option log_path {
 	}
 
 	cmdline description {
-		short = "log file"
+		short = "<log file>"
 		long  = "specify log file"
 	}
 
