@@ -29,6 +29,7 @@ retrace_func_define_prototypes(signal) = {
 		.name = "signal",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "sig",
@@ -43,9 +44,6 @@ retrace_func_define_prototypes(signal) = {
 				 *.ref_type_name = "ptr",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -53,14 +51,12 @@ retrace_func_define_prototypes(signal) = {
 		.name = "raise",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "sig",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	}

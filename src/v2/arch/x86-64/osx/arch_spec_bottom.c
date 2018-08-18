@@ -66,25 +66,31 @@ struct RealImpls {
 };
 
 static struct RealImpls retrace_as_real_impls;
-
+/*
 long int retrace_as_call_real(const void *real_impl,
 	const struct ParamMeta *params_meta,
-	long int params[])
+	long int params[])*/
+
+long int retrace_as_call_real(const void *real_impl,
+	const struct FuncParam params[],
+	int params_cnt)
 {
 	long int ret_val;
-	unsigned long int params_cnt;
-	const struct ParamMeta *p;
+	//unsigned long int params_cnt;
+	//const struct ParamMeta *p;
 
 	/* calc params count
 	 * TODO: Improve speed (calc once)
 	 */
+
+/*
 	params_cnt = 0;
 	p = params_meta;
 	while (retrace_real_impls.strlen(p->name)) {
 		params_cnt++;
 		p++;
 	}
-
+*/
 	asm volatile (
 				/* save regs that we gonna use,
 				 * dont rely on clobbed regs
@@ -258,7 +264,7 @@ long int retrace_as_call_real(const void *real_impl,
 				"popq %%rax;"
 
 				: "=m"(ret_val)
-				: "m"(real_impl), "m"(params), "m"(params_cnt)
+				: "m"(real_impl), "m"(&params[0].val), "m"(params_cnt)
 				: "memory");
 
 	return ret_val;

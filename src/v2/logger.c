@@ -39,7 +39,8 @@ int retrace_mod_ena[MODULES_CNT] = {
 	[DATA_TYPES] = 1,
 	[ENGINE] = 1,
 	[FUNCS] = 1,
-	[MAIN] = 1
+	[MAIN] = 1,
+	[ARCH] = 1
 };
 
 char *retrace_module_pref[MODULES_CNT] = {"ACT",
@@ -47,7 +48,8 @@ char *retrace_module_pref[MODULES_CNT] = {"ACT",
 	"TYPES",
 	"ENGINE",
 	"FUNCS",
-	"MAIN"
+	"MAIN",
+	"ARCH"
 };
 
 char *retrace_severities[SEVERITY_CNT] = {"DEBUG",

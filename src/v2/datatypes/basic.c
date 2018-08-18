@@ -444,6 +444,38 @@ int retrace_ulong_get_size(const void *data,
 	return 0;
 }
 
+size_t retrace_longlong_to_sz(const void *data,
+	const struct DataType *data_type,
+	char *str)
+{
+	return retrace_real_impls.sprintf(str, "%ll",
+		*((const long long *) data));
+}
+
+size_t retrace_longlong_get_sz_size(const void *data,
+	const struct DataType *data_type)
+{
+	return retrace_real_impls.snprintf(NULL,
+		0,
+		"%ll",
+		*((const long long *) data));
+}
+
+int retrace_longlong_to_size_t(const void *data, size_t *dst_size_t)
+{
+	/* warning, possible data loss */
+	*dst_size_t = (size_t) *((long long *) data);
+	return 0;
+};
+
+int retrace_longlong_get_size(const void *data,
+	const struct DataType *data_type,
+	size_t *dst_size_t)
+{
+	*dst_size_t = sizeof(long long);
+	return 0;
+}
+
 size_t retrace_sz_to_sz(const void *data,
 	const struct DataType *data_type,
 	char *str)
@@ -571,6 +603,8 @@ retrace_datatype_define_prototypes(basic) = {
 	{
 		.name = "int",
 		.struct_members[0] = {.name = ""},
+		.pa_basic_type = PBT_INT,
+		.pa_flag = PFM_UNK,
 		.to_sz = retrace_int_to_sz,
 		.get_sz_size = retrace_int_get_sz_size,
 		.to_size_t = retrace_int_to_size_t,
@@ -587,6 +621,8 @@ retrace_datatype_define_prototypes(basic) = {
 	{
 		.name = "int16_t",
 		.struct_members[0] = {.name = ""},
+		.pa_basic_type = PBT_INT,
+		.pa_flag = PFM_SHORT,
 		.to_sz = retrace_int16_to_sz,
 		.get_sz_size = retrace_int16_get_sz_size,
 		.to_size_t = retrace_int16_to_size_t,
@@ -595,6 +631,8 @@ retrace_datatype_define_prototypes(basic) = {
 	{
 		.name = "long int",
 		.struct_members[0] = {.name = ""},
+		.pa_basic_type = PBT_INT,
+		.pa_flag = PFM_LONG,
 		.to_sz = retrace_longint_to_sz,
 		.get_sz_size = retrace_longint_get_sz_size,
 		.to_size_t = retrace_longint_to_size_t,
@@ -607,6 +645,16 @@ retrace_datatype_define_prototypes(basic) = {
 		.get_sz_size = retrace_ulong_get_sz_size,
 		.to_size_t = retrace_ulong_to_size_t,
 		.get_size = retrace_ulong_get_size
+	},
+	{
+		.name = "long long int",
+		.struct_members[0] = {.name = ""},
+		.pa_basic_type = PBT_INT,
+		.pa_flag = PFM_LONG_LONG,
+		.to_sz = retrace_longlong_to_sz,
+		.get_sz_size = retrace_longlong_get_sz_size,
+		.to_size_t = retrace_longlong_to_size_t,
+		.get_size = retrace_longlong_get_size
 	},
 	{
 		.name = "sz",
@@ -627,6 +675,8 @@ retrace_datatype_define_prototypes(basic) = {
 	{
 		.name = "char",
 		.struct_members[0] = {.name = ""},
+		.pa_basic_type = PBT_CHAR,
+		.pa_flag = PFM_UNK,
 		.to_sz = retrace_char_to_sz,
 		.get_sz_size = retrace_char_get_sz_size,
 		.to_size_t = retrace_char_to_size_t,
@@ -635,6 +685,8 @@ retrace_datatype_define_prototypes(basic) = {
 	{
 		.name = "ptr",
 		.struct_members[0] = {.name = ""},
+		.pa_basic_type = PBT_POINTER,
+		.pa_flag = PFM_UNK,
 		.to_sz = retrace_ptr_to_sz,
 		.get_sz_size = retrace_ptr_get_sz_size,
 		.to_size_t = retrace_ptr_to_size_t,

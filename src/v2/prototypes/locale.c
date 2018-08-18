@@ -29,6 +29,7 @@ retrace_func_define_prototypes(locale) = {
 		.name = "setlocale",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "category",
@@ -41,9 +42,6 @@ retrace_func_define_prototypes(locale) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -51,10 +49,8 @@ retrace_func_define_prototypes(locale) = {
 		.name = "localeconv",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	}
 };

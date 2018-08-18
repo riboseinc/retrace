@@ -27,6 +27,20 @@
 
 #include "engine.h"
 #include "real_impls.h"
+#include "logger.h"
+#include "printf.h"
+
+#define log_err(fmt, ...) \
+	retrace_logger_log(ARCH, ERROR, fmt, ##__VA_ARGS__)
+
+#define log_info(fmt, ...) \
+	retrace_logger_log(ARCH, INFO, fmt, ##__VA_ARGS__)
+
+#define log_warn(fmt, ...) \
+	retrace_logger_log(ARCH, WARN, fmt, ##__VA_ARGS__)
+
+#define log_dbg(fmt, ...) \
+	retrace_logger_log(ARCH, DEBUG, fmt, ##__VA_ARGS__)
 
 struct WrapperSystemVFrame {
 	/* this flag will cause the assembly portion to call the real impl */
@@ -55,23 +69,21 @@ struct WrapperSystemVFrame {
 };
 
 long int retrace_as_call_real(const void *real_impl,
-	const struct ParamMeta *params_meta,
-	long int params[])
+	const struct FuncParam params[],
+	int params_cnt)
 {
 	long int ret_val;
-	unsigned long int params_cnt;
-	const struct ParamMeta *p;
+	long int *vals;
+	int i;
+	unsigned long int params_cnt_uli;
 
-	/* calc params count
-	 * TODO: Improve speed (calc once)
-	 */
-	params_cnt = 0;
-	p = params_meta;
-	while (retrace_real_impls.strlen(p->name)) {
-		params_cnt++;
-		p++;
+	/* prep param values to keep the asm part clean */
+	params_cnt_uli = params_cnt;
+	vals = (long int *) retrace_real_impls.malloc(
+			sizeof(long int) * params_cnt);
+	for (i = 0; i != params_cnt; i++) {
+		vals[i] = params[i].val;
 	}
-
 	asm volatile (
 				/* save regs that we gonna use,
 				 * dont rely on clobbed regs
@@ -240,9 +252,10 @@ long int retrace_as_call_real(const void *real_impl,
 				"popq %%rax;"
 
 				: "=m"(ret_val)
-				: "m"(real_impl), "m"(params), "m"(params_cnt)
+				: "m"(real_impl), "m"(vals), "m"(params_cnt_uli)
 				: "memory");
 
+	retrace_real_impls.free(vals);
 	return ret_val;
 }
 
@@ -264,67 +277,237 @@ void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl)
 	wrapper_frame_top->real_impl = real_impl;
 }
 
-void retrace_as_setup_params(
+int retrace_as_setup_params(
 	void *arch_spec_ctx,
-	const struct ParamMeta *params_meta,
-	long int params[])
+	const struct FuncPrototype *proto,
+	struct FuncParam params[],
+	int *params_cnt)
 {
-	int i;
+	int i, j;
 	int params_on_stack;
-	int params_cnt;
 	struct WrapperSystemVFrame *wrapper_frame_top;
+	int num_of_vaparams;
+	int cnt_left;
+	int *types;
+	const struct DataType *dt;
 
-	/* calc params count
-	 * TODO: Improve speed (calc once)
-	 */
-	params_cnt = 0;
-	while (retrace_real_impls.strlen(
-		params_meta[params_cnt].name)) {
-		params_cnt++;
-	}
+	cnt_left = *params_cnt;
+	if (cnt_left > proto->params_cnt)
+		cnt_left = proto->params_cnt;
 
+	/* set up prototyped params */
 	wrapper_frame_top = (struct WrapperSystemVFrame *) arch_spec_ctx;
-	for (i = 0; i != params_cnt; i++) {
+	params_on_stack = proto->params_cnt - 6;
 
-		/* setup data*/
+	for (i = 0; i != cnt_left; i++) {
+
+		/* reset param */
+		retrace_real_impls.memset(&params[i].param_meta,
+				0,
+				sizeof(struct ParamMeta));
+
+		/* setup meta */
+		retrace_real_impls.memcpy(&params[i].param_meta,
+				&proto->params[i],
+				sizeof(struct ParamMeta));
+
+		/* setup datatype */
+		params[i].data_type = retrace_datatype_get(proto->params[i].type_name);
+
+		/* setup value */
 		if (i < 6) {
 			/* get param from reg */
 			switch (i) {
 			case 0:
-				params[i] =
+				params[i].val =
 					wrapper_frame_top->real_rdi;
 				break;
 			case 1:
-				params[i] =
+				params[i].val =
 					wrapper_frame_top->real_rsi;
 				break;
 			case 2:
-				params[i] =
+				params[i].val =
 					wrapper_frame_top->real_rdx;
 				break;
 			case 3:
-				params[i] =
+				params[i].val =
 					wrapper_frame_top->real_rcx;
 				break;
 			case 4:
-				params[i] =
+				params[i].val =
 					wrapper_frame_top->real_r8;
 				break;
 			case 5:
-				params[i] =
+				params[i].val =
 					wrapper_frame_top->real_r9;
 				break;
 			}
 		} else {
 			/* get param from stack */
-			params_on_stack = params_cnt - 6;
 
 			/* assume sizeof(void*) == sizeof(long int) */
-			params[i] =
+			params[i].val =
 				(wrapper_frame_top->real_rsp +
 					sizeof(void *) * (params_on_stack - i));
 		}
 	}
+
+	/* save count of set up params before parsing varargs */
+
+
+	/* if no varargs then we are done */
+	if (proto->fmt == FAT_NOVARARGS) {
+		*params_cnt = i;
+		return 0;
+	}
+
+	/* if format is not printf, return as no supported */
+	if (proto->fmt != FAT_PRINTF) {
+		log_err("varargs format '%d' is not supported for func '%s'",
+			proto->fmt, proto->name);
+		*params_cnt = i;
+		return 0;
+	}
+
+	/* if no single % then we are done */
+	for (j = 0;
+		*(((char *) params[proto->fmt_param_idx].val) + j);
+		j++) {
+
+		if (
+			(*(((char *)params[proto->fmt_param_idx].val) + j) == '%') &&
+			(j > 0) &&
+			(*(((char *)params[proto->fmt_param_idx].val) + j - 1) != '%') &&
+			(*(((char *)params[proto->fmt_param_idx].val) + j + 1) != '%')
+		)
+			break;
+	}
+
+	if (*(((char *) params[proto->fmt_param_idx].val) + j) == 0) {
+		/* no format specifier */
+		*params_cnt = i;
+		return 0;
+	}
+
+	/* space exhausted?, we will probably crash */
+	cnt_left = *params_cnt - proto->params_cnt;
+
+	if (cnt_left <= 0) {
+		log_warn("too many varargs params for '%s', no space for %d more",
+			proto->name, cnt_left * -1);
+		return cnt_left;
+	}
+
+	/* setup varargs params if needed
+	 * for now use parse_printf_format, there is no sign info
+	 */
+	num_of_vaparams =
+		parse_printf_format(
+			(const char *) params[proto->fmt_param_idx].val,
+			0,
+			NULL);
+
+	if (!num_of_vaparams) {
+		log_err("parse_printf_format failed to parse param idx '%d'"
+				"for func '%s'", proto->fmt_param_idx, proto->name);
+		return 0;
+	}
+
+	types = (int *)
+		retrace_real_impls.malloc(sizeof(int) * num_of_vaparams);
+
+	num_of_vaparams =
+		parse_printf_format(
+			(const char *) params[proto->fmt_param_idx].val,
+			num_of_vaparams,
+			types);
+
+	if (cnt_left > num_of_vaparams) {
+		cnt_left = num_of_vaparams;
+	}
+
+	for (j = 0; j != cnt_left; j++) {
+		/* prep param meta */
+		dt = retrace_datatype_printf_to_dt(types[j]);
+		if (dt == NULL) {
+			log_warn("argtype '%d' is not supported for func '%s', skipping",
+				types[j], proto->name);
+
+			/* TODO Add unknown since it will not be passed on stack */
+			continue;
+		}
+
+		/* reset param */
+		retrace_real_impls.memset(&params[i].param_meta,
+			0,
+			sizeof(struct ParamMeta));
+
+		/* setup meta */
+		retrace_real_impls.snprintf(params[i].param_meta.name,
+			sizeof(params[i].param_meta.name),
+			"vararg%02d",
+			j);
+
+		retrace_real_impls.strcpy(params[i].param_meta.type_name, dt->name);
+		params[i].param_meta.modifiers = CDM_NOMOD;
+		/* FIXME: How to know the direction of the param? */
+		params[i].param_meta.direction = PDIR_IN;
+
+		/* fixup pointer type to string*/
+		if ((types[j] & ~PA_FLAG_MASK) == PA_STRING) {
+			params[i].param_meta.modifiers |= CDM_POINTER;
+			retrace_real_impls.strcpy(params[i].param_meta.ref_type_name, "sz");
+		}
+
+		/* setup datatype */
+		params[i].data_type = dt;
+
+		/* setup value */
+		if (i < 6) {
+			/* get param from reg */
+			switch (i) {
+				case 0:
+					params[i].val =
+						wrapper_frame_top->real_rdi;
+					break;
+				case 1:
+					params[i].val =
+						wrapper_frame_top->real_rsi;
+					break;
+				case 2:
+					params[i].val =
+						wrapper_frame_top->real_rdx;
+					break;
+				case 3:
+					params[i].val =
+						wrapper_frame_top->real_rcx;
+					break;
+				case 4:
+					params[i].val =
+						wrapper_frame_top->real_r8;
+					break;
+				case 5:
+					params[i].val =
+						wrapper_frame_top->real_r9;
+					break;
+			}
+		} else {
+			/* get param from stack */
+
+			/* assume sizeof(void*) == sizeof(long int) */
+			params[i].val =
+				(wrapper_frame_top->real_rsp +
+					sizeof(void *) * (params_on_stack - i));
+		}
+
+		/* advance next param */
+		i++;
+	}
+
+	/* save count of set up params before parsing varargs */
+	*params_cnt = i;
+	return num_of_vaparams - cnt_left;
 }
 
 void retrace_as_intercept_done(void *arch_spec_ctx,

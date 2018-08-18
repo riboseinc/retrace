@@ -1,0 +1,63 @@
+/* this JSON demonstrates the modification of 
+the 'hello 2018 year' string of template '%s %d year' to 'bye 2017 year' for printf() call.
+intended to be used with printf_exmpl:
+'printf_exmpl "%s %d year" 2 \"hello\" 2018'
+*/
+
+{
+	"intercept_scripts": [
+		{
+			"func_name": "printf",
+			"actions": [
+				{
+					"action_name": "log_params"
+				},
+				{
+					"action_name": "modify_in_param_str",
+					"action_params": {
+					
+						/* name of the param, must be a pointer to C string */
+						"param_name" : "vararg00",
+						
+						/* match_str is optional, if omitted,
+						new_str will be always assigned */
+						"match_str" : "hello",
+						
+						/* new_str is mandatory, specifies new value for
+						param */
+						"new_str" : "bye"				
+					}
+				},
+				{
+					"action_name": "modify_in_param_int",
+					"action_params": {
+						"param_name" : "vararg01",
+						"match_int" : 2018,
+						"new_int" : 2017		
+					}
+				},
+				{
+					"action_name": "log_params"
+				},
+		        {
+					"action_name": "call_real",
+					"action_params": {
+          			}
+				}
+			]
+		},		
+		
+		/* default script for known functions */
+		{
+			"func_name": "*",
+			"actions": [
+				{
+					"action_name": "log_params"
+				},
+		        {
+					"action_name": "call_real"
+				}
+			]
+		}
+	]
+};

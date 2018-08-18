@@ -29,6 +29,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "access",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "pathname",
@@ -42,9 +43,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -52,15 +50,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "alarm",
 		.conv = CC_SYSTEM_V,
 		.type_name = "unsigned int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "seconds",
 				.type_name = "unsigned int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -68,15 +64,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "brk",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "addr",
 				.type_name = "ptr",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_OUT
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -84,6 +78,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "chdir",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "path",
@@ -91,9 +86,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -101,6 +93,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "chroot",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "path",
@@ -108,9 +101,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -118,6 +108,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "chown",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "pathname",
@@ -137,9 +128,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "gid_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -147,15 +135,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "close",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "fd",
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -163,6 +149,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "confstr",
 		.conv = CC_SYSTEM_V,
 		.type_name = "size_t",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "name",
@@ -183,9 +170,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "size_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -193,6 +177,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "crypt",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "key",
@@ -207,9 +192,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -217,6 +199,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "ctermid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "s",
@@ -224,9 +207,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER,
 				.ref_type_name = "sz",
 				.direction = PDIR_OUT
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -234,6 +214,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "cuserid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "string",
@@ -241,9 +222,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER,
 				.ref_type_name = "sz",
 				.direction = PDIR_OUT
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -251,15 +229,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "dup",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "oldfd",
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -267,6 +243,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "dup2",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "oldfd",
@@ -279,9 +256,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -289,6 +263,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "encrypt",
 		.conv = CC_SYSTEM_V,
 		.type_name = "void",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "block",
@@ -301,9 +276,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -321,6 +293,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "execv",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "path",
@@ -334,9 +307,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "ptr",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -344,6 +314,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "execve",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "filename",
@@ -363,9 +334,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "ptr",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -373,6 +341,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "execvp",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "file",
@@ -386,9 +355,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "ptr",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -396,15 +362,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "_exit",
 		.conv = CC_SYSTEM_V,
 		.type_name = "void",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "status",
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -412,6 +376,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "fchown",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "fd",
@@ -430,9 +395,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "gid_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -440,15 +402,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "fchdir",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "fd",
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -456,16 +416,15 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "fork",
 		.conv = CC_SYSTEM_V,
 		.type_name = "pid_t",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "fpathconf",
 		.conv = CC_SYSTEM_V,
 		.type_name = "long int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "fd",
@@ -478,9 +437,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -488,15 +444,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "fsync",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "fd",
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -504,6 +458,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "ftruncate",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "fd",
@@ -516,9 +471,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "off_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -526,6 +478,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "getcwd",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "buf",
@@ -539,9 +492,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "size_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -549,46 +499,39 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "getdtablesize",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "getegid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "gid_t",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "geteuid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "uid_t",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "getgid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "gid_t",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "getgroups",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "size",
@@ -602,9 +545,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER | CDM_ARRAY,
 				.direction = PDIR_OUT,
 				.array_cnt_param = "size"
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -612,26 +552,23 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "gethostid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "long",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "getlogin",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "getlogin_r",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "buf",
@@ -644,9 +581,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "size_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -654,6 +588,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "getopt",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "argc",
@@ -675,9 +610,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -685,16 +617,15 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "getpagesize",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "getpass",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "prompt",
@@ -702,9 +633,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -712,15 +640,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "getpgid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "pid_t",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "pid",
 				.type_name = "pid_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -728,45 +654,37 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "getpgrp",
 		.conv = CC_SYSTEM_V,
 		.type_name = "pid_t",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "getpid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "pid_t",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "getppid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "pid_t",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "getsid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "pid_t",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "pid",
 				.type_name = "pid_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -774,16 +692,15 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "getuid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "uid_t",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "getwd",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "buf",
@@ -791,9 +708,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER,
 				.ref_type_name = "sz",
 				.direction = PDIR_OUT
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -801,15 +715,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "isatty",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "fd",
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -817,6 +729,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "lchown",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "path",
@@ -836,9 +749,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "gid_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -846,6 +756,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "link",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "oldpath",
@@ -866,9 +777,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "uid_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -876,6 +784,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "lockf",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "fd",
@@ -894,9 +803,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "off_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -904,6 +810,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "lseek",
 		.conv = CC_SYSTEM_V,
 		.type_name = "off_t",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "fd",
@@ -922,9 +829,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -932,6 +836,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "nice",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "fd",
@@ -944,9 +849,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -954,6 +856,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "pathconf",
 		.conv = CC_SYSTEM_V,
 		.type_name = "long int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "path",
@@ -967,9 +870,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -977,25 +877,21 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "pause",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "pipe",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "pipefd",
 				.type_name = "ptr",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1003,6 +899,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "pread",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ssize_t",
+		.params_cnt = 4,
 		.params = {
 			{
 				.name = "fd",
@@ -1029,9 +926,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "off_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1039,6 +933,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "pthread_atfork",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "prepare",
@@ -1057,9 +952,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "ptr",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1067,6 +959,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "pwrite",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ssize_t",
+		.params_cnt = 4,
 		.params = {
 			{
 				.name = "fd",
@@ -1093,9 +986,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "off_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1103,6 +993,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "read",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ssize_t",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "fd",
@@ -1123,9 +1014,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "size_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1133,6 +1021,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "readlink",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "path",
@@ -1154,9 +1043,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "size_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1164,6 +1050,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "rmdir",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "pathname",
@@ -1171,9 +1058,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1181,15 +1065,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "sbrk",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "increment",
 				.type_name = "intptr_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1197,15 +1079,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "setgid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "gid",
 				.type_name = "gid_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1213,6 +1093,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "setpgid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "pid",
@@ -1225,9 +1106,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "pid_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1235,16 +1113,15 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "setpgrp",
 		.conv = CC_SYSTEM_V,
 		.type_name = "pid_t",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "setregid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "rgid",
@@ -1257,9 +1134,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "gid_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1267,6 +1141,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "setreuid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "ruid",
@@ -1279,9 +1154,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "uid_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1289,25 +1161,21 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "setsid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "pid_t",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "setuid",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "uid",
 				.type_name = "uid_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1315,15 +1183,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "sleep",
 		.conv = CC_SYSTEM_V,
 		.type_name = "unsigned int ",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "seconds",
 				.type_name = "unsigned int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1331,6 +1197,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "swab",
 		.conv = CC_SYSTEM_V,
 		.type_name = "void",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "from",
@@ -1353,9 +1220,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "size_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1363,6 +1227,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "symlink",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "path1",
@@ -1377,9 +1242,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN,
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1387,25 +1249,21 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "sync",
 		.conv = CC_SYSTEM_V,
 		.type_name = "void",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "sysconf",
 		.conv = CC_SYSTEM_V,
 		.type_name = "long int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "name",
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1413,15 +1271,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "tcgetpgrp",
 		.conv = CC_SYSTEM_V,
 		.type_name = "pid_t",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "fd",
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1429,6 +1285,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "truncate",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "path",
@@ -1442,9 +1299,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "off_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1452,15 +1306,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "ttyname",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "fd",
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1468,6 +1320,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "ttyname_r",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "fd",
@@ -1487,9 +1340,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "size_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1497,6 +1347,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "ualarm",
 		.conv = CC_SYSTEM_V,
 		.type_name = "useconds_t",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "usecs",
@@ -1509,9 +1360,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "useconds_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1519,6 +1367,7 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "unlink",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "pathname",
@@ -1526,9 +1375,6 @@ retrace_func_define_prototypes(unistd) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1536,15 +1382,13 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "usleep",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "usec",
 				.type_name = "useconds_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -1552,16 +1396,15 @@ retrace_func_define_prototypes(unistd) = {
 		.name = "vfork",
 		.conv = CC_SYSTEM_V,
 		.type_name = "pid_t",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "write",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ssize_t",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "fd",
@@ -1582,9 +1425,6 @@ retrace_func_define_prototypes(unistd) = {
 				.type_name = "size_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	}
