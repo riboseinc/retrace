@@ -42,45 +42,6 @@
 
 #define ARR_MAX_COUNT 64
 
-static int get_param(const char *param_name,
-		const struct ParamMeta *param_metas,
-		const long int param_vals[],
-		const struct DataType **param_data_type,
-		const struct ParamMeta **param_meta,
-		long int *param_val)
-{
-	/* TODO: improve speed */
-	const struct DataType *p;
-	int i;
-
-	i = 0;
-	/* calc index */
-	while (retrace_real_impls.strcmp(param_name,
-		param_metas[i].name)) {
-		i++;
-	}
-
-	if (!retrace_real_impls.strlen(param_metas[i].name))
-		return -1;
-
-	/* find data type */
-	p = retrace_datatype_get(param_metas[i].type_name);
-
-	if (!p)
-		return -2;
-
-	if (param_data_type != NULL)
-		*param_data_type = p;
-
-	if (param_meta != NULL)
-		*param_meta = &param_metas[i];
-
-	if (param_val != NULL)
-		*param_val = param_vals[i];
-
-	return 0;
-}
-
 /*
  * action_params:
  * omit_params [array] - skip logging of params in this list
@@ -113,19 +74,16 @@ static int ia_log_params
 	 * .arr_count_param = size_t_to_sz() }
 	 */
 
-	const struct ParamMeta *meta;
-	const struct ParamMeta *count_meta;
+	const struct FuncParam *param;
+	const struct FuncParam *arr_cnt_param;
 
-	const struct DataType *data_type;
-	const struct DataType *count_data_type;
 	const struct DataType *ref_data_type;
 
-	long int param_val;
-	long int count_param_data;
-	const void *ref_data;
 
 	int ret;
 	int i;
+	int param_idx;
+	int cnt_param_idx;
 	char *serialized_string;
 	JSON_Value *root_value;
 	JSON_Object *root_object;
@@ -134,11 +92,11 @@ static int ia_log_params
 	size_t sz_size;
 	size_t arr_size;
 	size_t ref_data_size;
+	const void *ref_data;
 	char *sz;
 	/* one for * and one for '\0' */
 	char deref_sz[MAXLEN_PARAM_NAME + 2];
 
-	meta = t_ctx->prototype->params;
 	root_value = json_value_init_object();
 	root_object = json_value_get_object(root_value);
 
@@ -146,47 +104,46 @@ static int ia_log_params
 	if (action_params != NULL)
 		omit_params = json_object_get_array(action_params, "omit_params");
 
-	while (retrace_real_impls.strlen(meta->name)) {
+	for (param_idx = 0; param_idx != t_ctx->params_cnt; param_idx++) {
+		param = &t_ctx->params[param_idx];
 
 		/* check if this param is in omit_params array */
 		if (omit_params != NULL) {
 			for (i = 0; i < json_array_get_count(omit_params); i++) {
 				if (!retrace_real_impls.strcmp(
-						meta->name,
+						param->param_meta.name,
 						json_array_get_string(omit_params, i))) {
 
-					log_info("omitting param '%s'", meta->name);
+					log_info("omitting param '%s'",
+						param->param_meta.name);
 
 					goto next_param;
+
+
 				}
 
 			}
+
 		}
 
-		ret = get_param(meta->name,
-			t_ctx->prototype->params,
-			t_ctx->params,
-			&data_type,
-			NULL,
-			&param_val);
-
-		if (ret) {
-			log_err("Could not get param info for %s, error %d",
-				meta->name, ret);
-				break;
-		}
-
-		sz_size = data_type->get_sz_size((const void *) &param_val,
-			data_type);
+		sz_size = param->data_type->get_sz_size(
+			(const void *) &param->val,
+			param->data_type);
 
 		sz = (char *) retrace_real_impls.malloc(sz_size + 1);
 
-		data_type->to_sz((const void *) &param_val,
-			data_type, sz);
-		json_object_set_string(root_object, meta->name, sz);
+		param->data_type->to_sz(
+			(const void *) &param->val,
+			param->data_type,
+			sz);
+
+		json_object_set_string(root_object,
+			param->param_meta.name,
+			sz);
+
 		retrace_real_impls.free(sz);
 
-		if (meta->modifiers & CDM_POINTER) {
+		if (param->param_meta.modifiers & CDM_POINTER) {
 			/* in case of pointers we want to dereference one level
 			 * and handle arrays accordingly.
 			 * FIXME: dereferencing may lead to loop if pointers
@@ -194,39 +151,46 @@ static int ia_log_params
 			 */
 
 			/* TODO: Maybe should cast via data_type? */
-			ref_data = (void *) param_val;
-			ref_data_type = retrace_datatype_get(meta->ref_type_name);
+
+			ref_data = (void *) param->val;
+			ref_data_type =
+				retrace_datatype_get(param->param_meta.ref_type_name);
+
 			if (ref_data_type == NULL) {
 				log_err("get_param_type() failed for %s",
-					meta->ref_type_name);
+					param->param_meta.ref_type_name);
 				break;
 			}
 
 			/* pointer to ARRAY */
-			if (meta->modifiers & CDM_ARRAY) {
+			if (param->param_meta.modifiers & CDM_ARRAY) {
+				for (cnt_param_idx = 0;
+						cnt_param_idx != t_ctx->params_cnt;
+						cnt_param_idx++) {
 
-				ret = get_param(meta->array_cnt_param,
-					t_ctx->prototype->params,
-					t_ctx->params,
-					&count_data_type,
-					&count_meta,
-					&count_param_data);
+					if (!retrace_real_impls.strcmp(
+						t_ctx->params[cnt_param_idx].param_meta.name,
+						param->param_meta.array_cnt_param))
+						break;
 
-				if (ret) {
-					log_err(
-						"Could not get param info for %s, error %d",
-						meta->array_cnt_param,
-						ret);
+				}
+
+				if (cnt_param_idx == t_ctx->params_cnt) {
+					log_err("wrong array_cnt_param for param '%s'",
+						param->param_meta.name);
+
 					break;
 				}
 
-				ret = count_data_type->to_size_t(
-					(const void *) &count_param_data,
+				arr_cnt_param = &t_ctx->params[cnt_param_idx];
+
+				ret = arr_cnt_param->data_type->to_size_t(
+					(const void *) &arr_cnt_param->val,
 					&arr_size);
 
 				if (ret) {
 					log_err("to_size_t() failed for %s, error %d",
-						meta->array_cnt_param, ret);
+						arr_cnt_param->param_meta.name, ret);
 					break;
 				}
 			} else
@@ -243,20 +207,20 @@ static int ia_log_params
 						ref_data_type);
 
 				sz = (char *) retrace_real_impls.malloc(
-						sz_size + 1);
+					sz_size + 1);
 
 				ref_data_type->to_sz(ref_data,
-						ref_data_type, sz);
+					ref_data_type, sz);
 
 				json_array_append_string(json_array(arr_val),
-						sz);
+					sz);
 
 				retrace_real_impls.free(sz);
 
 				/* advance to the next element */
 				ret = ref_data_type->get_size(ref_data,
-						ref_data_type,
-						&ref_data_size);
+					ref_data_type,
+					&ref_data_size);
 
 				if (ret) {
 
@@ -274,14 +238,13 @@ static int ia_log_params
 
 			retrace_real_impls.snprintf(deref_sz,
 				sizeof(deref_sz),
-				"*%s", meta->name);
+				"*%s", param->param_meta.name);
 
 			json_object_set_value(root_object, deref_sz, arr_val);
 		}
 
-next_param:
+next_param:;
 		/* process next member */
-		meta++;
 	}
 
 	serialized_string = json_serialize_to_string_pretty(root_value);
@@ -303,7 +266,7 @@ static int ia_modify_in_param_str
 	const char *param_name;
 	const char *match_str;
 	const char *new_str;
-	const struct ParamMeta *param_meta;
+	const struct FuncParam *param;
 	int param_idx;
 
 	if (action_params == NULL) {
@@ -320,34 +283,34 @@ static int ia_modify_in_param_str
 		return -1;
 	}
 
-	/* check that param exists in prototype */
-	param_meta = t_ctx->prototype->params;
-	param_idx = 0;
-	while (retrace_real_impls.strlen(param_meta->name) &&
-		retrace_real_impls.strcmp(param_meta->name, param_name)) {
-		param_meta++;
-		param_idx++;
+	/* check that param exists in parsed params */
+	for (param_idx = 0; param_idx != t_ctx->params_cnt; param_idx++) {
+		if (!retrace_real_impls.strcmp(
+			t_ctx->params[param_idx].param_meta.name,
+			param_name))
+			break;
 	}
 
-	if (!retrace_real_impls.strlen(param_meta->name)) {
-
-		log_err("param '%s', does not defined for func '%s'",
-			param_meta->name, t_ctx->prototype->name);
+	if (param_idx == t_ctx->params_cnt) {
+		log_err("param '%s', is not defined for func '%s'",
+			param_name, t_ctx->prototype->name);
 
 		return -1;
 	}
 
+	param = &t_ctx->params[param_idx];
+
 	/* check param in or inout */
-	if (param_meta->direction != PDIR_IN) {
+	if (param->param_meta.direction != PDIR_IN) {
 		log_err("param '%s' is not an input param", param_name);
 
 		return -1;
 	}
 
 	/* check param is a pointer to C string */
-	if (!(param_meta->modifiers & CDM_POINTER) ||
+	if (!(param->param_meta.modifiers & CDM_POINTER) ||
 		(retrace_real_impls.strcmp(
-			param_meta->ref_type_name, "sz"))) {
+			param->param_meta.ref_type_name, "sz"))) {
 		log_err("param '%s' is not a pointer to string", param_name);
 
 		return -1;
@@ -373,7 +336,8 @@ static int ia_modify_in_param_str
 		 * since we know its a pointer to C str
 		 */
 		if (retrace_real_impls.strcmp(match_str,
-			(char *) t_ctx->params[param_idx])) {
+			(char *) param->val)) {
+
 			log_info("no match for param '%s'", param_name);
 
 			/* no match, do nothing */
@@ -387,19 +351,24 @@ static int ia_modify_in_param_str
 			param_name);
 
 	/* allocate new str */
-	t_ctx->new_params[t_ctx->new_params_cnt] =
-		(char *) retrace_real_impls.malloc(
+
+	/* override if parameters is already modified  */
+	if (t_ctx->params[param_idx].free_val) {
+		retrace_real_impls.free((void *) t_ctx->params[param_idx].val);
+		t_ctx->params[param_idx].free_val = 0;
+	}
+
+	t_ctx->params[param_idx].val =
+		(long int) retrace_real_impls.malloc(
 			retrace_real_impls.strlen(new_str) + 1);
+	t_ctx->params[param_idx].free_val = 1;
 
 	retrace_real_impls.strcpy(
-		t_ctx->new_params[t_ctx->new_params_cnt],
+		(char *) t_ctx->params[param_idx].val,
 		new_str);
 
-	t_ctx->params[param_idx] =
-		(long int) t_ctx->new_params[t_ctx->new_params_cnt];
-
 	/* mark allocation for clean up */
-	t_ctx->new_params_cnt++;
+	t_ctx->params[param_idx].free_val = 1;
 
 	log_info("param '%s' set to '%s'",
 		param_name, new_str);
@@ -415,12 +384,12 @@ static int ia_modify_in_param_arr
 	const char *param_name;
 	const JSON_Array *match_arr;
 	const JSON_Array *new_arr;
-	const struct ParamMeta *param_meta;
-	const struct ParamMeta *param_cnt_meta;
+	struct FuncParam *param;
+	struct FuncParam *cnt_param;
 	int param_idx;
+	int cnt_param_idx;
 	char *match_str;
 	int match_idx;
-	double match_number;
 	char *param_arr;
 	int new_arr_idx;
 	char *new_str;
@@ -440,31 +409,31 @@ static int ia_modify_in_param_arr
 	}
 
 	/* check that param exists in prototype */
-	param_meta = t_ctx->prototype->params;
-	param_idx = 0;
-	while (retrace_real_impls.strlen(param_meta->name) &&
-		retrace_real_impls.strcmp(param_meta->name, param_name)) {
-		param_meta++;
-		param_idx++;
+	for (param_idx = 0; param_idx != t_ctx->params_cnt; param_idx++) {
+		if (!retrace_real_impls.strcmp(
+			t_ctx->params[param_idx].param_meta.name,
+			param_name))
+			break;
 	}
 
-	if (!retrace_real_impls.strlen(param_meta->name)) {
-
-		log_err("param '%s', does not defined for func '%s'",
-			param_meta->name, t_ctx->prototype->name);
+	if (param_idx == t_ctx->params_cnt) {
+		log_err("param '%s', is not defined for func '%s'",
+			param_name, t_ctx->prototype->name);
 
 		return -1;
 	}
 
+	param = &t_ctx->params[param_idx];
+
 	/* check param in or inout */
-	if (param_meta->direction != PDIR_IN) {
+	if (param->param_meta.direction != PDIR_IN) {
 		log_err("param '%s' is not an input param", param_name);
 
 		return -1;
 	}
 
 	/* check param is a pointer */
-	if (!(param_meta->modifiers & CDM_POINTER)) {
+	if (!(param->param_meta.modifiers & CDM_POINTER)) {
 		log_err("param '%s' is not a pointer", param_name);
 
 		return -1;
@@ -499,7 +468,7 @@ static int ia_modify_in_param_arr
 		 * TODO Consider to use size param as well
 		 */
 		for (match_idx = 0,
-			param_arr = (char *) t_ctx->params[param_idx];
+			param_arr = (char *) param->val;
 			match_idx != json_array_get_count(match_arr);
 			match_idx++) {
 
@@ -517,47 +486,51 @@ static int ia_modify_in_param_arr
 			param_name);
 
 	/* allocate and override */
-	t_ctx->new_params[t_ctx->new_params_cnt] =
-		(char *) retrace_real_impls.malloc(
-				json_array_get_count(new_arr));
+	if (param->free_val) {
+		retrace_real_impls.free((void *) param->val);
+		param->free_val = 0;
+	}
+
+	param->val =
+		(long int) retrace_real_impls.malloc(
+			json_array_get_count(new_arr));
+	param->free_val = 1;
 
 	for (new_arr_idx = 0;
 		new_arr_idx != json_array_get_count(new_arr);
 		new_arr_idx++) {
-
-		*(t_ctx->new_params[t_ctx->new_params_cnt] + new_arr_idx) =
+		*((char *) (param->val + new_arr_idx)) =
 			(char) json_array_get_number(new_arr, new_arr_idx);
 	}
 
-	t_ctx->params[param_idx] =
-		(long int) t_ctx->new_params[t_ctx->new_params_cnt];
-	t_ctx->new_params_cnt++;
-
 	/* update the size param if exists */
-	if (retrace_real_impls.strlen(
-		param_meta->array_cnt_param)) {
+	if (retrace_real_impls.strlen(param->param_meta.array_cnt_param)) {
+		for (cnt_param_idx = 0;
+				cnt_param_idx != t_ctx->params_cnt;
+				cnt_param_idx++) {
 
-		param_cnt_meta = t_ctx->prototype->params;
-		param_idx = 0;
-		while (retrace_real_impls.strlen(param_cnt_meta->name) &&
-			retrace_real_impls.strcmp(param_cnt_meta->name,
-				param_meta->array_cnt_param)) {
-			param_cnt_meta++;
-			param_idx++;
+			if (!retrace_real_impls.strcmp(
+				t_ctx->params[cnt_param_idx].param_meta.name,
+				param->param_meta.array_cnt_param))
+				break;
+
 		}
 
-		if (!retrace_real_impls.strlen(param_cnt_meta->name)) {
-			log_err("wrong array_cnt_param for param '%s'", param_name);
+		if (cnt_param_idx == t_ctx->params_cnt) {
+			log_err("wrong array_cnt_param for param '%s'",
+				param->param_meta.name);
 
 			return -1;
 		}
 
+		cnt_param = &t_ctx->params[cnt_param_idx];
+
 		/* not sure size_t or int or use virtual method */
-		t_ctx->params[param_idx] =
-			json_array_get_count(new_arr);
+		cnt_param->val = json_array_get_count(new_arr);
 
 		log_info("array_cnt_param '%s' set to '%ld",
-				param_cnt_meta->name, t_ctx->params[param_idx]);
+				cnt_param->param_meta.name,
+				cnt_param->val);
 	}
 
 	new_str = json_serialize_to_string_pretty(
@@ -579,8 +552,8 @@ static int ia_modify_in_param_int
 	const char *param_name;
 	double match_int;
 	double new_int;
-	const struct ParamMeta *param_meta;
 	int param_idx;
+	struct FuncParam *param;
 
 	if (action_params == NULL) {
 		log_err("action_params must exists for modify_in_param_int");
@@ -597,24 +570,24 @@ static int ia_modify_in_param_int
 	}
 
 	/* check that param exists in prototype */
-	param_meta = t_ctx->prototype->params;
-	param_idx = 0;
-	while (retrace_real_impls.strlen(param_meta->name) &&
-		retrace_real_impls.strcmp(param_meta->name, param_name)) {
-		param_meta++;
-		param_idx++;
+	for (param_idx = 0; param_idx != t_ctx->params_cnt; param_idx++) {
+		if (!retrace_real_impls.strcmp(
+			t_ctx->params[param_idx].param_meta.name,
+			param_name))
+			break;
 	}
 
-	if (!retrace_real_impls.strlen(param_meta->name)) {
-
-		log_err("param '%s', does not defined for func '%s'",
-			param_meta->name, t_ctx->prototype->name);
+	if (param_idx == t_ctx->params_cnt) {
+		log_err("param '%s', is not defined for func '%s'",
+			param_name, t_ctx->prototype->name);
 
 		return -1;
 	}
 
+	param = &t_ctx->params[param_idx];
+
 	/* check param in or inout */
-	if (param_meta->direction != PDIR_IN) {
+	if (param->param_meta.direction != PDIR_IN) {
 		log_err("param '%s' is not an input param", param_name);
 
 		return -1;
@@ -634,9 +607,8 @@ static int ia_modify_in_param_int
 
 		log_info("match requested for param '%s', val='%d",
 			param_name, (int) match_int);
+		if (((int) param->val) != (int) match_int) {
 
-		if (((int) t_ctx->params[param_idx]) !=
-			(int) match_int) {
 			log_info("no match for param '%s'", param_name);
 
 			/* no match, do nothing */
@@ -650,7 +622,7 @@ static int ia_modify_in_param_int
 			param_name);
 
 	/* direct modification */
-	t_ctx->params[param_idx] = (int) new_int;
+	param->val = (long int) new_int;
 
 	log_info("param '%s' set to '%d'",
 		param_name, (int) new_int);
@@ -668,8 +640,8 @@ static int ia_call_real
 			t_ctx->prototype->name);
 
 	t_ctx->ret_val = retrace_as_call_real(t_ctx->real_impl,
-		t_ctx->prototype->params,
-		t_ctx->params);
+		t_ctx->params,
+		t_ctx->params_cnt);
 
 	log_dbg("real returned val=0x%lx", t_ctx->ret_val);
 

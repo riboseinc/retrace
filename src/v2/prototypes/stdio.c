@@ -29,6 +29,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fclose",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "stream",
@@ -40,9 +41,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "STREAM",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -50,6 +48,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "clearerr",
 		.conv = CC_SYSTEM_V,
 		.type_name = "void",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "stream",
@@ -60,9 +59,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -70,6 +66,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "feof",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "stream",
@@ -80,9 +77,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -90,6 +84,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "ferror",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "stream",
@@ -100,9 +95,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -110,6 +102,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fflush",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "stream",
@@ -120,9 +113,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -130,6 +120,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fgetpos",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "stream",
@@ -150,9 +141,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -160,6 +148,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fopen",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "filename",
@@ -174,9 +163,6 @@ retrace_func_define_prototypes(stdio) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -184,6 +170,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fread",
 		.conv = CC_SYSTEM_V,
 		.type_name = "size_t",
+		.params_cnt = 4,
 		.params = {
 			{
 				.name = "ptr",
@@ -216,9 +203,6 @@ retrace_func_define_prototypes(stdio) = {
 				 */
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -226,6 +210,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "freopen",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "filename",
@@ -250,9 +235,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -260,6 +242,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fseek",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "stream",
@@ -282,9 +265,6 @@ retrace_func_define_prototypes(stdio) = {
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -292,6 +272,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fsetpos",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "stream",
@@ -312,9 +293,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -322,6 +300,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "ftell",
 		.conv = CC_SYSTEM_V,
 		.type_name = "long int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "stream",
@@ -332,9 +311,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -342,6 +318,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fwrite",
 		.conv = CC_SYSTEM_V,
 		.type_name = "size_t",
+		.params_cnt = 4,
 		.params = {
 			{
 				.name = "ptr",
@@ -374,9 +351,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -384,6 +358,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "remove",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "filename",
@@ -391,9 +366,6 @@ retrace_func_define_prototypes(stdio) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -401,6 +373,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "rename",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "old_filename",
@@ -415,9 +388,6 @@ retrace_func_define_prototypes(stdio) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -425,6 +395,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "rewind",
 		.conv = CC_SYSTEM_V,
 		.type_name = "void",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "stream",
@@ -435,9 +406,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -445,6 +413,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "setbuf",
 		.conv = CC_SYSTEM_V,
 		.type_name = "void",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "stream",
@@ -465,9 +434,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -475,6 +441,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "setvbuf",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 4,
 		.params = {
 			{
 				.name = "stream",
@@ -507,9 +474,6 @@ retrace_func_define_prototypes(stdio) = {
 				.type_name = "size_t",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -517,16 +481,15 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "tmpfile",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "tmpnam",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "str",
@@ -534,19 +497,32 @@ retrace_func_define_prototypes(stdio) = {
 				.modifiers = CDM_POINTER,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
+	{
+		.name = "printf",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.fmt = FAT_PRINTF,
+		.fmt_param_idx = 0,
+		.params_cnt = 1,
+		.params = {
+			{
+				.name = "format",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			}
+		}
+	},
+
 /* FIXME: Prototype when vararg funcs are supported by the engine */
 #if 0
-
 /*
  *
  *	int fprintf(FILE *stream, const char *format, ...)
- *	int printf(const char *format, ...)
  *	int sprintf(char *str, const char *format, ...)
  *	int vfprintf(FILE *stream, const char *format, va_list arg)
  *	int vprintf(const char *format, va_list arg)
@@ -560,6 +536,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fgetc",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "stream",
@@ -570,9 +547,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -580,6 +554,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fgets",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "str",
@@ -604,9 +579,6 @@ retrace_func_define_prototypes(stdio) = {
 				 */
 
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -614,6 +586,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fputc",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "char",
@@ -630,9 +603,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -640,6 +610,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "fputs",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "str",
@@ -657,9 +628,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -667,6 +635,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "getc",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "stream",
@@ -677,9 +646,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -687,16 +653,15 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "getchar",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 0,
 		.params = {
-			{
-				.name = ""
-			}
 		}
 	},
 	{
 		.name = "gets",
 		.conv = CC_SYSTEM_V,
 		.type_name = "ptr",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "str",
@@ -704,9 +669,6 @@ retrace_func_define_prototypes(stdio) = {
 				.modifiers = CDM_POINTER,
 				.ref_type_name = "sz",
 				.direction = PDIR_OUT
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -714,6 +676,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "putc",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "char",
@@ -730,9 +693,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -740,6 +700,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "putchar",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "char",
@@ -756,9 +717,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -766,6 +724,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "puts",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "str",
@@ -773,9 +732,6 @@ retrace_func_define_prototypes(stdio) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -783,6 +739,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "ungetc",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 2,
 		.params = {
 			{
 				.name = "char",
@@ -799,9 +756,6 @@ retrace_func_define_prototypes(stdio) = {
 				 *.ref_type_name = "void",
 				 */
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -809,6 +763,7 @@ retrace_func_define_prototypes(stdio) = {
 		.name = "perror",
 		.conv = CC_SYSTEM_V,
 		.type_name = "void",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "str",
@@ -816,9 +771,6 @@ retrace_func_define_prototypes(stdio) = {
 				.modifiers = CDM_POINTER | CDM_CONST,
 				.ref_type_name = "sz",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	}

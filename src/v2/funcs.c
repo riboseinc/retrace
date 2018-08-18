@@ -66,14 +66,13 @@ static inline unsigned long hash_string(const char *str)
 /* not threadsafe, must be called only once */
 int retrace_funcs_init(void)
 {
-	const struct FuncPrototype *p;
+	struct FuncPrototype *p;
 	struct HashEl *h;
 	unsigned long size;
-	unsigned int i;
+	unsigned int i, j;
 	unsigned long hash;
 
 	retrace_as_get_section_info("__DATA", "__retrace_funcs", &p, &size);
-	log_dbg("sizeof(struct FuncPrototype)=%d", sizeof(struct FuncPrototype));
 	for (i = 0; i != size / sizeof(struct FuncPrototype); i++, p++) {
 
 		hash = hash_string(p->name);
@@ -114,6 +113,7 @@ int retrace_funcs_init(void)
 
 			log_dbg("Added '%s' at hash: %d", p->name, hash);
 		}
+
 	}
 	return 0;
 }

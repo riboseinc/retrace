@@ -93,12 +93,12 @@ static inline struct ThreadContext *get_thread_context(void)
 
 static inline void clear_context(struct ThreadContext *thread_ctx)
 {
-
+	int i;
 	/* free new params */
-	while (thread_ctx->new_params_cnt >= 0) {
-		retrace_real_impls.free(
-			thread_ctx->new_params[thread_ctx->new_params_cnt]);
-		thread_ctx->new_params_cnt--;
+
+	for (i = 0; i != thread_ctx->params_cnt; i++) {
+		if (thread_ctx->params[i].free_val)
+			retrace_real_impls.free((void *) thread_ctx->params[i].val);
 	}
 
 	retrace_real_impls.memset(thread_ctx, 0, sizeof(*thread_ctx));
@@ -263,7 +263,6 @@ void retrace_engine_wrapper(char *func_name,
 		return;
 	}
 
-	char *name = (char *) ((struct WrapperSystemVFrame *) arch_spec_ctx)->real_rdi;
 
 	/* set default to call real impl */
 	retrace_as_sched_real(arch_spec_ctx, real_impl);
@@ -288,13 +287,12 @@ void retrace_engine_wrapper(char *func_name,
 		goto clean_up;
 	}
 
-	/* setup params */
+	/* setup params, ignore the return value */
+	thread_ctx->params_cnt = ENGINE_MAXCOUNT_PARAMS;
 	retrace_as_setup_params(thread_ctx->arch_spec_ctx,
-		thread_ctx->prototype->params,
-		thread_ctx->params);
-
-	char *param_ptr = (char *) thread_ctx->params[0];
-
+		thread_ctx->prototype,
+		thread_ctx->params,
+		&thread_ctx->params_cnt);
 	/* find intercept script for the func and return addr */
 	i_scripts = json_object_get_array(retrace_conf, "intercept_scripts");
 	if (!i_scripts) {

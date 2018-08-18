@@ -96,6 +96,34 @@ struct StructMember {
 	size_t array_cnt;
 };
 
+/* PrintfFmtBasicTypes and PrintfFmtMods
+ * Superset the PA enum and FLAG macro from print.h
+ * We have do do it since 0 value means PA_INT,
+ * while we need it for datatypes that are not related
+ * to standard types
+ */
+enum PrintfFmtBasicTypes
+{
+	PBT_UNK,
+	PBT_INT,
+	PBT_CHAR,
+	PBT_STRING,
+	PBT_POINTER,
+	PBT_FLOAT,
+	PBT_DOUBLE,
+	PBT_CNT
+};
+
+enum PrintfFmtMods
+{
+	PFM_UNK,
+	PFM_PTR,
+	PFM_SHORT,
+	PFM_LONG,
+	PFM_LONG_LONG,
+	/*PFM_LONG_DOUBLE,*/
+	PFM_CNT
+};
 
 struct DataType {
 	char name[MAXLEN_DATATYPE_NAME + 1];
@@ -104,6 +132,10 @@ struct DataType {
 	 * empty for non structs
 	 */
 	struct StructMember struct_members[MAXCOUNT_STRUCT_MEMBERS];
+
+	/* for gnu format mapping, see printf.h */
+	enum PrintfFmtBasicTypes pa_basic_type;
+	enum PrintfFmtMods pa_flag;
 
 	/**
 	 * @brief serializes data object to C-string
@@ -134,8 +166,11 @@ struct DataType {
 		const struct DataType *data_type);
 };
 
-//extern const struct DataType retrace_data_types[];
 const struct DataType *retrace_datatype_get(const char *datatype_name);
+
+/* as defined by parse_printf_format */
+const struct DataType *retrace_datatype_printf_to_dt(int argtype);
+
 int retrace_datatypes_init(void);
 
 /* aligned 1 is used because i group all DataType in the same

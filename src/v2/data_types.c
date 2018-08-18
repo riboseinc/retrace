@@ -23,6 +23,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stddef.h>
+
+/* for printf.h */
+#ifndef __GNUC__
+#error GNU extensions are required!
+#endif
+
+#include <printf.h>
+
 #include "data_types.h"
 #include "logger.h"
 #include "real_impls.h"
@@ -47,6 +56,21 @@ struct HashEl {
 };
 
 static struct HashEl dts_hash[MAXCOUNT_DT_HASH_ENTRIES];
+
+/* Map printf defs to known types */
+static int gnu_fmt_to_pbt[PA_LAST] =
+{
+	[PA_INT] = PBT_INT,
+	[PA_CHAR] = PBT_CHAR,
+	[PA_WCHAR] = PBT_UNK,
+	[PA_STRING] = PBT_POINTER,
+	[PA_WSTRING] = PBT_UNK,
+	[PA_POINTER] = PBT_POINTER,
+	[PA_FLOAT] = PBT_UNK,
+	[PA_DOUBLE] = PBT_UNK
+};
+
+static const struct DataType *gnu_fmt_to_dt[PBT_CNT][PFM_CNT];
 
 /* trivial string hash */
 static inline unsigned long hash_string(const char *str)
@@ -100,8 +124,7 @@ int retrace_datatypes_init(void)
 
 			if (!retrace_real_impls.strcmp(
 					h->data_type->name, p->name)) {
-				//prototype already exists, error
-				log_dbg("Prototype for '%s' already exists", p->name);
+				log_err("data type '%s' already exists", p->name);
 				return -1;
 			}
 
@@ -113,6 +136,33 @@ int retrace_datatypes_init(void)
 
 			log_dbg("Added '%s' at hash: %d", p->name, hash);
 		}
+
+		/* add gnu printf mapping */
+		if (p->pa_basic_type >= PBT_CNT) {
+			log_err("Wrong pe_basic_type: %d of data type '%s'",
+				p->pa_basic_type, p->name);
+			return -1;
+		}
+
+		if (p->pa_flag >= PFM_CNT) {
+			log_err("Wrong pa_flag: %d of data type '%s'",
+				p->pa_flag, p->name);
+			return -1;
+		}
+
+		if (p->pa_basic_type != PBT_UNK) {
+			if (gnu_fmt_to_dt[p->pa_basic_type][p->pa_flag] != NULL) {
+				log_err("data type '%s' for pe_basic_type: %d"
+					" pa_flag: %d already exists",
+					p->name,
+					p->pa_basic_type,
+					p->pa_flag);
+				return -1;
+			}
+			gnu_fmt_to_dt[p->pa_basic_type][p->pa_flag] = p;
+		}
+
+
 	}
 	return 0;
 }
@@ -149,4 +199,39 @@ const struct DataType *retrace_datatype_get(const char *datatype_name)
 	log_dbg("Not found '%s'", datatype_name);
 
 	return 0;
+}
+
+static inline int gnu_modflag_to_pfm(int pa_flag)
+{
+	if ((pa_flag == PA_FLAG_LONG_LONG) ||
+		(pa_flag == PA_FLAG_LONG_DOUBLE))
+		return PFM_LONG_LONG;
+	else if (pa_flag == PA_FLAG_LONG)
+		return PFM_LONG;
+	else if (pa_flag == PA_FLAG_SHORT)
+		return PFM_SHORT;
+	else if (pa_flag == PA_FLAG_PTR)
+		return PFM_PTR;
+	else
+		return PFM_UNK;
+}
+
+const struct DataType *retrace_datatype_printf_to_dt(int argtype)
+{
+	int basic_type;
+	int flag_mod;
+
+	basic_type = argtype & ~PA_FLAG_MASK;
+	flag_mod = argtype & PA_FLAG_MASK;
+
+	if (basic_type >= PA_LAST) {
+		log_err("Invalid basic_type: %d", basic_type);
+
+		return NULL;
+	}
+
+	basic_type = gnu_fmt_to_pbt[basic_type];
+	flag_mod = gnu_modflag_to_pfm(flag_mod);
+
+	return gnu_fmt_to_dt[basic_type][flag_mod];
 }

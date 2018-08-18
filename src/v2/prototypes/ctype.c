@@ -30,14 +30,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "isalnum",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -45,14 +43,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "isalpha",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -60,14 +56,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "isblank",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -75,14 +69,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "iscntrl",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -90,14 +82,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "isdigit",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -105,14 +95,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "isgraph",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -120,14 +108,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "islower",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -135,14 +121,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "isprint",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -150,14 +134,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "ispunct",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -165,14 +147,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "isspace",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -180,14 +160,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "isupper",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -195,14 +173,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "isxdigit",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -210,14 +186,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "toupper",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -225,14 +199,12 @@ retrace_func_define_prototypes(ctype) = {
 		.name = "tolower",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
+		.params_cnt = 1,
 		.params = {
 			{
 				.name = "c",
 				.type_name = "int",
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	}

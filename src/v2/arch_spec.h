@@ -27,13 +27,16 @@
 #define ARCH_SPEC_H_
 
 #include "arch_spec_macros.h"
+#include "data_types.h"
+#include "funcs.h"
 
-struct ParamMeta;
+struct FuncParam {
+	struct ParamMeta param_meta;
+	const struct DataType *data_type;
+	long int val;
+	int free_val;
+};
 
-/* calls real_impls passing params accordingly to params_meta */
-long int retrace_as_call_real(const void *real_impl,
-	const struct ParamMeta *params_meta,
-	long int params[]);
 /*
 void retrace_as_abort(void *arch_spec_ctx, long int ret_val);
 */
@@ -58,10 +61,16 @@ void *retrace_as_get_real_safe(const char *real_impl);
 void retrace_as_cancel_sched_real(void *arch_spec_ctx);
 
 /* should be called by retrace_engine_wrapper to setup params */
-void retrace_as_setup_params(
+int retrace_as_setup_params(
 	void *arch_spec_ctx,
-	const struct ParamMeta *params_meta,
-	long int params[]);
+	const struct FuncPrototype *proto,
+	struct FuncParam params[],
+	int *params_cnt);
+
+/* calls real_impls passing params accordingly to params_meta */
+long int retrace_as_call_real(const void *real_impl,
+	const struct FuncParam params[],
+	int params_cnt);
 
 /* schedules real_impl to run after retrace_engine_wrapper */
 void retrace_as_set_ret_val(void *arch_spec_ctx,

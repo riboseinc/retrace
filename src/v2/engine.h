@@ -29,6 +29,9 @@
 #include <stddef.h>
 
 #include "funcs.h"
+#include "arch_spec.h"
+/* for varags */
+#define ENGINE_MAXCOUNT_PARAMS 32
 
 #if 0
 enum InterceptActions {
@@ -60,14 +63,21 @@ enum ArrayCountMethods {
 };
 #endif
 
+
 struct ThreadContext {
 	const struct FuncPrototype *prototype;
+
+	/* real implementation ptr */
 	void *real_impl;
+
+	/* value to set as return value */
 	long int ret_val;
-	/* values of the params */
-	long int params[MAXCOUNT_PARAMS];
-	char *new_params[MAXCOUNT_PARAMS];
-	int new_params_cnt;
+
+	struct FuncParam params[ENGINE_MAXCOUNT_PARAMS];
+
+	/* valid param cnt */
+	int params_cnt;
+
 	void *arch_spec_ctx;
 	void *ret_addr;
 };

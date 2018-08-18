@@ -22,39 +22,76 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-enum Modules {
-	ACTIONS,
-	CONF,
-	DATA_TYPES,
-	ENGINE,
-	FUNCS,
-	MAIN,
-	ARCH,
-	MODULES_CNT
-};
+void print_usage(void)
+{
+	printf("Usage: printf_exmpl $FMT $NUM_OF_VARARGS $VARARGS\n"
+		"$FMT: printf format\n"
+		"$NUM_OF_VARARGS: number of varargs, max 4\n"
+		"$VARARGS: list of varargs\n"
+		"e.g. printf_exmpl \"hello "
+		"str=%%s num1=%%u num2=%%d num3=%%lu\" 4 \\\"world\\\" 1 2 3\n");
+}
 
-enum Severity {
-	DEBUG,
-	INFO,
-	WARN,
-	ERROR,
-	SEVERITY_CNT
-};
+int main(int argc, char *argv[])
+{
+	char *env_var;
+	int vargs_cnt;
+	long int params[4];
+	int i;
 
-extern int retrace_sev_ena[SEVERITY_CNT];
-extern int retrace_mod_ena[MODULES_CNT];
+	if (argc < 3) {
+		print_usage();
+		return -1;
+	}
 
-extern char *retrace_severities[SEVERITY_CNT];
-extern char *retrace_module_pref[MODULES_CNT];
+	vargs_cnt = atoi(argv[2]);
+	if (vargs_cnt > 4) {
+		print_usage();
+		return -1;
+	}
 
-int retrace_logger_init(void);
+	char *st;
 
-#define retrace_logger_log(module, sev, fmt, ...) \
-do { \
-	if (retrace_sev_ena[(sev)] && retrace_mod_ena[(module)]) \
-		retrace_real_impls.printf("[%s][%s]: " fmt "\n", \
-			retrace_module_pref[(module)], \
-				retrace_severities[(sev)], ##__VA_ARGS__); \
-} while (0)
+	for (i = 3; i != vargs_cnt + 3; i++) {
+		st = argv[i];
+		if (*((char*) argv[i]) == '"') {
+			/* string, eliminate "" */
 
+			argv[i] += 1;
+			st = argv[i];
+
+			*(argv[i] + strlen(argv[i]) - 1) = 0;
+			params[i - 3] = (long int) argv[i];
+		} else {
+			/* int */
+			params[i - 3] = atoi(argv[i]);
+		}
+	}
+
+	switch (vargs_cnt) {
+
+	case 0:
+		return printf("%s", argv[1]);
+
+	case 1:
+		return printf(argv[1], params[0]);
+
+	case 2:
+		return printf(argv[1], params[0], params[1]);
+
+	case 3:
+		return printf(argv[1], params[0], params[1], params[2]);
+
+	case 4:
+		return printf(argv[1], params[0], params[1], params[2], params[3]);
+
+	default:
+		return -1;
+	}
+
+	return 0;
+}

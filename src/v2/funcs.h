@@ -27,7 +27,6 @@
 #define SRC_RETRACE_V2_FUNCS_H_
 
 #include "data_types.h"
-#include "arch_spec.h"
 
 #define MAXLEN_FUNC_NAME 64
 #define MAXLEN_PARAM_NAME 32
@@ -47,6 +46,18 @@ enum ParamDirections {
 	PDIR_CNT
 };
 
+/*
+ * As defined by gcc format attribute
+ */
+enum FormatArchTypes {
+	FAT_NOVARARGS,
+	FAT_PRINTF,
+	FAT_SCANF,
+	FAT_STRFTIME,
+	/* TODO: Add more */
+	FAT_CNT
+};
+
 struct ParamMeta {
 	char name[MAXLEN_PARAM_NAME + 1];
 	char type_name[MAXLEN_DATATYPE_NAME + 1];
@@ -64,13 +75,27 @@ struct ParamMeta {
 };
 
 struct FuncPrototype {
+	/* function name, same as exported symbol */
 	char name[MAXLEN_FUNC_NAME + 1];
-	enum CallingConventions conv;
-	struct ParamMeta params[MAXCOUNT_PARAMS];
-	char type_name[MAXLEN_DATATYPE_NAME + 1];
-};
 
-//extern const struct FuncPrototype retrace_funcs[];
+	/* calling convention, TODO: consider to remove */
+	enum CallingConventions conv;
+
+	/* static params, i.e. not varargs */
+	struct ParamMeta params[MAXCOUNT_PARAMS];
+
+	/* num of static params */
+	int params_cnt;
+
+	/* function return type name */
+	char type_name[MAXLEN_DATATYPE_NAME + 1];
+
+	/* gcc-style format support */
+	enum FormatArchTypes fmt;
+
+	/* index of param holding fmt template */
+	int fmt_param_idx;
+};
 
 const struct FuncPrototype *retrace_func_get(const char *func_name);
 int retrace_funcs_init(void);

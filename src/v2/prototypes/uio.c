@@ -29,6 +29,7 @@ retrace_func_define_prototypes(uio) = {
 		.name = "writev",
 		.conv = CC_SYSTEM_V,
 		.type_name = "size_t",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "fd",
@@ -50,9 +51,6 @@ retrace_func_define_prototypes(uio) = {
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	},
@@ -60,6 +58,7 @@ retrace_func_define_prototypes(uio) = {
 		.name = "readv",
 		.conv = CC_SYSTEM_V,
 		.type_name = "size_t",
+		.params_cnt = 3,
 		.params = {
 			{
 				.name = "fd",
@@ -81,9 +80,6 @@ retrace_func_define_prototypes(uio) = {
 				.type_name = "int",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
-			},
-			{
-				.name = ""
 			}
 		}
 	}
