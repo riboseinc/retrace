@@ -29,12 +29,13 @@
 #include "parson.h"
 #include "engine.h"
 #include "arch_spec_macros.h"
+#include "conf.h"
 
 #define MAXLEN_ACTION_NAME 32
 
 int(*retrace_actions_get(const char *action_name))
 	(struct ThreadContext *t_ctx,
-		const JSON_Object *action_params);
+		rtr2_action_t *action);
 
 int retrace_actions_init(void);
 

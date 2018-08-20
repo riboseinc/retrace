@@ -40,7 +40,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <nereon.h>
+#include <nereon/nereon.h>
 #include "retrace_v2.h"
 #include "retrace_v2.nos.h"
 
@@ -383,7 +383,7 @@ main(int argc, char *argv[])
 		exit(ret);
 	}
 
-	ret = nereon_get_config_options(&ctx, cfg_opts, sizeof(cfg_opts) / sizeof(struct nereon_config_option));
+	ret = nereon_get_config_options(&ctx, cfg_opts);
 	if (ret != 0) {
 		fprintf(stderr, "Failed to get configuration options(err:%s)\n", nereon_get_errmsg());
 		goto end;
