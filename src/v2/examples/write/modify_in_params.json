@@ -18,7 +18,7 @@ Parameters will be logged before and after the modifications.
 				{
 					"action_name": "modify_in_param_arr",
 					"action_params": {
-						"param_name" : "buff",								
+						"param_name" : "buf",								
 						"match_arr" : [
                   			72,
 							101,
