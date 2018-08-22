@@ -8,6 +8,9 @@ the 'name' param for getnev() call. */
 			"actions": [
 				{
 					"action_name": "log_params"
+				},
+		        {
+					"action_name": "call_real"
 				}
 			]
 		},		
