@@ -385,7 +385,7 @@ size_t retrace_longint_to_sz(const void *data,
 	char *str)
 {
 	return retrace_real_impls.sprintf(str, "%ld",
-		*((const long int *) data));
+		*((const long *) data));
 }
 
 size_t retrace_longint_get_sz_size(const void *data,
@@ -394,13 +394,13 @@ size_t retrace_longint_get_sz_size(const void *data,
 	return retrace_real_impls.snprintf(NULL,
 		0,
 		"%ld",
-		*((const long int *) data));
+		*((const long *) data));
 }
 
 int retrace_longint_to_size_t(const void *data, size_t *dst_size_t)
 {
 	/* warning, possible data loss */
-	*dst_size_t = (size_t) *((long int *) data);
+	*dst_size_t = (size_t) *((long *) data);
 	return 0;
 };
 
@@ -408,7 +408,7 @@ int retrace_longint_get_size(const void *data,
 	const struct DataType *data_type,
 	size_t *dst_size_t)
 {
-	*dst_size_t = sizeof(long int);
+	*dst_size_t = sizeof(long);
 	return 0;
 }
 
@@ -629,7 +629,7 @@ retrace_datatype_define_prototypes(basic) = {
 		.get_size = retrace_int16_get_size
 	},
 	{
-		.name = "long int",
+		.name = "long",
 		.struct_members[0] = {.name = ""},
 		.pa_basic_type = PBT_INT,
 		.pa_flag = PFM_LONG,
@@ -639,7 +639,7 @@ retrace_datatype_define_prototypes(basic) = {
 		.get_size = retrace_longint_get_size
 	},
 	{
-		.name = "unsigned long int",
+		.name = "unsigned long",
 		.struct_members[0] = {.name = ""},
 		.to_sz = retrace_ulong_to_sz,
 		.get_sz_size = retrace_ulong_get_sz_size,
@@ -647,7 +647,7 @@ retrace_datatype_define_prototypes(basic) = {
 		.get_size = retrace_ulong_get_size
 	},
 	{
-		.name = "long long int",
+		.name = "long long",
 		.struct_members[0] = {.name = ""},
 		.pa_basic_type = PBT_INT,
 		.pa_flag = PFM_LONG_LONG,

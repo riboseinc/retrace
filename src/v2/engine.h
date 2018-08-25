@@ -33,37 +33,6 @@
 /* for varags */
 #define ENGINE_MAXCOUNT_PARAMS 32
 
-#if 0
-enum InterceptActions {
-	IA_INVALID,
-
-	/* Do nothing */
-	IA_NA,
-
-	/* Log parameters */
-	IA_LOG_PARAMS,
-
-	/* Call real implementation */
-	IA_CALL_REAL,
-
-	IA_LOG_PARAMS_JSON,
-
-	IA_COUNT
-};
-
-
-enum ArrayCountMethods {
-	ACM_INVALID,
-
-	/* Other struct member holds the count */
-	ACM_DYN,
-
-	/* Known during compile time */
-	ACM_STATIC
-};
-#endif
-
-
 struct ThreadContext {
 	const struct FuncPrototype *prototype;
 
@@ -71,7 +40,7 @@ struct ThreadContext {
 	void *real_impl;
 
 	/* value to set as return value */
-	long int ret_val;
+	long ret_val;
 
 	struct FuncParam params[ENGINE_MAXCOUNT_PARAMS];
 

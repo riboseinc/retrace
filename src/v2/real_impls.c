@@ -34,24 +34,6 @@
 #include "arch_spec.h"
 
 struct RetraceRealImpls retrace_real_impls = {0};
-/*
-void *__libc_dlsym(void *__map, const char *__name);
-void *_dl_sym(void *handle, const char *name, void *dl_caller);
-*/
-
-#if 0
-void *retrace_real_impls_get(const char *func_name)
-{
-	/* This assumes there will be no interceptions for __libc_dlsym */
-	//return __libc_dlsym(RTLD_NEXT, func_name);
-	//return _dl_sym(RTLD_NEXT, func_name, __func__);
-
-	//TODO: Fix the above code so it wont be intercepted
-	// currently dlsym can be intercepted
-	//return dlsym(RTLD_DEFAULT, func_name);
-	return retrace_as_get_real_safe(func_name);
-}
-#endif
 
 /* This should be the absolutely the first module to be inited */
 int retrace_real_impls_init(void)

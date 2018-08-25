@@ -47,8 +47,7 @@
 #define CLI_IN_BUFF_SIZE 128
 #define CLI_OUT_BUFF_SIZE CLI_IN_BUFF_SIZE
 
-typedef struct
-{
+typedef struct {
 	unsigned int id;
 	cli_cmd_t cmd;
 } cli_menu_item_t;
@@ -188,9 +187,8 @@ int cli_scanf(const char *format, ...)
 		/* currently support only main Enter key as end of input */
 		if (in == '\r') {
 			in = '\n';
-			if (write(pts_fd, &in, 1) == -1) {
+			if (write(pts_fd, &in, 1) == -1)
 				return EOF;
-			}
 		}
 		in_buff[idx++] = in;
 	}

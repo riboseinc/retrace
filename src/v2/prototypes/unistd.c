@@ -280,7 +280,7 @@ retrace_func_define_prototypes(unistd) = {
 		}
 	},
 	/* FIXME: Prototype when vararg funcs are supported by the engine */
-#if 0
+
 /*
  *
  *
@@ -288,7 +288,7 @@ retrace_func_define_prototypes(unistd) = {
  *		int          execle(const char *, const char *, ...);
  *		int          execlp(const char *, const char *, ...);
  */
-#endif
+
 	{
 		.name = "execv",
 		.conv = CC_SYSTEM_V,
@@ -423,7 +423,7 @@ retrace_func_define_prototypes(unistd) = {
 	{
 		.name = "fpathconf",
 		.conv = CC_SYSTEM_V,
-		.type_name = "long int",
+		.type_name = "long",
 		.params_cnt = 2,
 		.params = {
 			{
@@ -855,7 +855,7 @@ retrace_func_define_prototypes(unistd) = {
 	{
 		.name = "pathconf",
 		.conv = CC_SYSTEM_V,
-		.type_name = "long int",
+		.type_name = "long",
 		.params_cnt = 2,
 		.params = {
 			{
@@ -1256,7 +1256,7 @@ retrace_func_define_prototypes(unistd) = {
 	{
 		.name = "sysconf",
 		.conv = CC_SYSTEM_V,
-		.type_name = "long int",
+		.type_name = "long",
 		.params_cnt = 1,
 		.params = {
 			{

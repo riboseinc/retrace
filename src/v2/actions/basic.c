@@ -359,7 +359,7 @@ static int ia_modify_in_param_str
 	}
 
 	t_ctx->params[param_idx].val =
-		(long int) retrace_real_impls.malloc(
+		(long) retrace_real_impls.malloc(
 			retrace_real_impls.strlen(new_str) + 1);
 	t_ctx->params[param_idx].free_val = 1;
 
@@ -492,7 +492,7 @@ static int ia_modify_in_param_arr
 	}
 
 	param->val =
-		(long int) retrace_real_impls.malloc(
+		(long) retrace_real_impls.malloc(
 			json_array_get_count(new_arr));
 	param->free_val = 1;
 
@@ -622,7 +622,7 @@ static int ia_modify_in_param_int
 			param_name);
 
 	/* direct modification */
-	param->val = (long int) new_int;
+	param->val = (long) new_int;
 
 	log_info("param '%s' set to '%d'",
 		param_name, (int) new_int);
@@ -636,7 +636,7 @@ static int ia_call_real
 		const JSON_Object *action_params)
 {
 	log_dbg("calling real at 0x%lx for %s...",
-			(long int) t_ctx->real_impl,
+			(long) t_ctx->real_impl,
 			t_ctx->prototype->name);
 
 	t_ctx->ret_val = retrace_as_call_real(t_ctx->real_impl,

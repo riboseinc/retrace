@@ -33,8 +33,7 @@
 #define MAXLEN_ACTION_NAME 32
 
 int(*retrace_actions_get(const char *action_name))
-	(struct ThreadContext *t_ctx,
-		const JSON_Object *action_params);
+	(struct ThreadContext *t_ctx, const JSON_Object *action_params);
 
 int retrace_actions_init(void);
 
@@ -48,6 +47,6 @@ struct Action {
 #define retrace_actions_define_package(pkg_name) \
 	retrace_as_define_var_in_sec(const struct Action,\
 		retrace_actions_##pkg_name[], \
-			"__DATA", "__retrace_acts")__attribute__((aligned(1)))
+			"__DATA", "__retrace_acts") __attribute__((aligned(1)))
 
 #endif /* SRC_RETRACE_V2_ACTIONS_H_ */

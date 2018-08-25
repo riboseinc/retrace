@@ -25,26 +25,28 @@
 #include "funcs.h"
 
 retrace_func_define_prototypes(stdlib) = {
+
 	/* TODO: Uncomment when float is supported */
-#if 0
-	{
-		.name = "atof",
-		.conv = CC_SYSTEM_V,
-		.type_name = "double",
-		.params = {
-			{
-				.name = "str",
-				.type_name = "ptr",
-				.modifiers = CDM_POINTER | CDM_CONST,
-				.ref_type_name = "sz",
-				.direction = PDIR_IN
-			},
-			{
-				.name = ""
-			}
-		}
-	}
-#endif
+
+/*
+ * {
+ *		.name = "atof",
+ *		.conv = CC_SYSTEM_V,
+ *		.type_name = "double",
+ *		.params = {
+ *			{
+ *				.name = "str",
+ *				.type_name = "ptr",
+ *				.modifiers = CDM_POINTER | CDM_CONST,
+ *				.ref_type_name = "sz",
+ *				.direction = PDIR_IN
+ *			},
+ *			{
+ *				.name = ""
+ *			}
+ *		}
+ *	}
+ */
 	{
 		.name = "atoi",
 		.conv = CC_SYSTEM_V,
@@ -63,7 +65,7 @@ retrace_func_define_prototypes(stdlib) = {
 	{
 		.name = "atol",
 		.conv = CC_SYSTEM_V,
-		.type_name = "long int",
+		.type_name = "long",
 		.params_cnt = 1,
 		.params = {
 			{
@@ -76,36 +78,38 @@ retrace_func_define_prototypes(stdlib) = {
 		}
 	},
 	/* TODO: Uncomment when float is supported */
-#if 0
-	{
-		.name = "strtod",
-		.conv = CC_SYSTEM_V,
-		.type_name = "double",
-		.params = {
-			{
-				.name = "str",
-				.type_name = "ptr",
-				.modifiers = CDM_POINTER | CDM_CONST,
-				.ref_type_name = "sz",
-				.direction = PDIR_IN
-			},
-			{
-				.name = "endptr",
-				.type_name = "ptr",
-				.modifiers = CDM_POINTER,
-				.ref_type_name = "ptr",
-				.direction = PDIR_OUT
-			},
-			{
-				.name = ""
-			}
-		}
-	},
-#endif
+
+/*
+ * {
+ *		.name = "strtod",
+ *		.conv = CC_SYSTEM_V,
+ *		.type_name = "double",
+ *		.params = {
+ *			{
+ *				.name = "str",
+ *				.type_name = "ptr",
+ *				.modifiers = CDM_POINTER | CDM_CONST,
+ *				.ref_type_name = "sz",
+ *				.direction = PDIR_IN
+ *			},
+ *			{
+ *				.name = "endptr",
+ *				.type_name = "ptr",
+ *				.modifiers = CDM_POINTER,
+ *				.ref_type_name = "ptr",
+ *				.direction = PDIR_OUT
+ *			},
+ *			{
+ *				.name = ""
+ *			}
+ *		}
+ *	},
+ */
+
 	{
 		.name = "strtol",
 		.conv = CC_SYSTEM_V,
-		.type_name = "long int",
+		.type_name = "long",
 		.params_cnt = 3,
 		.params = {
 			{
@@ -133,7 +137,7 @@ retrace_func_define_prototypes(stdlib) = {
 	{
 		.name = "strtoul",
 		.conv = CC_SYSTEM_V,
-		.type_name = "unsigned long int",
+		.type_name = "unsigned long",
 		.params_cnt = 3,
 		.params = {
 			{
@@ -399,12 +403,12 @@ retrace_func_define_prototypes(stdlib) = {
 	{
 		.name = "labs",
 		.conv = CC_SYSTEM_V,
-		.type_name = "long int",
+		.type_name = "long",
 		.params_cnt = 1,
 		.params = {
 			{
 				.name = "x",
-				.type_name = "long int",
+				.type_name = "long",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
 			}
@@ -418,13 +422,13 @@ retrace_func_define_prototypes(stdlib) = {
 		.params = {
 			{
 				.name = "numer",
-				.type_name = "long int",
+				.type_name = "long",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
 			},
 			{
 				.name = "denom",
-				.type_name = "long int",
+				.type_name = "long",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
 			}

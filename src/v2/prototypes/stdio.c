@@ -256,7 +256,7 @@ retrace_func_define_prototypes(stdio) = {
 			},
 			{
 				.name = "offset",
-				.type_name = "long int",
+				.type_name = "long",
 				.modifiers = CDM_NOMOD,
 				.direction = PDIR_IN
 			},
@@ -299,7 +299,7 @@ retrace_func_define_prototypes(stdio) = {
 	{
 		.name = "ftell",
 		.conv = CC_SYSTEM_V,
-		.type_name = "long int",
+		.type_name = "long",
 		.params_cnt = 1,
 		.params = {
 			{
@@ -519,7 +519,7 @@ retrace_func_define_prototypes(stdio) = {
 	},
 
 /* FIXME: Prototype when vararg funcs are supported by the engine */
-#if 0
+
 /*
  *
  *	int fprintf(FILE *stream, const char *format, ...)
@@ -531,7 +531,7 @@ retrace_func_define_prototypes(stdio) = {
  *	int scanf(const char *format, ...)
  *	int sscanf(const char *str, const char *format, ...)
  */
-#endif
+
 	{
 		.name = "fgetc",
 		.conv = CC_SYSTEM_V,

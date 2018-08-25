@@ -33,13 +33,9 @@
 struct FuncParam {
 	struct ParamMeta param_meta;
 	const struct DataType *data_type;
-	long int val;
+	long val;
 	int free_val;
 };
-
-/*
-void retrace_as_abort(void *arch_spec_ctx, long int ret_val);
-*/
 
 /* this function is an entry point for the hi level logic
  * it will be called from assembly interceptor.
@@ -68,13 +64,13 @@ int retrace_as_setup_params(
 	int *params_cnt);
 
 /* calls real_impls passing params accordingly to params_meta */
-long int retrace_as_call_real(const void *real_impl,
+long retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt);
 
 /* schedules real_impl to run after retrace_engine_wrapper */
 void retrace_as_set_ret_val(void *arch_spec_ctx,
-	long int ret_val);
+	long ret_val);
 
 int retrace_as_init(void);
 

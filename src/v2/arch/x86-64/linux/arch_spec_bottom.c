@@ -44,7 +44,7 @@
 
 struct WrapperSystemVFrame {
 	/* this flag will cause the assembly portion to call the real impl */
-	long int call_real_flag;
+	long call_real_flag;
 
 	/* In case call_real_flag is 1,
 	 * the assembly portion will jmp to this address
@@ -54,36 +54,37 @@ struct WrapperSystemVFrame {
 	/* return value for the function,
 	 * used in case call_real_flag == 0
 	 */
-	long int ret_val;
+	long ret_val;
 
 	/* original values of the param regs,
 	 * as seen by the assembly portion
 	 */
-	long int real_r9;
-	long int real_r8;
-	long int real_rcx;
-	long int real_rdx;
-	long int real_rsi;
-	long int real_rdi;
-	long int real_rsp;
+	long real_r9;
+	long real_r8;
+	long real_rcx;
+	long real_rdx;
+	long real_rsi;
+	long real_rdi;
+	long real_rsp;
 };
 
-long int retrace_as_call_real(const void *real_impl,
+long retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt)
 {
-	long int ret_val;
-	long int *vals;
+	long ret_val;
+	long *vals;
 	int i;
-	unsigned long int params_cnt_uli;
+	unsigned long params_cnt_uli;
 
 	/* prep param values to keep the asm part clean */
 	params_cnt_uli = params_cnt;
-	vals = (long int *) retrace_real_impls.malloc(
-			sizeof(long int) * params_cnt);
-	for (i = 0; i != params_cnt; i++) {
+	vals = (long *) retrace_real_impls.malloc(
+			sizeof(long) * params_cnt);
+
+	for (i = 0; i != params_cnt; i++)
 		vals[i] = params[i].val;
-	}
+
 	asm volatile (
 				/* save regs that we gonna use,
 				 * dont rely on clobbed regs
@@ -259,7 +260,7 @@ long int retrace_as_call_real(const void *real_impl,
 	return ret_val;
 }
 
-void retrace_as_abort(void *arch_spec_ctx, long int ret_val)
+void retrace_as_abort(void *arch_spec_ctx, long ret_val)
 {
 	struct WrapperSystemVFrame *wrapper_frame_top;
 
@@ -346,7 +347,7 @@ int retrace_as_setup_params(
 		} else {
 			/* get param from stack */
 
-			/* assume sizeof(void*) == sizeof(long int) */
+			/* assume sizeof(void*) == sizeof(long) */
 			params[i].val =
 				(wrapper_frame_top->real_rsp +
 					sizeof(void *) * (params_on_stack - i));
@@ -423,9 +424,8 @@ int retrace_as_setup_params(
 			num_of_vaparams,
 			types);
 
-	if (cnt_left > num_of_vaparams) {
+	if (cnt_left > num_of_vaparams)
 		cnt_left = num_of_vaparams;
-	}
 
 	for (j = 0; j != cnt_left; j++) {
 		/* prep param meta */
@@ -467,35 +467,35 @@ int retrace_as_setup_params(
 		if (i < 6) {
 			/* get param from reg */
 			switch (i) {
-				case 0:
-					params[i].val =
-						wrapper_frame_top->real_rdi;
-					break;
-				case 1:
-					params[i].val =
-						wrapper_frame_top->real_rsi;
-					break;
-				case 2:
-					params[i].val =
-						wrapper_frame_top->real_rdx;
-					break;
-				case 3:
-					params[i].val =
-						wrapper_frame_top->real_rcx;
-					break;
-				case 4:
-					params[i].val =
-						wrapper_frame_top->real_r8;
-					break;
-				case 5:
-					params[i].val =
-						wrapper_frame_top->real_r9;
-					break;
+			case 0:
+				params[i].val =
+					wrapper_frame_top->real_rdi;
+				break;
+			case 1:
+				params[i].val =
+					wrapper_frame_top->real_rsi;
+				break;
+			case 2:
+				params[i].val =
+					wrapper_frame_top->real_rdx;
+				break;
+			case 3:
+				params[i].val =
+					wrapper_frame_top->real_rcx;
+				break;
+			case 4:
+				params[i].val =
+					wrapper_frame_top->real_r8;
+				break;
+			case 5:
+				params[i].val =
+					wrapper_frame_top->real_r9;
+				break;
 			}
 		} else {
 			/* get param from stack */
 
-			/* assume sizeof(void*) == sizeof(long int) */
+			/* assume sizeof(void*) == sizeof(long) */
 			params[i].val =
 				(wrapper_frame_top->real_rsp +
 					sizeof(void *) * (params_on_stack - i));
@@ -511,7 +511,7 @@ int retrace_as_setup_params(
 }
 
 void retrace_as_intercept_done(void *arch_spec_ctx,
-	long int ret_val)
+	long ret_val)
 {
 	((struct WrapperSystemVFrame *) arch_spec_ctx)->ret_val = ret_val;
 
@@ -524,7 +524,7 @@ void retrace_as_cancel_sched_real(void *arch_spec_ctx)
 }
 
 void retrace_as_set_ret_val(void *arch_spec_ctx,
-	long int ret_val)
+	long ret_val)
 {
 	((struct WrapperSystemVFrame *) arch_spec_ctx)->ret_val = ret_val;
 }

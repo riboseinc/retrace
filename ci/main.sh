@@ -8,6 +8,7 @@ CFLAGS="-I${CMOCKA_INSTALL}/include"
 export LD_LIBRARY_PATH CFLAGS LDFLAGS
 
 CHECKPATCH=$CHECKPATCH_INSTALL/checkpatch.pl
+CHECKPATCH_TYPEDEFS=$CHECKPATCH_INSTALL/typedefs.checkpatch
 
 CHECKPATCH_FLAGS+=" --no-tree"
 CHECKPATCH_FLAGS+=" --ignore COMPLEX_MACRO"
@@ -31,13 +32,15 @@ CHECKPATCH_FLAGS+=" --ignore EXECUTE_PERMISSIONS"
 CHECKPATCH_FLAGS+=" --ignore MULTISTATEMENT_MACRO_USE_DO_WHILE"
 CHECKPATCH_FLAGS+=" --ignore STORAGE_CLASS"
 CHECKPATCH_FLAGS+=" --ignore SPDX_LICENSE_TAG"
+CHECKPATCH_FLAGS+=" --ignore PREFER_ALIGNED"
+CHECKPATCH_FLAGS+=" --ignore EMAIL_SUBJECT"
 
 # checkpatch.pl will ignore the following paths
 CHECKPATCH_IGNORE+=" checkpatch.pl.patch Makefile test/Makefile test/http.redirect/hello.txt src/v2/parson.c src/v2/parson.h *.json"
 CHECKPATCH_EXCLUDE=$(for p in $CHECKPATCH_IGNORE; do echo ":(exclude)$p" ; done)
 
 function _checkpatch() {
-		$CHECKPATCH $CHECKPATCH_FLAGS --no-tree -
+		$CHECKPATCH $CHECKPATCH_FLAGS --typedefsfile=$CHECKPATCH_TYPEDEFS --no-tree -
 }
 
 function checkpatch() {
