@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 {
 	char *env_var;
 	int vargs_cnt;
-	long int params[4];
+	long params[4];
 	int i;
 
 	if (argc < 3) {
@@ -58,14 +58,14 @@ int main(int argc, char *argv[])
 
 	for (i = 3; i != vargs_cnt + 3; i++) {
 		st = argv[i];
-		if (*((char*) argv[i]) == '"') {
+		if (*((char *) argv[i]) == '"') {
 			/* string, eliminate "" */
 
 			argv[i] += 1;
 			st = argv[i];
 
 			*(argv[i] + strlen(argv[i]) - 1) = 0;
-			params[i - 3] = (long int) argv[i];
+			params[i - 3] = (long) argv[i];
 		} else {
 			/* int */
 			params[i - 3] = atoi(argv[i]);

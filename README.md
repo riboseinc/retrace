@@ -251,7 +251,7 @@ Hit the main Enter key, and the command menu with prompt will appear:
 ``` console
 Welcome to minicom 2.7.1
 
-OPTIONS: I18n 
+OPTIONS: I18n
 Compiled on Aug 13 2017, 15:25:34.
 Port /dev/tty8, 13:10:04
 
@@ -263,7 +263,7 @@ Retrace command menu
 --------------------
 [0] <Main> Say Hi
 [1] <Main> Terminate process
-Enter command id>> 
+Enter command id>>
 ```
 
 The following are the characteristics of the terminal:

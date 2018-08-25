@@ -104,29 +104,6 @@ static inline void clear_context(struct ThreadContext *thread_ctx)
 	retrace_real_impls.memset(thread_ctx, 0, sizeof(*thread_ctx));
 }
 
-#if 0
-const struct FuncPrototype
-*retrace_engine_get_func_prototype(
-	const char *func_name)
-{
-	const struct FuncPrototype *p;
-
-	/* TODO: Make a faster search - not O(n) like this */
-
-	/* end of func tables are marked by empty string */
-//	p = retrace_funcs;
-	while (p->name[0]) {
-		if (!retrace_real_impls.strncmp(func_name,
-			p->name, MAXLEN_DATATYPE_NAME))
-			return p;
-
-		p++;
-	}
-
-	return NULL;
-}
-#endif
-
 static const JSON_Object *get_i_script(const JSON_Array *i_array,
 	const char *func_name,
 	void *ret_addr)
@@ -179,7 +156,7 @@ static const JSON_Object *get_i_script(const JSON_Array *i_array,
 
 struct WrapperSystemVFrame {
 	/* this flag will cause the assembly portion to call the real impl */
-	long int call_real_flag;
+	long call_real_flag;
 
 	/* In case call_real_flag is 1,
 	 * the assembly portion will jmp to this address
@@ -189,18 +166,18 @@ struct WrapperSystemVFrame {
 	/* return value for the function,
 	 * used in case call_real_flag == 0
 	 */
-	long int ret_val;
+	long ret_val;
 
 	/* original values of the param regs,
 	 * as seen by the assembly portion
 	 */
-	long int real_r9;
-	long int real_r8;
-	long int real_rcx;
-	long int real_rdx;
-	long int real_rsi;
-	long int real_rdi;
-	long int real_rsp;
+	long real_r9;
+	long real_r8;
+	long real_rcx;
+	long real_rdx;
+	long real_rsi;
+	long real_rdi;
+	long real_rsp;
 };
 
 /* The purpose of this function is to continue the work of the assembly wrapper.
@@ -269,9 +246,8 @@ void retrace_engine_wrapper(char *func_name,
 
 	/* do not intervene if already intercepting
 	 */
-	if (thread_ctx->real_impl != NULL) {
+	if (thread_ctx->real_impl != NULL)
 		return;
-	}
 
 	/* save arc spec context */
 	thread_ctx->arch_spec_ctx = arch_spec_ctx;

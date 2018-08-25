@@ -32,6 +32,7 @@ if [ ! -e "${CHECKPATCH_INSTALL}/checkpatch.pl" ]; then
 	wget https://raw.githubusercontent.com/torvalds/linux/master/scripts/spelling.txt
 	patch -p0 < $SPWD/checkpatch.pl.patch
 	echo "invalid.struct.name" > const_structs.checkpatch
+	echo "JSON_Object" > typedefs.checkpatch
 fi
 
 # install libnereon

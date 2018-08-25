@@ -119,8 +119,7 @@ int retrace_actions_init(void)
 }
 
 int(*retrace_actions_get(const char *action_name))
-	(struct ThreadContext *t_ctx,
-		const JSON_Object *action_params)
+	(struct ThreadContext *t_ctx, const JSON_Object *action_params)
 {
 	int hash;
 	struct HashEl *h;

@@ -58,8 +58,7 @@ struct HashEl {
 static struct HashEl dts_hash[MAXCOUNT_DT_HASH_ENTRIES];
 
 /* Map printf defs to known types */
-static int gnu_fmt_to_pbt[PA_LAST] =
-{
+static int gnu_fmt_to_pbt[PA_LAST] = {
 	[PA_INT] = PBT_INT,
 	[PA_CHAR] = PBT_CHAR,
 	[PA_WCHAR] = PBT_UNK,

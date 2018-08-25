@@ -315,9 +315,8 @@ int rtr_spawn_run(struct rtr_spawn_opt *spawn_opt)
 
 		fi->index = i;
 		fi->spawn_opt = spawn_opt;
-		if (pthread_create(&fi->th, NULL, fork_cmd_proc, (void *)fi) != 0) {
+		if (pthread_create(&fi->th, NULL, fork_cmd_proc, (void *)fi) != 0)
 			RTR_SPAWN_LOG("pthread_create() failed with fork(#%d).\n", i);
-		}
 	}
 
 	return 0;

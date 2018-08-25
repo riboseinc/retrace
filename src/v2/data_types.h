@@ -49,16 +49,6 @@ enum CDataModifiers {
 	CMD_AGGREGATED = 0x10,
 
 	CMD_UNION
-
-#if 0
-	/* Pointer points to char array
-	 * TODO: Add support for arrays of other types (not expected)
-	 */
-	CDM_ARRAY = 0x8,
-
-	/* Pointer points to C-string */
-	CDT_SZ = 0x10
-#endif
 };
 
 struct StructMember {
@@ -76,20 +66,6 @@ struct StructMember {
 	 */
 	char ref_type_name[MAXLEN_STRUCT_MEMBER_NAME + 1];
 
-#if 0
-	/* TODO support pointer dereferencing for struct members */
-	/* in case modifiers & CDM_ARRAY, this the method for count calc */
-	ArrayCountMethods_t count_meth;
-
-	union {
-		/* for ACM_DYN, must support to_size_t() */
-		char array_cnt_member[STRUCT_MEMBER_NAME_MAX_LEN + 1];
-
-		/* for ACM_STATIC */
-		size_t array_cnt;
-	} count_meth_data;
-#endif
-
 	/* if modifiers & CMD_ARRAY,
 	 * this members holds the number of elements
 	 */
@@ -102,8 +78,7 @@ struct StructMember {
  * while we need it for datatypes that are not related
  * to standard types
  */
-enum PrintfFmtBasicTypes
-{
+enum PrintfFmtBasicTypes {
 	PBT_UNK,
 	PBT_INT,
 	PBT_CHAR,
@@ -114,8 +89,7 @@ enum PrintfFmtBasicTypes
 	PBT_CNT
 };
 
-enum PrintfFmtMods
-{
+enum PrintfFmtMods {
 	PFM_UNK,
 	PFM_PTR,
 	PFM_SHORT,
@@ -179,6 +153,6 @@ int retrace_datatypes_init(void);
 #define retrace_datatype_define_prototypes(datatype_name) \
 	retrace_as_define_var_in_sec(const struct DataType,\
 		retrace_dt_##datatype_name[], \
-			"__DATA", "__retrace_dt")__attribute__((aligned(1)))
+			"__DATA", "__retrace_dt") __attribute__((aligned(1)))
 
 #endif /* SRC_RETRACE_V2_DATA_TYPES_H_ */

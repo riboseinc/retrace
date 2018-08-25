@@ -34,7 +34,7 @@
 
 struct WrapperSystemVFrame {
 	/* this flag will cause the assembly portion to call the real impl */
-	long int call_real_flag;
+	long call_real_flag;
 
 	/* In case call_real_flag is 1,
 	 * the assembly portion will jmp to this address
@@ -44,18 +44,18 @@ struct WrapperSystemVFrame {
 	/* return value for the function,
 	 * used in case call_real_flag == 0
 	 */
-	long int ret_val;
+	long ret_val;
 
 	/* original values of the param regs,
 	 * as seen by the assembly portion
 	 */
-	long int real_r9;
-	long int real_r8;
-	long int real_rcx;
-	long int real_rdx;
-	long int real_rsi;
-	long int real_rdi;
-	long int real_rsp;
+	long real_r9;
+	long real_r8;
+	long real_rcx;
+	long real_rdx;
+	long real_rsi;
+	long real_rdi;
+	long real_rsp;
 };
 
 struct RealImpls {
@@ -66,31 +66,13 @@ struct RealImpls {
 };
 
 static struct RealImpls retrace_as_real_impls;
-/*
-long int retrace_as_call_real(const void *real_impl,
-	const struct ParamMeta *params_meta,
-	long int params[])*/
 
-long int retrace_as_call_real(const void *real_impl,
+long retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt)
 {
-	long int ret_val;
-	//unsigned long int params_cnt;
-	//const struct ParamMeta *p;
+	long ret_val;
 
-	/* calc params count
-	 * TODO: Improve speed (calc once)
-	 */
-
-/*
-	params_cnt = 0;
-	p = params_meta;
-	while (retrace_real_impls.strlen(p->name)) {
-		params_cnt++;
-		p++;
-	}
-*/
 	asm volatile (
 				/* save regs that we gonna use,
 				 * dont rely on clobbed regs
@@ -270,7 +252,7 @@ long int retrace_as_call_real(const void *real_impl,
 	return ret_val;
 }
 
-void retrace_as_abort(void *arch_spec_ctx, long int ret_val)
+void retrace_as_abort(void *arch_spec_ctx, long ret_val)
 {
 	struct WrapperSystemVFrame *wrapper_frame_top;
 
@@ -292,7 +274,7 @@ void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl)
 void retrace_as_setup_params(
 	void *arch_spec_ctx,
 	const struct ParamMeta *params_meta,
-	long int params[])
+	long params[])
 {
 	int i;
 	int params_on_stack;
@@ -344,7 +326,7 @@ void retrace_as_setup_params(
 			/* get param from stack */
 			params_on_stack = params_cnt - 6;
 
-			/* assume sizeof(void*) == sizeof(long int) */
+			/* assume sizeof(void*) == sizeof(long) */
 			params[i] =
 				(wrapper_frame_top->real_rsp +
 					sizeof(void *) * (params_on_stack - i));
@@ -353,7 +335,7 @@ void retrace_as_setup_params(
 }
 
 void retrace_as_intercept_done(void *arch_spec_ctx,
-	long int ret_val)
+	long ret_val)
 {
 	((struct WrapperSystemVFrame *) arch_spec_ctx)->ret_val = ret_val;
 
@@ -366,22 +348,10 @@ void retrace_as_cancel_sched_real(void *arch_spec_ctx)
 }
 
 void retrace_as_set_ret_val(void *arch_spec_ctx,
-	long int ret_val)
+	long ret_val)
 {
 	((struct WrapperSystemVFrame *) arch_spec_ctx)->ret_val = ret_val;
 }
-
-#if 0
-char *retrace_as_get_funcs_sec(unsigned long *size)
-{
-	extern char start_mysection __asm("section$start$__DATA$__retrace_funcs");
-	extern char stop_mysection __asm("section$end$__DATA$__retrace_funcs");
-
-	*size = (&stop_mysection)-(&start_mysection);
-
-	return (char *) &start_mysection;
-}
-#endif
 
 int retrace_as_init(void)
 {
