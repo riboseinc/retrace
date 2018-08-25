@@ -74,4 +74,6 @@ void retrace_as_set_ret_val(void *arch_spec_ctx,
 
 int retrace_as_init(void);
 
+int retrace_as_init_late(void);
+
 #endif /* ARCH_SPEC_H_ */

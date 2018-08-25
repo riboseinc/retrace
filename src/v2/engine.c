@@ -368,7 +368,10 @@ int retrace_engine_init(void)
 	int key_res;
 
 	key_res = retrace_real_impls.pthread_key_create(&thread_ctx_key,
-			thread_ctx_destructor);
+		thread_ctx_destructor);
+
+	if (key_res)
+		log_err("failed to create pthread_key");
 
 	return key_res;
 }

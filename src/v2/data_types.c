@@ -58,7 +58,13 @@ struct HashEl {
 static struct HashEl dts_hash[MAXCOUNT_DT_HASH_ENTRIES];
 
 /* Map printf defs to known types */
+#ifdef PA_LAST
+/* On OSX PA_LAST does not exist */
 static int gnu_fmt_to_pbt[PA_LAST] = {
+#else
+static int gnu_fmt_to_pbt[]
+#endif
+= {
 	[PA_INT] = PBT_INT,
 	[PA_CHAR] = PBT_CHAR,
 	[PA_WCHAR] = PBT_UNK,
@@ -215,22 +221,70 @@ static inline int gnu_modflag_to_pfm(int pa_flag)
 		return PFM_UNK;
 }
 
+static size_t unk_to_sz(const void *data,
+	const struct DataType *data_type,
+	char *str)
+{
+	retrace_real_impls.strcpy(str, "?");
+	return retrace_real_impls.strlen("?");
+}
+
+static size_t unk_get_sz_size(const void *data,
+	const struct DataType *data_type)
+{
+	return retrace_real_impls.strlen("?");
+}
+
+static int unk_to_size_t(const void *data, size_t *dst_size_t)
+{
+	/* cannot convert */
+	return -1;
+};
+
+static int unk_get_size(const void *data,
+	const struct DataType *data_type,
+	size_t *dst_size_t)
+{
+	*dst_size_t = sizeof("?");
+	return 0;
+}
+
+static const struct DataType unk_dt = {
+	.name = "unknown_type",
+	.struct_members[0] = {.name = ""},
+	.pa_basic_type = 0,
+	.pa_flag = 0,
+	.to_sz = unk_to_sz,
+	.get_sz_size = unk_get_sz_size,
+	.to_size_t = unk_to_size_t,
+	.get_size = unk_get_size
+};
+
 const struct DataType *retrace_datatype_printf_to_dt(int argtype)
 {
 	int basic_type;
 	int flag_mod;
+	const struct DataType *dt;
 
 	basic_type = argtype & ~PA_FLAG_MASK;
 	flag_mod = argtype & PA_FLAG_MASK;
 
-	if (basic_type >= PA_LAST) {
-		log_err("Invalid basic_type: %d", basic_type);
-
-		return NULL;
+	/* ensure basic_type does not overflow */
+	if (((char *) &gnu_fmt_to_pbt[basic_type]) >
+		((char *) gnu_fmt_to_pbt) + sizeof(gnu_fmt_to_pbt)) {
+		log_err("invalid basic_type: %d", basic_type);
+		return &unk_dt;
 	}
 
 	basic_type = gnu_fmt_to_pbt[basic_type];
 	flag_mod = gnu_modflag_to_pfm(flag_mod);
 
-	return gnu_fmt_to_dt[basic_type][flag_mod];
+	dt = gnu_fmt_to_dt[basic_type][flag_mod];
+	if (!dt) {
+		log_err("Unsupported argtype, basic_type: %d, flag_mod: %d",
+			basic_type, flag_mod);
+		return &unk_dt;
+	}
+
+	return dt;
 }
