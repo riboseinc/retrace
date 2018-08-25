@@ -104,6 +104,12 @@ static void retrace_main(void)
 		return;
 	}
 
+	ret = retrace_as_init_late();
+	if (ret) {
+		log_err("retrace_as_init_late() failed, ret = %d", ret);
+		return;
+	}
+
 	log_info("retrace init success");
 
 	retrace_inited = 1;
