@@ -79,11 +79,11 @@ int retrace_funcs_init(void)
 		hash = hash_string(p->name);
 		h = &funcs_hash[hash];
 
-		log_dbg("Adding prototype for '%s', hash: %d", p->name, hash);
+		// log_dbg("Adding prototype for '%s', hash: %d", p->name, hash);
 
 		if (!h->proto) {
 
-			log_dbg("New entry at hash: %d", hash);
+			// log_dbg("New entry at hash: %d", hash);
 
 			h->proto = p;
 			h->next = 0;
@@ -94,7 +94,7 @@ int retrace_funcs_init(void)
 				h->proto->name, p->name) &&
 				h->next) {
 
-				log_dbg("Passing '%s' at hash: %d", h->proto->name, hash);
+				// log_dbg("Passing '%s' at hash: %d", h->proto->name, hash);
 
 				h = h->next;
 			}
@@ -102,7 +102,7 @@ int retrace_funcs_init(void)
 			if (!retrace_real_impls.strcmp(
 					h->proto->name, p->name)) {
 				//prototype already exists, error
-				log_dbg("Prototype for '%s' already exists", p->name);
+				// log_dbg("Prototype for '%s' already exists", p->name);
 				return -1;
 			}
 
@@ -112,7 +112,7 @@ int retrace_funcs_init(void)
 			h->next->proto = p;
 			h->next->next = 0;
 
-			log_dbg("Added '%s' at hash: %d", p->name, hash);
+			// log_dbg("Added '%s' at hash: %d", p->name, hash);
 		}
 	}
 	return 0;
@@ -126,25 +126,25 @@ const struct FuncPrototype *retrace_func_get(const char *func_name)
 	hash = hash_string(func_name);
 	h = &funcs_hash[hash];
 
-	log_dbg("Seraching for prototype for '%s', hash: %d", func_name, hash);
+	// log_dbg("Seraching for prototype for '%s', hash: %d", func_name, hash);
 
 	if (h->proto) {
 
 		while (retrace_real_impls.strcmp(h->proto->name, func_name) &&
 			h->next) {
 
-			log_dbg("Passing '%s' at hash: %d", h->proto->name, hash);
+			// log_dbg("Passing '%s' at hash: %d", h->proto->name, hash);
 
 			h = h->next;
 		}
 	}
 
 	if (h->proto && !retrace_real_impls.strcmp(h->proto->name, func_name)) {
-		log_dbg("Found '%s' at hash: %d", h->proto->name, hash);
+		// log_dbg("Found '%s' at hash: %d", h->proto->name, hash);
 		return h->proto;
 	}
 
-	log_dbg("Not found '%s'", func_name);
+	// log_dbg("Not found '%s'", func_name);
 
 	return (const struct FuncPrototype *) 0;
 }

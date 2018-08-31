@@ -83,7 +83,7 @@ int retrace_actions_init(void)
 
 		if (!h->action) {
 
-			log_dbg("New entry at hash: %d", hash);
+			// log_dbg("New entry at hash: %d", hash);
 
 			h->action = p;
 			h->next = 0;
@@ -112,7 +112,7 @@ int retrace_actions_init(void)
 			h->next->action = p;
 			h->next->next = 0;
 
-			log_dbg("Added '%s' at hash: %d", p->name, hash);
+			// log_dbg("Added '%s' at hash: %d", p->name, hash);
 		}
 	}
 	return 0;
@@ -120,7 +120,7 @@ int retrace_actions_init(void)
 
 int(*retrace_actions_get(const char *action_name))
 	(struct ThreadContext *t_ctx,
-		const JSON_Object *action_params)
+		const rtr2_action_t *action)
 {
 	int hash;
 	struct HashEl *h;

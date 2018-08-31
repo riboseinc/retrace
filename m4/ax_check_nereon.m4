@@ -17,7 +17,7 @@
 #   This macro sets NEREON_INCLUDES such that source files should include
 #   nereon.h like so:
 #
-#     #include <nereon.h>
+#     #include <nereon/nereon.h>
 
 AU_ALIAS([CHECK_NEREON], [AX_CHECK_NEREON])
 AC_DEFUN([AX_CHECK_NEREON], [
@@ -41,7 +41,7 @@ AC_DEFUN([AX_CHECK_NEREON], [
     NEREON_INCLUDES=
     for nereondir in $nereondirs; do
         AC_MSG_CHECKING([for nereon in $nereondir])
-        if test -f "$nereondir/include/nereon.h"; then
+        if test -f "$nereondir/include/nereon/nereon.h"; then
             NEREON_INCLUDES="-I$nereondir/include/"
             NEREON_LDFLAGS="-L$nereondir/lib"
             NEREON_LIBS="-lnereon"
@@ -69,7 +69,7 @@ AC_DEFUN([AX_CHECK_NEREON], [
     LIBS="$NEREON_LIBS $LIBS"
     CPPFLAGS="$NEREON_INCLUDES $CPPFLAGS"
     AC_LINK_IFELSE(
-        [AC_LANG_PROGRAM([#include <nereon.h>], [nereon_get_errmsg()])],
+        [AC_LANG_PROGRAM([#include <nereon/nereon.h>], [nereon_get_errmsg()])],
         [
             AC_MSG_RESULT([yes])
             $1

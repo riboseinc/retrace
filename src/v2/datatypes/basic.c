@@ -27,9 +27,9 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+#include "parson.h"
 #include "data_types.h"
 #include "real_impls.h"
-#include "parson.h"
 #include "basic.h"
 #include "logger.h"
 

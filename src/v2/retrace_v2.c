@@ -40,7 +40,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <nereon.h>
+#include <nereon/nereon.h>
 #include "retrace_v2.h"
 #include "retrace_v2.nos.h"
 
@@ -162,7 +162,7 @@ check_dynamic_loadable(const char *lib_path)
 	/* try to load library for testing purpose */
 	handle = dlopen(lib_path, RTLD_NOW);
 	if (!handle) {
-		printf("Failed\n");
+		printf("Failed(err:%s)\n", dlerror());
 		return -1;
 	}
 
@@ -302,10 +302,12 @@ check_options(struct rtr2_options *opt)
 		opt->lib_path = opt->sys_lib_path;
 	}
 
+#if 0
 	if (!opt->lib_path || check_dynamic_loadable(opt->lib_path) != 0) {
 		fprintf(stderr, "Please specify valid path of %s library file\n", RTR2_LIB_NAME);
 		return -1;
 	}
+#endif
 
 	/* check avaiability of command */
 	if (check_binary_avail(opt) < 0) {
@@ -383,7 +385,7 @@ main(int argc, char *argv[])
 		exit(ret);
 	}
 
-	ret = nereon_get_config_options(&ctx, cfg_opts, sizeof(cfg_opts) / sizeof(struct nereon_config_option));
+	ret = nereon_get_config_options(&ctx, cfg_opts);
 	if (ret != 0) {
 		fprintf(stderr, "Failed to get configuration options(err:%s)\n", nereon_get_errmsg());
 		goto end;
