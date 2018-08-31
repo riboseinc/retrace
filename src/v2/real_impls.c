@@ -150,6 +150,21 @@ int retrace_real_impls_init(void)
 	if (retrace_real_impls.printf == NULL)
 		return -25;
 
+	retrace_real_impls.pthread_mutex_init =
+		retrace_as_get_real_safe("pthread_mutex_init");
+	if (retrace_real_impls.pthread_mutex_init == NULL)
+		return -26;
+
+	retrace_real_impls.pthread_mutex_lock =
+		retrace_as_get_real_safe("pthread_mutex_lock");
+	if (retrace_real_impls.pthread_mutex_lock == NULL)
+		return -27;
+
+	retrace_real_impls.pthread_mutex_unlock =
+		retrace_as_get_real_safe("pthread_mutex_unlock");
+	if (retrace_real_impls.pthread_mutex_unlock == NULL)
+		return -28;
+
 	return 0;
 }
 
