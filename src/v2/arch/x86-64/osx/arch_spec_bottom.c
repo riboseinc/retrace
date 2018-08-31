@@ -177,7 +177,10 @@ static int as_arginfo_function(const struct printf_info *__info,
 
 	default:
 		ctx->printf_args_types[ctx->printf_args_cnt] = 0;
-		log_err("unknown varargs format '%d'", __info->spec);
+		/*
+		 * Better not to challenge the printf here
+		 * log_err("unknown varargs format '%d'", __info->spec);
+		 */
 	}
 
 	/* setup flags */
