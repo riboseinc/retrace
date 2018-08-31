@@ -78,11 +78,11 @@ int retrace_datatypes_init(void)
 		hash = hash_string(p->name);
 		h = &dts_hash[hash];
 
-		log_dbg("Adding data type '%s', hash: %d", p->name, hash);
+		// log_dbg("Adding data type '%s', hash: %d", p->name, hash);
 
 		if (!h->data_type) {
 
-			log_dbg("New entry at hash: %d", hash);
+			// log_dbg("New entry at hash: %d", hash);
 
 			h->data_type = p;
 			h->next = 0;
@@ -111,7 +111,7 @@ int retrace_datatypes_init(void)
 			h->next->data_type = p;
 			h->next->next = 0;
 
-			log_dbg("Added '%s' at hash: %d", p->name, hash);
+			// log_dbg("Added '%s' at hash: %d", p->name, hash);
 		}
 	}
 	return 0;

@@ -26,6 +26,10 @@
 #ifndef __RTR2_CONF_H__
 #define __RTR2_CONF_H__
 
+#define RTR2_DEFAULT_FUNC_NAME             "*"
+#define RTR2_DEFAULT_ACT_NAME1             "log_params"
+#define RTR2_DEFAULT_ACT_NAME2             "call_real"
+
 /*
  * retrace v2 log level
  */
@@ -44,7 +48,13 @@ enum RTR2_LOG_LEVEL {
 enum RTR2_MATCH_TYPE {
 	RTR2_MATCH_TYPE_INT = 0,
 	RTR2_MATCH_TYPE_STRING,
-	RTR2_MATCH_TYPE_ARRAY
+	RTR2_MATCH_TYPE_ARRAY_INT,
+	RTR2_MATCH_TYPE_ARRAY_STRING,
+	RTR2_MATCH_TYPE_CHAR,
+	RTR2_MATCH_TYPE_ANY_INT,                    /* match data is ANY for integer type */
+	RTR2_MATCH_TYPE_ANY_STRING,                 /* match data is ANY for string type */
+	RTR2_MATCH_TYPE_ANY_RANDOM,                 /* match data is ANY && new data is RANDOM */
+	RTR2_MATCH_TYPE_UNKNOWN
 };
 
 /*
@@ -53,12 +63,16 @@ enum RTR2_MATCH_TYPE {
 
 typedef struct rtr2_action {
 	char *name;
-	char *param_name;
 
+	char *param_name;
 	enum RTR2_MATCH_TYPE match_type;
 
 	void *match_data;
 	void *new_data;
+
+	/* these fields are available only when match type is array */
+	int match_data_num;
+	int new_data_num;
 } rtr2_action_t;
 
 /*
@@ -84,14 +98,17 @@ typedef struct rtr2_conf {
 
 	rtr2_func_t *funcs;
 	int funcs_count;
+
+	int use_default;
 } rtr2_conf_t;
+
 
 /*
  * retrace v2 configuration API functions
  */
 
-int retrace_conf_init(const char *config_fpath);
-void retrace_conf_finalize(void);
+int rtr2_config_init(void);
+void rtr2_config_free(void);
 
 extern rtr2_conf_t *g_rtr2_config;
 

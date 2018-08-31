@@ -29,7 +29,6 @@
 
 #include "real_impls.h"
 #include "engine.h"
-#include "parson.h"
 #include "conf.h"
 #include "arch_spec.h"
 #include "logger.h"
@@ -152,6 +151,12 @@ static void retrace_main(void)
 	//__asm("int $3;");
 	int ret;
 
+	ret = rtr2_config_init();
+	if (ret) {
+		log_err("retrace_conf_init() failed, ret = %d", ret);
+		return;
+	}
+
 	if (retrace_as_init())
 		/* cant report error... */
 		return;
@@ -167,12 +172,6 @@ static void retrace_main(void)
 	/* init parson code which is used by various modules */
 	json_set_allocation_functions(retrace_real_impls.malloc,
 			retrace_real_impls.free);
-
-	ret = retrace_conf_init();
-	if (ret) {
-		log_err("retrace_conf_init() failed, ret = %d", ret);
-		return;
-	}
 
 	ret = retrace_engine_init();
 	if (ret) {

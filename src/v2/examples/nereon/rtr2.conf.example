@@ -1,0 +1,61 @@
+
+globals {
+	log_path = /var/log/retrace_v2.log
+	log_level = 1                                    # default log level
+}
+
+interception_func "read" {
+	action "injection" {
+		param_name = "buf"
+		match_type = "char"
+
+		match_data = "any"
+		new_data = "random"
+	}
+
+	action "format_str" {
+		param_name = "buf"
+		match_type = "string"
+
+		match_data = "test"
+		new_data = "%s%s%s%s%s"
+	}
+}
+
+interception_func "write" {
+	action "injection_w" {
+		param_name = "buf"
+		match_type = "char"
+
+		match_data = "any"
+		new_data = "random"
+	}
+
+	action "format_str_w" {
+		param_name = "buf"
+		match_type = "string"
+
+		match_data = "test"
+		new_data = "%s%s%s%s%s"
+	}
+
+	log_level = 2
+}
+
+interception_func "getenv" {
+	action "injection_int" {
+		param_name = "buf"
+		match_type = "array_int"
+
+		match_data = [80, 65, 84, 72, 0]
+		new_data = [80, 87, 68, 0]
+	}
+
+	action "injection_str" {
+		param_name = "buf"
+		match_type = "array_string"
+
+		match_data = ["test1", "test2", "test3", "test4"]
+		new_data = ["t1", "t2", "t3", "t4"]
+	}
+}

@@ -35,7 +35,7 @@
 
 int(*retrace_actions_get(const char *action_name))
 	(struct ThreadContext *t_ctx,
-		rtr2_action_t *action);
+		const rtr2_action_t *action);
 
 int retrace_actions_init(void);
 

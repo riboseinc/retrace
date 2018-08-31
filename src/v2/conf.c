@@ -23,208 +23,210 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if 0
-
-#include <errno.h>
-
-#include "conf.h"
-#include "real_impls.h"
-#include "logger.h"
-
-#define log_err(fmt, ...) \
-	retrace_logger_log(CONF, ERROR, fmt, ##__VA_ARGS__)
-
-#define log_info(fmt, ...) \
-	retrace_logger_log(CONF, INFO, fmt, ##__VA_ARGS__)
-
-#define log_warn(fmt, ...) \
-	retrace_logger_log(CONF, WARN, fmt, ##__VA_ARGS__)
-
-#define log_dbg(fmt, ...) \
-	retrace_logger_log(CONF, DEBUG, fmt, ##__VA_ARGS__)
-
-#define ENVAR_JSON_CONFIG_FN "RETRACE_JSON_CONFIG"
-
-/* Default config - do log_params and call_real for all
- * known functions
- */
-char *def_json_conf =
-"{"
-	"\"intercept_scripts\": ["
-		"{"
-			"\"func_name\": \"*\","
-			"\"actions\": ["
-				"{"
-					"\"action_name\": \"log_params\""
-				"},"
-				"{"
-					"\"action_name\": \"call_real\""
-				"}"
-			"]"
-		"}"
-	"]"
-"}";
-
-JSON_Object *retrace_conf;
-
-int retrace_conf_init(void)
-{
-	const char *conf_fn;
-	FILE *f;
-	const char *json_conf;
-	char *file_json_conf;
-	long fz;
-	JSON_Value *json_conf_val;
-
-	file_json_conf = NULL;
-	f = NULL;
-
-	/* first create an empty conf object */
-	retrace_conf = json_value_get_object(
-		json_value_init_object());
-
-	/* try environment variable for config json file
-	 * do not use json_parse_file_with_comments as it will use C funcs
-	 * for io
-	 */
-	conf_fn = retrace_real_impls.getenv(ENVAR_JSON_CONFIG_FN);
-	if (conf_fn != NULL) {
-		log_info("config file is set to: '%s'", conf_fn);
-
-		f = retrace_real_impls.fopen(conf_fn, "r");
-		if (f == NULL) {
-			log_err("fopen failed, errno: %d", errno);
-			goto parse_json;
-		}
-
-		if (retrace_real_impls.fseek(f,
-			0, SEEK_END) == -1) {
-			log_err("fseek failed, errno: %d", errno);
-			goto parse_json;
-		}
-
-		fz = retrace_real_impls.ftell(f);
-		if (fz == -1) {
-			log_err("ftell failed, errno: %d", errno);
-			goto parse_json;
-		}
-
-		if (retrace_real_impls.fseek(f,
-			0L, SEEK_SET) == -1) {
-			log_err("fseek failed, errno: %d", errno);
-			goto parse_json;
-		}
-
-		file_json_conf = (char *) retrace_real_impls.malloc(fz);
-
-		if (file_json_conf == NULL) {
-			log_err("malloc failed, errno: %d", errno);
-			goto parse_json;
-		}
-
-		if (retrace_real_impls.fread(file_json_conf,
-			1,
-			fz,
-			f) != fz) {
-
-			log_err("fread failed, errno: %d", errno);
-			retrace_real_impls.free(file_json_conf);
-			file_json_conf = NULL;
-		}
-
-		retrace_real_impls.fclose(f);
-	} else
-		log_warn("config file not set, using the default conf");
-
-parse_json:
-
-	if (file_json_conf != NULL)
-		json_conf = file_json_conf;
-	else
-		json_conf = def_json_conf;
-
-	json_conf_val = json_parse_string_with_comments(
-		json_conf);
-
-	if (file_json_conf != NULL)
-		retrace_real_impls.free(file_json_conf);
-
-	if (json_conf_val == NULL) {
-		log_err("failed to parse json config");
-		return -1;
-	}
-
-	/* finally set the config root object */
-	json_object_clear(retrace_conf);
-	retrace_conf = json_value_get_object(json_conf_val);
-
-	return 0;
-
-}
-
-#endif
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <nereon.h>
-
-#include "common.h"
+#include <nereon/nereon.h>
 
 #include "conf.h"
 
-extern rtr2_conf_t *g_rtr2_config;
+rtr2_conf_t *g_rtr2_config;
 static nereon_ctx_t g_nereon_ctx;
+
+/*
+ * get match type from string
+ */
+
+static struct rtr2_match_types {
+	enum RTR2_MATCH_TYPE match_type;
+	const char *str;
+} g_match_types[] = {
+	{RTR2_MATCH_TYPE_STRING, "string"},
+	{RTR2_MATCH_TYPE_INT, "int"},
+	{RTR2_MATCH_TYPE_ARRAY_INT, "array_int"},
+	{RTR2_MATCH_TYPE_ARRAY_STRING, "array_string"},
+	{RTR2_MATCH_TYPE_CHAR, "char"},
+	{RTR2_MATCH_TYPE_UNKNOWN, NULL}
+};
+
+static enum RTR2_MATCH_TYPE get_match_type(const char *type_str)
+{
+	int i;
+
+	for (i = 0; g_match_types[i].str != NULL; i++) {
+		if (strcmp(g_match_types[i].str, type_str) == 0)
+			return g_match_types[i].match_type;
+	}
+
+	return RTR2_MATCH_TYPE_UNKNOWN;
+}
+
+/*
+ * set action array data
+ */
+
+static int set_action_array_data(nereon_noc_option_t *noc_opt, enum RTR2_MATCH_TYPE match_type, void **action_data, int *num)
+{
+	void *data = NULL;
+	int opt_count = 0;
+
+	/* set action data */
+	nereon_object_object_foreach(noc_opt, val) {
+		if (match_type == RTR2_MATCH_TYPE_ARRAY_INT) {
+			data = realloc(data, (opt_count + 1) * sizeof(int));
+			if (!data)
+				goto err;
+
+			((int *)data)[opt_count++] = val->data.i;
+		} else {
+			data = realloc(data, (opt_count + 1) * sizeof(char **));
+			if (!data)
+				goto err;
+
+			((char **)data)[opt_count++] = val->data.str;
+		}
+	}
+	*action_data = data;
+	*num = opt_count;
+
+	return 0;
+
+err:
+	if (data)
+		free(data);
+
+	return -1;
+}
+
+/*
+ * set match data
+ */
+
+static int set_action_data(nereon_noc_option_t *match_opt, nereon_noc_option_t *new_opt, rtr2_action_t *action)
+{
+	int ret = 0;
+
+	fprintf(stderr, "set action data for action:%s\n", action->name);
+
+	/* check whether special types are used */
+	if (match_opt->type == NEREON_TYPE_STRING && strcmp(match_opt->data.str, "any") == 0) {
+		if (new_opt->type == NEREON_TYPE_STRING && strcmp(new_opt->data.str, "random") == 0)
+			action->match_type = RTR2_MATCH_TYPE_ANY_RANDOM;
+		else {
+			if (action->match_type == RTR2_MATCH_TYPE_INT)
+				action->match_type = RTR2_MATCH_TYPE_ANY_INT;
+			else
+				action->match_type = RTR2_MATCH_TYPE_ANY_STRING;
+		}
+
+		return 0;
+	}
+
+	switch (action->match_type) {
+	case RTR2_MATCH_TYPE_INT:
+	case RTR2_MATCH_TYPE_CHAR:
+		{
+			if (match_opt->type != NEREON_TYPE_INT || new_opt->type != NEREON_TYPE_INT) {
+				ret = -1;
+				break;
+			}
+			*(int *)(action->match_data) = match_opt->data.i;
+			*(int *)(action->new_data) = new_opt->data.i;
+		}
+		break;
+
+	case RTR2_MATCH_TYPE_STRING:
+		{
+			if (match_opt->type != NEREON_TYPE_STRING || new_opt->type != NEREON_TYPE_STRING) {
+				ret = -1;
+				break;
+			}
+			action->match_data = (void *)match_opt->data.str;
+			action->new_data = (void *)new_opt->data.str;
+		}
+		break;
+
+	case RTR2_MATCH_TYPE_ARRAY_INT:
+	case RTR2_MATCH_TYPE_ARRAY_STRING:
+		{
+			if (set_action_array_data(match_opt, action->match_type, &action->match_data, &action->match_data_num) != 0 ||
+				set_action_array_data(new_opt, action->match_type, &action->new_data, &action->new_data_num) != 0) {
+				ret = -1;
+				break;
+			}
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	return ret;
+}
 
 /*
  * get action list
  */
 
-static int get_actions_list(nereon_config_object_t obj, rtr2_func_t *func)
+static int get_actions_list(rtr2_func_t *func, nereon_noc_option_t *noc_opt)
 {
 	rtr2_action_t *actions = NULL;
 	int actions_count = 0;
 
 	int ret = 0;
 
-	const char *key = "action";
+	fprintf(stderr, "Try to find actions from object '%p'\n", noc_opt);
 
 	/* parse action objects */
-	while (obj) {
-		nereon_object_object_foreach(obj, key, p) {
-			rtr2_action_t action;
-			char *match_str = NULL, *new_str = NULL;
+	nereon_object_object_foreach(noc_opt, p) {
+		rtr2_action_t action;
+		nereon_noc_option_t *match_data = NULL, *new_data = NULL;
+		char *match_type;
 
-			nereon_config_option_t action_opts[] = {
-				{NULL, NEREON_TYPE_KEY, false, NULL, &action.name},
-				{"param_name", NEREON_TYPE_STRING, false, NULL, &action.param_name},
-				{"match_type", NEREON_TYPE_INT, false, NULL, &action.match_type},
-				{"match_str", NEREON_TYPE_STRING, false, NULL, &match_str},
-				{"new_str", NEREON_TYPE_ARRAY, false, NULL, &new_str},
-			};
+		nereon_config_option_t action_opts[] = {
+			{NULL, NEREON_TYPE_KEY, false, NULL, &action.name},
+			{"param_name", NEREON_TYPE_STRING, false, NULL, &action.param_name},
+			{"match_type", NEREON_TYPE_STRING, false, NULL, &match_type},
+			{"match_data", NEREON_TYPE_OBJECT, false, NULL, &match_data},
+			{"new_data", NEREON_TYPE_OBJECT, false, NULL, &new_data},
+		};
 
-			if (!p)
-				break;
+		if (!p)
+			break;
 
-			/* get function info from object */
-			memset(&action, 0, sizeof(action));
-			if (nereon_object_config_options(p, action_opts) != 0) {
-				fprintf(stderr, "Failed to get action options(err:%s)\n", nereon_get_errmsg());
-				ret = -1;
+		if (strcmp(p->key, "action") != 0)
+			continue;
 
-				break;
-			}
+		/* get function info from object */
+		memset(&action, 0, sizeof(action));
+		if (nereon_get_noc_configs(p->childs, action_opts) != 0) {
+			fprintf(stderr, "Failed to get action options(err:%s)\n", nereon_get_errmsg());
+			ret = -1;
 
-			actions = realloc(actions, (actions_count + 1) * sizeof(rtr2_action_t));
-			if (!actions) {
-				fprintf(stderr, "Out of memory!\n");
-				ret = -1;
-
-				break;
-			}
-			memcpy(&actions[actions_count], &action, sizeof(rtr2_action_t));
-			actions_count++;
+			break;
 		}
+
+		/* set match type */
+		action.match_type = get_match_type(match_type);
+
+		/* set match and new data */
+		if (set_action_data(match_data, new_data, &action) != 0) {
+			fprintf(stderr, "Invalid match data for action '%s'\n", action.name);
+			ret = -1;
+
+			break;
+		}
+
+		/* add action to list */
+		actions = realloc(actions, (actions_count + 1) * sizeof(rtr2_action_t));
+		if (!actions) {
+			fprintf(stderr, "Out of memory!\n");
+			ret = -1;
+
+			break;
+		}
+		memcpy(&actions[actions_count], &action, sizeof(rtr2_action_t));
+		actions_count++;
 	}
 
 	if (ret != 0 && actions)
@@ -241,49 +243,48 @@ static int get_actions_list(nereon_config_object_t obj, rtr2_func_t *func)
  * get interception function list
  */
 
-static int get_intercept_funcs_list(nereon_config_object_t obj)
+static int get_intercept_funcs_list(rtr2_conf_t *config, nereon_noc_option_t *noc_opt)
 {
 	rtr2_func_t *funcs = NULL;
 	int funcs_count = 0;
 
 	int ret = 0;
 
-	const char *key = "interception_func";
-
 	/* parse intercept function objects */
-	while (obj) {
-		nereon_object_object_foreach(obj, key, p) {
-			rtr2_func_t func;
-			nereon_config_object_t act_objs;
+	nereon_object_object_foreach(noc_opt, p) {
+		rtr2_func_t func;
+		nereon_noc_option_t *act_objs = NULL;
 
-			nereon_config_option_t func_opts[] = {
-				{NULL, NEREON_TYPE_KEY, false, NULL, &func.name},
-				{"log_level", NEREON_TYPE_STRING, false, NULL, &func.log_level},
-				{"action", NEREON_TYPE_ARRAY, false, NULL, &act_objs},
-			};
+		nereon_config_option_t func_opts[] = {
+			{NULL, NEREON_TYPE_KEY, false, NULL, &func.name},
+			{"log_level", NEREON_TYPE_INT, false, NULL, &func.log_level},
+			{"action", NEREON_TYPE_ARRAY, false, NULL, &act_objs},
+		};
 
-			if (!p)
-				break;
+		if (strcmp(p->key, "interception_func") != 0)
+			continue;
 
-			/* get function info from object */
-			memset(&func, 0, sizeof(func));
-			if (nereon_object_config_options(p, func_opts) != 0) {
-				fprintf(stderr, "Failed to get function options(err:%s)\n", nereon_get_errmsg());
-				ret = -1;
+		/* get function info from object */
+		memset(&func, 0, sizeof(func));
+		if (nereon_get_noc_configs(p->childs, func_opts) != 0) {
+			fprintf(stderr, "Failed to get function options(err:%s)\n", nereon_get_errmsg());
+			ret = -1;
 
-				break;
-			}
-
-			funcs = realloc(funcs, (funcs_count + 1) * sizeof(rtr2_func_t));
-			if (!funcs) {
-				fprintf(stderr, "Out of memory!\n");
-				ret = -1;
-
-				break;
-			}
-			memcpy(&funcs[funcs_count], &func, sizeof(rtr2_func_t));
-			funcs_count++;
+			break;
 		}
+
+		/* get action info from action object */
+		get_actions_list(&func, act_objs->childs);
+
+		funcs = realloc(funcs, (funcs_count + 1) * sizeof(rtr2_func_t));
+		if (!funcs) {
+			fprintf(stderr, "Out of memory!\n");
+			ret = -1;
+
+			break;
+		}
+		memcpy(&funcs[funcs_count], &func, sizeof(rtr2_func_t));
+		funcs_count++;
 	}
 
 	if (ret != 0 && funcs)
@@ -297,83 +298,163 @@ static int get_intercept_funcs_list(nereon_config_object_t obj)
 }
 
 /*
- * initialize retrace v2 configuration
+ * build default configuration
  */
 
-int retrace_conf_init(const char *config_fpath)
+static int build_default_config(void)
 {
-	nereon_config_object_t intercept_funcs = NULL;
+	rtr2_func_t *func;
 
-	int ret, i;
+	func = (rtr2_func_t *)malloc(sizeof(rtr2_func_t));
+	if (!func) {
+		fprintf(stderr, "Out of memory!\n");
+		return -1;
+	}
+	memset(func, 0, sizeof(rtr2_func_t));
+
+	func->actions = (rtr2_action_t *)malloc(2 * sizeof(rtr2_action_t));
+	if (!func->actions) {
+		fprintf(stderr, "Out of memory!\n");
+		free(func);
+		return -1;
+	}
+	memset(func->actions, 0, sizeof(2 * sizeof(rtr2_action_t)));
+
+	func->name = strdup(RTR2_DEFAULT_FUNC_NAME);
+	func->actions[0].name = strdup(RTR2_DEFAULT_ACT_NAME1);
+	func->actions[1].name = strdup(RTR2_DEFAULT_ACT_NAME2);
+
+	g_rtr2_config->funcs = func;
+	g_rtr2_config->funcs_count = 1;
+
+	g_rtr2_config->use_default = 1;
+
+	return 0;
+}
+
+/*
+ * initiailze rtr2 config
+ */
+
+int rtr2_config_init()
+{
+	nereon_noc_option_t *funcs = NULL;
+	int ret;
+
+	const char *config_path;
+	char *log_path = NULL, *log_level = NULL;
 
 	nereon_config_option_t rtr2_cfg_opts[] = {
-		{"globals.log_path", NEREON_TYPE_STRING, false, NULL, &g_rtr2_config->log_path},
-		{"globals.log_level", NEREON_TYPE_STRING, false, NULL, &g_rtr2_config->log_level},
-		{"interception_func", NEREON_TYPE_ARRAY, false, NULL, &intercept_funcs}
+		{"globals.log_path", NEREON_TYPE_STRING, false, NULL, &log_path},
+		{"globals.log_level", NEREON_TYPE_STRING, false, NULL, &log_level},
+		{"interception_func", NEREON_TYPE_ARRAY, false, NULL, &funcs}
 	};
 
+	/* allocate memory for rtr2 config */
 	g_rtr2_config = (rtr2_conf_t *)malloc(sizeof(rtr2_conf_t));
 	if (!g_rtr2_config) {
-		fprintf(stderr, "Out of memory\n");
+		fprintf(stderr, "Out of memory!\n");
 		return -1;
+	}
+	memset(g_rtr2_config, 0, sizeof(rtr2_conf_t));
+
+	/* get configuration file environment variable */
+	config_path = getenv("RETRACE_V2_CONFIG");
+	if (!config_path) {
+		fprintf(stdout, "There is no configuration file for retrace v2. Try to use default configuration\n");
+
+		/* build default configuration */
+		if (build_default_config() != 0) {
+			free(g_rtr2_config);
+			return -1;
+		}
+
+		return 0;
 	}
 
 	/* initialize nereon context */
 	ret = nereon_ctx_init(&g_nereon_ctx, NULL);
 	if (ret != 0) {
 		fprintf(stderr, "Could not initialize libnereon context(err:%s)\n", nereon_get_errmsg());
-		free(g_rtr2_config);
-		g_rtr2_config = NULL;
-
-		return -1;
+		goto err;
 	}
 
-	/* parse configuration file */
-	memset(g_rtr2_config, 0, sizeof(rtr2_conf_t));
-
-	fprintf(stderr, "Try to parse configuration file '%s'\n", argv[1]);
-
-	ret = nereon_parse_config_file(&g_nereon_ctx, argv[1]);
+	ret = nereon_parse_config_file(&g_nereon_ctx, config_path);
 	if (ret != 0) {
-		fprintf(stderr, "Failed to parse configuration file '%s'(err:%s)\n", argv[1], nereon_get_errmsg());
-		goto end;
+		fprintf(stderr, "Failed to parse configuration file '%s'(err:%s)\n", config_path, nereon_get_errmsg());
+		goto err;
 	}
 
 	/* get configuration options */
 	ret = nereon_get_config_options(&g_nereon_ctx, rtr2_cfg_opts);
 	if (ret != 0) {
 		fprintf(stderr, "Failed to get configuration options(err:%s)\n", nereon_get_errmsg());
-		goto end;
+		goto err;
 	}
 
 	/* get interception function list */
-	ret = get_intercept_funcs_list(intercept_funcs);
-	if (ret != 0) {
-		fprintf(stderr, "Failed to get interception function list\n");
-		goto end;
-	}
+	ret = get_intercept_funcs_list(g_rtr2_config, funcs);
+	if (ret != 0)
+		goto err;
 
 	return 0;
 
-end:
+err:
 	nereon_ctx_finalize(&g_nereon_ctx);
-	free(g_rtr2_config);
+	rtr2_config_free();
 
 	return -1;
 }
 
 /*
- * finalize configuration parser
+ * free rtr2 config
  */
 
-void retrace_conf_finalize(void)
+void rtr2_config_free(void)
 {
+	int i;
+
 	if (!g_rtr2_config)
 		return;
 
-	nereon_ctx_finalize(&g_nereon_ctx);
+	if (g_rtr2_config->use_default) {
+		free(g_rtr2_config->funcs[0].actions);
+		free(g_rtr2_config->funcs);
+		free(g_rtr2_config);
+
+		return;
+	}
+
+	if (!g_rtr2_config->funcs) {
+		free(g_rtr2_config);
+		return;
+	}
+
+	for (i = 0; i < g_rtr2_config->funcs_count; i++) {
+		rtr2_func_t *func = &g_rtr2_config->funcs[i];
+		int j;
+
+		if (!func->actions)
+			continue;
+
+		for (j = 0; j < func->actions_count; j++) {
+			rtr2_action_t *action = &func->actions[j];
+
+			if (action->match_type != RTR2_MATCH_TYPE_ARRAY_INT &&
+				action->match_type != RTR2_MATCH_TYPE_ARRAY_STRING)
+				continue;
+
+			if (action->match_data)
+				free(action->match_data);
+
+			if (action->new_data)
+				free(action->new_data);
+		}
+		free(func->actions);
+	}
+
+	free(g_rtr2_config->funcs);
 	free(g_rtr2_config);
 
-	g_rtr2_config = NULL;
+	nereon_ctx_finalize(&g_nereon_ctx);
 }
-
