@@ -108,7 +108,7 @@ static const JSON_Object *get_i_script(const JSON_Array *i_array,
 	const char *func_name,
 	void *ret_addr)
 {
-	int i;
+	size_t i;
 	const JSON_Object *i_script;
 	const char *i_func;
 	double i_ret_addr;
@@ -190,7 +190,7 @@ void retrace_engine_wrapper(char *func_name,
 		void *arch_spec_ctx)
 {
 	void *real_impl;
-	int i;
+	size_t i;
 	struct ThreadContext *thread_ctx;
 	const JSON_Object *i_script;
 	const JSON_Array *i_actions;

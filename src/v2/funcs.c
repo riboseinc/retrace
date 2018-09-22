@@ -53,7 +53,7 @@ static struct HashEl funcs_hash[MAXCOUNT_FUNCS_HASH_ENTRIES];
 static inline unsigned long hash_string(const char *str)
 {
 	unsigned long hash;
-	int i;
+	size_t i;
 
 	hash = 7;
 
@@ -69,7 +69,7 @@ int retrace_funcs_init(void)
 	struct FuncPrototype *p;
 	struct HashEl *h;
 	unsigned long size;
-	unsigned int i, j;
+	unsigned int i;
 	unsigned long hash;
 
 	retrace_as_get_section_info("__DATA", "__retrace_funcs", &p, &size);

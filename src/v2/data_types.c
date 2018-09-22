@@ -81,7 +81,7 @@ static const struct DataType *gnu_fmt_to_dt[PBT_CNT][PFM_CNT];
 static inline unsigned long hash_string(const char *str)
 {
 	unsigned long hash;
-	int i;
+	size_t i;
 
 	hash = 7;
 

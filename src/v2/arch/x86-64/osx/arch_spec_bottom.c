@@ -75,8 +75,6 @@ struct RealImpls {
 	   unsigned long *size);
 };
 
-static struct RealImpls retrace_as_real_impls;
-
 struct AsThreadContext {
 	printf_domain_t domain;
 
