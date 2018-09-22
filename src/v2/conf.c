@@ -122,7 +122,7 @@ int retrace_conf_init(void)
 		if (retrace_real_impls.fread(file_json_conf,
 			1,
 			fz,
-			f) != fz) {
+			f) != (size_t) fz) {
 
 			log_err("fread failed, errno: %d", errno);
 			retrace_real_impls.free(file_json_conf);

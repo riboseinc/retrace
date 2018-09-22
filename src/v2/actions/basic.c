@@ -81,7 +81,7 @@ static int ia_log_params
 
 
 	int ret;
-	int i;
+	size_t i;
 	int param_idx;
 	int cnt_param_idx;
 	char *serialized_string;
@@ -389,9 +389,9 @@ static int ia_modify_in_param_arr
 	int param_idx;
 	int cnt_param_idx;
 	char *match_str;
-	int match_idx;
+	size_t match_idx;
 	char *param_arr;
-	int new_arr_idx;
+	size_t new_arr_idx;
 	char *new_str;
 
 	if (action_params == NULL) {
@@ -635,6 +635,8 @@ static int ia_call_real
 	(struct ThreadContext *t_ctx,
 		const JSON_Object *action_params)
 {
+	(void)(action_params);
+
 	log_dbg("calling real at 0x%lx for %s...",
 			(long) t_ctx->real_impl,
 			t_ctx->prototype->name);

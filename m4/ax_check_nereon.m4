@@ -41,8 +41,8 @@ AC_DEFUN([AX_CHECK_NEREON], [
     NEREON_INCLUDES=
     for nereondir in $nereondirs; do
         AC_MSG_CHECKING([for nereon in $nereondir])
-        if test -f "$nereondir/include/nereon.h"; then
-            NEREON_INCLUDES="-I$nereondir/include/"
+        if test -f "$nereondir/include/nereon/nereon.h"; then
+            NEREON_INCLUDES="-I$nereondir/include/nereon"
             NEREON_LDFLAGS="-L$nereondir/lib"
             NEREON_LIBS="-lnereon"
             NEREON_LIBDIR="$nereondir/lib"

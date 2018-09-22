@@ -26,7 +26,7 @@ libretrace_v2_la_SOURCES = \
 	logger.c            \
 	funcs_symbols.S
 
-libretrace_v2_la_CFLAGS = $(NEREON_INCLUDES) -Wall -Wextra -shared -fPIC
+libretrace_v2_la_CFLAGS = $(NEREON_INCLUDES) -Wall -Wextra -shared -fPIC -Wno-unused-parameter
 libretrace_v2_la_LIBADD = $(NEREON_LIBDIR)/libnereon.a
 
 if DARWIN

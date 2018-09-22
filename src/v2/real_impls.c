@@ -33,7 +33,7 @@
 #include "real_impls.h"
 #include "arch_spec.h"
 
-struct RetraceRealImpls retrace_real_impls = {0};
+struct RetraceRealImpls retrace_real_impls;
 
 /* This should be the absolutely the first module to be inited */
 int retrace_real_impls_init(void)

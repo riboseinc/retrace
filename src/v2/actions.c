@@ -53,7 +53,7 @@ static struct HashEl actions_hash[MAXCOUNT_ACTS_HASH_ENTRIES];
 static inline unsigned long hash_string(const char *str)
 {
 	unsigned long hash;
-	int i;
+	size_t i;
 
 	hash = 7;
 
