@@ -284,63 +284,68 @@ int retrace_as_setup_params(
 	struct FuncParam params[],
 	int *params_cnt)
 {
-	int i, j;
+	int i;
+	int printf_params;
+	int param_idx;
 	int params_on_stack;
 	struct WrapperSystemVFrame *wrapper_frame_top;
-	int num_of_vaparams;
-	int cnt_left;
-	int *types;
 	const struct DataType *dt;
+	int *types;
 
-	cnt_left = *params_cnt;
-	if (cnt_left > proto->params_cnt)
-		cnt_left = proto->params_cnt;
+	/* check whether there is enough space for prototyped params */
+	if (*params_cnt < proto->params_cnt) {
+		log_err("too many prototyped params for '%s', no space for %d more",
+			proto->name,
+			(*params_cnt - proto->params_cnt) * -1);
+		return 0;
+	}
 
 	/* set up prototyped params */
 	wrapper_frame_top = (struct WrapperSystemVFrame *) arch_spec_ctx;
 	params_on_stack = proto->params_cnt - 6;
 
-	for (i = 0; i != cnt_left; i++) {
+	for (param_idx = 0; param_idx != proto->params_cnt; param_idx++) {
 
 		/* reset param */
-		retrace_real_impls.memset(&params[i].param_meta,
+		retrace_real_impls.memset(&params[param_idx].param_meta,
 				0,
 				sizeof(struct ParamMeta));
 
 		/* setup meta */
-		retrace_real_impls.memcpy(&params[i].param_meta,
-				&proto->params[i],
+		retrace_real_impls.memcpy(&params[param_idx].param_meta,
+				&proto->params[param_idx],
 				sizeof(struct ParamMeta));
 
 		/* setup datatype */
-		params[i].data_type = retrace_datatype_get(proto->params[i].type_name);
+		params[param_idx].data_type =
+			retrace_datatype_get(proto->params[param_idx].type_name);
 
 		/* setup value */
-		if (i < 6) {
+		if (param_idx < 6) {
 			/* get param from reg */
-			switch (i) {
+			switch (param_idx) {
 			case 0:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_rdi;
 				break;
 			case 1:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_rsi;
 				break;
 			case 2:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_rdx;
 				break;
 			case 3:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_rcx;
 				break;
 			case 4:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_r8;
 				break;
 			case 5:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_r9;
 				break;
 			}
@@ -348,147 +353,108 @@ int retrace_as_setup_params(
 			/* get param from stack */
 
 			/* assume sizeof(void*) == sizeof(long) */
-			params[i].val =
+			params[param_idx].val =
 				(wrapper_frame_top->real_rsp +
-					sizeof(void *) * (params_on_stack - i));
+					sizeof(void *) * (params_on_stack - param_idx));
 		}
 	}
 
-	/* save count of set up params before parsing varargs */
-
-
-	/* if no varargs then we are done */
+	/* set up varargs params */
 	if (proto->fmt == FAT_NOVARARGS) {
-		*params_cnt = i;
-		return 0;
+		/* we`re done */
+		*params_cnt = proto->params_cnt;
+		return 1;
 	}
 
-	/* if format is not printf, return as no supported */
-	if (proto->fmt != FAT_PRINTF) {
+	/* check whether format is supported */
+	if ((proto->fmt != FAT_NOVARARGS) &&
+		(proto->fmt != FAT_PRINTF)) {
+
 		log_err("varargs format '%d' is not supported for func '%s'",
 			proto->fmt, proto->name);
-		*params_cnt = i;
 		return 0;
 	}
 
-	/* if no single % then we are done */
-	for (j = 0;
-		*(((char *) params[proto->fmt_param_idx].val) + j);
-		j++) {
-
-		if (
-			(*(((char *)params[proto->fmt_param_idx].val) + j) == '%') &&
-			(j > 0) &&
-			(*(((char *)params[proto->fmt_param_idx].val) + j - 1) != '%') &&
-			(*(((char *)params[proto->fmt_param_idx].val) + j + 1) != '%')
-		)
-			break;
-	}
-
-	if (*(((char *) params[proto->fmt_param_idx].val) + j) == 0) {
-		/* no format specifier */
-		*params_cnt = i;
-		return 0;
-	}
-
-	/* space exhausted?, we will probably crash */
-	cnt_left = *params_cnt - proto->params_cnt;
-
-	if (cnt_left <= 0) {
-		log_warn("too many varargs params for '%s', no space for %d more",
-			proto->name, cnt_left * -1);
-		return cnt_left;
-	}
-
-	/* setup varargs params if needed
-	 * for now use parse_printf_format, there is no sign info
-	 */
-	num_of_vaparams =
+	printf_params =
 		parse_printf_format(
 			(const char *) params[proto->fmt_param_idx].val,
 			0,
 			NULL);
 
-	if (!num_of_vaparams) {
-		log_err("parse_printf_format failed to parse param idx '%d'"
-				"for func '%s'", proto->fmt_param_idx, proto->name);
-		return 0;
+	if (!printf_params) {
+		/* we`re done */
+		*params_cnt = proto->params_cnt;
+		return 1;
 	}
 
 	types = (int *)
-		retrace_real_impls.malloc(sizeof(int) * num_of_vaparams);
+		retrace_real_impls.malloc(sizeof(int) * printf_params);
 
-	num_of_vaparams =
+	printf_params =
 		parse_printf_format(
 			(const char *) params[proto->fmt_param_idx].val,
-			num_of_vaparams,
+			printf_params,
 			types);
 
-	if (cnt_left > num_of_vaparams)
-		cnt_left = num_of_vaparams;
-
-	for (j = 0; j != cnt_left; j++) {
+	for (i = 0; i != printf_params; i++, param_idx++) {
 		/* prep param meta */
-		dt = retrace_datatype_printf_to_dt(types[j]);
-		if (dt == NULL) {
-			log_warn("argtype '%d' is not supported for func '%s', skipping",
-				types[j], proto->name);
-
-			/* TODO Add unknown since it will not be passed on stack */
-			continue;
-		}
+		dt = retrace_datatype_printf_to_dt(types[i]);
 
 		/* reset param */
-		retrace_real_impls.memset(&params[i].param_meta,
+		retrace_real_impls.memset(&params[param_idx].param_meta,
 			0,
 			sizeof(struct ParamMeta));
 
 		/* setup meta */
-		retrace_real_impls.snprintf(params[i].param_meta.name,
-			sizeof(params[i].param_meta.name),
+		retrace_real_impls.snprintf(params[param_idx].param_meta.name,
+			sizeof(params[param_idx].param_meta.name),
 			"vararg%02d",
-			j);
+			i);
 
-		retrace_real_impls.strcpy(params[i].param_meta.type_name, dt->name);
-		params[i].param_meta.modifiers = CDM_NOMOD;
+		retrace_real_impls.strcpy(params[param_idx].param_meta.type_name,
+			dt->name);
+
+		params[param_idx].param_meta.modifiers = CDM_NOMOD;
 		/* FIXME: How to know the direction of the param? */
-		params[i].param_meta.direction = PDIR_IN;
+		params[param_idx].param_meta.direction = PDIR_IN;
 
 		/* fixup pointer type to string*/
-		if ((types[j] & ~PA_FLAG_MASK) == PA_STRING) {
-			params[i].param_meta.modifiers |= CDM_POINTER;
-			retrace_real_impls.strcpy(params[i].param_meta.ref_type_name, "sz");
+		if ((types[i] & ~PA_FLAG_MASK) == PA_STRING) {
+			params[param_idx].param_meta.modifiers |= CDM_POINTER;
+			retrace_real_impls.strcpy(
+				params[param_idx].param_meta.ref_type_name,
+				"sz");
 		}
 
 		/* setup datatype */
-		params[i].data_type = dt;
+		params[param_idx].data_type = dt;
 
 		/* setup value */
-		if (i < 6) {
+		if (param_idx < 6) {
 			/* get param from reg */
-			switch (i) {
+			switch (param_idx) {
 			case 0:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_rdi;
 				break;
 			case 1:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_rsi;
 				break;
 			case 2:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_rdx;
 				break;
 			case 3:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_rcx;
 				break;
 			case 4:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_r8;
 				break;
 			case 5:
-				params[i].val =
+				params[param_idx].val =
 					wrapper_frame_top->real_r9;
 				break;
 			}
@@ -496,18 +462,14 @@ int retrace_as_setup_params(
 			/* get param from stack */
 
 			/* assume sizeof(void*) == sizeof(long) */
-			params[i].val =
+			params[param_idx].val =
 				(wrapper_frame_top->real_rsp +
-					sizeof(void *) * (params_on_stack - i));
+					sizeof(void *) * (params_on_stack - param_idx));
 		}
-
-		/* advance next param */
-		i++;
 	}
 
-	/* save count of set up params before parsing varargs */
-	*params_cnt = i;
-	return num_of_vaparams - cnt_left;
+	*params_cnt = param_idx;
+	return 1;
 }
 
 void retrace_as_intercept_done(void *arch_spec_ctx,
