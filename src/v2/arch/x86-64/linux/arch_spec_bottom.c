@@ -534,6 +534,11 @@ int retrace_as_init(void)
 	return 0;
 }
 
+int retrace_as_init_late(void)
+{
+	return 0;
+}
+
 extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
 
 void *retrace_as_get_real_safe(const char *real_impl)
