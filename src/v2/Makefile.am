@@ -26,8 +26,7 @@ libretrace_v2_la_SOURCES = \
 	logger.c            \
 	funcs_symbols.S
 
-libretrace_v2_la_CFLAGS = $(NEREON_INCLUDES) -Wall -Wextra -shared -fPIC -Wno-unused-parameter
-libretrace_v2_la_LIBADD = $(NEREON_LIBDIR)/libnereon.a
+libretrace_v2_la_CFLAGS = -Wall -Wextra -shared -fPIC -Wno-unused-parameter
 
 if DARWIN
 libretrace_v2_la_CFLAGS += -D_FORTIFY_SOURCE=0 -I./arch/x86-64/osx
@@ -58,6 +57,8 @@ endif
 
 # retrace V2 binary
 
+if RTR_V2_WRAPPER
+
 bin_PROGRAMS=retrace2
 
 retrace2_SOURCES = \
@@ -73,3 +74,4 @@ clean-local:
 retrace2_CFLAGS = $(NEREON_INCLUDES) -Wall -Wextra
 retrace2_LDADD = $(NEREON_LIBDIR)/libnereon.a
 
+endif
