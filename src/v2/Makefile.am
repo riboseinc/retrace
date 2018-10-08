@@ -38,12 +38,13 @@ libretrace_v2_la_SOURCES += \
 endif
 
 if LINUX
-libretrace_v2_la_CFLAGS += -I./arch/x86-64/linux
-libretrace_v2_la_CCASFLAGS = -I./arch/x86-64/linux
-libretrace_v2_la_LDFLAGS = -Wl,--no-as-needed -ldl
 libretrace_v2_la_SOURCES += \
 	arch/x86-64/linux/arch_spec_bottom.c \
 	arch/x86-64/linux/arch_spec_top.S
+
+libretrace_v2_la_CFLAGS += -I./arch/x86-64/linux
+libretrace_v2_la_CCASFLAGS = -I./arch/x86-64/linux
+libretrace_v2_la_LDFLAGS = -Wl,--no-as-needed -Wl,-ldl
 endif
 
 if FREEBSD
