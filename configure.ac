@@ -225,10 +225,18 @@ AC_ARG_ENABLE(
 AC_MSG_RESULT($enable_v2)
 AM_CONDITIONAL([RTR_V2], [test "x$enable_v2" = "xyes"])
 if test "x$enable_v2" = "xyes" ; then
-    AX_CHECK_NEREON([], AC_MSG_ERROR([]))
     AC_DEFINE(RTR_V2, [1], [Define to use retrace v2])
 else
     AC_DEFINE(RTR_V2, [0], [Define to use retrace v2])
+fi
+
+AC_MSG_RESULT($enable_v2_wrapper)
+AM_CONDITIONAL([RTR_V2_WRAPPER], [test "x$enable_v2_wrapper" = "xyes"])
+if test "x$enable_v2_wrapper" = "xyes" ; then
+    AX_CHECK_NEREON([], AC_MSG_ERROR([]))
+    AC_DEFINE(RTR_V2_WRAPPER, [1], [Define to use retrace v2 wrapper])
+else
+    AC_DEFINE(RTR_V2_WRAPPER, [0], [Define to use retrace v2 wrapper])
 fi
 
 AC_MSG_CHECKING(whether to enable rpc)
