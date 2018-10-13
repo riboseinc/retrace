@@ -263,12 +263,19 @@ void retrace_engine_wrapper(char *func_name,
 		goto clean_up;
 	}
 
-	/* setup params, ignore the return value */
+	/* setup params, do not proceed if failed since
+	 * it can be dangerous to call orig with partial params
+	 */
 	thread_ctx->params_cnt = ENGINE_MAXCOUNT_PARAMS;
-	retrace_as_setup_params(thread_ctx->arch_spec_ctx,
+	if (!retrace_as_setup_params(thread_ctx->arch_spec_ctx,
 		thread_ctx->prototype,
 		thread_ctx->params,
-		&thread_ctx->params_cnt);
+		&thread_ctx->params_cnt)) {
+		log_err(
+			"failed to setup params for %s(), will not proceed",
+			func_name);
+		goto clean_up;
+	}
 	/* find intercept script for the func and return addr */
 	i_scripts = json_object_get_array(retrace_conf, "intercept_scripts");
 	if (!i_scripts) {
