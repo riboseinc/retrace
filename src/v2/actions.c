@@ -127,7 +127,7 @@ int(*retrace_actions_get(const char *action_name))
 	hash = hash_string(action_name);
 	h = &actions_hash[hash];
 
-	log_dbg("Seraching for action for '%s', hash: %d", action_name, hash);
+	log_dbg("Searching for action for '%s', hash: %d", action_name, hash);
 
 	if (h->action) {
 

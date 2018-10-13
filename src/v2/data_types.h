@@ -145,6 +145,8 @@ const struct DataType *retrace_datatype_get(const char *datatype_name);
 /* as defined by parse_printf_format */
 const struct DataType *retrace_datatype_printf_to_dt(int argtype);
 
+const struct DataType *retrace_datatype_get_unk_dt(void);
+
 int retrace_datatypes_init(void);
 
 /* aligned 1 is used because i group all DataType in the same
