@@ -180,7 +180,7 @@ const struct DataType *retrace_datatype_get(const char *datatype_name)
 	hash = hash_string(datatype_name);
 	h = &dts_hash[hash];
 
-	log_dbg("Seraching for datatype for '%s', hash: %d",
+	log_dbg("Searching for datatype for '%s', hash: %d",
 		datatype_name, hash);
 
 	if (h->data_type) {
@@ -260,6 +260,12 @@ static const struct DataType unk_dt = {
 	.get_size = unk_get_size
 };
 
+const struct DataType *retrace_datatype_get_unk_dt(void)
+{
+	/* TODO consider register with all data types */
+	return &unk_dt;
+}
+
 const struct DataType *retrace_datatype_printf_to_dt(int argtype)
 {
 	int basic_type;
@@ -281,7 +287,7 @@ const struct DataType *retrace_datatype_printf_to_dt(int argtype)
 
 	dt = gnu_fmt_to_dt[basic_type][flag_mod];
 	if (!dt) {
-		log_err("Unsupported argtype, basic_type: %d, flag_mod: %d",
+		log_warn("Unsupported argtype, basic_type: %d, flag_mod: %d",
 			basic_type, flag_mod);
 		return &unk_dt;
 	}

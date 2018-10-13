@@ -56,7 +56,11 @@ void *retrace_as_get_real_safe(const char *real_impl);
 /* cancels real_impl to run after retrace_engine_wrapper */
 void retrace_as_cancel_sched_real(void *arch_spec_ctx);
 
-/* should be called by retrace_engine_wrapper to setup params */
+/* should be called by retrace_engine_wrapper to setup params,
+ * upon successful completion, *params_cnt will hold number of
+ * set up params.
+ * Returns 0 in case of failure.
+ */
 int retrace_as_setup_params(
 	void *arch_spec_ctx,
 	const struct FuncPrototype *proto,
