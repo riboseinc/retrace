@@ -55,7 +55,7 @@ __attribute__((constructor(101)))
 static void retrace_main(void)
 {
 	/* The order of module inits is strict */
-	//__asm("int $3;");
+	/* __asm("int $3;"); */
 	int ret;
 
 	if (retrace_as_init())
@@ -79,6 +79,8 @@ static void retrace_main(void)
 		log_err("retrace_conf_init() failed, ret = %d", ret);
 		return;
 	}
+
+	retrace_loger_update_config();
 
 	ret = retrace_engine_init();
 	if (ret) {
@@ -110,7 +112,13 @@ static void retrace_main(void)
 		return;
 	}
 
-	log_info("retrace init success");
+	log_dbg("retrace init success");
 
 	retrace_inited = 1;
+}
+
+__attribute__((destructor))
+static void retrace_destructor(void)
+{
+	retrace_logger_deinit();
 }

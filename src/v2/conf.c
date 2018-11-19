@@ -131,7 +131,7 @@ int retrace_conf_init(void)
 
 		retrace_real_impls.fclose(f);
 	} else
-		log_warn("config file not set, using the default conf");
+		log_dbg("config file not set, using the default conf");
 
 parse_json:
 

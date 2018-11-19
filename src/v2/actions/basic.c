@@ -247,13 +247,14 @@ next_param:;
 		/* process next member */
 	}
 
-	serialized_string = json_serialize_to_string_pretty(root_value);
+	//serialized_string = json_serialize_to_string_pretty(root_value);
 
 	/* finally */
-	log_info("%s", serialized_string);
+	//log_info("%s", serialized_string);
+	retrace_logger_log_json(ACTIONS, INFO, root_value);
 
-	json_free_serialized_string(serialized_string);
-	json_value_free(root_value);
+	//json_free_serialized_string(serialized_string);
+	//json_value_free(root_value);
 
 	/* 0 indicates successful processing */
 	return 0;

@@ -165,6 +165,36 @@ int retrace_real_impls_init(void)
 	if (retrace_real_impls.pthread_mutex_unlock == NULL)
 		return -28;
 
+	retrace_real_impls.vsnprintf =
+		retrace_as_get_real_safe("vsnprintf");
+	if (retrace_real_impls.vsnprintf == NULL)
+		return -29;
+
+	retrace_real_impls.time =
+		retrace_as_get_real_safe("time");
+	if (retrace_real_impls.time == NULL)
+		return -30;
+
+	retrace_real_impls.localtime_r =
+		retrace_as_get_real_safe("localtime_r");
+	if (retrace_real_impls.localtime_r == NULL)
+		return -31;
+
+	retrace_real_impls.fprintf =
+		retrace_as_get_real_safe("fprintf");
+	if (retrace_real_impls.fprintf == NULL)
+		return -32;
+
+	retrace_real_impls.fflush =
+		retrace_as_get_real_safe("fflush");
+	if (retrace_real_impls.fflush == NULL)
+		return -33;
+
+	retrace_real_impls.vprintf =
+		retrace_as_get_real_safe("vprintf");
+	if (retrace_real_impls.vprintf == NULL)
+		return -34;
+
 	return 0;
 }
 
