@@ -26,6 +26,8 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include <time.h>
 
 struct RetraceRealImpls {
 	int (*pthread_key_create)(pthread_key_t *key,
@@ -66,6 +68,13 @@ struct RetraceRealImpls {
 	long (*ftell)(FILE *stream);
 
 	int (*printf)(const char *format, ...);
+	int (*vsnprintf)(char *str, size_t size, const char *format, va_list ap);
+	int (*vprintf)(const char *format, va_list ap);
+
+	time_t (*time)(time_t *t);
+	struct tm *(*localtime_r)(const time_t *timep, struct tm *result);
+	int (*fprintf)(FILE *stream, const char *format, ...);
+	int (*fflush)(FILE *stream);
 };
 
 extern struct RetraceRealImpls retrace_real_impls;

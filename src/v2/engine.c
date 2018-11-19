@@ -341,7 +341,7 @@ void retrace_engine_wrapper(char *func_name,
 			break;
 		}
 
-		log_dbg("Running action %s, for %s:%p, tpid 0x%llx...",
+		log_info("Running action %s, for %s:%p, tpid 0x%llx...",
 				i_action_name,
 				func_name,
 				thread_ctx->ret_addr,

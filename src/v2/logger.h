@@ -22,6 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "parson.h"
 
 enum Modules {
 	ACTIONS,
@@ -42,19 +43,8 @@ enum Severity {
 	SEVERITY_CNT
 };
 
-extern int retrace_sev_ena[SEVERITY_CNT];
-extern int retrace_mod_ena[MODULES_CNT];
-
-extern char *retrace_severities[SEVERITY_CNT];
-extern char *retrace_module_pref[MODULES_CNT];
-
 int retrace_logger_init(void);
-
-#define retrace_logger_log(module, sev, fmt, ...) \
-do { \
-	if (retrace_sev_ena[(sev)] && retrace_mod_ena[(module)]) \
-		retrace_real_impls.printf("[%s][%s]: " fmt "\n", \
-			retrace_module_pref[(module)], \
-				retrace_severities[(sev)], ##__VA_ARGS__); \
-} while (0)
-
+void retrace_logger_deinit(void);
+void retrace_loger_update_config(void);
+void retrace_logger_log(int module, int sev, const char *fmt, ...);
+void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value);
