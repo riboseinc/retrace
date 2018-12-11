@@ -40,18 +40,6 @@
 #include "conf.h"
 #include "logger.h"
 
-#define log_err(fmt, ...) \
-	retrace_logger_log(ENGINE, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
-
-#define log_info(fmt, ...) \
-	retrace_logger_log(ENGINE, SEVERITY_INFO, fmt, ##__VA_ARGS__)
-
-#define log_warn(fmt, ...) \
-	retrace_logger_log(ENGINE, SEVERITY_WARN, fmt, ##__VA_ARGS__)
-
-#define log_dbg(fmt, ...) \
-	retrace_logger_log(ENGINE, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
-
 static pthread_key_t thread_ctx_key;
 
 static void thread_ctx_destructor(void *thread_ctx)

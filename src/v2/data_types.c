@@ -36,18 +36,6 @@
 #include "logger.h"
 #include "real_impls.h"
 
-#define log_err(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
-
-#define log_info(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_INFO, fmt, ##__VA_ARGS__)
-
-#define log_warn(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_WARN, fmt, ##__VA_ARGS__)
-
-#define log_dbg(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
-
 #define MAXCOUNT_DT_HASH_ENTRIES 16
 
 struct HashEl {

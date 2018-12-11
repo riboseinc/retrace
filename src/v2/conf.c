@@ -28,18 +28,6 @@
 #include "real_impls.h"
 #include "logger.h"
 
-#define log_err(fmt, ...) \
-	retrace_logger_log(CONF, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
-
-#define log_info(fmt, ...) \
-	retrace_logger_log(CONF, SEVERITY_INFO, fmt, ##__VA_ARGS__)
-
-#define log_warn(fmt, ...) \
-	retrace_logger_log(CONF, SEVERITY_WARN, fmt, ##__VA_ARGS__)
-
-#define log_dbg(fmt, ...) \
-	retrace_logger_log(CONF, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
-
 #define ENVAR_JSON_CONFIG_FN "RETRACE_JSON_CONFIG"
 
 /* Default config - do log_params and call_real for all

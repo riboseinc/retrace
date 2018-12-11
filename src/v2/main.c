@@ -37,18 +37,6 @@
 #include "actions.h"
 #include "data_types.h"
 
-#define log_err(fmt, ...) \
-	retrace_logger_log(MAIN, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
-
-#define log_info(fmt, ...) \
-	retrace_logger_log(MAIN, SEVERITY_INFO, fmt, ##__VA_ARGS__)
-
-#define log_warn(fmt, ...) \
-	retrace_logger_log(MAIN, SEVERITY_WARN, fmt, ##__VA_ARGS__)
-
-#define log_dbg(fmt, ...) \
-	retrace_logger_log(MAIN, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
-
 int retrace_inited;
 
 __attribute__((constructor(101)))

@@ -33,18 +33,6 @@
 #include "basic.h"
 #include "logger.h"
 
-#define log_err(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
-
-#define log_info(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_INFO, fmt, ##__VA_ARGS__)
-
-#define log_warn(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_WARN, fmt, ##__VA_ARGS__)
-
-#define log_dbg(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
-
 static int get_member(const struct DataType *struct_type,
 		const void *struct_data,
 		const char *member_name,
