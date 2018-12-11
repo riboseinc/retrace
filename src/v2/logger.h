@@ -50,14 +50,14 @@ void retrace_logger_log(int module, int sev, const char *fmt, ...);
 void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value);
 
 #define log_err(fmt, ...) \
-        retrace_logger_log(FUNCS, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
+	retrace_logger_log(FUNCS, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
 
 #define log_info(fmt, ...) \
-        retrace_logger_log(FUNCS, SEVERITY_INFO, fmt, ##__VA_ARGS__)
+	retrace_logger_log(FUNCS, SEVERITY_INFO, fmt, ##__VA_ARGS__)
 
 #define log_warn(fmt, ...) \
-        retrace_logger_log(FUNCS, SEVERITY_WARN, fmt, ##__VA_ARGS__)
+	retrace_logger_log(FUNCS, SEVERITY_WARN, fmt, ##__VA_ARGS__)
 
 #define log_dbg(fmt, ...) \
-        retrace_logger_log(FUNCS, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
+	retrace_logger_log(FUNCS, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
 
