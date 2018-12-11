@@ -27,18 +27,6 @@
 #include "real_impls.h"
 #include "logger.h"
 
-#define log_err(fmt, ...) \
-	retrace_logger_log(FUNCS, ERROR, fmt, ##__VA_ARGS__)
-
-#define log_info(fmt, ...) \
-	retrace_logger_log(FUNCS, INFO, fmt, ##__VA_ARGS__)
-
-#define log_warn(fmt, ...) \
-	retrace_logger_log(FUNCS, WARN, fmt, ##__VA_ARGS__)
-
-#define log_dbg(fmt, ...) \
-	retrace_logger_log(FUNCS, DEBUG, fmt, ##__VA_ARGS__)
-
 #define MAXCOUNT_FUNCS_HASH_ENTRIES 128
 
 struct HashEl;

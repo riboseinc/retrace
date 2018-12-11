@@ -33,18 +33,6 @@
 #include "basic.h"
 #include "logger.h"
 
-#define log_err(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
-
-#define log_info(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_INFO, fmt, ##__VA_ARGS__)
-
-#define log_warn(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_WARN, fmt, ##__VA_ARGS__)
-
-#define log_dbg(fmt, ...) \
-	retrace_logger_log(DATA_TYPES, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
-
 static int get_member(const struct DataType *struct_type,
 		const void *struct_data,
 		const char *member_name,
@@ -480,8 +468,12 @@ size_t retrace_sz_to_sz(const void *data,
 	const struct DataType *data_type,
 	char *str)
 {
-	retrace_real_impls.strcpy(str, (const char *) data);
-	return retrace_real_impls.strlen((const char *) data);
+	if (data && str) {
+		retrace_real_impls.strcpy(str, (const char *) data);
+		return retrace_real_impls.strlen((const char *) data);
+	}
+
+	return 0;
 }
 
 size_t retrace_sz_get_sz_size(const void *data,
@@ -500,7 +492,8 @@ int retrace_sz_get_size(const void *data,
 	const struct DataType *data_type,
 	size_t *dst_size_t)
 {
-	*dst_size_t = retrace_real_impls.strlen((const char *) data) + 1;
+	if (data && dst_size_t)
+		*dst_size_t = retrace_real_impls.strlen((const char *) data) + 1;
 	return 0;
 }
 

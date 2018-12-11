@@ -28,18 +28,6 @@
 #include "real_impls.h"
 #include "data_types.h"
 
-#define log_err(fmt, ...) \
-	retrace_logger_log(ACTIONS, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
-
-#define log_info(fmt, ...) \
-	retrace_logger_log(ACTIONS, SEVERITY_INFO, fmt, ##__VA_ARGS__)
-
-#define log_warn(fmt, ...) \
-	retrace_logger_log(ACTIONS, SEVERITY_WARN, fmt, ##__VA_ARGS__)
-
-#define log_dbg(fmt, ...) \
-	retrace_logger_log(ACTIONS, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
-
 #define ARR_MAX_COUNT 64
 
 /*
@@ -84,7 +72,6 @@ static int ia_log_params
 	size_t i;
 	int param_idx;
 	int cnt_param_idx;
-	char *serialized_string;
 	JSON_Value *root_value;
 	JSON_Object *root_object;
 	JSON_Value *arr_val;

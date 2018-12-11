@@ -263,7 +263,6 @@ void retrace_logger_log(int module, int sev, const char *fmt, ...)
 void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 {
 	time_t rawtime;
-	struct tm timeinfo;
 	JSON_Value *root_value;
 	JSON_Object *root_object;
 	char *serialized_string;
