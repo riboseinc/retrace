@@ -36,10 +36,10 @@ enum Modules {
 };
 
 enum Severity {
-	DEBUG,
-	INFO,
-	WARN,
-	ERROR,
+	SEVERITY_DEBUG,
+	SEVERITY_INFO,
+	SEVERITY_WARN,
+	SEVERITY_ERROR,
 	SEVERITY_CNT
 };
 

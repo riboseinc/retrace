@@ -47,10 +47,10 @@ static struct LoggerConfig
 
 } g_logger_config = {
 	.severities_ena = {
-		[DEBUG] = 0,
-		[INFO] = 1,
-		[WARN] = 1,
-		[ERROR] = 1
+		[SEVERITY_DEBUG] = 0,
+		[SEVERITY_INFO] = 1,
+		[SEVERITY_WARN] = 1,
+		[SEVERITY_ERROR] = 1
 	},
 	.modules_ena = {
 		[ACTIONS] = 1,
