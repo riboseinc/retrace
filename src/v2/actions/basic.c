@@ -29,16 +29,16 @@
 #include "data_types.h"
 
 #define log_err(fmt, ...) \
-	retrace_logger_log(ACTIONS, ERROR, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ACTIONS, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
 
 #define log_info(fmt, ...) \
-	retrace_logger_log(ACTIONS, INFO, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ACTIONS, SEVERITY_INFO, fmt, ##__VA_ARGS__)
 
 #define log_warn(fmt, ...) \
-	retrace_logger_log(ACTIONS, WARN, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ACTIONS, SEVERITY_WARN, fmt, ##__VA_ARGS__)
 
 #define log_dbg(fmt, ...) \
-	retrace_logger_log(ACTIONS, DEBUG, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ACTIONS, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
 
 #define ARR_MAX_COUNT 64
 
@@ -251,7 +251,7 @@ next_param:;
 
 	/* finally */
 	//log_info("%s", serialized_string);
-	retrace_logger_log_json(ACTIONS, INFO, root_value);
+	retrace_logger_log_json(ACTIONS, SEVERITY_INFO, root_value);
 
 	//json_free_serialized_string(serialized_string);
 	//json_value_free(root_value);

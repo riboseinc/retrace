@@ -31,16 +31,16 @@
 #include "printf.h"
 
 #define log_err(fmt, ...) \
-	retrace_logger_log(ARCH, ERROR, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ARCH, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
 
 #define log_info(fmt, ...) \
-	retrace_logger_log(ARCH, INFO, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ARCH, SEVERITY_INFO, fmt, ##__VA_ARGS__)
 
 #define log_warn(fmt, ...) \
-	retrace_logger_log(ARCH, WARN, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ARCH, SEVERITY_WARN, fmt, ##__VA_ARGS__)
 
 #define log_dbg(fmt, ...) \
-	retrace_logger_log(ARCH, DEBUG, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ARCH, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
 
 struct WrapperSystemVFrame {
 	/* this flag will cause the assembly portion to call the real impl */

@@ -41,16 +41,16 @@
 #include "logger.h"
 
 #define log_err(fmt, ...) \
-	retrace_logger_log(ENGINE, ERROR, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ENGINE, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
 
 #define log_info(fmt, ...) \
-	retrace_logger_log(ENGINE, INFO, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ENGINE, SEVERITY_INFO, fmt, ##__VA_ARGS__)
 
 #define log_warn(fmt, ...) \
-	retrace_logger_log(ENGINE, WARN, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ENGINE, SEVERITY_WARN, fmt, ##__VA_ARGS__)
 
 #define log_dbg(fmt, ...) \
-	retrace_logger_log(ENGINE, DEBUG, fmt, ##__VA_ARGS__)
+	retrace_logger_log(ENGINE, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
 
 static pthread_key_t thread_ctx_key;
 
