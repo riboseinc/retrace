@@ -479,7 +479,10 @@ size_t retrace_sz_to_sz(const void *data,
 size_t retrace_sz_get_sz_size(const void *data,
 	const struct DataType *data_type)
 {
-	return retrace_real_impls.strlen((const char *) data);
+	if (data)
+		return retrace_real_impls.strlen((const char *) data);
+
+	return 0;
 }
 
 int retrace_sz_to_size_t(const void *data, size_t *dst_size_t)
