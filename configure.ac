@@ -203,6 +203,9 @@ AC_ARG_ENABLE(debug,
      AS_HELP_STRING(--enable-debug, turn on debugging (disabled by default)),
      [], [enable_debug=no]
 )
+
+# Disable optimizations always for now as -O2 is crashing v2
+CFLAGS="$CFLAGS -O0"
 if test "x$enable_debug" = "xyes" ; then
     CFLAGS="$CFLAGS -g3 -O0 -DDEBUG"
 fi
