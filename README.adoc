@@ -13,8 +13,8 @@ image:https://img.shields.io/coverity/scan/12840.svg[Coverity Scan, link=https:/
 
 == Retrace v2
 
-Work in a new version of `retrace` is ongoing, all the documentation is only about `retrace` v1, documentation for
-`retrace` v2 is coming soon, stay tuned!
+Work in a new version of `retrace` is ongoing, all the documentation is only about `retrace` v1, early documentation for
+`retrace` v2 is link:READMEv2.adoc[here].
 
 If you want to give it a go despiste the lack of documentation you can enable it in the build using `./configure --enable-v2`.
 
