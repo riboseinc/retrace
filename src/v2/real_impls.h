@@ -73,6 +73,8 @@ struct RetraceRealImpls {
 
 	time_t (*time)(time_t *t);
 	struct tm *(*localtime_r)(const time_t *timep, struct tm *result);
+	char *(*ctime_r)(const time_t *clock, char *buf);
+
 	int (*fprintf)(FILE *stream, const char *format, ...);
 	int (*fflush)(FILE *stream);
 };

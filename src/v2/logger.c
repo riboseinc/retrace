@@ -281,7 +281,8 @@ void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 	char buff[26];
 
 	retrace_real_impls.time(&rawtime);
-	ctime_r(&rawtime, buff);
+	retrace_real_impls.ctime_r(&rawtime, buff);
+
 	json_object_set_string(root_object, "time", buff);
 	json_object_set_string(root_object, "module",
 		g_retrace_module_pref[module]);

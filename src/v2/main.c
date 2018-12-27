@@ -102,6 +102,16 @@ static void retrace_main(void)
 
 	log_dbg("retrace init success");
 
+#ifdef __APPLE__
+	// Call this here so that the timezone structures can be initialized before
+	// retrace gets in the way, otherwise we crash
+	time_t clock;
+	char *buff;
+
+	clock = time(NULL);
+	buff = ctime(&clock);
+#endif
+
 	retrace_inited = 1;
 }
 

@@ -195,6 +195,11 @@ int retrace_real_impls_init(void)
 	if (retrace_real_impls.vprintf == NULL)
 		return -34;
 
+	retrace_real_impls.ctime_r =
+		retrace_as_get_real_safe("ctime_r");
+	if (retrace_real_impls.ctime_r == NULL)
+		return -35;
+
 	return 0;
 }
 
