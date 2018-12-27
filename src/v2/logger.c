@@ -278,12 +278,9 @@ void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 	root_value = json_value_init_object();
 	root_object = json_value_get_object(root_value);
 
-	char buff[26];
-
 	retrace_real_impls.time(&rawtime);
-	retrace_real_impls.ctime_r(&rawtime, buff);
 
-	json_object_set_string(root_object, "time", buff);
+	json_object_set_number(root_object, "time", rawtime);
 	json_object_set_string(root_object, "module",
 		g_retrace_module_pref[module]);
 	json_object_set_string(root_object, "severity",
