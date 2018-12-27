@@ -1,0 +1,192 @@
+== Retrace v2
+
+Work in a new version of `retrace` is ongoing, this new version features a new method of interposing functions and an advanced configuration mechanism that allows to intercept all calls using custom code. We still consider retrace v2 in beta, but it already works almost to the level of the first version of retrace.
+
+== Configuration 
+
+`retrace` v2 is configuration file is specified using the `RETRACE_JSON_CONFIG` environment variable. This is a JSON configuration file that will specify different "intercept scripts".
+
+The default (hardcoded) configuration is the following:
+
+----
+{
+        "intercept_scripts": [
+                {
+                        "func_name": "*",
+                        "actions": [
+                                {
+                                        "action_name": "log_params"
+                                },
+                                {
+                                        "action_name": "call_real"
+                                }
+                        ]
+                }
+        ]
+}
+----
+
+This defines an `intercept_scripts` json object that contains a `func_name` and an array of `actions`. `func_name` refers to the function name this particular intercept will apply too. and `actions` defines a list of actions that will be executed when a call to that function is intercepted.
+
+Actions are programable (via plugins, more on that later) but we ship with five basic actions:
+
+`log_params` would simply print the params of the call into the retrace log.
+
+`call_real` would call into the actual function that we intercepted.  If you don't specify this action the call would be skipped.
+
+`modify_in_param_str`
+
+
+This action lets you modify string parameters in functions call. Take for example the following program:
+
+----
+#include <stdlib.h>
+
+int main(void)
+{
+        getenv("TEST");
+        getenv("OTHERTEST");
+
+        return 0;
+}
+----
+
+If we want to intercept the call to `getenv()` and change "TEST" and "OTHERTEST" for "PATH", the config file would look something like this:
+
+{
+        "intercept_scripts": [
+                {
+                        "func_name": "getenv",
+                        "actions": [
+                         {
+                                       "action_name": "log_params"
+                         },
+                         {
+                                        "action_name": "modify_in_param_str",
+                                        "action_params": {
+                                                "param_name" : "name",
+                                                "new_str" : "PATH"
+                                        }
+                         },
+                         {
+                                "action_name": "call_real"
+                         }
+                        ]
+                }
+        ]
+}
+
+This will change all calls to `getenv()` to pass its `name` parameter as "PATH". If we only wanted to change the first one ("TEST") we can specify a matching parameter so it will only be changed when we have a positive match:
+
+----
+{
+        "intercept_scripts": [
+                {
+                        "func_name": "getenv",
+                        "actions": [
+                         {
+                                       "action_name": "log_params"
+                         },
+                         {
+                                        "action_name": "modify_in_param_str",
+                                        "action_params": {
+                                                "param_name" : "name",
+                                                "match_str" : "TEST",
+                                                "new_str" : "PATH"
+                                        }
+                         },
+                         {
+                                "action_name": "call_real"
+                         }
+                        ]
+                }
+        ]
+}
+----
+
+We added the `match_str` directive inside the `action_params` of `modify_in_param_str` so that the argument would be compared against the one provided ("TEST") and only perform the substitution if it matches. A link to all the functions we support and their parameter names can be found in link:src/v2/prototypes[the source code]
+
+
+
+`modify_in_param_int`
+
+This action let's you modify integer parameters in functions call. Take for example the following program:
+
+----
+#include <sys/types.h>
+#include <unistd.h>
+
+int main(void)
+{
+        setuid(111);
+        setuid(112);
+        return 0;
+}
+----
+
+If we want to intercept the call to `setuid()` and change the 111 and 112 for a 42, the config file would look something like this:
+
+----
+{
+        "intercept_scripts": [
+                {
+                        "func_name": "setuid",
+                        "actions": [
+                         {
+                                       "action_name": "log_params"
+                         },
+                         {
+                                        "action_name": "modify_in_param_int",
+                                        "action_params": {
+                                                "param_name" : "uid",
+                                                "new_int" : 5
+                                        }
+                         },
+                         {
+                                "action_name": "call_real"
+                         }
+                        ]
+                }
+        ]
+}
+----
+
+This will change all calls to `setuid()` to pass its `uid` parameter as 5. If we only wanted to change the first one (111) we can specify a matching parameter so it will only be changed when we have a positive match:
+
+----
+{
+        "intercept_scripts": [
+                {
+                        "func_name": "setuid",
+                        "actions": [
+                         {
+                                       "action_name": "log_params"
+                         },
+                         {
+                                        "action_name": "modify_in_param_int",
+                                        "action_params": {
+                                                "param_name" : "uid",
+                                                "match_int" : 111,
+                                                "new_int" : 5
+                                        }
+                         },
+                         {
+                                "action_name": "call_real"
+                         }
+                        ]
+                }
+        ]
+}
+----
+
+We added the `match_int` directive inside the `action_params` of `modify_int_param_int` so that the argument would be compared against the one provided (111) and only perform the substitution if it matches. A link to all the functions we support and their parameter names can be found in link:src/v2/prototypes[the source code]
+
+`modify_in_param_arr`
+
+To be added.
+
+== Custom actions
+
+The above setup only allows very basic substituions of basic type parameters. The power of retrace lies on its abaility to extended it to intercept and modify any function and parameter type. For an example of this the basic actions source code is in link:src/v2/actions/basic.c[here]. We plan to add many rich actions in the future but you can also add yours for whatever you like.
+
+
