@@ -65,8 +65,8 @@ int main(void)
 
 
 	printf ("Failed %.0f calls to malloc from %.0f (%.02f%%)\n", failed_malloc, TEST_LOOPS, failed_malloc / TEST_LOOPS * 100);
-	printf ("Failed %.0f calls to malloc from %.0f (%.02f%%)\n", failed_calloc, TEST_LOOPS, failed_calloc / TEST_LOOPS * 100);
-	printf ("Failed %.0f calls to malloc from %.0f (%.02f%%)\n", failed_realloc, TEST_LOOPS, failed_realloc / TEST_LOOPS * 100);
+	printf ("Failed %.0f calls to calloc from %.0f (%.02f%%)\n", failed_calloc, TEST_LOOPS, failed_calloc / TEST_LOOPS * 100);
+	printf ("Failed %.0f calls to realloc from %.0f (%.02f%%)\n", failed_realloc, TEST_LOOPS, failed_realloc / TEST_LOOPS * 100);
 
 	return 0;
 }
