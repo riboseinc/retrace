@@ -35,6 +35,8 @@
 #include <math.h>
 #include <errno.h>
 
+#include "real_impls.h"
+
 /* Apparently sscanf is not implemented in some "standard" libraries, so don't use it, if you
  * don't have to. */
 #define sscanf THINK_TWICE_ABOUT_USING_SSCANF
@@ -921,7 +923,7 @@ static int json_serialize_to_buffer_r(const JSON_Value *value, char *buf, int le
             if (buf != NULL) {
                 num_buf = buf;
             }
-            written = sprintf(num_buf, FLOAT_FORMAT, num);
+            written = retrace_real_impls.sprintf(num_buf, FLOAT_FORMAT, num);
             if (written < 0) {
                 return -1;
             }
