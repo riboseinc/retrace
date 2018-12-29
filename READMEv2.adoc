@@ -17,7 +17,24 @@ This will leave retrace build as a shared library in `src/v2/.libs/libretrace_v2
 
 == Retrace wrapper
 
-Optionally there's a wrapper that makes running retrace easier. You can enable it using `./configure --enable-v2 --enable-v2_wrapper`. It depends in libnereon which you can find in https://github.com/riboseinc/libnereon. Please follow its build and installation procedure before enabling the `retrace` wrapper.
+Optionally there's a wrapper that makes running retrace easier. You can enable it using `./configure --enable-v2 --enable-v2_wrapper`. It depends in libnereon which you can find in https://github.com/riboseinc/libnereon. Please follow its build and installation procedure before enabling the `retrace` wrapper. The wrapper parameters are:
+
+----
+Usage: retrace2 [options]
+  -c  <config file>            : set configuration file
+  -p  <process command line>   : set process command line to be traced
+  -l  <retrace v2 library path>: set retrace v2 library path
+  -d  <log level>              : set log verbosity level(0 : SILENT, 1 : NORMAL, 2 : VERBOSE, 3 : DEBUG)
+  -l  <log file>               : specify log file
+  -v                           : print version
+  -h                           : print help message
+----
+
+Example:
+
+----
+./retrace2 -l .libs/libretrace_v2.so -p /bin/ls
+----
 
 
 == Configuration 
