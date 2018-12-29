@@ -2,6 +2,24 @@
 
 Work in a new version of `retrace` is ongoing, this new version features a new method of interposing functions and an advanced configuration mechanism that allows to intercept all calls using custom code. We still consider retrace v2 in beta, but it already works almost to the level of the first version of retrace.
 
+
+== Build
+
+`retrace` v2 build is not enabled by default, to enable it you should run
+
+----
+sh autogen.sh
+./configure --enable-v2
+make
+----
+
+This will leave retrace build as a shared library in `src/v2/.libs/libretrace_v2.so`. Please refer to the main README to see how to run your program with this shared library.
+
+== Retrace wrapper
+
+Optionally there's a wrapper that makes running retrace easier. You can enable it using `./configure --enable-v2 --enable-v2_wrapper`. It depends in libnereon which you can find in https://github.com/riboseinc/libnereon. Please follow its build and installation procedure before enabling the `retrace` wrapper.
+
+
 == Configuration 
 
 `retrace` v2 is configuration file is specified using the `RETRACE_JSON_CONFIG` environment variable. This is a JSON configuration file that will specify different "intercept scripts".
@@ -187,6 +205,6 @@ To be added.
 
 == Custom actions
 
-The above setup only allows very basic substituions of basic type parameters. The power of retrace lies on its abaility to extended it to intercept and modify any function and parameter type. For an example of this the basic actions source code is in link:src/v2/actions/basic.c[here]. We plan to add many rich actions in the future but you can also add yours for whatever you like.
+The above setup only allows very basic substitutions of basic type parameters. The power of retrace lies on its abaility to extended it to intercept and modify any function and parameter type. For an example of this, the basic actions source code is in link:src/v2/actions/basic.c[here]. We plan to add many rich actions in the future but you can also add yours for whatever you like.
 
 
