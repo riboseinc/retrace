@@ -639,6 +639,34 @@ static int ia_call_real
 	return 0;
 }
 
+static int ia_modify_return_value_int
+	(struct ThreadContext *t_ctx,
+		const JSON_Object *action_params)
+{
+	double new_int;
+
+	if (action_params == NULL) {
+		log_err("action_params must exists for modify_return_value_int");
+		return -1;
+	}
+
+	if (!json_object_has_value(action_params, "retval_int")) {
+		log_err("retval_int must exist in action_params "
+				"for modify_return_value_int");
+		return -1;
+	}
+
+	new_int = json_object_get_number(action_params, "retval_int");
+
+	t_ctx->ret_val = (long) new_int;
+
+	log_info("retval set to '%d'",
+		(int) new_int);
+
+	/* 0 indicates successful processing */
+	return 0;
+}
+
 retrace_actions_define_package(basic) = {
 	{
 		.name = "log_params",
@@ -659,5 +687,9 @@ retrace_actions_define_package(basic) = {
 	{
 		.name = "modify_in_param_arr",
 		.action = ia_modify_in_param_arr
+	},
+	{
+		.name = "modify_return_value_int",
+		.action = ia_modify_return_value_int
 	}
 };

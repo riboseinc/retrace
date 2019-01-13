@@ -220,6 +220,49 @@ We added the `match_int` directive inside the `action_params` of `modify_int_par
 
 To be added.
 
+`modify_return_value_int`
+
+This action let's you modify integer return values. Take for example the following program:
+
+----
+#include <unistd.h>
+#include <sys/types.h>
+#include <stdio.h>
+
+int main(void)
+{
+        uid_t a =  getuid();
+
+        printf("%d\n", a);
+}
+----
+
+If we want to intercept the call to `getuid()` and change the return value to 42, the config file would look something like this:
+
+----
+{
+        "intercept_scripts": [
+                {
+                        "func_name": "getuid",
+                        "actions": [
+                         {
+                                       "action_name": "call_real"
+                         },
+                         {
+                                        "action_name": "modify_return_value_int",
+                                        "action_params": {
+                                                "retval_int" : 42
+                                        }
+                         }
+                        ]
+                }
+        ]
+}
+----
+
+This will make the program always print 42, regardless of the actual return value of guid().
+
+
 == Custom actions
 
 The above setup only allows very basic substitutions of basic type parameters. The power of retrace lies on its abaility to extended it to intercept and modify any function and parameter type. For an example of this, the basic actions source code is in link:src/v2/actions/basic.c[here]. We plan to add many rich actions in the future but you can also add yours for whatever you like.
