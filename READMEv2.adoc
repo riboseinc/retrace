@@ -262,6 +262,59 @@ If we want to intercept the call to `getuid()` and change the return value to 42
 
 This will make the program always print 42, regardless of the actual return value of guid().
 
+`memory_fuzz`
+
+This action let's you randomly fail calls to malloc(), realloc() or even any other function that returns a pointer type. Take for example the following program:
+
+----
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void)
+{
+        int fail = 0;
+        int pass = 0;
+
+        for (int i = 0; i < 10; i++) {
+                void *p = malloc(10);
+                if (p)
+                        pass++;
+                else
+                        fail++;
+        }
+
+        printf("fail %d, pass %d\n", fail, pass);
+}
+----
+
+If we want to fail 10% of the calls to malloc we would use a config file like the following:
+
+----
+{
+        "intercept_scripts": [
+                {
+                        "func_name": "malloc",
+                        "actions": [
+                         {
+                                       "action_name": "call_real"
+                         },
+                         {
+                                        "action_name": "memory_fuzz",
+                                        "action_params": {
+                                                "fail_rate" : 0.1
+                                        }
+                         }
+                        ]
+                }
+        ]
+}
+----
+This will randomly fail 10% of the calls to malloc returning NULL, this is useful to test programs that don't check the return value of malloc or similar functions.
+
+
+
+
+
 
 == Custom actions
 
