@@ -12,6 +12,7 @@ libretrace_v2_la_SOURCES = \
 	prototypes/uio.c    \
 	prototypes/unistd.c \
 	actions/basic.c     \
+	actions/memfuzz.c   \
 	datatypes/basic.c   \
 	datatypes/uio.c     \
 	datatypes/unistd.c  \
