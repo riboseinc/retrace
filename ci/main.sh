@@ -59,6 +59,16 @@ sh autogen.sh && \
 sudo make install
 make check
 
+make clean
+./configure \
+	--enable-v2 \
+	--enable-tests && \
+	make clean
+	make
+
+sudo make install
+make check
+
 # checkpatch
 if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
 	checkpatch HEAD
