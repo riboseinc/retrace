@@ -196,8 +196,8 @@ retrace_func_define_prototypes(stdio) = {
 			},
 			{
 				.name = "stream",
+				.type_name = "ptr",
 				/*
-				 *.type_name = "ptr",
 				 *.modifiers = CDM_POINTER,
 				 *.ref_type_name = "void",
 				 */
