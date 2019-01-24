@@ -312,6 +312,15 @@ If we want to fail 10% of the calls to malloc we would use a config file like th
 This will randomly fail 10% of the calls to malloc returning NULL, this is useful to test programs that don't check the return value of malloc or similar functions.
 
 
+== Logging configuration variables
+
+The retrace logger can be controlled using the following enviroment variables:
+
+
+`RETRACE_LOGGER_DEF_ENA` Setting this to 0 will completly disable the `retrace` logging engine.
+`RETRACE_LOGGER_DEF_STDOUT_ENA` Setting this to 0 will prevent the retrace logging going to the standard output, this will prevent the program output and retrace output to get mixed.
+`RETRACE_LOGGER_DEF_FN` Set this to a file path where `retrace` will write its log. Useful when you disabled `RETRACE_LOGGER_DEF_STDOUT_ENA`.
+
 
 
 
