@@ -570,14 +570,21 @@ size_t retrace_ptr_to_sz(const void *data,
 	const struct DataType *data_type,
 	char *str)
 {
-	return retrace_real_impls.sprintf(str, "%p", *((void **) data));
+	if (data)
+		return retrace_real_impls.sprintf(str, "%p", *((void **) data));
+
+	*str = '\0';
+	return 0;
 }
 
 
 size_t retrace_ptr_get_sz_size(const void *data,
 	const struct DataType *data_type)
 {
-	return retrace_real_impls.snprintf(NULL, 0, "%p", *((void **) data));
+	if (data)
+		return retrace_real_impls.snprintf(NULL, 0, "%p", *((void **) data));
+
+	return 0;
 }
 
 
