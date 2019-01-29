@@ -773,5 +773,46 @@ retrace_func_define_prototypes(stdio) = {
 				.direction = PDIR_IN
 			}
 		}
+	},
+	{
+		.name = "popen",
+		.conv = CC_SYSTEM_V,
+		.type_name = "ptr",
+		.params_cnt = 2,
+		.params = {
+			{
+				.name = "command",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "type",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "pclose",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 1,
+		.params = {
+			{
+				.name = "stream",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				/*
+				 * Do not dereference
+				 *.modifiers = CDM_POINTER,
+				 *.ref_type_name = "STREAM",
+				 */
+				.direction = PDIR_IN
+			}
+		}
 	}
 };
