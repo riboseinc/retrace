@@ -37,6 +37,7 @@ install:
 
 script:
   - ./ci/main.sh
+  - ./ci/checkpatch.sh
 
 os:
   - linux

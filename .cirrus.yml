@@ -1,0 +1,15 @@
+freebsd_task:
+  freebsd_instance:
+    image: freebsd-11-2-release-amd64
+
+  env:
+    PATH: /usr/local/bin:$PATH
+    MD5SUM: /sbin/md5sum
+    CMOCKA_INSTALL: $PWD/builds/cmocka-install
+    CHECKPATCH_INSTALL: $PWD/builds/checkpatch-install
+
+  install_script:
+    - ./ci/before_install.sh
+  script:
+    - bash ./ci/install.sh
+    - bash ./ci/main.sh
