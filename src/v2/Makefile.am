@@ -50,7 +50,7 @@ libretrace_v2_la_LDFLAGS = -Wl,--no-as-needed -Wl,-ldl
 endif
 
 if FREEBSD
-libretrace_v2_la_CFLAGS += -I./arch/x86-64/bsd
+libretrace_v2_la_CFLAGS += -I./arch/x86-64/bsd -Wl,-z,notext
 libretrace_v2_la_CCASFLAGS = -I./arch/x86-64/bsd
 libretrace_v2_la_LDFLAGS = -gdwarf-2 -Wl,--no-as-needed -pthread -shared
 libretrace_v2_la_SOURCES += \
