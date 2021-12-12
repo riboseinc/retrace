@@ -1,13 +1,13 @@
-#!/bin/sh
+#!/usr/bin/env bash
 set -ex
 
 # https://gist.github.com/marcusandre/4b88c2428220ea255b83
 get_os() {
-	if [ -z $OSTYPE ]; then
-		echo "$(uname | tr '[:upper:]' '[:lower:]')"
+	if [ -z "$OSTYPE" ]; then
+		uname
 	else
-		echo "$(echo $OSTYPE | tr '[:upper:]' '[:lower:]')"
-	fi
+		echo "$OSTYPE"
+	fi | tr '[:upper:]' '[:lower:]'
 }
 
 macos_install() {
@@ -24,9 +24,9 @@ macos_install() {
 		ruby
 	"
 	for p in ${packages}; do
-		brew install ${p} || brew upgrade ${p}
+		brew install "${p}" || brew upgrade "${p}"
 	done
-	mkdir -p ${CMOCKA_INSTALL}
+	mkdir -p "${CMOCKA_INSTALL}"
 	gem install mustache
 }
 
@@ -53,6 +53,20 @@ netbsd_install() {
 }
 
 linux_install() {
+	sudo gem install mustache
+}
+
+msys_install() {
+	packages=(
+		automake
+		mingw-w64-x86_64-cmocka
+		mingw64/mingw-w64-x86_64-ninja
+		mingw64/mingw-w64-x86_64-cmake
+		mingw64/mingw-w64-x86_64-graphviz # for doxygen's dot component
+		openssl-devel
+		doxygen
+	)
+	pacman --noconfirm -S --needed "${packages[@]}"
 	gem install mustache
 }
 
@@ -72,6 +86,8 @@ main() {
 			macos_install ;;
 		linux*)
 			linux_install ;;
+		msys*)
+			msys_install ;;
 		*) echo "unknown"; exit 1 ;;
 	esac
 

@@ -1,0 +1,43 @@
+name: Ubuntu
+
+on:
+  push:
+    branches:
+      - master
+      - 'release/**'
+    paths-ignore:
+      - 'docs/**'
+      - '**.adoc'
+      - '**.md'
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/ubuntu.yml'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.adoc'
+      - '**.md'
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    strategy:
+      fail-fast: false
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+      - name: Set up environment
+        run: |
+          echo CMOCKA_INSTALL="${HOME}/builds/cmocka-install" >> "${GITHUB_ENV}"
+      - name: Install more prerequisites
+        run: |
+          ./ci/before_install.sh
+          ./ci/install.sh cmocka libnereon
+      - name: Configure
+        run: |
+          ./autogen.sh
+          ./configure --enable-tests
+      - name: Build
+        run: ./ci/main.sh

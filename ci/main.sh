@@ -7,24 +7,30 @@ CFLAGS="-I${CMOCKA_INSTALL}/include"
 
 export LD_LIBRARY_PATH CFLAGS LDFLAGS
 
+install_retrace() {
+	sh autogen.sh && \
+		./configure \
+			--disable-silent-rules \
+			--with-cmocka="${CMOCKA_INSTALL}" \
+			--enable-tests && \
+		make clean && \
+		make
 
-sh autogen.sh && \
-	./configure \
-		--disable-silent-rules \
-		--with-cmocka=${CMOCKA_INSTALL} \
-		--enable-tests && \
-	make clean && \
-	make
+	sudo make install
+	make check
+}
 
-sudo make install
-make check
-
-make clean
-./configure \
-	--enable-v2 \
-	--enable-tests && \
+test_retrace() {
 	make clean
-	make V=1
+	./configure \
+		--enable-v2 \
+		--enable-tests && \
+		make clean
+		make V=1
 
-sudo make install
-make check
+	sudo make install
+	make check
+}
+
+install_retrace
+test_retrace

@@ -1,0 +1,23 @@
+name: Checkpatch
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up environment
+        run: |
+          echo CHECKPATCH_INSTALL="${HOME}/builds/checkpatch-install" >> "${GITHUB_ENV}"
+          ./ci/before_install.sh
+      - name: Install more prerequisites
+        run: ./ci/install.sh checkpatch
+      - name: Check patch
+        run: ./ci/checkpatch.sh
