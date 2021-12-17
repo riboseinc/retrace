@@ -11,6 +11,8 @@ on:
       - '**.md'
       - '.github/workflows/*.yml'
       - '!.github/workflows/windows.yml'
+      - 'ci/before_install/*'
+      - '!ci/before_install/msys.sh'
   pull_request:
     paths-ignore:
       - 'docs/**'

@@ -11,6 +11,8 @@ on:
       - '**.md'
       - '.github/workflows/*.yml'
       - '!.github/workflows/macos.yml'
+      - 'ci/before_install/*'
+      - '!ci/before_install/darwin.sh'
   pull_request:
     paths-ignore:
       - 'docs/**'
@@ -37,6 +39,17 @@ jobs:
         run: |
           ./ci/before_install.sh
           ./ci/install.sh cmocka libnereon
+      - name: Set up more environment
+        run: |
+          # see: https://github.com/oracle/truffleruby/commit/2706c09e57c4c27fb6177a9e420a87c0befb9e70
+          export OPENSSL_PREFIX="$(brew --prefix openssl@1.1)"
+          export PKG_CONFIG_PATH="${OPENSSL_PREFIX}/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+          export LDFLAGS="-L${OPENSSL_PREFIX}/lib"
+          export CPPFLAGS="-I${OPENSSL_PREFIX}/include"
+          export PATH="${OPENSSL_PREFIX}/bin:$PATH"
+          for var in OPENSSL_PREFIX PKG_CONFIG_PATH LDFLAGS CPPFLAGS PATH; do echo "${var}=${!var}" | tee -a "${GITHUB_ENV}"; done
+          cd /usr/local/include
+          sudo ln -s "${OPENSSL_PREFIX}/include/openssl" .
       - name: Configure
         run: |
           ./autogen.sh

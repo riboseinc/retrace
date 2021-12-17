@@ -10,66 +10,6 @@ get_os() {
 	fi | tr '[:upper:]' '[:lower:]'
 }
 
-macos_install() {
-	brew update
-	packages="
-		openssl
-		make
-		cmake
-		autoconf
-		automake
-		libtool
-		cmocka
-		pkg-config
-		ruby
-	"
-	for p in ${packages}; do
-		brew install "${p}" || brew upgrade "${p}"
-	done
-	mkdir -p "${CMOCKA_INSTALL}"
-	gem install mustache
-}
-
-freebsd_install() {
-	sudo pkg install -y cmake
-	sudo pkg install -y ruby
-	sudo pkg install -y devel/ruby-gems
-	sudo pkg install -y bash
-	sudo pkg install -y git
-	sudo pkg install -y wget
-	sudo pkg install -y autoconf
-	sudo pkg install -y automake
-	sudo pkg install -y libtool
-	sudo pkg install -y pkgconf
-	sudo gem install mustache
-}
-
-openbsd_install() {
-	echo ""
-}
-
-netbsd_install() {
-	echo ""
-}
-
-linux_install() {
-	sudo gem install mustache
-}
-
-msys_install() {
-	packages=(
-		automake
-		mingw-w64-x86_64-cmocka
-		mingw64/mingw-w64-x86_64-ninja
-		mingw64/mingw-w64-x86_64-cmake
-		mingw64/mingw-w64-x86_64-graphviz # for doxygen's dot component
-		openssl-devel
-		doxygen
-	)
-	pacman --noconfirm -S --needed "${packages[@]}"
-	gem install mustache
-}
-
 crossplat_install() {
 	echo ""
 }
@@ -77,16 +17,22 @@ crossplat_install() {
 main() {
 	case $(get_os) in
 		freebsd*)
+			. ci/before_install/freebsd.sh
 			freebsd_install ;;
 		netbsd*)
+			. ci/before_install/netbsd.sh
 			netbsd_install ;;
 		openbsd*)
+			. ci/before_install/openbsd.sh
 			openbsd_install ;;
 		darwin*)
+			. ci/before_install/darwin.sh
 			macos_install ;;
 		linux*)
+			. ci/before_install/linux.sh
 			linux_install ;;
 		msys*)
+			. ci/before_install/msys.sh
 			msys_install ;;
 		*) echo "unknown"; exit 1 ;;
 	esac
