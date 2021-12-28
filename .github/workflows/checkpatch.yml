@@ -10,6 +10,10 @@ on:
       - '**.adoc'
       - '**.md'
       - '**.nix'
+      - '.gitignore'
+      - '.gitattributes'
+      - '.editorconfig'
+      - '.cirrus.yml'
       - '.github/workflows/*.yml'
       - '!.github/workflows/checkpatch.yml'
       - 'ci/before_install/*'
@@ -19,6 +23,15 @@ on:
       - 'docs/**'
       - '**.adoc'
       - '**.md'
+      - '**.nix'
+      - '.gitignore'
+      - '.gitattributes'
+      - '.editorconfig'
+      - '.cirrus.yml'
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/checkpatch.yml'
+      - 'ci/before_install/*'
+      - '!ci/before_install/linux.sh'
 
 jobs:
   build:
