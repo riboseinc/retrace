@@ -1,5 +1,12 @@
 = Retrace
 
+image:https://github.com/riboseinc/retrace/actions/workflows/ubuntu.yml/badge.svg[Ubuntu, link=https://github.com/riboseinc/retrace/actions/workflows/ubuntu.yml]
+image:https://github.com/riboseinc/retrace/actions/workflows/macos.yml/badge.svg[macOS, link=https://github.com/riboseinc/retrace/actions/workflows/macos.yml]
+image:https://github.com/riboseinc/retrace/actions/workflows/windows.yml/badge.svg[Windows, link=https://github.com/riboseinc/retrace/actions/workflows/windows.yml]
+image:https://img.shields.io/cirrus/github/riboseinc/retrace?label=freebsd&logo=cirrus%20ci["FreeBSD", link="https://cirrus-ci.com/github/riboseinc/retrace"]
+image:https://github.com/riboseinc/retrace/actions/workflows/checkpatch.yml/badge.svg[checkpatch, link=https://github.com/riboseinc/retrace/actions/workflows/checkpatch.yml]
+image:https://img.shields.io/coverity/scan/12840.svg[Coverity Scan, link=https://scan.coverity.com/projects/riboseinc-retrace]
+
 `retrace` is a versatile security vulnerability / bug discovery tool
 through monitoring and modifying the behavior of compiled binaries on
 Linux, OpenBSD/FreeBSD/NetBSD (shared object) and macOS (dynamic library).
@@ -8,8 +15,6 @@ Linux, OpenBSD/FreeBSD/NetBSD (shared object) and macOS (dynamic library).
 dynamically-linked ELF (Linux/OpenBSD/FreeBSD/NetBSD) and
 Mach-O (macOS) binary executables.
 
-image:https://img.shields.io/travis/riboseinc/retrace/master.svg[Build Status (Travis CI), link=https://travis-ci.org/riboseinc/retrace]
-image:https://img.shields.io/coverity/scan/12840.svg[Coverity Scan, link=https://scan.coverity.com/projects/riboseinc-retrace]
 
 == Retrace v2
 
@@ -322,4 +327,3 @@ new and interesting ways.
 
 Please send feedback and improvement suggestions either as GitHub issues or to
 retrace@ribose.com.
-
