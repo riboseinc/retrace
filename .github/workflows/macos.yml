@@ -9,6 +9,7 @@ on:
       - 'docs/**'
       - '**.adoc'
       - '**.md'
+      - '**.nix'
       - '.github/workflows/*.yml'
       - '!.github/workflows/macos.yml'
       - 'ci/before_install/*'
