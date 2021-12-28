@@ -1,31 +1,29 @@
-freebsd-11-2-task:
-  freebsd_instance:
-    image: freebsd-11-2-release-amd64
+env:
+  PATH: /usr/local/bin:$PATH
+  MD5SUM: /sbin/md5sum
+  CMOCKA_INSTALL: $PWD/builds/cmocka-install
+  CHECKPATCH_INSTALL: $PWD/builds/checkpatch-install
 
-  env:
-    PATH: /usr/local/bin:$PATH
-    MD5SUM: /sbin/md5sum
-    CMOCKA_INSTALL: $PWD/builds/cmocka-install
-    CHECKPATCH_INSTALL: $PWD/builds/checkpatch-install
-
-  install_script:
+global_task_template: &GLOBAL_TASK_TEMPLATE
+  setup_environment_script: |
+    # Update all packages to avoid "version FBSD_1.6 not found" error
+    # See: https://forums.freebsd.org/threads/lib-libc-so-7-version-fbsd_1-6-required-by-usr-local-lib-libepoll-shim-so-0-not-found.81021/
+    pkg update -f
+    pkg upgrade -f -y
+    # Use bash for the CI scripts
+    pkg install -y devel/readline bash
+  install_build_prerequisites_script:
     - ./ci/before_install.sh
-  script:
     - bash ./ci/install.sh
+  ci_script:
     - bash ./ci/main.sh
 
-freebsd-12-task:
+freebsd-12-3-task:
+  << : *GLOBAL_TASK_TEMPLATE
   freebsd_instance:
-    image: freebsd-12-0-release-amd64
+    image: freebsd-12-3-release-amd64
 
-  env:
-    PATH: /usr/local/bin:$PATH
-    MD5SUM: /sbin/md5sum
-    CMOCKA_INSTALL: $PWD/builds/cmocka-install
-    CHECKPATCH_INSTALL: $PWD/builds/checkpatch-install
-
-  install_script:
-    - ./ci/before_install.sh
-  script:
-    - bash ./ci/install.sh
-    - bash ./ci/main.sh
+freebsd-13-task:
+  << : *GLOBAL_TASK_TEMPLATE
+  freebsd_instance:
+    image: freebsd-13-0-release-amd64
