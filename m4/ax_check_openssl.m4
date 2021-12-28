@@ -32,7 +32,7 @@
 #   and this notice are preserved. This file is offered as-is, without any
 #   warranty.
 
-#serial 10
+#serial 11
 
 AU_ALIAS([CHECK_SSL], [AX_CHECK_OPENSSL])
 AC_DEFUN([AX_CHECK_OPENSSL], [
@@ -49,7 +49,22 @@ AC_DEFUN([AX_CHECK_OPENSSL], [
               ;;
             esac
         ], [
-            ssldirs="/usr/local/ssl /usr/lib/ssl /usr/ssl /usr/pkg /usr/local /usr /usr/local/opt/openssl"
+            # if pkg-config is installed and openssl has installed a .pc file,
+            # then use that information and don't search ssldirs
+            AC_CHECK_TOOL([PKG_CONFIG], [pkg-config])
+            if test x"$PKG_CONFIG" != x""; then
+                OPENSSL_LDFLAGS=`$PKG_CONFIG openssl --libs-only-L 2>/dev/null`
+                if test $? = 0; then
+                    OPENSSL_LIBS=`$PKG_CONFIG openssl --libs-only-l 2>/dev/null`
+                    OPENSSL_INCLUDES=`$PKG_CONFIG openssl --cflags-only-I 2>/dev/null`
+                    found=true
+                fi
+            fi
+
+            # no such luck; use some default ssldirs
+            if ! $found; then
+                ssldirs="/usr/local/ssl /usr/lib/ssl /usr/ssl /usr/pkg /usr/local /usr"
+            fi
         ]
         )
 
@@ -60,8 +75,8 @@ AC_DEFUN([AX_CHECK_OPENSSL], [
     if ! $found; then
         OPENSSL_INCLUDES=
         for ssldir in $ssldirs; do
-            AC_MSG_CHECKING([for openssl/crypto.h in $ssldir])
-            if test -f "$ssldir/include/openssl/crypto.h"; then
+            AC_MSG_CHECKING([for include/openssl/ssl.h in $ssldir])
+            if test -f "$ssldir/include/openssl/ssl.h"; then
                 OPENSSL_INCLUDES="-I$ssldir/include"
                 OPENSSL_LDFLAGS="-L$ssldir/lib"
                 OPENSSL_LIBS="-lssl -lcrypto"
@@ -91,7 +106,7 @@ AC_DEFUN([AX_CHECK_OPENSSL], [
     LIBS="$OPENSSL_LIBS $LIBS"
     CPPFLAGS="$OPENSSL_INCLUDES $CPPFLAGS"
     AC_LINK_IFELSE(
-        [AC_LANG_PROGRAM([#include <openssl/crypto.h>], [SSL_new(NULL)])],
+        [AC_LANG_PROGRAM([#include <openssl/ssl.h>], [SSL_new(NULL)])],
         [
             AC_MSG_RESULT([yes])
             $1
