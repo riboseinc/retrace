@@ -72,7 +72,7 @@ RETRACE_IMPLEMENTATION(select)(int nfds, fd_set *readfds, fd_set *writefds,
 	ret = real_select(nfds, readfds, writefds, exceptfds, timeout);
 
 	if (timeout != NULL) {
-		sprintf(str_timeout, "timeout: %ld %ld", timeout->tv_sec, (long int) timeout->tv_usec);
+		sprintf(str_timeout, "timeout: %ld %ld", timeout->tv_sec, (long) timeout->tv_usec);
 		event_info.extra_info = str_timeout;
 	} else {
 		event_info.extra_info = "no timeout";

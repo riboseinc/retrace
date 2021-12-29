@@ -47,15 +47,15 @@ static void retrace_main(void)
 	int ret;
 
 	if (retrace_as_init())
-		/* cant report error... */
+		/* can't report error... */
 		return;
 
 	if (retrace_real_impls_init())
-		/* cant report error... */
+		/* can't report error... */
 		return;
 
 	if (retrace_logger_init())
-		/* cant report error... */
+		/* can't report error... */
 		return;
 
 	/* init parson code which is used by various modules */

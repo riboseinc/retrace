@@ -162,7 +162,7 @@ uid=1000(test) gid=1000(test) groups=1000(test),10(wheel)
 
 == Redirect usage example
 
-The power of `retrace` lies its its ability to modify the behavior of
+The power of `retrace` lies in its ability to modify the behavior of
 the standard system calls in a number of different ways.
 This is done using a config file.
 
@@ -312,9 +312,9 @@ stacktrace-disabled-funcs,[functions list]
 
 == macOS System Integrity Protection
 
-We use the DYLD_INSERT_LIBRARIES enviroment variable to insert `retrace` into binaries.
+We use the DYLD_INSERT_LIBRARIES environment variable to insert `retrace` into binaries.
 Starting on Mac OS X El Capitan Apple removes the DYLD_INSERT_LIBRARIES variable for
-the enviroment for binaries in system directories. This means you can't trace system binaries
+the environment for binaries in system directories. This means you can't trace system binaries
 using `retrace` by default.
 
 You can disable this behaviour by running `csrutil disable` and rebooting.

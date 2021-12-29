@@ -1,11 +1,22 @@
 --- checkpatch.pl.orig	2017-06-13 19:11:59.932004444 +0300
 +++ checkpatch.pl	2017-06-13 19:11:42.317051086 +0300
-@@ -466,6 +466,8 @@ our @typeListMisordered = (
+@@ -718,6 +718,8 @@ our @typeListMisordered = (
  );
- 
+
  our @typeList = (
 +	qr{FILE},
 +	qr{DIR},
  	qr{void},
  	qr{(?:(?:un)?signed\s+)?char},
  	qr{(?:(?:un)?signed\s+)?short\s+int},
+--- checkpatch.pl.orig	2021-12-29 15:26:03.000000000 +0800
++++ checkpatch.pl	2021-12-29 15:26:17.000000000 +0800
+@@ -5181,7 +5181,7 @@
+ 								$line_fixed = 1;
+ 							}
+ 						}
+-					} elsif ($ctx =~ /Wx[^WCE]|[^WCE]xW/) {
++					} elsif ($ctx =~ /Wx[^WCEV]|[^WCE]xW/) {
+ 						if (ERROR("SPACING",
+ 							  "need consistent spacing around '$op' $at\n" . $hereptr)) {
+ 							$good = rtrim($fix_elements[$n]) . " " . trim($fix_elements[$n + 1]) . " ";

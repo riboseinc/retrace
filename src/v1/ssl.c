@@ -80,7 +80,7 @@ int RETRACE_IMPLEMENTATION(SSL_write)(SSL *ssl, const void *buf, int num)
 	return (r);
 }
 
-RETRACE_REPLACE(SSL_write, int, (SSL * ssl, const void *buf, int num),
+RETRACE_REPLACE(SSL_write, int, (SSL *ssl, const void *buf, int num),
 	(ssl, buf, num))
 
 
@@ -124,7 +124,7 @@ int RETRACE_IMPLEMENTATION(SSL_read)(SSL *ssl, void *buf, int num)
 	return (r);
 }
 
-RETRACE_REPLACE(SSL_read, int, (SSL * ssl, void *buf, int num),
+RETRACE_REPLACE(SSL_read, int, (SSL *ssl, void *buf, int num),
 	(ssl, buf, num))
 
 int RETRACE_IMPLEMENTATION(SSL_connect)(SSL *ssl)
@@ -154,7 +154,7 @@ int RETRACE_IMPLEMENTATION(SSL_connect)(SSL *ssl)
 	return (r);
 }
 
-RETRACE_REPLACE(SSL_connect, int, (SSL * ssl), (ssl))
+RETRACE_REPLACE(SSL_connect, int, (SSL *ssl), (ssl))
 
 
 
@@ -185,7 +185,7 @@ int RETRACE_IMPLEMENTATION(SSL_accept)(SSL *ssl)
 	return (r);
 }
 
-RETRACE_REPLACE(SSL_accept, int, (SSL * ssl), (ssl))
+RETRACE_REPLACE(SSL_accept, int, (SSL *ssl), (ssl))
 
 
 long
@@ -215,6 +215,7 @@ RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
 	if (rtr_get_config_single("SSL_get_verify_result", ARGUMENT_TYPE_INT, ARGUMENT_TYPE_END, &redirect_id)) {
 
 		char redirect_str[128];
+
 		snprintf(redirect_str, sizeof(redirect_str), "redirection in effect: '%i'", redirect_id);
 		event_info.extra_info = redirect_str;
 		event_info.logging_level |= RTR_LOG_LEVEL_REDIRECT;
@@ -227,7 +228,7 @@ RETRACE_IMPLEMENTATION(SSL_get_verify_result)(const SSL *ssl)
 	return r;
 }
 
-RETRACE_REPLACE(SSL_get_verify_result, long, (const SSL * ssl), (ssl))
+RETRACE_REPLACE(SSL_get_verify_result, long, (const SSL *ssl), (ssl))
 
 
 #define DEFINE_TO_STR(def, str) case (def): str = #def; break;
@@ -551,7 +552,7 @@ long RETRACE_IMPLEMENTATION(BIO_ctrl)(BIO *bp, int cmd, long larg, void *parg)
 	DEFINE_TO_STR(BIO_C_SET_CONNECT_MODE, cmd_str)
 #endif
 
-	default:
+	default :
 		cmd_str = "UNKNOWN";
 	}
 

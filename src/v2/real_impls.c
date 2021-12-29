@@ -44,7 +44,7 @@ int retrace_real_impls_init(void)
 
 #ifdef __linux__
 	/* load all libs that are used in safe mode,
-	 *  since the linker wont link them
+	 *  since the linker won't link them
 	 */
 	void *handle;
 
@@ -202,4 +202,3 @@ int retrace_real_impls_init(void)
 
 	return 0;
 }
-

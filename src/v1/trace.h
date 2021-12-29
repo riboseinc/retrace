@@ -10,10 +10,9 @@ typedef int (*rtr_ptrace_t)(int request, pid_t pid, caddr_t addr, int data);
 #elif defined(__NetBSD__)
 typedef int (*rtr_ptrace_t)(int request, pid_t pid, void *addr, int data);
 #else
-typedef long int (*rtr_ptrace_t)(enum __ptrace_request request, ...);
+typedef long (*rtr_ptrace_t)(enum __ptrace_request request, ...);
 #endif
 
 RETRACE_DECL(ptrace);
 
 #endif /* __RETRACE_TRACE_H__ */
-

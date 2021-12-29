@@ -110,7 +110,7 @@ int retrace_logger_init(void)
 	char *env_val;
 
 	if (retrace_real_impls.pthread_mutex_init(&g_logger_mtx, NULL)) {
-		/* cant report error...or use stderr? */
+		/* can't report error...or use stderr? */
 		return 1;
 	}
 

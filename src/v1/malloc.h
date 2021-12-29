@@ -21,7 +21,7 @@ typedef int (*rtr_munmap_t)(void *addr, size_t length);
 typedef int (*rtr_brk_t)(void *addr);
 
 #ifdef __OpenBSD__
-typedef void *(*rtr_sbrk_t)(int long increment);
+typedef void *(*rtr_sbrk_t)(long increment);
 #else
 typedef void *(*rtr_sbrk_t)(intptr_t increment);
 #endif

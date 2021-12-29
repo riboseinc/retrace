@@ -631,7 +631,7 @@ int retrace_as_setup_params(
 		log_warn("problem parsing params format string for func '%s'",
 			proto->name);
 
-		/* set up printf_params as unknown so we wont crash */
+		/* set up printf_params as unknown so we won't crash */
 		use_unk_dt = 1;
 	} else
 		use_unk_dt = 0;
@@ -769,4 +769,3 @@ void *retrace_as_get_real_safe(const char *real_impl)
 	/* could not find any other suitable method */
 	return dlsym(RTLD_NEXT, real_impl);
 }
-

@@ -74,7 +74,7 @@ struct StructMember {
 
 /* PrintfFmtBasicTypes and PrintfFmtMods
  * Superset the PA enum and FLAG macro from print.h
- * We have do do it since 0 value means PA_INT,
+ * We have to do it since 0 value means PA_INT,
  * while we need it for datatypes that are not related
  * to standard types
  */

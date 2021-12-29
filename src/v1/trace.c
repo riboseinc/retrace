@@ -29,7 +29,7 @@
 #include <sys/types.h>
 #include <sys/ptrace.h>
 
-long int ptrace_v(int request, va_list ap)
+long ptrace_v(int request, va_list ap)
 {
 	pid_t pid;
 	caddr_t addr;
@@ -47,7 +47,7 @@ int RETRACE_IMPLEMENTATION(ptrace)(int request, pid_t pid, caddr_t addr, int dat
 #elif defined(__NetBSD__)
 int RETRACE_IMPLEMENTATION(ptrace)(int request, pid_t pid, void *addr, int data)
 #else
-long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
+long RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 #endif
 {
 	struct rtr_event_info event_info;
@@ -58,6 +58,7 @@ long int RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 	pid_t pid;
 	caddr_t addr;
 	va_list arglist;
+
 	va_start(arglist, request);
 
 	pid = va_arg(arglist, int);
@@ -229,7 +230,6 @@ RETRACE_REPLACE(ptrace, int, (int request, pid_t pid, caddr_t addr, int data),
 RETRACE_REPLACE(ptrace, int, (int request, pid_t pid, void *addr, int data),
 	(request, pid, addr, data))
 #else
-RETRACE_REPLACE_V(ptrace, long int, (enum __ptrace_request request, ...),
+RETRACE_REPLACE_V(ptrace, long, (enum __ptrace_request request, ...),
 	request, ptrace_v, (request, ap))
 #endif
-

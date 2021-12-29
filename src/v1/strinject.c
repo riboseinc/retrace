@@ -90,6 +90,7 @@ static void rtr_strinject_init(void)
 	int reverse;
 
 	RTR_CONFIG_HANDLE config = RTR_CONFIG_START;
+
 	while (1) {
 		/* get configuration line */
 		if (rtr_get_config_multiple(&config, "stringinject", ARGUMENT_TYPE_STRING, ARGUMENT_TYPE_STRING,

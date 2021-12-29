@@ -37,7 +37,7 @@ Example:
 ----
 
 
-== Configuration 
+== Configuration
 
 `retrace` v2 is configuration file is specified using the `RETRACE_JSON_CONFIG` environment variable. This is a JSON configuration file that will specify different "intercept scripts".
 
@@ -63,7 +63,7 @@ The default (hardcoded) configuration is the following:
 
 This defines an `intercept_scripts` json object that contains a `func_name` and an array of `actions`. `func_name` refers to the function name this particular intercept will apply too. and `actions` defines a list of actions that will be executed when a call to that function is intercepted.
 
-Actions are programable (via plugins, more on that later) but we ship with five basic actions:
+Actions are programmable (via plugins, more on that later) but we ship with five basic actions:
 
 `log_params` would simply print the params of the call into the retrace log.
 
@@ -319,10 +319,9 @@ The above setup only allows very basic substitutions of basic type parameters. T
 
 == Logging configuration variables
 
-The retrace logger can be controlled using the following enviroment variables:
+The retrace logger can be controlled using the following environment variables:
 
 
-`RETRACE_LOGGER_DEF_ENA` Setting this to 0 will completly disable the `retrace` logging engine.
+`RETRACE_LOGGER_DEF_ENA` Setting this to 0 will completely disable the `retrace` logging engine.
 `RETRACE_LOGGER_DEF_STDOUT_ENA` Setting this to 0 will prevent the retrace logging going to the standard output, this will prevent the program output and retrace output to get mixed.
 `RETRACE_LOGGER_DEF_FN` Set this to a file path where `retrace` will write its log. Useful when you disabled `RETRACE_LOGGER_DEF_STDOUT_ENA`.
-

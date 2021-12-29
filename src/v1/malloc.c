@@ -41,7 +41,7 @@
 
 struct map {
 	SLIST_ENTRY(map) next;
-	unsigned long int address;
+	unsigned long address;
 	char map[MAPSZ];
 };
 
@@ -52,7 +52,7 @@ static int map_bit(const void *p, int set)
 	static struct maplist maps = SLIST_HEAD_INITIALIZER(maps);
 	static pthread_mutex_t maps_mutex = PTHREAD_MUTEX_INITIALIZER;
 	struct map *map, *prev;
-	unsigned long int address;
+	unsigned long address;
 	unsigned int offset, bit;
 	int old, mask, old_trace_state;
 
@@ -576,7 +576,7 @@ void *RETRACE_IMPLEMENTATION(sbrk)(intptr_t increment)
 }
 
 #if __OpenBSD__
-RETRACE_REPLACE(sbrk, void *, (long int increment), (increment))
+RETRACE_REPLACE(sbrk, void *, (long increment), (increment))
 #else
 RETRACE_REPLACE(sbrk, void *, (intptr_t increment), (increment))
 #endif

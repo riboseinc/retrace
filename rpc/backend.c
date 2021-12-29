@@ -47,7 +47,7 @@ static void
 free_tls(void *p)
 {
 	g_sockfd = -1;
-	real_close((long int)p);
+	real_close((long)p);
 }
 
 static void
@@ -173,7 +173,7 @@ rpc_get_sockfd()
 	 * as address of thread local.
 	 */
 
-	long int fd;
+	long fd;
 
 #if defined __OpenBSD__ || defined __FreeBSD__
 	static int initialised;
@@ -201,7 +201,7 @@ rpc_get_sockfd()
 	if (g_sockfd == -1)
 		return -1;
 
-	fd = (long int)pthread_getspecific(g_fdkey);
+	fd = (long)pthread_getspecific(g_fdkey);
 	if (fd == 0) {
 		fd = new_rpc_endpoint();
 		pthread_setspecific(g_fdkey, (void *)fd);
@@ -210,7 +210,7 @@ rpc_get_sockfd()
 }
 
 void
-rpc_set_sockfd(long int fd)
+rpc_set_sockfd(long fd)
 {
 	pthread_setspecific(g_fdkey, (void *)fd);
 }

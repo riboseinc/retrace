@@ -643,7 +643,7 @@ int retrace_as_setup_params(
 		log_warn("problem parsing params format string for func '%s'",
 			proto->name);
 
-		/* set up printf_params as unknown so we wont crash */
+		/* set up printf_params as unknown so we won't crash */
 		use_unk_dt = 1;
 	} else
 		use_unk_dt = 0;

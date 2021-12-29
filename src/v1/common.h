@@ -175,7 +175,7 @@ DYLD_INTERPOSE(retrace_impl_##func, func)
 
 #else /* !__OpenBSD */
 
-__attribute__((regparm (3))) extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
+__attribute__((regparm(3))) extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
 
 #ifdef HAVE_ATOMIC_BUILTINS
 
@@ -240,7 +240,7 @@ int rtr_get_config_single(const char *function, ...);
 void rtr_config_close(FILE *config);
 
 int get_tracing_enabled(void);
-int trace_disable();
+int trace_disable(void);
 void trace_restore(int oldstate);
 
 /* Descriptor tracking */

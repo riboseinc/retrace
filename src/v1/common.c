@@ -184,7 +184,8 @@ static void initialize_tracing_key(void);
 
 
 /* Returns time as zero on the first call and in subsequents call
- * returns the time elapsed since the first called */
+ * returns the time elapsed since the first called
+ */
 static double
 retrace_get_time(void)
 {
@@ -653,9 +654,11 @@ retrace_print_parameter(struct rtr_print_buf *print_buffer, unsigned int event_t
 		int fd, comma = 0;
 
 		const char *set = (*(const char **) *value);
+
 		value++;
 
 		int nfds = (*(int *) *value);
+
 		value++;
 
 		fd_set in = (*(fd_set *) *value);
@@ -700,6 +703,7 @@ retrace_print_parameter(struct rtr_print_buf *print_buffer, unsigned int event_t
 		char ip_addr[INET6_ADDRSTRLEN];
 
 		const void *addr = *value;
+
 		value++;
 
 		int type = *(int *)value;
@@ -929,6 +933,7 @@ static void
 retrace_print_key(struct rtr_print_buf *print_buffer, const unsigned char *buf, int len)
 {
 	int i;
+
 	for (i = 0; i < len; i++) {
 		trace_printf(print_buffer, 0, "%02X", buf[i]);
 	}
@@ -975,7 +980,7 @@ retrace_print_ssl_keys(struct rtr_print_buf *print_buffer, void *_ssl)
 		if (real_SSL_get_client_random &&
 		    real_SSL_SESSION_get_master_key &&
 		    real_SSL_get_client_random) {
-			session = real_SSL_get_session (ssl);
+			session = real_SSL_get_session(ssl);
 
 			if (session) {
 				master_key_length = real_SSL_SESSION_get_master_key(session, master_key, SSL_MAX_MASTER_KEY_LENGTH);
@@ -1550,9 +1555,9 @@ trace_restore(int old_state)
 #else
 	if (is_main_thread()) {
 		g_enable_tracing = old_state;
-        } else {
+	} else {
 		set_tracing_state_thread(old_state);
-        }
+	}
 #endif
 }
 
@@ -1617,7 +1622,8 @@ get_config_file()
 }
 
 static const struct config_entry *
-get_config() {
+get_config()
+{
 	struct config_head config;
 
 	FILE *config_file;
@@ -1974,7 +1980,7 @@ rtr_init_random(void)
 int
 rtr_get_fuzzing_flag(double fail_rate)
 {
-	long int random_value;
+	long random_value;
 
 	rtr_init_random();
 

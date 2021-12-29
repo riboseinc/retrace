@@ -7,4 +7,4 @@ SUBDIRS+= rpc
 endif
 
 pkgdata_DATA=
-EXTRA_DIST= autogen.sh 
+EXTRA_DIST= autogen.sh
