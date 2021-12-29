@@ -4,6 +4,7 @@ image:https://github.com/riboseinc/retrace/actions/workflows/ubuntu.yml/badge.sv
 image:https://github.com/riboseinc/retrace/actions/workflows/macos.yml/badge.svg[macOS, link=https://github.com/riboseinc/retrace/actions/workflows/macos.yml]
 image:https://github.com/riboseinc/retrace/actions/workflows/windows.yml/badge.svg[Windows, link=https://github.com/riboseinc/retrace/actions/workflows/windows.yml]
 image:https://img.shields.io/cirrus/github/riboseinc/retrace?label=freebsd&logo=cirrus%20ci["FreeBSD", link="https://cirrus-ci.com/github/riboseinc/retrace"]
+image:https://github.com/riboseinc/retrace/actions/workflows/nix.yml/badge.svg[nix, link=https://github.com/riboseinc/retrace/actions/workflows/nix.yml]
 image:https://github.com/riboseinc/retrace/actions/workflows/checkpatch.yml/badge.svg[checkpatch, link=https://github.com/riboseinc/retrace/actions/workflows/checkpatch.yml]
 image:https://img.shields.io/coverity/scan/12840.svg[Coverity Scan, link=https://scan.coverity.com/projects/riboseinc-retrace]
 
