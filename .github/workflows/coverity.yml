@@ -4,33 +4,6 @@ on:
   schedule:
     # every day at 9:00 UTC
     - cron: '0 9 * * *'
-  push:
-    branches:
-      - main
-      - 'release/**'
-    paths-ignore:
-      - 'docs/**'
-      - '**.adoc'
-      - '**.md'
-      - '**.nix'
-      - '.gitignore'
-      - '.gitattributes'
-      - '.editorconfig'
-      - '.cirrus.yml'
-      - '.github/workflows/*.yml'
-      - '!.github/workflows/coverity.yml'
-  pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '**.adoc'
-      - '**.md'
-      - '**.nix'
-      - '.gitignore'
-      - '.gitattributes'
-      - '.editorconfig'
-      - '.cirrus.yml'
-      - '.github/workflows/*.yml'
-      - '!.github/workflows/coverity.yml'
 
 env:
   CORES: 2
@@ -46,7 +19,6 @@ jobs:
       matrix:
         # os: [ubuntu-18.04, ubuntu-20.04]
         os: [ubuntu-18.04]
-    if: "!contains(github.event.head_commit.message, 'skip ci')"
 
     timeout-minutes: 20
     steps:
