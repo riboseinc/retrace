@@ -17,6 +17,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/nix.yml'
       - 'ci/before_install/*'
+      - 'ci/checkpatch*'
   pull_request:
     paths-ignore:
       - 'docs/**'
@@ -30,6 +31,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/nix.yml'
       - 'ci/before_install/*'
+      - 'ci/checkpatch*'
 
 jobs:
   build:
