@@ -1,0 +1,91 @@
+name: coverity
+
+on:
+  schedule:
+    # every day at 9:00 UTC
+    - cron: '0 9 * * *'
+  push:
+    branches:
+      - main
+      - 'release/**'
+    paths-ignore:
+      - 'docs/**'
+      - '**.adoc'
+      - '**.md'
+      - '**.nix'
+      - '.gitignore'
+      - '.gitattributes'
+      - '.editorconfig'
+      - '.cirrus.yml'
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/coverity.yml'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.adoc'
+      - '**.md'
+      - '**.nix'
+      - '.gitignore'
+      - '.gitattributes'
+      - '.editorconfig'
+      - '.cirrus.yml'
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/coverity.yml'
+
+env:
+  CORES: 2
+
+jobs:
+  scan:
+    runs-on: ${{ matrix.os }}
+    environment:
+      name: coverity-scan
+      url: https://scan.coverity.com/projects/riboseinc-retrace?tab=overview
+    strategy:
+      fail-fast: false
+      matrix:
+        # os: [ubuntu-18.04, ubuntu-20.04]
+        os: [ubuntu-18.04]
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+      - name: Setup environment
+        run: |
+          echo CMOCKA_INSTALL="${HOME}/builds/cmocka-install" >> "${GITHUB_ENV}"
+      - name: Install more prerequisites
+        run: |
+          ./ci/before_install.sh
+          ./ci/install.sh cmocka libnereon
+      - name: Configure
+        run: |
+          ./autogen.sh
+          ./configure --enable-tests
+      - name: Download Coverity
+        env:
+          TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+        run: |
+          wget -q https://scan.coverity.com/download/cxx/linux64 --post-data "token=$TOKEN&project=$GITHUB_REPOSITORY" -O cov-analysis-linux64.tar.gz
+          mkdir cov-analysis-linux64
+          tar xzf cov-analysis-linux64.tar.gz --strip 1 -C cov-analysis-linux64
+      - name: Build
+        run: |
+          set -x
+          export PATH="$PWD/cov-analysis-linux64/bin:$PATH"
+          cov-build --dir cov-int ci/main.sh
+      - name: Submit
+        env:
+          TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+        run: |
+          tar czvf results.tgz cov-int
+          curl \
+            --form project=$GITHUB_REPOSITORY \
+            --form token=$TOKEN \
+            --form email=retrace@ribose.com \
+            --form file=@results.tgz \
+            --form version=$GITHUB_REF \
+            --form description=$GITHUB_SHA \
+            https://scan.coverity.com/builds?project=$GITHUB_REPOSITORY
