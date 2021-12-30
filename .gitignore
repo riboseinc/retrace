@@ -64,3 +64,5 @@ src/v2/retrace2
 src/v2/retrace_v2.nos.c
 src/v2/retrace_v2.nos.h
 
+# Nix
+result
