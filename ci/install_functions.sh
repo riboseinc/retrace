@@ -56,7 +56,7 @@ install_libnereon() {
 	cd libnereon
 	mkdir build
 	cd build
-	cmake .. 
+	cmake .. -G "Unix Makefiles"
 	ls -la
 	ls -la ..
 	make
