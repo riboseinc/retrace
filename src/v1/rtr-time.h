@@ -6,10 +6,10 @@
 typedef char *(*rtr_ctime_t)(const time_t *timep);
 typedef char *(*rtr_ctime_r_t)(const time_t *timep, char *buf);
 
-#ifdef __APPLE__
+#ifdef HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
 typedef int (*rtr_gettimeofday_t)(struct timeval *restrict tv, void *restrict tzp);
 #else
-typedef int (*rtr_gettimeofday_t)(struct timeval *tv, struct timezone *tz);
+typedef int (*rtr_gettimeofday_t)(struct timeval *restrict tv, struct timezone *restrict tz);
 #endif
 
 RETRACE_DECL(ctime);

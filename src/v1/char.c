@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+ * Copyright (c) 2017-2022 [Ribose Inc](https://www.ribose.com).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -68,7 +68,7 @@ RETRACE_IMPLEMENTATION(putc)(int c, FILE *stream)
 RETRACE_REPLACE(putc, int, (int c, FILE *stream), (c, stream))
 
 
-#ifndef __APPLE__
+#ifdef HAVE__IO_PUTC
 int
 RETRACE_IMPLEMENTATION(_IO_putc)(int c, FILE *stream)
 {
@@ -76,7 +76,6 @@ RETRACE_IMPLEMENTATION(_IO_putc)(int c, FILE *stream)
 	unsigned int parameter_types[] = {PARAMETER_TYPE_CHAR, PARAMETER_TYPE_FILE_STREAM, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {&c, &stream};
 	int r = 0;
-
 
 	memset(&event_info, 0, sizeof(event_info));
 	event_info.function_name = "_IO_putc";
