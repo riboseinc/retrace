@@ -11,7 +11,6 @@ msys_install() {
 		gcc
 		libtool
 		make
-		mingw64/mingw-w64-x86_64-autotools
 		mingw-w64-x86_64-cmocka
 		mingw-w64-x86_64-graphviz # for doxygen's dot component
 		openssl-devel
