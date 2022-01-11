@@ -3,7 +3,6 @@ set -ex
 
 msys_install() {
 	packages=(
-		autotools
 		automake
 		autoconf
 		cmake
@@ -12,7 +11,7 @@ msys_install() {
 		gcc
 		libtool
 		make
-		mingw-w64-x86_64-autotools
+		mingw64/mingw-w64-x86_64-autotools
 		mingw-w64-x86_64-cmocka
 		mingw-w64-x86_64-graphviz # for doxygen's dot component
 		openssl-devel
