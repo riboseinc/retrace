@@ -48,9 +48,10 @@ install_libnereon() {
 	cd libnereon
 	mkdir build
 	cd build
-	cmake ..
+	cmake .. -G "MSYS Makefiles"
 	ls -la
 	ls -la ..
 	cmake --build .
 	sudo make install
 }
+ 
