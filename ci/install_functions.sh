@@ -9,6 +9,14 @@ CORES="2" && [ -r /proc/cpuinfo ] && CORES=$(grep -c '^$' /proc/cpuinfo)
 : "${CMOCKA_VERSION:=1.1.1}"
 : "${LIBNEREON_VERSION:=v0.9.4}"
 
+get_os() {
+	if [ -z "$OSTYPE" ]; then
+		uname
+	else
+		echo "$OSTYPE"
+	fi | tr '[:upper:]' '[:lower:]'
+}
+
 # cmocka
 install_cmocka() {
 	if [ ! -e "${CMOCKA_INSTALL}/lib/libcmocka.so" ] && [ ! -e "${CMOCKA_INSTALL}/lib/libcmocka.dylib" ]; then
@@ -51,7 +59,11 @@ install_libnereon() {
 	cmake .. 
 	ls -la
 	ls -la ..
-	cmake --build .
-	"${SUDO}" make install
+	make
+	if [ $(get_os) == "msys"]; then
+	  make install
+	else
+	  sudo make install
+	fi
 }
  

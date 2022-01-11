@@ -17,27 +17,21 @@ crossplat_install() {
 main() {
 	case $(get_os) in
 		freebsd*)
-		    export SUDO=sudo
 			. ci/before_install/freebsd.sh
 			freebsd_install ;;
 		netbsd*)
-		    export SUDO=sudo
 			. ci/before_install/netbsd.sh
 			netbsd_install ;;
 		openbsd*)
-		    export SUDO=sudo
 			. ci/before_install/openbsd.sh
 			openbsd_install ;;
 		darwin*)
-		    export SUDO=sudo
 			. ci/before_install/darwin.sh
 			macos_install ;;
 		linux*)
-		    export SUDO=sudo
 			. ci/before_install/linux.sh
 			linux_install ;;
 		msys*)
-		    export SUDO=""
 			. ci/before_install/msys.sh
 			msys_install ;;
 		*) echo "unknown"; exit 1 ;;
