@@ -91,7 +91,7 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *restrict tv, struct tim
 {
 	struct rtr_event_info event_info;
 
-#if HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
+#ifdef HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
 	unsigned int parameter_types[] = {PARAMETER_TYPE_TIMEVAL, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
 	void const *parameter_values[] = {(void const*)&tv, (void const*)&tzp};
 #else
@@ -101,7 +101,7 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *restrict tv, struct tim
 
 	int ret;
 
-#if HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
+#ifdef HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
 	struct timezone *tz;
 	tz = (struct timezone *)tzp;
 #endif
@@ -125,7 +125,7 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *restrict tv, struct tim
 	return ret;
 }
 
-#if HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
+#ifdef HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
 RETRACE_REPLACE(gettimeofday, int, (struct timeval *restrict tv, void *restrict tzp), (tv, tzp))
 #else
 RETRACE_REPLACE(gettimeofday, int, (struct timeval *restrict tv, struct timezone *restrict tz), (tv, tz))
