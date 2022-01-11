@@ -51,6 +51,6 @@ install_libnereon() {
 	cmake ..
 	ls -la
 	ls -la ..
-	make
+	cmake --build .
 	sudo make install
 }
