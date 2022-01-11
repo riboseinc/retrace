@@ -1,5 +1,5 @@
-AC_PREREQ(2.60)
-AC_INIT([retrace], [2.0.1], [https://github.com/riboseinc/retrace/issues])
+AC_PREREQ([2.69])
+AC_INIT([retrace],[2.0.1],[https://github.com/riboseinc/retrace/issues])
 AM_INIT_AUTOMAKE([foreign subdir-objects -Wall])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AC_CONFIG_MACRO_DIR([m4])
@@ -13,7 +13,7 @@ AM_PROG_CC_C_O
 AC_USE_SYSTEM_EXTENSIONS
 
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
-AC_PROG_LIBTOOL
+LT_INIT
 AC_PROG_INSTALL
 AM_PROG_AS
 
@@ -173,11 +173,35 @@ AC_CHECK_DECLS([SO_SNDBUFFORCE], [], [], [#include <sys/socket.h>])
 AC_CHECK_DECLS([SO_RCVBUFFORCE], [], [], [#include <sys/socket.h>])
 AC_CHECK_DECLS([SO_BUSY_POLL], [], [], [#include <sys/socket.h>])
 
+AX_CHECK_OPENSSL([], AC_MSG_ERROR([]))
+
+AX_CHECK_CMOCKA([cmocka=true], )
+AM_CONDITIONAL([CMOCKA], [test "x$cmocka" = "xtrue"])
+if test "x$cmocka" = "xtrue" ; then
+    AC_DEFINE(USE_CMOCKA, [1], [Define to use cmocka])
+else
+    AC_DEFINE(USE_CMOCKA, [0], [Define to use cmocka])
+fi
+
 # Check if the C compiler recognizes a variant of restrict keyword
 AC_C_RESTRICT
-
 # Check if _IO_putc exists
 AC_CHECK_DECLS([_IO_putc], [], [], [#include <stdio.h>])
+# Check second parameter of gettimeofday
+AC_MSG_CHECKING(gettimeofday second parameter)
+AC_LANG_WERROR
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/time.h>]], 
+                  [[struct timeval tv; int tz; gettimeofday(&tv, &tz)]])],
+                   [with_struct_timezone=no],[with_struct_timezone=yes])
+
+if test "$with_struct_timezone" = no; then
+  AC_DEFINE(HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE, 1,
+   [define to 1 if gettimeofday second argument is const void*; assume const struct timezone* otherwise])
+  AC_MSG_RESULT((assumed) const struct timezone*) 
+else  
+  AC_MSG_RESULT(const void*) 
+fi
+
 
 TESTS_CFLAGS=""
 AC_MSG_CHECKING(whether to run tests)
@@ -194,16 +218,6 @@ else
 AC_MSG_NOTICE([no])
 fi
 AC_SUBST([TESTS_CFLAGS])
-
-AX_CHECK_CMOCKA([cmocka=true], )
-AX_CHECK_OPENSSL([], AC_MSG_ERROR([]))
-AM_CONDITIONAL([CMOCKA], [test "x$cmocka" = "xtrue"])
-
-if test "x$cmocka" = "xtrue" ; then
-    AC_DEFINE(USE_CMOCKA, [1], [Define to use cmocka])
-else
-    AC_DEFINE(USE_CMOCKA, [0], [Define to use cmocka])
-fi
 
 AC_ARG_ENABLE(debug,
      AS_HELP_STRING(--enable-debug, turn on debugging (disabled by default)),
@@ -267,23 +281,6 @@ if test "x$backtrace" = "xtrue" ; then
     AC_DEFINE(BACKTRACE, [1], [Define to enable backtrace])
 else
     AC_DEFINE(BACKTRACE, [0], [Define to enable backtrace])
-fi
-
-# Check second parameter of gettimeofday
-# !!! This has to be the last test because of AC_LANG_WERROR
-AC_MSG_CHECKING(gettimeofday second parameter)
-AC_LANG_WERROR
-AC_TRY_COMPILE([#include <sys/time.h>],
- [struct timeval tv; int tz; gettimeofday(&tv, &tz)],
- with_struct_timezone=no,
- with_struct_timezone=yes)
-
-if test "$with_struct_timezone" = no; then
-  AC_DEFINE(HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE, 1,
-   [define to 1 if gettimeofday second argument is const void*; assume const struct timezone* otherwise])
-  AC_MSG_RESULT((assumed) const struct timezone*) 
-else  
-  AC_MSG_RESULT(const void*) 
 fi
 
 AC_CONFIG_FILES([Makefile
