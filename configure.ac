@@ -179,22 +179,6 @@ AC_C_RESTRICT
 # Check if _IO_putc exists
 AC_CHECK_DECLS([_IO_putc], [], [], [#include <stdio.h>])
 
-# Check second parameter of gettimeofday
-AC_MSG_CHECKING(gettimeofday second parameter)
-AC_LANG_WERROR
-AC_TRY_COMPILE([#include <sys/time.h>],
- [struct timeval tv; int tz; gettimeofday(&tv, &tz)],
- with_struct_timezone=no,
- with_struct_timezone=yes)
-
-if test "$with_struct_timezone" = no; then
-  AC_DEFINE(HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE, 1,
-   [define to 1 if gettimeofday second argument is const void*; assume const struct timezone* otherwise])
-  AC_MSG_RESULT((assumed) const struct timezone*) 
-else  
-  AC_MSG_RESULT(const void*) 
-fi
-
 TESTS_CFLAGS=""
 AC_MSG_CHECKING(whether to run tests)
 AC_ARG_ENABLE([tests],
@@ -283,6 +267,23 @@ if test "x$backtrace" = "xtrue" ; then
     AC_DEFINE(BACKTRACE, [1], [Define to enable backtrace])
 else
     AC_DEFINE(BACKTRACE, [0], [Define to enable backtrace])
+fi
+
+# Check second parameter of gettimeofday
+# !!! This has to be the last test because of AC_LANG_WERROR
+AC_MSG_CHECKING(gettimeofday second parameter)
+AC_LANG_WERROR
+AC_TRY_COMPILE([#include <sys/time.h>],
+ [struct timeval tv; int tz; gettimeofday(&tv, &tz)],
+ with_struct_timezone=no,
+ with_struct_timezone=yes)
+
+if test "$with_struct_timezone" = no; then
+  AC_DEFINE(HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE, 1,
+   [define to 1 if gettimeofday second argument is const void*; assume const struct timezone* otherwise])
+  AC_MSG_RESULT((assumed) const struct timezone*) 
+else  
+  AC_MSG_RESULT(const void*) 
 fi
 
 AC_CONFIG_FILES([Makefile
