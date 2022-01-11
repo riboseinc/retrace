@@ -5,6 +5,9 @@ msys_install() {
 	packages=(
 		automake
 		autoconf
+		make 
+		pkg-config 
+		libtool
 		mingw-w64-x86_64-cmocka
 		mingw64/mingw-w64-x86_64-ninja
 		mingw64/mingw-w64-x86_64-cmake
