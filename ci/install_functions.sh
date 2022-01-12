@@ -56,11 +56,9 @@ install_libnereon() {
 	cd libnereon
 	mkdir build
 	cd build
-	cmake .. -G "Unix Makefiles"
-	ls -la
-	ls -la ..
+	cmake .. 
 	make
-	if [ $(get_os) == "msys"]; then
+	if [ $(get_os) == "msys" ]; then
 	  make install
 	else
 	  sudo make install
