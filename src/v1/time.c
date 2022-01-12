@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+ * Copyright (c) 2017-2022 [Ribose Inc](https://www.ribose.com).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,6 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "config.h"
 #include "common.h"
 #include "rtr-time.h"
 
@@ -82,25 +83,26 @@ char *RETRACE_IMPLEMENTATION(ctime)(const time_t *timep)
 
 RETRACE_REPLACE(ctime, char *, (const time_t *timep), (timep))
 
-#if defined(__APPLE__) || defined(__NetBSD__)
-int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, void *tzp)
+#ifdef HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
+int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *restrict tv, void *restrict tzp)
 #else
-int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz)
+int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *restrict tv, struct timezone *restrict tz)
 #endif
 {
 	struct rtr_event_info event_info;
 
-#if defined(__APPLE__) || defined(__NetBSD__)
+#ifdef HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
 	unsigned int parameter_types[] = {PARAMETER_TYPE_TIMEVAL, PARAMETER_TYPE_POINTER, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&tv, &tzp};
+	void const *parameter_values[] = {(void const*)&tv, (void const*)&tzp};
 #else
 	unsigned int parameter_types[] = {PARAMETER_TYPE_TIMEVAL, PARAMETER_TYPE_TIMEZONE, PARAMETER_TYPE_END};
-	void const *parameter_values[] = {&tv, &tz};
+	void const *parameter_values[] = {(void const*)&tv, (void const*)&tz};
 #endif
-	int ret;
-#if defined(__APPLE__) || defined(__NetBSD__)
-	struct timezone *tz;
 
+	int ret;
+
+#ifdef HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
+	struct timezone *tz;
 	tz = (struct timezone *)tzp;
 #endif
 
@@ -123,8 +125,8 @@ int RETRACE_IMPLEMENTATION(gettimeofday)(struct timeval *tv, struct timezone *tz
 	return ret;
 }
 
-#if defined(__APPLE__) || defined(__NetBSD__)
-RETRACE_REPLACE(gettimeofday, int, (struct timeval *tv, void *tzp), (tv, tzp))
+#ifdef HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
+RETRACE_REPLACE(gettimeofday, int, (struct timeval *restrict tv, void *restrict tzp), (tv, tzp))
 #else
-RETRACE_REPLACE(gettimeofday, int, (struct timeval *tv, struct timezone *tz), (tv, tz))
+RETRACE_REPLACE(gettimeofday, int, (struct timeval *restrict tv, struct timezone *restrict tz), (tv, tz))
 #endif

@@ -12,14 +12,17 @@ test/*.o
 test/recvmsg
 test/setlocale
 test/strinject
+test/strinject.conf
 temp
 examples/dns-fuzz/axfr
 core
 tools/stringinjector
 tools/spawn/spawn
+libnereon/
 # editors
 *.swp
 *~
+.vscode/
 
 # archives
 *.tar.gz

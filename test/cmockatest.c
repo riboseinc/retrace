@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+ * Copyright (c) 2017-2022 [Ribose Inc](https://www.ribose.com).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,6 +24,7 @@
  */
 
 #include "common.h"
+#include <stdio.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
@@ -114,7 +115,7 @@ RTR_TEST_START(putc)
 	assert_string_equal(buf, "0123");
 RTR_TEST_END
 
-#ifndef __APPLE__
+#ifdef HAVE__IO_PUTC
 RTR_TEST_START(_IO_putc)
 	int fd[2];
 	FILE *f;
@@ -1177,7 +1178,7 @@ main(void)
 	const struct CMUnitTest tests[] = {
 		cmocka_unit_test(test_rtr_perror),   cmocka_unit_test(test_rtr_tolower),
 		cmocka_unit_test(test_rtr_toupper),  cmocka_unit_test(test_rtr_putc),
-#ifndef __APPLE__
+#ifdef HAVE__IO_PUTC
 		cmocka_unit_test(test_rtr__IO_putc),
 #endif
 		cmocka_unit_test(test_rtr_getenv),   cmocka_unit_test(test_rtr_putenv),
