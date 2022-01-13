@@ -7,7 +7,7 @@ SPWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 CORES="2" && [ -r /proc/cpuinfo ] && CORES=$(grep -c '^$' /proc/cpuinfo)
 
 : "${CMOCKA_VERSION:=1.1.1}"
-: "${LIBNEREON_VERSION:=maxirmx-issue-40}"
+: "${LIBNEREON_VERSION:=v0.9.6}"
 
 get_os() {
 	if [ -z "$OSTYPE" ]; then
@@ -56,7 +56,7 @@ install_libnereon() {
 	cd libnereon
 	mkdir build
 	cd build
-	cmake .. 
+	cmake .. -G "Unix Makefiles"
 	make
 	if [ $(get_os) == "msys" ]; then
 	  make install
