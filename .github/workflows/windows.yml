@@ -48,7 +48,7 @@ jobs:
           fetch-depth: 1
       - uses: msys2/setup-msys2@v2
         with:
-          path-type: inherit
+          path-type: strict
       - name: Set up environment
         shell: msys2 {0}
         run: |

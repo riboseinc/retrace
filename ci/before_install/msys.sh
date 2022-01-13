@@ -9,7 +9,7 @@ msys_install() {
 		doxygen
 		git
 		gcc
-		gettext
+		gettext-devel
 		libtool
 		make
 		mingw-w64-x86_64-cmocka
