@@ -47,6 +47,10 @@ jobs:
       fail-fast: false
     if: "!contains(github.event.head_commit.message, 'skip ci')"
 
+    defaults:
+      run:
+        shell: msys2 {0}
+
     steps:
       - uses: actions/checkout@v2
         with:
@@ -55,19 +59,15 @@ jobs:
         with:
           path-type: inherit
       - name: Set up environment
-        shell: msys2 {0}
         run: |
           echo CMOCKA_INSTALL="${HOME}/builds/cmocka-install" >> "${GITHUB_ENV}"
       - name: Install more prerequisites
-        shell: msys2 {0}
         run: |
           ./ci/before_install.sh
           ./ci/install.sh libnereon
       - name: Configure
-        shell: msys2 {0}
         run: |
           ./autogen.sh
           ./configure --enable-tests
       - name: Build
-        shell: msys2 {0}
         run: ./ci/main.sh
