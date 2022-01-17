@@ -49,10 +49,17 @@ install_libnereon() {
 	git clone -b "${LIBNEREON_VERSION}" https://github.com/riboseinc/libnereon
 	cd libnereon
 	mkdir build
-	cd build
-	cmake ..
-	ls -la
-	ls -la ..
-	make
-	sudo make install
+
+	if [[ "$(get_os)" = msys* ]]
+	then
+		cmake -S . -B build -G "Unix Makefiles"
+		cmake --build build
+		cmake --build build --target test
+		cmake --build build --target install
+	else
+		cd build
+		cmake ..
+		make
+		sudo make install
+	fi
 }
