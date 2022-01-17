@@ -33,5 +33,10 @@ msys_install() {
 	while read -r i; do echo ACLOCAL_PATH is $i . ; ls -la "$i" || : ; ls -la "$i/xsize.m4" || : ; done <<< "${ACLOCAL_PATH//:/$IFS}"
 	## XXX DEBUG: end
 
+	# Work around the following build issue:
+	#         aclocal-1.16: error: aclocal: file '/a/_temp/msys64/usr/share/aclocal/xsize.m4' does not exist
+	export ACLOCAL_PATH=/d/a/_temp/msys64/usr/share/aclocal/:"$ACLOCAL_PATH"
+	echo ACLOCAL_PATH="${ACLOCAL_PATH}" >> "${GITHUB_ENV}"
+
 	gem install mustache
 }
