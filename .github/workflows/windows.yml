@@ -40,6 +40,12 @@ on:
       - '!ci/before_install/msys.sh'
       - 'ci/checkpatch*'
 
+env:
+  # Fixes:
+  #   aclocal-1.16: error: aclocal: file '/a/_temp/msys64/usr/share/aclocal/xsize.m4' does not exist
+  # See: https://github.com/avast/yaracpp/issues/12
+  ACLOCAL_PATH: "/d/a/_temp/msys64/usr/share/aclocal/"
+
 jobs:
   build:
     runs-on: windows-latest
