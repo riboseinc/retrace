@@ -34,7 +34,7 @@ AC_SEARCH_LIBS(inet_aton, [resolv])
 AC_SEARCH_LIBS([pthread_create], [pthread])
 
 # list all used system headers for checking
-AC_CHECK_HEADERS_ONCE(m4_flatten([
+AC_CHECK_HEADERS_ONCE([
     ctype.h
     dlfcn.h
     dirent.h
@@ -57,7 +57,7 @@ AC_CHECK_HEADERS_ONCE(m4_flatten([
     sys/utsname.h
     sys/time.h
     sys/types.h
-]))
+])
 
 # add more host definitions if needed.
 islinux=no
