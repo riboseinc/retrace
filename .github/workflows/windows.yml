@@ -45,7 +45,6 @@ env:
   #   aclocal-1.16: error: aclocal: file '/a/_temp/msys64/usr/share/aclocal/xsize.m4' does not exist
   # See: https://github.com/avast/yaracpp/issues/12
   ACLOCAL_PATH: "/d/a/_temp/msys64/usr/share/aclocal/"
-  CMOCKA_INSTALL: "${HOME}/builds/cmocka-install" 
 
 jobs:
   build:
@@ -67,14 +66,6 @@ jobs:
         with:
           path-type: strict
           update: false
-          install: >-
-            autoconf
-            automake
-            cmake
-            git
-            gcc
-            libtool
-            make
 
 #      - name: Set up environment
 #        run: |

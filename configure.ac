@@ -35,30 +35,14 @@ AC_SEARCH_LIBS(inet_aton, [resolv])
 AC_SEARCH_LIBS([pthread_create], [pthread])
 
 # list all used system headers for checking
-AC_CHECK_HEADERS_ONCE([ctype.h])
-AC_CHECK_HEADERS_ONCE([
-    dlfcn.h
-    dirent.h
-    lwp.h
-    pthread.h
-    pthread_np.h
-    pwd.h
-    runetype.h
-    string.h
-    stdio.h
-    string.h
-    stdarg.h
-    stdlib.h
-    syscall.h
-    stdarg.h
-    time.h
-    unistd.h
-    execinfo.h
-    sys/stat.h
-    sys/utsname.h
-    sys/time.h
-    sys/types.h
-])
+# There is no longer any need to check for headers that are part of
+# ISO C90 (as amended): assert.h, ctype.h, errno.h, float.h, iso646.h,
+# limits.h, locale.h, math.h, setjmp.h, signal.h, stdarg.h, stddef.h,
+# stdio.h, stdlib.h, string.h, time.h, wchar.h, wctype.h.
+
+AC_CHECK_HEADERS_ONCE([dlfcn.h dirent.h lwp.h pthread.h pthread_np.h])
+AC_CHECK_HEADERS_ONCE([pwd.h runetype.h syscall.h unistd.h execinfo.h])
+AC_CHECK_HEADERS_ONCE([sys/stat.h sys/utsname.h sys/time.h sys/types.h])
 
 # add more host definitions if needed.
 islinux=no
