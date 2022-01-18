@@ -1,6 +1,14 @@
 AC_PREREQ([2.69])
-AC_INIT([retrace], [2.0.1], [https://github.com/riboseinc/retrace/issues])
+AC_INIT([retrace],[2.0.1],[https://github.com/riboseinc/retrace/issues])
+
+AC_CONFIG_SRCDIR([configure.ac])
 AM_INIT_AUTOMAKE([foreign subdir-objects -Wall])
+
+AC_USE_SYSTEM_EXTENSIONS
+
+#AM_GNU_GETTEXT_REQUIRE_VERSION([0.19.4])
+#AM_GNU_GETTEXT([external])
+
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
@@ -9,8 +17,6 @@ AC_CANONICAL_HOST
 
 AC_PROG_CC([egcc gcc cl cc])
 AM_PROG_CC_C_O
-
-AC_USE_SYSTEM_EXTENSIONS
 
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 LT_INIT
@@ -29,30 +35,14 @@ AC_SEARCH_LIBS(inet_aton, [resolv])
 AC_SEARCH_LIBS([pthread_create], [pthread])
 
 # list all used system headers for checking
-AC_CHECK_HEADERS_ONCE(m4_flatten([
-    ctype.h
-    dlfcn.h
-    dirent.h
-    lwp.h
-    pthread.h
-    pthread_np.h
-    pwd.h
-    runetype.h
-    string.h
-    stdio.h
-    string.h
-    stdarg.h
-    stdlib.h
-    syscall.h
-    stdarg.h
-    time.h
-    unistd.h
-    execinfo.h
-    sys/stat.h
-    sys/utsname.h
-    sys/time.h
-    sys/types.h
-]))
+# There is no longer any need to check for headers that are part of
+# ISO C90 (as amended): assert.h, ctype.h, errno.h, float.h, iso646.h,
+# limits.h, locale.h, math.h, setjmp.h, signal.h, stdarg.h, stddef.h,
+# stdio.h, stdlib.h, string.h, time.h, wchar.h, wctype.h.
+
+AC_CHECK_HEADERS_ONCE([dlfcn.h dirent.h lwp.h pthread.h pthread_np.h])
+AC_CHECK_HEADERS_ONCE([pwd.h runetype.h syscall.h unistd.h execinfo.h])
+AC_CHECK_HEADERS_ONCE([sys/stat.h sys/utsname.h sys/time.h sys/types.h])
 
 # add more host definitions if needed.
 islinux=no

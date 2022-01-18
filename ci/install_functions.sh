@@ -9,7 +9,15 @@ SPWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 CORES="2" && [ -r /proc/cpuinfo ] && CORES=$(grep -c '^$' /proc/cpuinfo)
 
 : "${CMOCKA_VERSION:=1.1.1}"
-: "${LIBNEREON_VERSION:=v0.9.4}"
+: "${LIBNEREON_VERSION:=v0.9.6}"
+
+get_os() {
+	if [ -z "$OSTYPE" ]; then
+		uname
+	else
+		echo "$OSTYPE"
+	fi | tr '[:upper:]' '[:lower:]'
+}
 
 # cmocka
 install_cmocka() {
@@ -49,17 +57,13 @@ install_libnereon() {
 	git clone -b "${LIBNEREON_VERSION}" https://github.com/riboseinc/libnereon
 	cd libnereon
 	mkdir build
-
-	if [[ "$(get_os)" = msys* ]]
-	then
-		cmake -S . -B build -G "Unix Makefiles"
-		cmake --build build
-		cmake --build build --target test
-		cmake --build build --target install
+	cd build
+	cmake .. -G "Unix Makefiles"
+	make
+	if [ $(get_os) == "msys" ]; then
+	  make install
 	else
-		cd build
-		cmake ..
-		make
-		sudo make install
+	  sudo make install
 	fi
 }
+ 
