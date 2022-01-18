@@ -180,16 +180,16 @@ AC_CHECK_DECLS([_IO_putc], [], [], [#include <stdio.h>])
 # Check second parameter of gettimeofday
 AC_MSG_CHECKING(gettimeofday second parameter)
 AC_LANG_WERROR
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/time.h>]], 
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/time.h>]],
                   [[struct timeval tv; int tz; gettimeofday(&tv, &tz)]])],
                    [with_struct_timezone=no],[with_struct_timezone=yes])
 
 if test "$with_struct_timezone" = no; then
   AC_DEFINE(HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE, 1,
    [define to 1 if gettimeofday second argument is const void*; assume const struct timezone* otherwise])
-  AC_MSG_RESULT((assumed) const struct timezone*) 
-else  
-  AC_MSG_RESULT(const void*) 
+  AC_MSG_RESULT((assumed) const struct timezone*)
+else
+  AC_MSG_RESULT(const void*)
 fi
 
 

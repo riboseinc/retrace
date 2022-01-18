@@ -66,4 +66,3 @@ install_libnereon() {
 	  sudo make install
 	fi
 }
- 
