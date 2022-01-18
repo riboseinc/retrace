@@ -2,11 +2,6 @@
 set -ex
 
 msys_install() {
-	## XXX DEBUG: start
-	echo '$ACLOCAL_PATH' === "$ACLOCAL_PATH"
-	while read -r i; do echo ACLOCAL_PATH is $i . ; ls -la "$i" || : ; ls -la "$i/xsize.m4" || : ; done <<< "${ACLOCAL_PATH//:/$IFS}"
-	## XXX DEBUG: end
-
 	packages=(
 		autoconf
 		automake
@@ -16,6 +11,7 @@ msys_install() {
 		git
 		gcc
 		gettext-devel
+                glib2-devel
 		libtool
 		make
 		mingw-w64-x86_64-cmocka
