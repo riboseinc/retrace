@@ -2,6 +2,8 @@
 set -x
 set -eu
 
+. ci/lib.sh
+
 SPWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 CORES="2" && [ -r /proc/cpuinfo ] && CORES=$(grep -c '^$' /proc/cpuinfo)

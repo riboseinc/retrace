@@ -5,6 +5,8 @@ env:
   CHECKPATCH_INSTALL: $PWD/builds/checkpatch-install
 
 global_task_template: &GLOBAL_TASK_TEMPLATE
+  only_if: $CIRRUS_BRANCH == 'master' || $CIRRUS_BRANCH == 'main' || $CIRRUS_BRANCH =~ 'release/.*' || $CIRRUS_PR != ''
+  skip: "!changesInclude('.cirrus.yml', 'ci/before_install/freebsd.sh') && changesIncludeOnly('*.sh', '.*', '_*', 'Brewfile', 'ci/**/*', 'doc/*', 'doc/**/*', '*.adoc', '*.md', '*.nix', 'flake.lock', '.github/**/*') || $CIRRUS_CHANGE_MESSAGE =~ '.*skip ci.*'"
   setup_environment_script: |
     # Update all packages to avoid "version FBSD_1.6 not found" error
     # See: https://forums.freebsd.org/threads/lib-libc-so-7-version-fbsd_1-6-required-by-usr-local-lib-libepoll-shim-so-0-not-found.81021/
