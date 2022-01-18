@@ -6,13 +6,16 @@ on:
       - main
       - 'release/**'
     paths-ignore:
-      - 'docs/**'
       - '**.adoc'
       - '**.md'
       - '**.nix'
-      - '.gitignore'
-      - '.gitattributes'
-      - '.editorconfig'
+      - '*.sh'
+      - '.*'
+      - 'Brewfile'
+      - '_*'
+      - 'doc/**'
+      - 'flake.lock'
+      - 'nix/**'
       - '.cirrus.yml'
       - '.github/workflows/*.yml'
       - '!.github/workflows/windows.yml'
@@ -21,19 +24,27 @@ on:
       - 'ci/checkpatch*'
   pull_request:
     paths-ignore:
-      - 'docs/**'
       - '**.adoc'
       - '**.md'
       - '**.nix'
-      - '.gitignore'
-      - '.gitattributes'
-      - '.editorconfig'
-      - '.cirrus.yml'
+      - '*.sh'
+      - '.*'
+      - 'Brewfile'
+      - '_*'
+      - 'doc/**'
+      - 'flake.lock'
+      - 'nix/**'
       - '.github/workflows/*.yml'
       - '!.github/workflows/windows.yml'
       - 'ci/before_install/*'
       - '!ci/before_install/msys.sh'
       - 'ci/checkpatch*'
+
+env:
+  # Fixes:
+  #   aclocal-1.16: error: aclocal: file '/a/_temp/msys64/usr/share/aclocal/xsize.m4' does not exist
+  # See: https://github.com/avast/yaracpp/issues/12
+  ACLOCAL_PATH: "/d/a/_temp/msys64/usr/share/aclocal/"
 
 jobs:
   build:
@@ -41,6 +52,10 @@ jobs:
     strategy:
       fail-fast: false
     if: "!contains(github.event.head_commit.message, 'skip ci')"
+
+    defaults:
+      run:
+        shell: msys2 {0}
 
     steps:
       - uses: actions/checkout@v2
@@ -50,19 +65,15 @@ jobs:
         with:
           path-type: strict
       - name: Set up environment
-        shell: msys2 {0}
         run: |
           echo CMOCKA_INSTALL="${HOME}/builds/cmocka-install" >> "${GITHUB_ENV}"
       - name: Install more prerequisites
-        shell: msys2 {0}
         run: |
           ./ci/before_install.sh
           ./ci/install.sh libnereon
       - name: Configure
-        shell: msys2 {0}
         run: |
           ./autogen.sh
           ./configure --enable-tests
       - name: Build
-        shell: msys2 {0}
         run: ./ci/main.sh
