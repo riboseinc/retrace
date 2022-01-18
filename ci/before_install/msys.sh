@@ -5,7 +5,6 @@ msys_install() {
 	packages=(
 		autoconf
 		automake
-		autoconf
 		cmake
 		doxygen
 		git

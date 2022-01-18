@@ -1,6 +1,7 @@
 AC_PREREQ([2.69])
 AC_INIT([retrace],[2.0.1],[https://github.com/riboseinc/retrace/issues])
 
+AC_CONFIG_SRCDIR([configure.ac])
 AM_INIT_AUTOMAKE([foreign subdir-objects -Wall])
 
 AC_USE_SYSTEM_EXTENSIONS
@@ -34,8 +35,8 @@ AC_SEARCH_LIBS(inet_aton, [resolv])
 AC_SEARCH_LIBS([pthread_create], [pthread])
 
 # list all used system headers for checking
+AC_CHECK_HEADERS_ONCE([ctype.h])
 AC_CHECK_HEADERS_ONCE([
-    ctype.h
     dlfcn.h
     dirent.h
     lwp.h
