@@ -5,6 +5,7 @@ AM_INIT_AUTOMAKE([foreign subdir-objects -Wall])
 
 AC_USE_SYSTEM_EXTENSIONS
 
+AM_GNU_GETTEXT_REQUIRE_VERSION([0.19.4])
 AM_GNU_GETTEXT([external])
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
