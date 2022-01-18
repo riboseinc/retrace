@@ -1,10 +1,9 @@
-AC_PREREQ([2.69])
-AC_INIT([retrace], [2.0.1], [https://github.com/riboseinc/retrace/issues])
+AC_PREREQ([2.71])
+AC_INIT([retrace],[2.0.1],[https://github.com/riboseinc/retrace/issues])
 AM_INIT_AUTOMAKE([foreign subdir-objects -Wall])
 
 AC_USE_SYSTEM_EXTENSIONS
 
-AM_GNU_GETTEXT_REQUIRE_VERSION([0.19.8])
 AM_GNU_GETTEXT([external])
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])

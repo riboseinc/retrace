@@ -3,9 +3,11 @@
 
 #include "config.h"
 
+#define _GNU_SOURCE
+
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/utsname.h>
+/*include <sys/utsname.h>*/
 #include <sys/time.h>
 #include <sys/queue.h>
 #include <sys/uio.h>
