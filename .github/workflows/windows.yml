@@ -55,19 +55,25 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 1
+
       - uses: msys2/setup-msys2@v2
         with:
-          path-type: inherit
+          path-type: strict
+          update: false
+
       - name: Set up environment
         run: |
           echo CMOCKA_INSTALL="${HOME}/builds/cmocka-install" >> "${GITHUB_ENV}"
+
       - name: Install more prerequisites
         run: |
           ./ci/before_install.sh
           ./ci/install.sh libnereon
+
       - name: Configure
         run: |
           ./autogen.sh
           ./configure --enable-tests
+
       - name: Build
         run: ./ci/main.sh

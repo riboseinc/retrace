@@ -3,14 +3,22 @@ set -ex
 
 msys_install() {
 	packages=(
+		autoconf
 		automake
-		mingw-w64-x86_64-cmocka
-		mingw64/mingw-w64-x86_64-ninja
-		mingw64/mingw-w64-x86_64-cmake
-		mingw64/mingw-w64-x86_64-graphviz # for doxygen's dot component
-		openssl-devel
+		cmake
 		doxygen
+		gcc
+		gettext-devel
+		git
+		glib2-devel
+		libtool
+		make
+		mingw-w64-x86_64-cmocka
+		mingw-w64-x86_64-graphviz # for doxygen's dot component
+		openssl-devel
+		ruby
 	)
 	pacman --noconfirm -S --needed "${packages[@]}"
+
 	gem install mustache
 }

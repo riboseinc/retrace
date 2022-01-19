@@ -3,7 +3,7 @@ set -x
 set -eu
 
 : "${CMOCKA_VERSION:=1.1.1}"
-: "${LIBNEREON_VERSION:=v0.9.4}"
+: "${LIBNEREON_VERSION:=v0.9.6}"
 
 . ci/lib.sh
 
@@ -51,9 +51,7 @@ install_libnereon() {
 	cd libnereon
 	mkdir build
 	cd build
-	cmake ..
-	ls -la
-	ls -la ..
+	cmake .. -G "Unix Makefiles"
 	make
 	$SUDO make install
 }
