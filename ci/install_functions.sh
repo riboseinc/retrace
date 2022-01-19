@@ -2,14 +2,15 @@
 set -x
 set -eu
 
-. ci/lib.sh
-
-SPWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-CORES="2" && [ -r /proc/cpuinfo ] && CORES=$(grep -c '^$' /proc/cpuinfo)
-
 : "${CMOCKA_VERSION:=1.1.1}"
 : "${LIBNEREON_VERSION:=v0.9.4}"
+
+. ci/lib.sh
+
+: "${CORES:=$(get_cores)}"
+
+SPWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SUDO=$(get_sudo)
 
 # cmocka
 install_cmocka() {
@@ -54,5 +55,5 @@ install_libnereon() {
 	ls -la
 	ls -la ..
 	make
-	sudo make install
+	$SUDO make install
 }
