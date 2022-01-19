@@ -21,7 +21,6 @@ macos_install() {
 	brew update-reset
 	# brew uninstall --ignore-dependencies openssl
 	brew bundle
-	mkdir -p "${CMOCKA_INSTALL}"
 	brew unlink openssl || :
 	brew link --force openssl@1.1
 	gem install mustache

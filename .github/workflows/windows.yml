@@ -63,10 +63,6 @@ jobs:
           path-type: strict
           update: false
 
-      - name: Set up environment
-        run: |
-          echo CMOCKA_INSTALL="${HOME}/builds/cmocka-install" >> "${GITHUB_ENV}"
-
       - name: Install more prerequisites
         run: |
           ./ci/before_install.sh

@@ -1,11 +1,14 @@
 #!/bin/bash
 set -eu
 
-LD_LIBRARY_PATH="${CMOCKA_INSTALL}/lib"
-LDFLAGS="-L${CMOCKA_INSTALL}/lib"
-CFLAGS="-I${CMOCKA_INSTALL}/include"
+if [[ -n "${CMOCKA_INSTALL:-}" ]]
+then
+	LD_LIBRARY_PATH="${CMOCKA_INSTALL}/lib"
+	LDFLAGS="-L${CMOCKA_INSTALL}/lib"
+	CFLAGS="-I${CMOCKA_INSTALL}/include"
 
-export LD_LIBRARY_PATH CFLAGS LDFLAGS
+	export LD_LIBRARY_PATH CFLAGS LDFLAGS
+fi
 
 . ci/lib.sh
 
@@ -24,7 +27,7 @@ test_retrace() {
 test_retracev1() {
 	test_retrace \
 		--disable-silent-rules \
-		--with-cmocka="${CMOCKA_INSTALL}" \
+		${CMOCKA_INSTALL:+--with-cmocka="${CMOCKA_INSTALL}"} \
 		--enable-tests
 }
 
