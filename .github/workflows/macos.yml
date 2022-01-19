@@ -44,6 +44,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-10.15, macos-11.0]
+        retrace-test: [v1, v2, v2wrapper]
     if: "!contains(github.event.head_commit.message, 'skip ci')"
 
     steps:
@@ -68,9 +69,5 @@ jobs:
           for var in OPENSSL_PREFIX PKG_CONFIG_PATH LDFLAGS CPPFLAGS PATH; do echo "${var}=${!var}" | tee -a "${GITHUB_ENV}"; done
           cd /usr/local/include
           sudo ln -s "${OPENSSL_PREFIX}/include/openssl" .
-      - name: Configure
-        run: |
-          ./autogen.sh
-          ./configure --enable-tests
       - name: Build
-        run: ./ci/main.sh
+        run: ./ci/main.sh ${{ matrix.retrace-test }}

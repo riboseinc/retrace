@@ -46,6 +46,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-18.04, ubuntu-20.04]
+        retrace-test: [v1, v2, v2wrapper]
     if: "!contains(github.event.head_commit.message, 'skip ci')"
 
     steps:
@@ -59,9 +60,5 @@ jobs:
         run: |
           ./ci/before_install.sh
           ./ci/install.sh cmocka libnereon
-      - name: Configure
-        run: |
-          ./autogen.sh
-          ./configure --enable-tests
       - name: Build
-        run: ./ci/main.sh
+        run: ./ci/main.sh ${{ matrix.retrace-test }}

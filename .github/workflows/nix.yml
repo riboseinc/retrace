@@ -38,6 +38,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        retrace-test: [v1, v2, v2wrapper]
     if: "!contains(github.event.head_commit.message, 'skip ci')"
 
     steps:
@@ -47,4 +48,5 @@ jobs:
       - uses: cachix/install-nix-action@v15
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix-build
+      - run: |
+          nix build .#${{ matrix.retrace-test }} || { nix log /nix/store/*-retrace-unstable.drv ; exit 1 ; }

@@ -7,30 +7,53 @@ CFLAGS="-I${CMOCKA_INSTALL}/include"
 
 export LD_LIBRARY_PATH CFLAGS LDFLAGS
 
-install_retrace() {
-	sh autogen.sh && \
-		./configure \
-			--disable-silent-rules \
-			--with-cmocka="${CMOCKA_INSTALL}" \
-			--enable-tests && \
-		make clean && \
-		make
+. ci/lib.sh
 
-	sudo make install
-	make check
-}
+: "${SUDO:=$(get_sudo)}"
 
 test_retrace() {
-	make clean
-	./configure \
-		--enable-v2 \
-		--enable-tests && \
-		make clean
-		make V=1
+	{ [[ ! -r Makefile ]] || make clean ; } && \
+	sh autogen.sh && \
+	./configure "$@" && \
+	make ${MAKE_FLAGS:+$MAKE_FLAGS}
 
-	sudo make install
+	$SUDO make install
 	make check
 }
 
-install_retrace
-test_retrace
+test_retracev1() {
+	test_retrace \
+		--disable-silent-rules \
+		--with-cmocka="${CMOCKA_INSTALL}" \
+		--enable-tests
+}
+
+test_retracev2() {
+	MAKE_FLAGS=V=1 test_retrace \
+		--enable-v2 \
+		--enable-tests
+}
+
+test_retracev2wrapper() {
+	MAKE_FLAGS=V=1 test_retrace \
+		--enable-v2 \
+		--enable-v2_wrapper \
+		--enable-tests
+}
+
+main() {
+	# Run these tests by default
+	if [[ $# -lt 1 ]]
+	then
+		test_retracev1
+		test_retracev2
+		test_retracev2wrapper
+	else
+		for arg in "$@"
+		do
+			test_retrace"$arg"
+		done
+	fi
+}
+
+main "$@"

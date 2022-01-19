@@ -7,14 +7,16 @@ stdenv.mkDerivation rec {
   pname = "retrace";
   version = "unstable";
 
-  src = ./.;
+  src = ./..;
 
   buildInputs = with pkgs; [
     openssl
   ];
 
   configureFlags = [
+    "--disable-silent-rules"
     "--enable-tests"
+    "--with-cmocka=${pkgs.cmocka}"
   ];
 
   nativeBuildInputs = with pkgs; [
@@ -25,6 +27,8 @@ stdenv.mkDerivation rec {
   checkInputs = with pkgs; [
     cmocka
   ];
+
+  doCheck = true;
 
   outputs = [ "out" "lib" "dev" ];
 
