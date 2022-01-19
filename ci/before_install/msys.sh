@@ -18,6 +18,7 @@ msys_install() {
 		openssl-devel
 		ruby
 	)
+	# pacman --noconfirm -Syu  # NOTE: would close the current terminal, thereby failing the build
 	pacman --noconfirm -S --needed "${packages[@]}"
 
 	gem install mustache
