@@ -36,11 +36,22 @@ jobs:
         run: |
           ./autogen.sh
           ./configure --enable-tests
+      - name: Calculate Coverity Tool Cache Key (updates every quarter)
+        run: echo "COV_CACHE_KEY=$(date +%Y)-$(echo "($(date +%-m)-1)/3" | bc)" >> "$GITHUB_ENV"
+      - name: Cache Coverity Tool
+        id: coverity-tool-cache
+        uses: actions/cache@v2
+        with:
+          path: cov-analysis-linux64
+          key: cov-analysis-linux64-${{ env.COV_CACHE_KEY }}
       - name: Download Coverity
+        # Downloading on GHA takes about 1m20s.
+        # Use cache to speed it up.
+        if: steps.coverity-tool-cache.outputs.cache-hit != 'true'
         env:
           TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
         run: |
-          wget -q https://scan.coverity.com/download/cxx/linux64 --post-data "token=$TOKEN&project=$GITHUB_REPOSITORY" -O cov-analysis-linux64.tar.gz
+          wget -q https://scan.coverity.com/download/linux64 --post-data "token=$TOKEN&project=$GITHUB_REPOSITORY" -O cov-analysis-linux64.tar.gz
           mkdir cov-analysis-linux64
           tar xzf cov-analysis-linux64.tar.gz --strip 1 -C cov-analysis-linux64
       - name: Build
