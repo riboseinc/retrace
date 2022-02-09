@@ -19,6 +19,10 @@ jobs:
       matrix:
         # os: [ubuntu-18.04, ubuntu-20.04]
         os: [ubuntu-18.04]
+        retrace-test:
+          - v1
+          - v2
+          - v2wrapper
 
     timeout-minutes: 20
     steps:
@@ -58,7 +62,7 @@ jobs:
         run: |
           set -x
           export PATH="$PWD/cov-analysis-linux64/bin:$PATH"
-          cov-build --dir cov-int ci/main.sh
+          cov-build --dir cov-int ci/main.sh ${{ matrix.retrace-test }}
       - name: Submit
         env:
           TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
@@ -69,6 +73,6 @@ jobs:
             --form token=$TOKEN \
             --form email=retrace@ribose.com \
             --form file=@results.tgz \
-            --form version=$GITHUB_REF \
+            --form version="$GITHUB_REF ${{ matrix.retrace-test }}" \
             --form description=$GITHUB_SHA \
             https://scan.coverity.com/builds?project=$GITHUB_REPOSITORY
