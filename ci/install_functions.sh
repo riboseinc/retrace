@@ -22,10 +22,16 @@ install_cmocka() {
 		cd ~/builds/
 		mkdir -p cmocka-build
 		cd cmocka-build
+
+		local build_opts=(
+			-DCMAKE_INSTALL_DIR="${CMOCKA_INSTALL}"
+			-DLIB_INSTALL_DIR="${CMOCKA_INSTALL}/lib" # for cmocka <= 1.1.2
+			-DCMAKE_INSTALL_LIBDIR="${CMOCKA_INSTALL}/lib" # for cmocka 1.1.3+
+			-DINCLUDE_INSTALL_DIR="${CMOCKA_INSTALL}/include"
+		)
+
 		cmake \
-			-DCMAKE_INSTALL_DIR="${CMOCKA_INSTALL}" \
-			-DLIB_INSTALL_DIR="${CMOCKA_INSTALL}/lib" \
-			-DINCLUDE_INSTALL_DIR="${CMOCKA_INSTALL}/include" \
+			"${build_opts[@]}" \
 			~/builds/cmocka
 		make -j"${CORES}" all install
 	fi
