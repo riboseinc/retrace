@@ -2,7 +2,7 @@
 set -x
 set -eu
 
-: "${CMOCKA_VERSION:=1.1.5}"
+: "${CMOCKA_VERSION:=1.1.1}"
 : "${LIBNEREON_VERSION:=v0.9.6}"
 
 . ci/lib.sh
