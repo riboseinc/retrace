@@ -43,11 +43,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest ]   # macos-latest flakes with install-nix-action@v27
-        attr: [ v1, v2 ]
+        attr: [ v2, v2wrapper ]
     runs-on: ${{ matrix.os }}
-    # The nix flake is packaging-tier (uses Autotools internally) and has
-    # pre-existing issues (v1 cmocka test failure, v2 build issues) that
-    # are out of scope for this modernization PR. Each step is best-effort.
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v27

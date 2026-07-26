@@ -72,7 +72,7 @@
 #cmakedefine01 HAVE_DECL_PTRACE_LISTEN
 #cmakedefine01 HAVE_DECL_PTRACE_PEEKSIGINFO
 
-/* fcntl f_features (used by src/v1/file.c). */
+/* fcntl f_features (used by src/backends/preload_elf/). */
 #cmakedefine01 HAVE_DECL_F_DUPFD_CLOEXEC
 #cmakedefine01 HAVE_DECL_F_SETOWN
 #cmakedefine01 HAVE_DECL_F_GETOWN
@@ -115,7 +115,7 @@
 #cmakedefine01 HAVE_STRUCT_LOG2PHYS
 #cmakedefine01 HAVE_STRUCT_F_OWNER_EX
 
-/* Socket options (used by src/v1/sock.c). */
+/* Socket options (used by src/backends/preload_elf/). */
 #cmakedefine01 HAVE_DECL_SOCK_PACKET
 #cmakedefine01 HAVE_DECL_SO_BINDTODEVICE
 #cmakedefine01 HAVE_DECL_SO_BSDCOMPAT
