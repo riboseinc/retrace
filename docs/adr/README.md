@@ -12,40 +12,10 @@ via a new ADR that references the old.
 | [0002](0002-layered-architecture.md) | Layered architecture (7 layers) | accepted |
 | [0003](0003-plugin-pattern-for-backends.md) | Plugin pattern for backends | accepted |
 | [0004](0004-plugin-pattern-for-config-sources.md) | Plugin pattern for config sources | accepted |
-| [0005](0005-v2-as-future-v1-deprecated.md) | v2 as future, v1 deprecated | accepted |
+| [0005](0005-v2-as-future-v1-deprecated.md) | v2 as future, v1 deprecated | superseded by ADR-0011 |
 | [0006](0006-semantic-versioning.md) | Semantic versioning | accepted |
 | [0007](0007-json-as-canonical-config.md) | JSON as canonical config format | accepted |
 | [0008](0008-opaque-public-types-for-abi.md) | Opaque public types for ABI stability | accepted |
-
-## When to write an ADR
-
-Write an ADR when making a decision that:
-
-- Is hard to reverse (would require a major version bump, or affects many
-  files).
-- Has multiple reasonable alternatives.
-- Will be questioned by future contributors ("why did they do it this way?").
-
-Don't write an ADR for: bug fixes, refactors, new tests, dependency bumps.
-
-## Template
-
-```markdown
-# ADR-NNNN: <imperative title>
-
-- **Status**: proposed | accepted | rejected | deprecated | superseded by ADR-MMMM
-- **Date**: YYYY-MM-DD
-- **References**: TODO.roadmap files, related ADRs
-
-## Context
-<problem statement, current state, forces>
-
-## Decision
-<the chosen option, stated imperatively>
-
-## Alternatives considered
-<each alternative, with rejection rationale>
-
-## Consequences
-<positive, negative, neutral; mitigations for negatives>
-```
+| [0009](0009-from-scratch-windows-trampoline.md) | From-scratch Windows trampoline (no MinHook, no Detours) | accepted |
+| [0010](0010-aarch64-float-params-from-day-one.md) | AArch64 port supports float parameters from day one | accepted |
+| [0011](0011-v1-removal-at-v2.1.0.md) | Remove v1 source at v2.1.0 | accepted |

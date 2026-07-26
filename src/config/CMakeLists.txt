@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # retrace JSON config source. Vendored parson parser + conf.c that
-# builds a retrace_script from JSON. See TODO.v2/04-engine-refactor.md
-# and TODO.roadmap/04-config-sources.md.
+# builds a retrace_script from JSON.
+# and the modernization plan.md.
 
 add_library(retrace_config_json OBJECT
 	json/parson.c

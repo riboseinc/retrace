@@ -25,7 +25,7 @@
 
 /*
  * Backend registry. See include/retrace/backend.h for the public API and
- * TODO.v2/05-backend-abstraction.md for the design.
+ * the v2 plan.md for the design.
  *
  * Registration is via constructor functions in each backend's backend.c.
  * The registry collects them into a sorted array at startup; select()

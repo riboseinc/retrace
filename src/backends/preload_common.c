@@ -28,7 +28,7 @@
  * uses its own due to DYLD_*). fork + execv with the appropriate env
  * var set.
  *
- * See TODO.v2/05-backend-abstraction.md.
+ *
  */
 
 #include <retrace/backend.h>

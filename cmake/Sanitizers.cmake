@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# Sanitizer + coverage flag helpers. See TODO.roadmap/08-testing-quality.md.
+# Sanitizer + coverage flag helpers.
 #
 # Usage from the top-level CMakeLists.txt:
 #

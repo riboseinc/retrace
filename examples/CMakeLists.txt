@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# retrace examples. See TODO.roadmap/11-documentation.md.
+# retrace examples.
 #
 # Examples are self-contained demos with their own .conf files. Most have
-# their own test-*.sh script (exercised by TODO.roadmap/08 integration tests).
+# their own test-*.sh script (exercised by the modernization plan/08 integration tests).
 
 # dns-fuzz: axfr.c, query.c
 add_executable(axfr  examples/dns-fuzz/axfr.c)

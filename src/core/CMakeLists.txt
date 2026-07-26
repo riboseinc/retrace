@@ -3,9 +3,9 @@
 # retrace core engine module. Owns: engine, prototype registry, action
 # registry, data types, real-impl table, logger. Does NOT own config
 # parsing (that's src/config/) or trampolines (those stay in src/v2/arch/
-# until TODO.v2/05 extracts them to src/backends/).
+# until the v2 plan/05 extracts them to src/backends/).
 #
-# See TODO.v2/04-engine-refactor.md.
+#
 
 set(_core_sources
 	engine.c        funcs.c         actions.c      data_types.c
@@ -24,7 +24,7 @@ set(_core_datatype_sources
 
 # Core is a single CMake OBJECT library so the eventual retrace_v2 shared
 # library (built by src/v2/) can pull these in without exporting them.
-# Downstream library users (TODO.roadmap/05) will get a real library
+# Downstream library users (the modernization plan/05) will get a real library
 # target; for now, this object library is linked into retrace_v2.
 add_library(retrace_core OBJECT
 	${_core_sources}
@@ -33,7 +33,7 @@ add_library(retrace_core OBJECT
 	${_core_datatype_sources})
 
 # Pick the per-platform macros.h (defines retrace_as_define_var_in_sec
-# — ELF vs Mach-O section syntax). TODO.roadmap/02 removes the data_types
+# — ELF vs Mach-O section syntax). the modernization plan/02 removes the data_types
 # dependency on this by centralizing section declaration in src/backends/.
 if(RETRACE_PLATFORM_LINUX)
 	set(_retrace_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_elf/x86_64)
@@ -47,7 +47,7 @@ target_include_directories(retrace_core
 	PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/backends>            # arch_spec.h
-		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/config/json>         # conf.h, parson.h (TODO.v2/04 decouples)
+		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/config/json>         # conf.h, parson.h (the v2 plan/04 decouples)
 	PRIVATE
 		${_retrace_arch_include}                                       # macros.h per-platform
 		${CMAKE_CURRENT_SOURCE_DIR}/prototypes

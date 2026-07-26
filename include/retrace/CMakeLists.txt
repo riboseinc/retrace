@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# Public header install rules. See TODO.roadmap/05-library-public-api.md.
+# Public header install rules.
 
 set(RETRACE_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/retrace.h

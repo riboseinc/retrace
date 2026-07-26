@@ -26,10 +26,10 @@
 /*
  * preload-elf backend: Linux via LD_PRELOAD.
  *
- * Per-arch trampolines live in x86_64/ (Phase 2 of TODO.v2 adds aarch64/).
+ * Per-arch trampolines live in x86_64/ (Phase 2 of the v2 plan adds aarch64/).
  * Spawn uses the shared retrace_preload_spawn_common() helper.
  *
- * See TODO.v2/05-backend-abstraction.md.
+ *
  */
 
 #include <retrace/backend.h>

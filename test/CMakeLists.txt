@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# retrace tests. See TODO.roadmap/08-testing-quality.md.
+# retrace tests.
 #
-# Currently mirrors the Autotools test/Makefile.am. TODO.roadmap/08 restructures
+# Currently mirrors the Autotools test/Makefile.am. the modernization plan/08 restructures
 # this into unit/integration/property/golden/smoke directories.
 
 set(_test_programs
@@ -37,7 +37,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/runtests.sh")
 		WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
-# TODO.roadmap/08: replace the above with structured CTest labels:
+# the modernization plan/08: replace the above with structured CTest labels:
 #   add_test(NAME integration-id   COMMAND ... LABELS "integration")
 #   add_test(NAME unit-engine      COMMAND ... LABELS "unit")
 #   add_test(NAME smoke-run        COMMAND ... LABELS "smoke")

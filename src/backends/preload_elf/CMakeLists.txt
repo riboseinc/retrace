@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# preload-elf backend: Linux x86_64 (Phase 2 of TODO.v2 adds aarch64).
+# preload-elf backend: Linux x86_64 (Phase 2 of the v2 plan adds aarch64).
 
 set(_preload_elf_x86_64_sources
 	x86_64/arch_spec_top.S

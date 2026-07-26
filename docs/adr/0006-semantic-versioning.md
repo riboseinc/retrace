@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-07-26
-- **References**: TODO.roadmap/05, TODO.roadmap/07
+- **References**: the modernization plan/05, the modernization plan/07
 
 ## Context
 
