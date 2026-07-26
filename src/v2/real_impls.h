@@ -29,6 +29,42 @@
 #include <stdarg.h>
 #include <time.h>
 
+/*
+ * Macro hygiene for Darwin.
+ *
+ * macOS <stdio.h> (when _USE_FORTIFY_LEVEL > 0, the default) defines:
+ *   #define sprintf(str, ...)  __builtin___sprintf_chk(str, 0, __darwin_obsz(str), __VA_ARGS__)
+ *   #define snprintf(...)      __builtin___snprintf_chk(...)
+ *   #define vsprintf(...)      __builtin___vsprintf_chk(...)
+ *   #define vsnprintf(...)     __builtin___vsnprintf_chk(...)
+ *
+ * If we declared `int (*sprintf)(...)` directly, the preprocessor would
+ * rewrite the field name to `__builtin___sprintf_chk`, breaking the
+ * struct. Suppress the macros just for the struct declaration; restore
+ * them after so the fortified versions remain in effect at all consumer
+ * call sites (34 of them — see TODO.v2/01-darwin-macro-hygiene.md).
+ */
+#if defined(__clang__) || defined(__GNUC__)
+#  define RETRACE_PUSH_MACROS() \
+      _Pragma("push_macro(\"sprintf\")")   \
+      _Pragma("push_macro(\"snprintf\")")  \
+      _Pragma("push_macro(\"vsprintf\")")  \
+      _Pragma("push_macro(\"vsnprintf\")") \
+      _Pragma("undef sprintf")             \
+      _Pragma("undef snprintf")            \
+      _Pragma("undef vsprintf")            \
+      _Pragma("undef vsnprintf")
+#  define RETRACE_POP_MACROS() \
+      _Pragma("pop_macro(\"sprintf\")")    \
+      _Pragma("pop_macro(\"snprintf\")")   \
+      _Pragma("pop_macro(\"vsprintf\")")   \
+      _Pragma("pop_macro(\"vsnprintf\")")
+#else
+#  define RETRACE_PUSH_MACROS()
+#  define RETRACE_POP_MACROS()
+#endif
+
+RETRACE_PUSH_MACROS()
 struct RetraceRealImpls {
 	int (*pthread_key_create)(pthread_key_t *key,
 		void (*destructor)(void *));
@@ -78,6 +114,7 @@ struct RetraceRealImpls {
 	int (*fprintf)(FILE *stream, const char *format, ...);
 	int (*fflush)(FILE *stream);
 };
+RETRACE_POP_MACROS()
 
 extern struct RetraceRealImpls retrace_real_impls;
 

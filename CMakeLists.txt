@@ -99,18 +99,14 @@ endif()
 # arm64 backends land (TODO.roadmap/03). Auto-disable on non-x86-64 hosts
 # unless the user explicitly insisted.
 if(RETRACE_BUILD_V2 AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
-	message(STATUS "retrace v2 requires x86-64 (per-arch trampolines not yet ported); disabling. See TODO.roadmap/03.")
+	message(STATUS "retrace v2 requires x86-64 (per-arch trampolines not yet ported); disabling. See TODO.v2/02.")
 	set(RETRACE_BUILD_V2 OFF)
 endif()
 
-# v2 also fails to build on Darwin: macOS <stdio.h> macro-substitutes
-# sprintf/snprintf to __builtin___*_chk, which then references nonexistent
-# members of struct RetraceRealImpls. Auto-disable on Darwin until
-# TODO.roadmap/02 ports v2 to a clean real-impl indirection.
-if(RETRACE_BUILD_V2 AND RETRACE_PLATFORM_DARWIN)
-	message(STATUS "retrace v2 does not yet build on Darwin (stdio.h macro substitution; see TODO.roadmap/02); disabling.")
-	set(RETRACE_BUILD_V2 OFF)
-endif()
+# v2 on Darwin (macOS Intel) is now unblocked via #pragma push_macro
+# hygiene in src/v2/real_impls.h. See TODO.v2/01-darwin-macro-hygiene.md.
+# macOS arm64 (Apple Silicon) still auto-disables via the x86-64 check
+# above until TODO.v2/03 lands the AArch64 macOS trampoline.
 
 # v1 source uses POSIX APIs (dlfcn, unistd, sys/socket, sys/utsname, pthread)
 # and a LD_PRELOAD/DYLD_INSERT interposition model that doesn't apply on
