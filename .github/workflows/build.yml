@@ -99,27 +99,18 @@ jobs:
           brew install cmake ninja pkg-config openssl@3
           echo "OPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
 
-      - name: Cache vcpkg (Windows)
-        if: runner.os == 'Windows'
-        uses: actions/cache@v4
-        with:
-          path: |
-            vcpkg/.git
-            vcpkg/buildtrees
-            vcpkg/downloads
-            vcpkg/packages
-          key: ${{ matrix.runner }}-vcpkg-${{ env.VCPKG_REF }}
-
       - name: Bootstrap vcpkg (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          if (-not (Test-Path vcpkg/vcpkg.exe)) {
-            git clone https://github.com/microsoft/vcpkg.git vcpkg
-            cd vcpkg
-            git checkout $env:VCPKG_REF
-            .\bootstrap-vcpkg.bat -disableMetrics
-          }
+          # Always bootstrap fresh — cache left vcpkg/ in a half-restored
+          # state (git metadata without the binary). Bootstrap is ~1 min.
+          if (Test-Path vcpkg) { Remove-Item -Recurse -Force vcpkg }
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git vcpkg
+          cd vcpkg
+          git fetch --depth 1 origin $env:VCPKG_REF
+          git checkout $env:VCPKG_REF
+          .\bootstrap-vcpkg.bat -disableMetrics
 
       # ----- Configure -----
       - name: Configure (POSIX)
