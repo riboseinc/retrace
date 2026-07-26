@@ -6,7 +6,7 @@
 
 add_library(retrace_config_json OBJECT
 	json/parson.c
-	json/source.c)
+	json/conf.c)
 
 target_include_directories(retrace_config_json
 	PUBLIC

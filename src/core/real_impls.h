@@ -92,8 +92,13 @@ struct RetraceRealImpls {
 	void *(*dlopen)(const char *filename, int flag);
 	void *(*dlsym)(void *handle, const char *symbol);
 
-	int (*sprintf)(char *str, const char *format, ...);
-	int (*snprintf)(char *str, size_t size, const char *format, ...);
+	/* Field names prefixed with `real_` because macOS <stdio.h>
+	 * macro-substitutes the bare names (sprintf -> __builtin___sprintf_chk).
+	 * The macro fires both at struct declaration AND at member-access
+	 * call sites (`obj.snprintf(...)` would expand the `snprintf(...)` part).
+	 * Renaming the fields avoids both cases. See TODO.v2/01. */
+	int (*real_sprintf)(char *str, const char *format, ...);
+	int (*real_snprintf)(char *str, size_t size, const char *format, ...);
 
 	char *(*getenv)(const char *name);
 
@@ -104,7 +109,7 @@ struct RetraceRealImpls {
 	long (*ftell)(FILE *stream);
 
 	int (*printf)(const char *format, ...);
-	int (*vsnprintf)(char *str, size_t size, const char *format, va_list ap);
+	int (*real_vsnprintf)(char *str, size_t size, const char *format, va_list ap);
 	int (*vprintf)(const char *format, va_list ap);
 
 	time_t (*time)(time_t *t);

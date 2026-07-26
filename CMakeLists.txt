@@ -98,7 +98,13 @@ endif()
 # v2's assembly trampolines (src/v2/arch/x86-64/*) are x86-64 only until
 # arm64 backends land (TODO.roadmap/03). Auto-disable on non-x86-64 hosts
 # unless the user explicitly insisted.
-if(RETRACE_BUILD_V2 AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+# macOS special-case: respect CMAKE_OSX_ARCHITECTURES if set (cross-compile).
+if(RETRACE_PLATFORM_DARWIN AND CMAKE_OSX_ARCHITECTURES)
+	set(_retrace_proc "${CMAKE_OSX_ARCHITECTURES}")
+else()
+	set(_retrace_proc "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+if(RETRACE_BUILD_V2 AND NOT _retrace_proc MATCHES "x86_64|amd64|AMD64")
 	message(STATUS "retrace v2 requires x86-64 (per-arch trampolines not yet ported); disabling. See TODO.v2/02.")
 	set(RETRACE_BUILD_V2 OFF)
 endif()
@@ -310,7 +316,9 @@ if(RETRACE_BUILD_V2)
 	add_subdirectory(src/core)
 	# TODO.v2/04: JSON config source (vendored parson).
 	add_subdirectory(src/config)
-	# v2 itself is now a thin shim that links core + config_json + arch trampoline.
+	# TODO.v2/05: backend plugins (preload-elf/macho/bsd, future msvc/mingw/ptrace).
+	add_subdirectory(src/backends)
+	# v2 itself is now a thin shim that links core + config_json + backends + funcs_symbols.S.
 	add_subdirectory(src/v2)
 endif()
 

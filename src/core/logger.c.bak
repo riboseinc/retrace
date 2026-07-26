@@ -184,7 +184,7 @@ void retrace_logger_log_old(int module, int sev, const char *fmt, ...)
 		retrace_real_impls.time(&rawtime);
 		retrace_real_impls.localtime_r(&rawtime, &timeinfo);
 
-		pref_size = retrace_real_impls.real_snprintf(NULL, 0, "[RT][%02d:%02d:%02d][%s][%s] ",
+		pref_size = retrace_real_impls.snprintf(NULL, 0, "[RT][%02d:%02d:%02d][%s][%s] ",
 			timeinfo.tm_hour,
 			timeinfo.tm_min,
 			timeinfo.tm_sec,
@@ -196,11 +196,11 @@ void retrace_logger_log_old(int module, int sev, const char *fmt, ...)
 	va_start(args, fmt);
 	va_copy(args2, args);
 
-	log_size = retrace_real_impls.real_vsnprintf(NULL, 0, fmt, args);
+	log_size = retrace_real_impls.vsnprintf(NULL, 0, fmt, args);
 	logBuff = (char *) retrace_real_impls.malloc(pref_size + log_size + 1);
 
 	if (g_logger_config.decoration_ena) {
-		retrace_real_impls.real_snprintf(logBuff,
+		retrace_real_impls.snprintf(logBuff,
 			pref_size + 1,
 			"[RT][%02d:%02d:%02d][%s][%s] ",
 			timeinfo.tm_hour,
@@ -210,7 +210,7 @@ void retrace_logger_log_old(int module, int sev, const char *fmt, ...)
 			g_retrace_severities[sev]);
 	}
 
-	retrace_real_impls.real_vsnprintf(logBuff + pref_size, log_size + 1, fmt, args2);
+	retrace_real_impls.vsnprintf(logBuff + pref_size, log_size + 1, fmt, args2);
 
 	if (g_logger_config.stdout_ena) {
 		retrace_real_impls.printf("%s\n", logBuff);
@@ -244,10 +244,10 @@ void retrace_logger_log(int module, int sev, const char *fmt, ...)
 	va_start(args, fmt);
 	va_copy(args2, args);
 
-	log_size = retrace_real_impls.real_vsnprintf(NULL, 0, fmt, args);
+	log_size = retrace_real_impls.vsnprintf(NULL, 0, fmt, args);
 	logBuff = (char *) retrace_real_impls.malloc(log_size + 1);
 
-	retrace_real_impls.real_vsnprintf(logBuff, log_size + 1, fmt, args2);
+	retrace_real_impls.vsnprintf(logBuff, log_size + 1, fmt, args2);
 	json_object_set_string(root_object, "text", logBuff);
 
 	retrace_logger_log_json(module, sev, root_value);
