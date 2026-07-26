@@ -114,12 +114,12 @@ int retrace_real_impls_init(void)
 	if (retrace_real_impls.atoi == NULL)
 		return -16;
 
-	retrace_real_impls.real_sprintf = retrace_as_get_real_safe("sprintf");
-	if (retrace_real_impls.real_sprintf == NULL)
+	retrace_real_impls.sprintf = retrace_as_get_real_safe("sprintf");
+	if (retrace_real_impls.sprintf == NULL)
 		return -17;
 
-	retrace_real_impls.real_snprintf = retrace_as_get_real_safe("snprintf");
-	if (retrace_real_impls.real_snprintf == NULL)
+	retrace_real_impls.snprintf = retrace_as_get_real_safe("snprintf");
+	if (retrace_real_impls.snprintf == NULL)
 		return -18;
 
 	retrace_real_impls.getenv = retrace_as_get_real_safe("getenv");
@@ -165,9 +165,9 @@ int retrace_real_impls_init(void)
 	if (retrace_real_impls.pthread_mutex_unlock == NULL)
 		return -28;
 
-	retrace_real_impls.real_vsnprintf =
+	retrace_real_impls.vsnprintf =
 		retrace_as_get_real_safe("vsnprintf");
-	if (retrace_real_impls.real_vsnprintf == NULL)
+	if (retrace_real_impls.vsnprintf == NULL)
 		return -29;
 
 	retrace_real_impls.time =

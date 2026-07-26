@@ -1,0 +1,104 @@
+/*
+ * Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*
+ * Shared spawn helper for LD_PRELOAD-style backends (Linux, BSD, macOS
+ * uses its own due to DYLD_*). fork + execv with the appropriate env
+ * var set.
+ *
+ * See TODO.v2/05-backend-abstraction.md.
+ */
+
+#include <retrace/backend.h>
+
+#include <stdlib.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <errno.h>
+
+extern char **environ;
+
+/*
+ * Spawn target with lib_path injected via env_var_name.
+ *
+ * env_var_name: "LD_PRELOAD" on Linux/BSD, "DYLD_INSERT_LIBRARIES" on macOS.
+ * lib_path: full path to the retrace_v2 shared library.
+ */
+pid_t
+retrace_preload_spawn_common(const char *env_var_name,
+                              const char *lib_path,
+                              const char *target_path,
+                              char *const argv[],
+                              char *const envp[])
+{
+	pid_t pid;
+	int status;
+	char *const *use_env = envp ? envp : environ;
+
+	(void)env_var_name;
+
+	pid = fork();
+	if (pid == 0) {
+		/* Child: set env and exec. */
+		setenv(env_var_name, lib_path, 1);
+		execv(target_path, argv);
+		_exit(127);
+	} else if (pid < 0) {
+		return RETRACE_BACKEND_INTERNAL;
+	}
+
+	/* Parent: wait for child to exit. */
+	while (waitpid(pid, &status, 0) == -1 && errno == EINTR)
+		;
+
+	return pid;
+}
+
+/*
+ * Detect the retrace_v2 library path. Priority:
+ *   1. RETRACE_V2_LIB env var (explicit override)
+ *   2. Hard-coded system paths (/usr/local/lib, /usr/lib)
+ */
+const char *
+retrace_preload_detect_lib(const char *filename)
+{
+	const char *explicit = getenv("RETRACE_V2_LIB");
+	if (explicit != NULL)
+		return explicit;
+
+	static const char *const dirs[] = {
+		"/usr/local/lib", "/usr/lib", NULL,
+	};
+	static char path[256];
+	size_t i;
+
+	for (i = 0; dirs[i] != NULL; i++) {
+		snprintf(path, sizeof(path), "%s/%s", dirs[i], filename);
+		if (access(path, R_OK) == 0)
+			return path;
+	}
+	return NULL;
+}

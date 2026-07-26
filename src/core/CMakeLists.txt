@@ -32,12 +32,24 @@ add_library(retrace_core OBJECT
 	${_core_action_sources}
 	${_core_datatype_sources})
 
+# Pick the per-platform macros.h (defines retrace_as_define_var_in_sec
+# — ELF vs Mach-O section syntax). TODO.roadmap/02 removes the data_types
+# dependency on this by centralizing section declaration in src/backends/.
+if(RETRACE_PLATFORM_LINUX)
+	set(_retrace_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_elf/x86_64)
+elseif(RETRACE_PLATFORM_DARWIN)
+	set(_retrace_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_macho/x86_64)
+elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
+	set(_retrace_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_bsd/x86_64)
+endif()
+
 target_include_directories(retrace_core
 	PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/v2>      # arch_spec.h (TODO.v2/05 moves this)
-		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/config/json>  # conf.h, parson.h (TODO.v2/04 decouples)
+		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/backends>            # arch_spec.h
+		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/config/json>         # conf.h, parson.h (TODO.v2/04 decouples)
 	PRIVATE
+		${_retrace_arch_include}                                       # macros.h per-platform
 		${CMAKE_CURRENT_SOURCE_DIR}/prototypes
 		${CMAKE_CURRENT_SOURCE_DIR}/actions
 		${CMAKE_CURRENT_SOURCE_DIR}/datatypes)

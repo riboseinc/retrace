@@ -201,7 +201,7 @@ size_t retrace_struct_to_sz(const void *data,
 	/* finally */
 	sz_size = retrace_real_impls.strlen(serialized_string);
 	if (str != NULL)
-		retrace_real_impls.real_sprintf(str, "%s", serialized_string);
+		retrace_real_impls.sprintf(str, "%s", serialized_string);
 
 	json_free_serialized_string(serialized_string);
 	json_value_free(root_value);
@@ -277,13 +277,13 @@ size_t retrace_int_to_sz(const void *data,
 	const struct DataType *data_type,
 	char *str)
 {
-	return retrace_real_impls.real_sprintf(str, "%d", *((const int *) data));
+	return retrace_real_impls.sprintf(str, "%d", *((const int *) data));
 }
 
 size_t retrace_int_get_sz_size(const void *data,
 	const struct DataType *data_type)
 {
-	return retrace_real_impls.real_snprintf(NULL,
+	return retrace_real_impls.snprintf(NULL,
 			0,
 			"%d",
 			*((const int *) data));
@@ -308,14 +308,14 @@ size_t retrace_uint_to_sz(const void *data,
 	const struct DataType *data_type,
 	char *str)
 {
-	return retrace_real_impls.real_sprintf(str, "%u",
+	return retrace_real_impls.sprintf(str, "%u",
 		*((const unsigned int *) data));
 }
 
 size_t retrace_uint_get_sz_size(const void *data,
 	const struct DataType *data_type)
 {
-	return retrace_real_impls.real_snprintf(NULL,
+	return retrace_real_impls.snprintf(NULL,
 		0,
 		"%u",
 		*((const unsigned int *) data));
@@ -340,14 +340,14 @@ size_t retrace_int16_to_sz(const void *data,
 	const struct DataType *data_type,
 	char *str)
 {
-	return retrace_real_impls.real_sprintf(str, "%" PRId16,
+	return retrace_real_impls.sprintf(str, "%" PRId16,
 		*((const int16_t *) data));
 }
 
 size_t retrace_int16_get_sz_size(const void *data,
 	const struct DataType *data_type)
 {
-	return retrace_real_impls.real_snprintf(NULL,
+	return retrace_real_impls.snprintf(NULL,
 		0,
 		"%" PRId16,
 		*((const int16_t *) data));
@@ -372,14 +372,14 @@ size_t retrace_longint_to_sz(const void *data,
 	const struct DataType *data_type,
 	char *str)
 {
-	return retrace_real_impls.real_sprintf(str, "%ld",
+	return retrace_real_impls.sprintf(str, "%ld",
 		*((const long *) data));
 }
 
 size_t retrace_longint_get_sz_size(const void *data,
 	const struct DataType *data_type)
 {
-	return retrace_real_impls.real_snprintf(NULL,
+	return retrace_real_impls.snprintf(NULL,
 		0,
 		"%ld",
 		*((const long *) data));
@@ -404,14 +404,14 @@ size_t retrace_ulong_to_sz(const void *data,
 	const struct DataType *data_type,
 	char *str)
 {
-	return retrace_real_impls.real_sprintf(str, "%lu",
+	return retrace_real_impls.sprintf(str, "%lu",
 		*((const unsigned long *) data));
 }
 
 size_t retrace_ulong_get_sz_size(const void *data,
 	const struct DataType *data_type)
 {
-	return retrace_real_impls.real_snprintf(NULL,
+	return retrace_real_impls.snprintf(NULL,
 		0,
 		"%lu",
 		*((const unsigned long *) data));
@@ -436,14 +436,14 @@ size_t retrace_longlong_to_sz(const void *data,
 	const struct DataType *data_type,
 	char *str)
 {
-	return retrace_real_impls.real_sprintf(str, "%ll",
+	return retrace_real_impls.sprintf(str, "%ll",
 		*((const long long *) data));
 }
 
 size_t retrace_longlong_get_sz_size(const void *data,
 	const struct DataType *data_type)
 {
-	return retrace_real_impls.real_snprintf(NULL,
+	return retrace_real_impls.snprintf(NULL,
 		0,
 		"%ll",
 		*((const long long *) data));
@@ -504,7 +504,7 @@ size_t retrace_char_to_sz(const void *data,
 	const struct DataType *data_type,
 	char *str)
 {
-	return retrace_real_impls.real_sprintf(str,
+	return retrace_real_impls.sprintf(str,
 			"0x%02x",
 			*((const char *) data));
 }
@@ -512,7 +512,7 @@ size_t retrace_char_to_sz(const void *data,
 size_t retrace_char_get_sz_size(const void *data,
 	const struct DataType *data_type)
 {
-	return retrace_real_impls.real_snprintf(NULL,
+	return retrace_real_impls.snprintf(NULL,
 		0,
 		"0x%02x",
 		*((const char *) data));
@@ -536,7 +536,7 @@ size_t retrace_size_t_to_sz(const void *data,
 	const struct DataType *data_type,
 	char *str)
 {
-	return retrace_real_impls.real_sprintf(str,
+	return retrace_real_impls.sprintf(str,
 		"%zu",
 		*((const size_t *) data));
 }
@@ -544,7 +544,7 @@ size_t retrace_size_t_to_sz(const void *data,
 size_t retrace_size_t_get_sz_size(const void *data,
 	const struct DataType *data_type)
 {
-	return retrace_real_impls.real_snprintf(NULL,
+	return retrace_real_impls.snprintf(NULL,
 		0,
 		"%zu",
 		*((const size_t *) data));
@@ -571,7 +571,7 @@ size_t retrace_ptr_to_sz(const void *data,
 	char *str)
 {
 	if (data)
-		return retrace_real_impls.real_sprintf(str, "%p", *((void **) data));
+		return retrace_real_impls.sprintf(str, "%p", *((void **) data));
 
 	*str = '\0';
 	return 0;
@@ -582,7 +582,7 @@ size_t retrace_ptr_get_sz_size(const void *data,
 	const struct DataType *data_type)
 {
 	if (data)
-		return retrace_real_impls.real_snprintf(NULL, 0, "%p", *((void **) data));
+		return retrace_real_impls.snprintf(NULL, 0, "%p", *((void **) data));
 
 	return 0;
 }

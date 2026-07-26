@@ -223,7 +223,7 @@ static int ia_log_params
 				arr_size--;
 			}
 
-			retrace_real_impls.real_snprintf(deref_sz,
+			retrace_real_impls.snprintf(deref_sz,
 				sizeof(deref_sz),
 				"*%s", param->param_meta.name);
 
