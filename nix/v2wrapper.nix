@@ -4,5 +4,5 @@
 }:
 
 (pkgs.callPackage ./v2.nix { }).overrideAttrs (oldAttrs: {
-  configureFlags = oldAttrs.configureFlags ++ [ "--enable-v2_wrapper" ];
+  cmakeFlags = oldAttrs.cmakeFlags ++ [ "-DRETRACE_BUILD_CLI=ON" ];
 })

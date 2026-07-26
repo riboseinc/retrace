@@ -3,7 +3,24 @@
 , stdenv ? pkgs.stdenv
 }:
 
-(pkgs.callPackage ./default.nix { }).overrideAttrs (oldAttrs: {
-  configureFlags = oldAttrs.configureFlags ++ [ "--enable-v2" ];
-  makeFlags = [ "V=1" ];
-})
+stdenv.mkDerivation rec {
+  pname = "retrace-v2";
+  version = "unstable";
+
+  src = ./..;
+
+  buildInputs = with pkgs; [
+    openssl
+  ];
+
+  nativeBuildInputs = with pkgs; [
+    cmake
+    pkg-config
+    ninja
+  ];
+
+  cmakeFlags = [
+    "-DRETRACE_BUILD_V2=ON"
+    "-DRETRACE_BUILD_TESTS=OFF"
+  ];
+}

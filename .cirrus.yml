@@ -18,7 +18,6 @@ global_task_template: &GLOBAL_TASK_TEMPLATE
   configure_script:  cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DRETRACE_BUILD_TESTS=ON
   build_script:      cmake --build build
   test_script:       ctest --test-dir build --output-on-failure
-  smoke_v1_script:   ./retrace --lib build/src/v1/libretrace.so -- /bin/id
   smoke_v2_script:
     - RETRACE_LOGGER_DEF_STDOUT_ENA=0 LD_PRELOAD=$(pwd)/build/src/v2/libretrace_v2.so /bin/id
 

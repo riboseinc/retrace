@@ -1,6 +1,11 @@
 #!/bin/bash
 set -eu
 
+# CMake-only build driver. Was the Autotools entry point; v1 + Autotools
+# were removed in Phase 9 (ADR-0011). CMake workflows (.github/workflows/,
+# .cirrus.yml) invoke cmake/ninja directly -- this script is kept only as
+# a documented entry point for local development.
+
 if [[ -n "${CMOCKA_INSTALL:-}" ]]
 then
 	LD_LIBRARY_PATH="${CMOCKA_INSTALL}/lib"
@@ -15,48 +20,18 @@ fi
 : "${SUDO:=$(get_sudo)}"
 
 test_retrace() {
-	{ [[ ! -r Makefile ]] || make clean ; } && \
-	sh autogen.sh && \
-	./configure "$@" && \
-	make ${MAKE_FLAGS:+$MAKE_FLAGS}
+	cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+		-DRETRACE_BUILD_TESTS=ON \
+		${CMOCKA_INSTALL:+-DCMAKE_PREFIX_PATH="${CMOCKA_INSTALL}"}
 
-	$SUDO make install
-	make check
-}
+	cmake --build build
 
-test_retracev1() {
-	test_retrace \
-		--disable-silent-rules \
-		${CMOCKA_INSTALL:+--with-cmocka="${CMOCKA_INSTALL}"} \
-		--enable-tests
-}
-
-test_retracev2() {
-	MAKE_FLAGS=V=1 test_retrace \
-		--enable-v2 \
-		--enable-tests
-}
-
-test_retracev2wrapper() {
-	MAKE_FLAGS=V=1 test_retrace \
-		--enable-v2 \
-		--enable-v2_wrapper \
-		--enable-tests
+	$SUDO cmake --install build
+	ctest --test-dir build --output-on-failure
 }
 
 main() {
-	# Run these tests by default
-	if [[ $# -lt 1 ]]
-	then
-		test_retracev1
-		test_retracev2
-		test_retracev2wrapper
-	else
-		for arg in "$@"
-		do
-			test_retrace"$arg"
-		done
-	fi
+	test_retrace
 }
 
 main "$@"

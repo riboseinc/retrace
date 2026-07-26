@@ -145,18 +145,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
       # ----- Smoke tests (POSIX only — no LD_PRELOAD on Windows) -----
-      # Best-effort: skipped if the v1 binary or v2 library wasn't produced.
-      # CMake v1/v2 builds are still landing (TODO.roadmap/01, 02); until
-      # then, missing artifacts are not a CI failure.
-      - name: Smoke test v1 (POSIX)
-        if: runner.os != 'Windows'
-        continue-on-error: true
-        run: |
-          ext="${{ runner.os == 'Linux' && 'so' || 'dylib' }}"
-          lib="build/src/v1/libretrace.$ext"
-          [ -x build/retrace ] && [ -f "$lib" ] || { echo "v1 artifacts missing; skipping"; exit 0; }
-          build/retrace --lib "$lib" -- /bin/id
-
+      # Best-effort: skipped if the v2 library wasn't produced.
       - name: Smoke test v2 (POSIX)
         if: runner.os != 'Windows'
         continue-on-error: true

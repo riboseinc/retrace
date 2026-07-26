@@ -12,9 +12,9 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in
       rec {
-        packages.v1 = pkgs.callPackage ./nix/default.nix { };
+        # v1 was removed in Phase 9 (ADR-0011). v2 is the only build.
         packages.v2 = pkgs.callPackage ./nix/v2.nix { };
         packages.v2wrapper = pkgs.callPackage ./nix/v2wrapper.nix { };
-        defaultPackage = packages.v1;
+        defaultPackage = packages.v2;
       });
 }

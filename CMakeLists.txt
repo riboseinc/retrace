@@ -1,12 +1,10 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # retrace top-level CMake build.
-# for the migration plan from Autotools. Both build systems coexist during
-# Phase 1-2; Autotools is removed in Phase 3.
 #
-# The CMake build is the canonical build for vcpkg / conan / system packagers.
-# The Autotools build (`./configure && make`) continues to work for existing
-# users during the transition.
+# v1 source was removed in Phase 9 (ADR-0011); CMake is now the only build
+# system. Autotools tree (configure.ac, Makefile.am, m4/, etc.) was deleted
+# in the same phase.
 
 cmake_minimum_required(VERSION 3.20)
 
@@ -27,8 +25,7 @@ project(retrace
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 # Enable GNU extensions (asm volatile, etc.) — v2's per-arch trampolines
-# use GNU-style inline assembly; several v1 files also rely on __attribute__
-# extensions. configure.ac effectively enabled these via -D_GNU_SOURCE.
+# use GNU-style inline assembly.
 set(CMAKE_C_EXTENSIONS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -50,8 +47,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # Options
 # ---------------------------------------------------------------
 
-option(RETRACE_BUILD_V1            "Build retrace v1 (deprecated; see the modernization plan/10)" ON)
-option(RETRACE_BUILD_V2            "Build retrace v2 (the future)"                       ON)
+option(RETRACE_BUILD_V2            "Build retrace v2"                                    ON)
 option(RETRACE_BUILD_CLI           "Build the retrace CLI"                               ON)
 option(RETRACE_BUILD_TESTS         "Build unit and integration tests"                    OFF)
 option(RETRACE_BUILD_DOCS          "Build Doxygen API reference"                         OFF)
@@ -64,10 +60,9 @@ option(RETRACE_ENABLE_UBSAN        "Enable UndefinedBehaviorSanitizer"          
 option(RETRACE_ENABLE_TSAN         "Enable ThreadSanitizer"                              OFF)
 option(RETRACE_BUILD_EXAMPLES      "Build the example programs"                          OFF)
 
-# retrace is a LD_PRELOAD/DYLD_INSERT library — shared by default. The v1
-# code uses _dl_sym (GLIBC_PRIVATE), which is unresolved at static-link
-# time but resolved at runtime by ld.so. BUILD_SHARED_LIBS propagates to
-# every add_library() call without an explicit type.
+# retrace is a LD_PRELOAD/DYLD_INSERT library — shared by default.
+# BUILD_SHARED_LIBS propagates to every add_library() call without an
+# explicit type.
 if(RETRACE_BUILD_SHARED AND NOT RETRACE_BUILD_STATIC)
 	set(BUILD_SHARED_LIBS ON)
 elseif(NOT RETRACE_BUILD_SHARED AND RETRACE_BUILD_STATIC)
@@ -77,8 +72,7 @@ else()
 endif()
 
 # ---------------------------------------------------------------
-# Platform detection (was: configure.ac is{linux,darwin,freebsd,openbsd})
-# Must come BEFORE the v1/v2 auto-disable logic below.
+# Platform detection
 # ---------------------------------------------------------------
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -95,9 +89,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "MSYS" OR CMAKE_SYSTEM_NAME STREQUAL "Windows"
 	set(RETRACE_PLATFORM_WINDOWS  TRUE)
 endif()
 
-# v2's assembly trampolines (src/backends/preload_*/{x86_64,aarch64}/...) are
-# per-arch. Phase 2/3 of the v2 plan added aarch64 (Linux and macOS/Apple
-# Silicon) alongside the original x86_64.
+# v2's assembly trampolines (src/backends/preload_*/{x86_64,aarch64}/...)
+# are per-arch. Both x86_64 and aarch64 are supported on Linux, macOS, BSDs.
 if(RETRACE_PLATFORM_DARWIN AND CMAKE_OSX_ARCHITECTURES)
 	set(_retrace_proc_list "${CMAKE_OSX_ARCHITECTURES}")
 else()
@@ -111,37 +104,23 @@ foreach(_proc ${_retrace_proc_list})
 	endif()
 endforeach()
 if(RETRACE_BUILD_V2 AND NOT _retrace_proc_supported)
-	message(STATUS "retrace v2 requires x86-64 or aarch64 (per-arch trampolines not yet ported); disabling. See the v2 plan/02.")
+	message(STATUS "retrace v2 requires x86-64 or aarch64 (per-arch trampolines not yet ported); disabling.")
 	set(RETRACE_BUILD_V2 OFF)
 endif()
 
-# v2 on Darwin (macOS Intel) is now unblocked via #pragma push_macro
-# hygiene in src/v2/real_impls.h.
-# macOS arm64 (Apple Silicon) is now supported via the AArch64 Mach-O
-# trampoline shipped in src/backends/preload_macho/aarch64/.
-
-# v1 source uses POSIX APIs (dlfcn, unistd, sys/socket, sys/utsname, pthread)
-# and a LD_PRELOAD/DYLD_INSERT interposition model that doesn't apply on
-# Windows native (no LD_PRELOAD; MSYS POSIX layer is a separate runtime).
-# Auto-disable v1/v2 on Windows entirely -- the Windows backends
-# (preload-msvc, preload-mingw) are SHARED libraries built independently
-# of the v1/v2 shared library. They link win_common (the from-scratch
-# inline-hooking core) and inject into a target via CreateRemoteThread.
-# See ADR-0009 for the from-scratch decision.
+# v2 core (engine.c) is POSIX-only. On Windows, the inline-hooking backends
+# (preload-msvc, preload-mingw) build standalone — they link win_common
+# directly and inject via CreateRemoteThread. See ADR-0009.
 if(RETRACE_PLATFORM_WINDOWS)
-	if(RETRACE_BUILD_V1)
-		message(STATUS "retrace v1 requires POSIX APIs not available on Windows; disabling. Windows consumers use the preload-msvc/mingw backends.")
-		set(RETRACE_BUILD_V1 OFF)
-	endif()
 	if(RETRACE_BUILD_V2)
 		message(STATUS "retrace v2 core (engine.c) requires POSIX APIs; disabling on Windows. The Windows inline-hooking backends build standalone.")
 		set(RETRACE_BUILD_V2 OFF)
 	endif()
 endif()
 
-# Feature-test macros — mirror AC_USE_SYSTEM_EXTENSIONS from configure.ac.
-# Without _GNU_SOURCE on glibc, SO_REUSEPORT / alloca / getline / S_ISVTX
-# are hidden. _DEFAULT_SOURCE covers BSDs.
+# Feature-test macros — mirror AC_USE_SYSTEM_EXTENSIONS from the old
+# configure.ac. Without _GNU_SOURCE on glibc, SO_REUSEPORT / alloca /
+# getline / S_ISVTX are hidden. _DEFAULT_SOURCE covers BSDs.
 if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
 	add_compile_definitions(_GNU_SOURCE _DEFAULT_SOURCE)
 elseif(RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
@@ -154,13 +133,13 @@ set(RETRACE_INSTALL_CMAKEDIR
 	"${CMAKE_INSTALL_LIBDIR}/cmake/retrace-${PROJECT_VERSION}"
 	CACHE PATH "Install path for CMake package config files")
 
-# macOS minimum version (was: configure.ac -mmacosx-version-min=10.12)
+# macOS minimum version
 if(RETRACE_PLATFORM_DARWIN)
 	set(CMAKE_OSX_DEPLOYMENT_TARGET "10.12" CACHE STRING "macOS deployment target" FORCE)
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_DARWIN_C_SOURCE")
 endif()
 
-# OpenBSD STAILQ_* -> SIMPLEQ_* aliasing (was: configure.ac AC_DEFINE)
+# OpenBSD STAILQ_* -> SIMPLEQ_* aliasing
 if(RETRACE_PLATFORM_OPENBSD)
 	add_compile_definitions(
 		STAILQ_INIT=SIMPLEQ_INIT
@@ -173,7 +152,7 @@ if(RETRACE_PLATFORM_OPENBSD)
 endif()
 
 # ---------------------------------------------------------------
-# Feature probes — populate config.h (was: configure.ac AC_CHECK_*)
+# Feature probes — populate config.h
 # ---------------------------------------------------------------
 
 include(CheckIncludeFile)
@@ -199,7 +178,7 @@ if(HAVE_EXECINFO_H)
 	set(BACKTRACE ON)
 endif()
 
-# gcc __atomic builtins (was: AC_LINK_IFELSE in configure.ac)
+# gcc __atomic builtins
 check_c_source_compiles("
 	int main(void) {
 		int i;
@@ -208,7 +187,7 @@ check_c_source_compiles("
 		return 0;
 	}" HAVE_ATOMIC_BUILTINS)
 
-# gettimeofday signature (was: AC_COMPILE_IFELSE in configure.ac)
+# gettimeofday signature
 check_c_source_compiles("
 	#include <sys/time.h>
 	int main(void) {
@@ -249,7 +228,6 @@ foreach(_decl
 endforeach()
 
 # struct existence (fcntl feature structs).
-# check_symbol_exists doesn't handle `struct foo` well; use a compile test.
 foreach(_struct flock fstore fpunchhole radvisory fbootstraptransfer log2phys f_owner_ex)
 	string(TOUPPER "${_struct}" _upper)
 	check_c_source_compiles("
@@ -266,7 +244,7 @@ if(Cmocka_FOUND)
 	set(USE_CMOCKA ON)
 endif()
 
-# Build switches (mirrored from configure.ac --enable-* flags)
+# Build switches
 if(RETRACE_BUILD_V2)
 	set(RTR_V2 ON)
 endif()
@@ -277,7 +255,7 @@ if(RETRACE_ENABLE_RPC)
 	set(RTR_RPC ON)
 endif()
 
-# Generate config.h from the template (was: AC_CONFIG_HEADERS([config.h]))
+# Generate config.h from the template
 configure_file(
 	"${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.h.cmake.in"
 	"${CMAKE_BINARY_DIR}/config.h"
@@ -307,8 +285,6 @@ find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 if(RETRACE_BUILD_TESTS)
-	# cmocka ships with vcpkg; for system installs use the local find module.
-	# It's optional — tests that need it are gated on its presence.
 	find_package(Cmocka QUIET)
 endif()
 
@@ -319,46 +295,32 @@ endif()
 # Public headers are installed from include/.
 add_subdirectory(include/retrace)
 
-# Core library (TODO 02) — for now, just the public API scaffold.
-# Each src/<layer>/CMakeLists.txt declares its own target. Once the layer
-# targets exist, an aggregate `retrace::core` alias ties them together.
-
-if(RETRACE_BUILD_V1)
-	add_subdirectory(src/v1)
-endif()
-
 if(RETRACE_BUILD_V2)
-	# the v2 plan/04: core engine + registries + prototypes + actions.
 	add_subdirectory(src/core)
-	# the v2 plan/04: JSON config source (vendored parson).
 	add_subdirectory(src/config)
-	# the v2 plan/05: backend plugins (preload-elf/macho/bsd, future msvc/mingw/ptrace).
 	add_subdirectory(src/backends)
-	# v2 itself is now a thin shim that links core + config_json + backends + funcs_symbols.S.
 	add_subdirectory(src/v2)
 elseif(RETRACE_PLATFORM_WINDOWS)
 	# Windows: build the inline-hooking backends standalone (ADR-0009).
-	# The v2 core (engine.c) is POSIX-only and stays off here; the
-	# preload-msvc / preload-mingw DLLs link win_common directly.
 	add_subdirectory(src/backends)
 endif()
 
-# CLI (TODO 06) — placeholder until the new CLI lands.
-# For now, the v1 launcher is the canonical `retrace` binary.
+# CLI launcher — built unconditionally when v2 is built.
+# TODO: Phase 10 will add the new CLI binary.
 if(RETRACE_BUILD_CLI)
-	# add_subdirectory(src/cli)  # TODO 06
+	# add_subdirectory(src/cli)
 endif()
 
 if(RETRACE_BUILD_TESTS)
-	if(RETRACE_BUILD_V1)
+	if(RETRACE_BUILD_V2)
 		enable_testing()
 		add_subdirectory(test)
 	else()
-		message(STATUS "Tests requested but RETRACE_BUILD_V1=OFF; skipping (tests link against v1).")
+		message(STATUS "Tests requested but RETRACE_BUILD_V2=OFF; skipping.")
 	endif()
 endif()
 
-if(RETRACE_BUILD_EXAMPLES AND RETRACE_BUILD_V1)
+if(RETRACE_BUILD_EXAMPLES)
 	add_subdirectory(examples)
 endif()
 
@@ -366,12 +328,13 @@ if(RETRACE_ENABLE_RPC)
 	add_subdirectory(rpc)
 endif()
 
-if(RETRACE_BUILD_V1)
+# tools/ uses POSIX-only headers (sys/wait.h etc.) -- skip on Windows.
+if(NOT RETRACE_PLATFORM_WINDOWS)
 	add_subdirectory(tools)
 endif()
 
 # ---------------------------------------------------------------
-# Package config (TODO 07)
+# Package config
 # ---------------------------------------------------------------
 
 include(CMakePackageConfigHelpers)
@@ -391,7 +354,7 @@ install(FILES
 	"${CMAKE_CURRENT_BINARY_DIR}/retrace-config-version.cmake"
 	DESTINATION "${RETRACE_INSTALL_CMAKEDIR}")
 
-# pkg-config module (TODO 07)
+# pkg-config module
 configure_file(
 	"${CMAKE_CURRENT_SOURCE_DIR}/cmake/retrace-core.pc.in"
 	"${CMAKE_CURRENT_BINARY_DIR}/retrace-core.pc"
