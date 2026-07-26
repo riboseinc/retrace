@@ -306,6 +306,11 @@ if(RETRACE_BUILD_V1)
 endif()
 
 if(RETRACE_BUILD_V2)
+	# TODO.v2/04: core engine + registries + prototypes + actions.
+	add_subdirectory(src/core)
+	# TODO.v2/04: JSON config source (vendored parson).
+	add_subdirectory(src/config)
+	# v2 itself is now a thin shim that links core + config_json + arch trampoline.
 	add_subdirectory(src/v2)
 endif()
 
