@@ -15,7 +15,8 @@ test/strinject
 test/strinject.conf
 temp
 examples/dns-fuzz/axfr
-core
+/core
+core.[0-9]*
 tools/stringinjector/stringinjector
 tools/spawn/spawn
 libnereon/
