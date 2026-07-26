@@ -147,21 +147,31 @@ long RETRACE_IMPLEMENTATION(ptrace)(enum __ptrace_request request, ...)
 		request_str = "PTRACE_GETREGS";
 		break;
 #endif
+#if HAVE_DECL_PTRACE_SETREGS
 	case PTRACE_SETREGS:
 		request_str = "PTRACE_SETREGS";
 		break;
+#endif
+#if HAVE_DECL_PTRACE_GETFPREGS
 	case PTRACE_GETFPREGS:
 		request_str = "PTRACE_GETFPREGS";
 		break;
+#endif
+#if HAVE_DECL_PTRACE_SETFPREGS
 	case PTRACE_SETFPREGS:
 		request_str = "PTRACE_SETFPREGS";
 		break;
+#endif
+#if HAVE_DECL_PTRACE_GETFPXREGS
 	case PTRACE_GETFPXREGS:
 		request_str = "PTRACE_GETFPXREGS";
 		break;
+#endif
+#if HAVE_DECL_PTRACE_SETFPXREGS
 	case PTRACE_SETFPXREGS:
 		request_str = "PTRACE_SETFPXREGS";
 		break;
+#endif
 	case PTRACE_SYSCALL:
 		request_str = "PTRACE_SYSCALL";
 		break;

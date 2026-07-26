@@ -1,0 +1,106 @@
+# Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
+# BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+# MSys2 / MinGW-w64 build. Two environments in matrix: mingw64 and ucrt64.
+# See TODO.roadmap/09-ci-cd-modernization.md.
+#
+# Kept separate from build.yml because:
+#   - Different shell (msys2 {0}, not pwsh or bash).
+#   - Different toolchain (gcc, not MSVC).
+#   - vcpkg mingw-static triplet, not the windows triplet.
+
+name: MSYS
+
+on:
+  push:
+    branches: [ main, 'release/**' ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref_name }}'
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: Release
+  MAKEFLAGS: -j4
+  VCPKG_REF: 4f95fba7a7d1101bb8acdeb51e4609686449701e
+
+jobs:
+  build-and-smoke-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        sys: [ mingw64, ucrt64 ]
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Setup msys
+        uses: msys2/setup-msys2@v2
+        with:
+          path-type: inherit
+          msystem: ${{ matrix.sys }}
+          update: false
+          install: git flex bison gettext-devel
+          pacboy: cmake:p python3:p ninja:p curl:p pkgconf:p gcc:p openssl:p
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure cache
+        run: |
+          printf 'VCPKG_DEFAULT_BINARY_CACHE<<EOF\n%s\nEOF\n' "$(pwd)/cache" >> "$GITHUB_ENV"
+          printf 'CI_CACHE<<EOF\n%s\nEOF\n'                   "$(pwd -W)/cache" >> "$GITHUB_ENV"
+
+      - name: Create cache storage
+        run: mkdir "$VCPKG_DEFAULT_BINARY_CACHE"
+
+      - name: Restore vcpkg cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CI_CACHE }}
+          key: ${{ github.workflow }}-${{ matrix.sys }}-vcpkg-${{ env.VCPKG_REF }}
+
+      - name: Bootstrap vcpkg
+        run: |
+          if [ ! -x vcpkg/vcpkg ]; then
+            git clone https://github.com/microsoft/vcpkg.git vcpkg
+            cd vcpkg && git checkout "$VCPKG_REF"
+            ./bootstrap-vcpkg.sh -disableMetrics
+          fi
+
+      - name: Configure
+        run: |
+          cmake -B build \
+                -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+                -DVCPKG_TARGET_TRIPLET=x64-mingw-static \
+                -DCMAKE_TOOLCHAIN_FILE="$(pwd)/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: cmake --build build --config ${{ env.BUILD_TYPE }}
+
+      - name: Smoke test
+        run: ./build/retrace --help

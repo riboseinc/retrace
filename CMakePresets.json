@@ -1,0 +1,101 @@
+{
+	"version": 5,
+	"cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
+	"configurePresets": [
+		{
+			"name": "_base",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+			}
+		},
+		{
+			"name": "debug",
+			"inherits": "_base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"RETRACE_BUILD_TESTS": "ON"
+			}
+		},
+		{
+			"name": "release",
+			"inherits": "_base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+		{
+			"name": "relwithdebinfo",
+			"inherits": "_base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo"
+			}
+		},
+		{
+			"name": "sanitize-asan",
+			"inherits": "_base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"RETRACE_BUILD_TESTS": "ON",
+				"RETRACE_ENABLE_ASAN": "ON",
+				"RETRACE_ENABLE_UBSAN": "ON"
+			}
+		},
+		{
+			"name": "sanitize-tsan",
+			"inherits": "_base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"RETRACE_BUILD_TESTS": "ON",
+				"RETRACE_ENABLE_TSAN": "ON"
+			}
+		},
+		{
+			"name": "coverage",
+			"inherits": "_base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"RETRACE_BUILD_TESTS": "ON",
+				"RETRACE_ENABLE_COVERAGE": "ON"
+			}
+		},
+		{
+			"name": "vcpkg-debug",
+			"inherits": "debug",
+			"cacheVariables": {
+				"CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+			}
+		},
+		{
+			"name": "vcpkg-release",
+			"inherits": "release",
+			"cacheVariables": {
+				"CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+			}
+		}
+	],
+	"buildPresets": [
+		{ "name": "debug",           "configurePreset": "debug" },
+		{ "name": "release",         "configurePreset": "release" },
+		{ "name": "relwithdebinfo",  "configurePreset": "relwithdebinfo" },
+		{ "name": "sanitize-asan",   "configurePreset": "sanitize-asan" },
+		{ "name": "sanitize-tsan",   "configurePreset": "sanitize-tsan" },
+		{ "name": "coverage",        "configurePreset": "coverage" },
+		{ "name": "vcpkg-debug",     "configurePreset": "vcpkg-debug" },
+		{ "name": "vcpkg-release",   "configurePreset": "vcpkg-release" }
+	],
+	"testPresets": [
+		{
+			"name": "debug",
+			"configurePreset": "debug",
+			"output": { "outputOnFailure": true },
+			"execution": { "noTestsAction": "error", "stopOnFailure": false }
+		},
+		{
+			"name": "sanitize-asan",
+			"configurePreset": "sanitize-asan",
+			"output": { "outputOnFailure": true }
+		}
+	]
+}

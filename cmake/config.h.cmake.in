@@ -1,0 +1,141 @@
+/*
+ * config.h template for CMake. Probes are populated by the top-level
+ * CMakeLists.txt via check_symbol_exists / check_struct_has_member etc.
+ * See TODO.roadmap/01-foundation-build-cmake.md.
+ *
+ * This file is the CMake-native equivalent of config.h.in (which is
+ * autoheader-generated for the Autotools build). Both produce the same
+ * config.h semantics.
+ */
+
+#ifndef RETRACE_CONFIG_H
+#define RETRACE_CONFIG_H
+
+/* Package identification — used by retrace.c --version output. */
+#define PACKAGE "retrace"
+#define PACKAGE_NAME "retrace"
+#define PACKAGE_VERSION "@PROJECT_VERSION@"
+#define PACKAGE_BUGREPORT "https://github.com/riboseinc/retrace/issues"
+#define PACKAGE_URL "https://github.com/riboseinc/retrace"
+
+/* Enable GNU extensions on glibc. */
+#cmakedefine _GNU_SOURCE
+
+/* macOS-specific _DARWIN_C_SOURCE — set by CMakeLists on Darwin. */
+#cmakedefine _DARWIN_C_SOURCE
+
+/* Header presence (was: AC_CHECK_HEADERS_ONCE in configure.ac).
+ * Use 01 form so `#if HAVE_FOO` works (no-value `#define` is not a valid
+ * `#if` expression). */
+#cmakedefine01 HAVE_DLFCN_H
+#cmakedefine01 HAVE_DIRENT_H
+#cmakedefine01 HAVE_EXECINFO_H
+#cmakedefine01 HAVE_PTHREAD_H
+#cmakedefine01 HAVE_PTHREAD_NP_H
+#cmakedefine01 HAVE_LWP_H
+#cmakedefine01 HAVE_PWD_H
+#cmakedefine01 HAVE_RUNETYPE_H
+#cmakedefine01 HAVE_SYSCALL_H
+#cmakedefine01 HAVE_UNISTD_H
+#cmakedefine01 HAVE_SYS_STAT_H
+#cmakedefine01 HAVE_SYS_TIME_H
+#cmakedefine01 HAVE_SYS_TYPES_H
+#cmakedefine01 HAVE_SYS_UTSNAME_H
+
+/* gcc __atomic builtins. */
+#cmakedefine01 HAVE_ATOMIC_BUILTINS
+
+/* Backtrace support via execinfo.h. */
+#cmakedefine01 BACKTRACE
+
+/* cmocka unit-test framework. */
+#cmakedefine01 HAVE_CMOCKA_H
+#cmakedefine01 USE_CMOCKA
+
+/* gettimeofday signature: 1 if second arg is void*, 0 if struct timezone*. */
+#cmakedefine01 HAVE_GETTIMEOFDAY_WITHOUT_TIMEZONE
+
+/* O_TMPFILE (Linux 3.11+). */
+#cmakedefine01 HAVE_DECL_O_TMPFILE
+
+/* PTRACE features (Linux). */
+#cmakedefine01 HAVE_DECL_PTRACE_GETREGS
+#cmakedefine01 HAVE_DECL_PTRACE_SETREGS
+#cmakedefine01 HAVE_DECL_PTRACE_GETFPREGS
+#cmakedefine01 HAVE_DECL_PTRACE_SETFPREGS
+#cmakedefine01 HAVE_DECL_PTRACE_GETFPXREGS
+#cmakedefine01 HAVE_DECL_PTRACE_SETFPXREGS
+#cmakedefine01 HAVE_DECL_PTRACE_GETREGSET
+#cmakedefine01 HAVE_DECL_PTRACE_SETREGSET
+#cmakedefine01 HAVE_DECL_PTRACE_SEIZE
+#cmakedefine01 HAVE_DECL_PTRACE_INTERRUPT
+#cmakedefine01 HAVE_DECL_PTRACE_LISTEN
+#cmakedefine01 HAVE_DECL_PTRACE_PEEKSIGINFO
+
+/* fcntl f_features (used by src/v1/file.c). */
+#cmakedefine01 HAVE_DECL_F_DUPFD_CLOEXEC
+#cmakedefine01 HAVE_DECL_F_SETOWN
+#cmakedefine01 HAVE_DECL_F_GETOWN
+#cmakedefine01 HAVE_DECL_F_SETLKW
+#cmakedefine01 HAVE_DECL_F_GETPATH
+#cmakedefine01 HAVE_DECL_F_PREALLOCATE
+#cmakedefine01 HAVE_DECL_F_PUNCHHOLE
+#cmakedefine01 HAVE_DECL_F_SETSIZE
+#cmakedefine01 HAVE_DECL_F_RDADVISE
+#cmakedefine01 HAVE_DECL_F_RDAHEAD
+#cmakedefine01 HAVE_DECL_F_READBOOTSTRAP
+#cmakedefine01 HAVE_DECL_F_WRITEBOOTSTRAP
+#cmakedefine01 HAVE_DECL_F_NOCACHE
+#cmakedefine01 HAVE_DECL_F_LOG2PHYS
+#cmakedefine01 HAVE_DECL_F_LOG2PHYS_EXT
+#cmakedefine01 HAVE_DECL_F_FULLFSYNC
+#cmakedefine01 HAVE_DECL_F_SETNOSIGPIPE
+#cmakedefine01 HAVE_DECL_F_GETNOSIGPIPE
+#cmakedefine01 HAVE_DECL_F_OFD_SETLK
+#cmakedefine01 HAVE_DECL_F_OFD_SETLKW
+#cmakedefine01 HAVE_DECL_F_OFD_GETLK
+#cmakedefine01 HAVE_DECL_F_GETOWN_EX
+#cmakedefine01 HAVE_DECL_F_SETOWN_EX
+#cmakedefine01 HAVE_DECL_F_GETSIG
+#cmakedefine01 HAVE_DECL_F_SETSIG
+#cmakedefine01 HAVE_DECL_F_SETLEASE
+#cmakedefine01 HAVE_DECL_F_GETLEASE
+#cmakedefine01 HAVE_DECL_F_NOTIFY
+#cmakedefine01 HAVE_DECL_F_SETPIPE_SZ
+#cmakedefine01 HAVE_DECL_F_GETPIPE_SZ
+#cmakedefine01 HAVE_DECL_F_ADD_SEALS
+#cmakedefine01 HAVE_DECL_F_GET_SEALS
+
+/* struct types referenced from fcntl features. */
+#cmakedefine01 HAVE_STRUCT_FLOCK
+#cmakedefine01 HAVE_STRUCT_FSTORE
+#cmakedefine01 HAVE_STRUCT_FPUNCHHOLE
+#cmakedefine01 HAVE_STRUCT_RADVISORY
+#cmakedefine01 HAVE_STRUCT_FBOOTSTRAPTRANSFER
+#cmakedefine01 HAVE_STRUCT_LOG2PHYS
+#cmakedefine01 HAVE_STRUCT_F_OWNER_EX
+
+/* Socket options (used by src/v1/sock.c). */
+#cmakedefine01 HAVE_DECL_SOCK_PACKET
+#cmakedefine01 HAVE_DECL_SO_BINDTODEVICE
+#cmakedefine01 HAVE_DECL_SO_BSDCOMPAT
+#cmakedefine01 HAVE_DECL_SO_DOMAIN
+#cmakedefine01 HAVE_DECL_SO_MARK
+#cmakedefine01 HAVE_DECL_SO_PASSCRED
+#cmakedefine01 HAVE_DECL_SO_PEERCRED
+#cmakedefine01 HAVE_DECL_SO_PRIORITY
+#cmakedefine01 HAVE_DECL_SO_PROTOCOL
+#cmakedefine01 HAVE_DECL_SO_RXQ_OVFL
+#cmakedefine01 HAVE_DECL_SO_SNDBUFFORCE
+#cmakedefine01 HAVE_DECL_SO_RCVBUFFORCE
+#cmakedefine01 HAVE_DECL_SO_BUSY_POLL
+
+/* _IO_putc (glibc internal). */
+#cmakedefine01 HAVE_DECL__IO_PUTC
+
+/* retrace build switches. */
+#cmakedefine01 RTR_V2
+#cmakedefine01 RTR_V2_WRAPPER
+#cmakedefine01 RTR_RPC
+
+#endif /* RETRACE_CONFIG_H */

@@ -1,31 +1,33 @@
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# FreeBSD CI via Cirrus. See TODO.roadmap/09-ci-cd-modernization.md.
+#
+# CMake build, mirroring the GHA workflows. The GHA workflows cover
+# Ubuntu/Alpine/macOS/Windows; Cirrus is the canonical FreeBSD surface.
+
 env:
   PATH: /usr/local/bin:$PATH
-  MD5SUM: /sbin/md5sum
-  CMOCKA_INSTALL: $PWD/builds/cmocka-install
-  CHECKPATCH_INSTALL: $PWD/builds/checkpatch-install
 
 global_task_template: &GLOBAL_TASK_TEMPLATE
   only_if: $CIRRUS_BRANCH == 'master' || $CIRRUS_BRANCH == 'main' || $CIRRUS_BRANCH =~ 'release/.*' || $CIRRUS_PR != ''
-  skip: "!changesInclude('.cirrus.yml', 'ci/before_install/freebsd.sh') && changesIncludeOnly('*.sh', '.*', '_*', 'Brewfile', 'ci/**/*', 'doc/*', 'doc/**/*', '*.adoc', '*.md', '*.nix', 'flake.lock', '.github/**/*') || $CIRRUS_CHANGE_MESSAGE =~ '.*skip ci.*'"
+  skip: |
+    $CIRRUS_CHANGE_MESSAGE =~ '.*skip ci.*'
   setup_environment_script: |
-    # Update all packages to avoid "version FBSD_1.6 not found" error
-    # See: https://forums.freebsd.org/threads/lib-libc-so-7-version-fbsd_1-6-required-by-usr-local-lib-libepoll-shim-so-0-not-found.81021/
     pkg update -f
-    pkg upgrade -f -y
-    # Use bash for the CI scripts
-    pkg install -y devel/readline bash
-  install_build_prerequisites_script:
-    - ./ci/before_install.sh
-    - bash ./ci/install.sh
-  ci_script:
-    - bash ./ci/main.sh
-
-freebsd-12-3-task:
-  << : *GLOBAL_TASK_TEMPLATE
-  freebsd_instance:
-    image: freebsd-12-3-release-amd64
+    pkg install -y cmake ninja pkgconf openssl git bash
+  configure_script:  cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DRETRACE_BUILD_TESTS=ON
+  build_script:      cmake --build build
+  test_script:       ctest --test-dir build --output-on-failure
+  smoke_v1_script:   ./retrace --lib build/src/v1/libretrace.so -- /bin/id
+  smoke_v2_script:
+    - RETRACE_LOGGER_DEF_STDOUT_ENA=0 LD_PRELOAD=$(pwd)/build/src/v2/libretrace_v2.so /bin/id
 
 freebsd-13-task:
   << : *GLOBAL_TASK_TEMPLATE
   freebsd_instance:
-    image: freebsd-13-0-release-amd64
+    image_family: freebsd-13-4
+
+freebsd-14-task:
+  << : *GLOBAL_TASK_TEMPLATE
+  freebsd_instance:
+    image_family: freebsd-14-2

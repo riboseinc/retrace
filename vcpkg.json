@@ -1,0 +1,25 @@
+{
+	"$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+	"name": "retrace",
+	"version": "2.0.1",
+	"description": "Versatile security vulnerability / bug discovery tool for ELF and Mach-O binaries. Intercepts libc calls in dynamically-linked binaries for tracing, redirection, and fuzzing.",
+	"homepage": "https://github.com/riboseinc/retrace",
+	"license": "BSD-2-Clause",
+	"dependencies": [
+		"openssl"
+	],
+	"features": {
+		"tests": {
+			"description": "Build unit and integration tests",
+			"dependencies": [
+				"cmocka"
+			]
+		},
+		"cli": {
+			"description": "Build the retrace command-line interface"
+		},
+		"v1": {
+			"description": "Build deprecated v1 implementation (maintenance only)"
+		}
+	}
+}

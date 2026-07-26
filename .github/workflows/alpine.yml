@@ -1,0 +1,122 @@
+# Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
+# BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+# Alpine / musl build, x86_64 (native container) + aarch64 (qemu binfmt).
+# See TODO.roadmap/09-ci-cd-modernization.md.
+#
+# Kept separate from build.yml because:
+#   - Different package manager (apk, not apt).
+#   - Container-based, not bare runner.
+#   - arm64 requires QEMU binfmt setup that doesn't apply to native runners.
+
+name: Alpine
+
+on:
+  push:
+    branches: [ main, 'release/**' ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref_name }}'
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: Release
+  ALPINE_VERSION: "3.21"
+  VCPKG_REF: 4f95fba7a7d1101bb8acdeb51e4609686449701e
+
+jobs:
+  build-x86_64:
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:${{ env.ALPINE_VERSION }}
+    env:
+      VCPKG_FORCE_SYSTEM_BINARIES: "1"
+    steps:
+      - run: |
+          apk --no-cache add
+            build-base cmake git ninja clang gcc
+            openssl-dev openssl-libs-static
+            pkgconfig python3 zip unzip curl
+            linux-headers bash
+      - uses: actions/checkout@v4
+      - run: git config --global --add safe.directory "$(pwd)"
+      - run: mkdir -p cache
+      - run: echo "VCPKG_DEFAULT_BINARY_CACHE=$(pwd)/cache" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            cache
+            vcpkg/.git
+            vcpkg/buildtrees
+            vcpkg/downloads
+            vcpkg/packages
+          key: ${{ github.workflow }}-x64-vcpkg-${{ env.VCPKG_REF }}
+      - name: Bootstrap vcpkg
+        run: |
+          if [ ! -x vcpkg/vcpkg ]; then
+            git clone https://github.com/microsoft/vcpkg.git vcpkg
+            cd vcpkg && git checkout "$VCPKG_REF"
+            ./bootstrap-vcpkg.sh -disableMetrics
+          fi
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+                -DCMAKE_C_COMPILER=clang \
+                -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
+                -DRETRACE_BUILD_TESTS=ON
+      - run: ninja -C build
+      - run: ctest --test-dir build --output-on-failure
+      - name: Smoke test
+        env:
+          RETRACE_LOGGER_DEF_STDOUT_ENA: "0"
+        run: |
+          LD_PRELOAD="$(pwd)/build/src/v2/libretrace_v2.so" /bin/id
+
+  build-aarch64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Build in arm64 Alpine container
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD:/work" -w /work \
+            "arm64v8/alpine:${{ env.ALPINE_VERSION }}" sh -c '
+              set -e
+              apk --no-cache add
+                build-base cmake git ninja clang gcc
+                openssl-dev openssl-libs-static
+                pkgconfig python3 linux-headers bash
+              cmake -B build -G Ninja
+                    -DCMAKE_BUILD_TYPE='"${{ env.BUILD_TYPE }}"'
+                    -DCMAKE_C_COMPILER=clang
+                    -DRETRACE_BUILD_TESTS=ON
+              ninja -C build
+              ctest --test-dir build --output-on-failure
+            '
