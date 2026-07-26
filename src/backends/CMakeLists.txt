@@ -31,6 +31,7 @@ target_include_directories(retrace_backends
 
 if(RETRACE_PLATFORM_LINUX)
 	add_subdirectory(preload_elf)
+	add_subdirectory(ptrace)
 endif()
 
 if(RETRACE_PLATFORM_DARWIN)

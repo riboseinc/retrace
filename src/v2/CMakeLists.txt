@@ -51,11 +51,13 @@ target_link_libraries(retrace_v2 PRIVATE
 	retrace_backends
 	retrace_preload_common)
 
-# Pull in the per-platform backend(s). On Linux this is preload_elf; on
-# macOS preload_macho; on BSDs preload_bsd. Future Windows: preload_msvc
-# + preload_mingw (the v2 plan/06).
+# Pull in the per-platform backend(s). On Linux this is preload_elf +
+# ptrace (static binaries); on macOS preload_macho; on BSDs preload_bsd.
+# Future Windows: preload_msvc + preload_mingw (the v2 plan/06).
 if(RETRACE_PLATFORM_LINUX)
-	target_link_libraries(retrace_v2 PRIVATE retrace_backend_preload_elf)
+	target_link_libraries(retrace_v2 PRIVATE
+		retrace_backend_preload_elf
+		retrace_backend_ptrace)
 elseif(RETRACE_PLATFORM_DARWIN)
 	target_link_libraries(retrace_v2 PRIVATE retrace_backend_preload_macho)
 elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
