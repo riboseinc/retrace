@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# retrace top-level CMake build. See TODO.roadmap/01-foundation-build-cmake.md
+# retrace top-level CMake build.
 # for the migration plan from Autotools. Both build systems coexist during
 # Phase 1-2; Autotools is removed in Phase 3.
 #
@@ -50,7 +50,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # Options
 # ---------------------------------------------------------------
 
-option(RETRACE_BUILD_V1            "Build retrace v1 (deprecated; see TODO.roadmap/10)" ON)
+option(RETRACE_BUILD_V1            "Build retrace v1 (deprecated; see the modernization plan/10)" ON)
 option(RETRACE_BUILD_V2            "Build retrace v2 (the future)"                       ON)
 option(RETRACE_BUILD_CLI           "Build the retrace CLI"                               ON)
 option(RETRACE_BUILD_TESTS         "Build unit and integration tests"                    OFF)
@@ -96,7 +96,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "MSYS" OR CMAKE_SYSTEM_NAME STREQUAL "Windows"
 endif()
 
 # v2's assembly trampolines (src/v2/arch/x86-64/*) are x86-64 only until
-# arm64 backends land (TODO.roadmap/03). Auto-disable on non-x86-64 hosts
+# arm64 backends land (the modernization plan/03). Auto-disable on non-x86-64 hosts
 # unless the user explicitly insisted.
 # macOS special-case: respect CMAKE_OSX_ARCHITECTURES if set (cross-compile).
 if(RETRACE_PLATFORM_DARWIN AND CMAKE_OSX_ARCHITECTURES)
@@ -105,14 +105,14 @@ else()
 	set(_retrace_proc "${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 if(RETRACE_BUILD_V2 AND NOT _retrace_proc MATCHES "x86_64|amd64|AMD64")
-	message(STATUS "retrace v2 requires x86-64 (per-arch trampolines not yet ported); disabling. See TODO.v2/02.")
+	message(STATUS "retrace v2 requires x86-64 (per-arch trampolines not yet ported); disabling. See the v2 plan/02.")
 	set(RETRACE_BUILD_V2 OFF)
 endif()
 
 # v2 on Darwin (macOS Intel) is now unblocked via #pragma push_macro
-# hygiene in src/v2/real_impls.h. See TODO.v2/01-darwin-macro-hygiene.md.
+# hygiene in src/v2/real_impls.h.
 # macOS arm64 (Apple Silicon) still auto-disables via the x86-64 check
-# above until TODO.v2/03 lands the AArch64 macOS trampoline.
+# above until the v2 plan/03 lands the AArch64 macOS trampoline.
 
 # v1 source uses POSIX APIs (dlfcn, unistd, sys/socket, sys/utsname, pthread)
 # and a LD_PRELOAD/DYLD_INSERT interposition model that doesn't apply on
@@ -312,11 +312,11 @@ if(RETRACE_BUILD_V1)
 endif()
 
 if(RETRACE_BUILD_V2)
-	# TODO.v2/04: core engine + registries + prototypes + actions.
+	# the v2 plan/04: core engine + registries + prototypes + actions.
 	add_subdirectory(src/core)
-	# TODO.v2/04: JSON config source (vendored parson).
+	# the v2 plan/04: JSON config source (vendored parson).
 	add_subdirectory(src/config)
-	# TODO.v2/05: backend plugins (preload-elf/macho/bsd, future msvc/mingw/ptrace).
+	# the v2 plan/05: backend plugins (preload-elf/macho/bsd, future msvc/mingw/ptrace).
 	add_subdirectory(src/backends)
 	# v2 itself is now a thin shim that links core + config_json + backends + funcs_symbols.S.
 	add_subdirectory(src/v2)

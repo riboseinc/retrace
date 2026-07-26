@@ -24,7 +24,7 @@
  */
 
 /*
- * retrace public API — see TODO.roadmap/05-library-public-api.md
+ * retrace public API — see the modernization plan.md
  *
  * Design constraints (see docs/adr/0008-opaque-public-types-for-abi.md):
  *   - All types are opaque handles. Struct definitions are internal.
@@ -125,7 +125,7 @@ RETRACE_API retrace_status_t retrace_engine_set_option(
  *
  * Backends self-register at constructor time. The engine selects one by
  * probing each registered backend; `retrace_engine_select_backend` forces
- * a specific one. See include/retrace/backend.h (TODO.roadmap/03).
+ * a specific one. See include/retrace/backend.h (the modernization plan/03).
  */
 RETRACE_API const char *const *retrace_engine_list_backends(
 		retrace_engine_t *eng, size_t *count);
@@ -136,7 +136,7 @@ RETRACE_API retrace_status_t retrace_engine_select_backend(
  * Programmatic script builder
  *
  * Build a script in C without parsing a file. Equivalent to the JSON path
- * but with no serialization in between. See TODO.roadmap/04-config-sources.md.
+ * but with no serialization in between.
  */
 RETRACE_API retrace_script_t *retrace_script_new(retrace_engine_t *eng);
 RETRACE_API void              retrace_script_free(retrace_script_t *script);
@@ -170,7 +170,7 @@ RETRACE_API retrace_status_t retrace_intercept_rule_add_action(
  * Config parsing
  *
  * Delegates to the named config source (typically "json" or "text").
- * Sources self-register at constructor time. See TODO.roadmap/04.
+ * Sources self-register at constructor time. See the modernization plan/04.
  */
 RETRACE_API retrace_status_t retrace_config_parse_file(
 		retrace_engine_t *eng,

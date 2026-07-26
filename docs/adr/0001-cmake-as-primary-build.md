@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-07-26
 - **Supersedes**: Autotools build (`configure.ac`, `Makefile.am`, `autogen.sh`)
-- **References**: TODO.roadmap/01
+- **References**: the modernization plan/01
 
 ## Context
 

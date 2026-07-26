@@ -24,7 +24,7 @@
  */
 
 /*
- * retrace backend interface — see TODO.v2/05-backend-abstraction.md and
+ * retrace backend interface — see the v2 plan.md and
  * ADR-0003-plugin-pattern-for-backends.md.
  *
  * A backend owns one (OS, arch) pair's interposition mechanism. The engine

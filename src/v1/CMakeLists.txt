@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# retrace v1 build under CMake. See TODO.roadmap/01-foundation-build-cmake.md.
+# retrace v1 build under CMake.
 #
 # This file builds the v1 library and launcher in parallel with the existing
 # Autotools build. It does NOT yet have feature parity — the Autotools build
@@ -76,7 +76,7 @@ install(TARGETS retrace_v1 retrace
 install(FILES ${_v1_headers}
 	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/retrace/v1)
 
-# TODO.roadmap/01 tasks for v1-CMake parity:
+# the modernization plan/01 tasks for v1-CMake parity:
 #
 # - [ ] Mirror every AC_CHECK_DECLS probe (O_TMPFILE, PTRACE_*, SO_*, fcntl
 #       features) via check_symbol_exists / check_struct_member.

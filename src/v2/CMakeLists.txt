@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# retrace v2 shared library. After TODO.v2/04 (engine refactor) and
-# TODO.v2/05 (backend abstraction), this is a thin shim:
+# retrace v2 shared library. After the v2 plan/04 (engine refactor) and
+# the v2 plan/05 (backend abstraction), this is a thin shim:
 #   - retrace_core             (object library): engine + registries
 #   - retrace_config_json      (object library): JSON config source
 #   - retrace_backends         (object library): backend registry
@@ -11,7 +11,7 @@
 #
 # The v2 shared library is what consumers LD_PRELOAD/DYLD_INSERT.
 
-# Per-arch function table. Phase 2 of TODO.v2 splits this per arch
+# Per-arch function table. Phase 2 of the v2 plan splits this per arch
 # (x86_64 vs aarch64) so each arch builds its own set.
 set(_v2_trampoline_sources funcs_symbols.S)
 
@@ -27,7 +27,7 @@ target_link_libraries(retrace_v2 PRIVATE
 
 # Pull in the per-platform backend(s). On Linux this is preload_elf; on
 # macOS preload_macho; on BSDs preload_bsd. Future Windows: preload_msvc
-# + preload_mingw (TODO.v2/06).
+# + preload_mingw (the v2 plan/06).
 if(RETRACE_PLATFORM_LINUX)
 	target_link_libraries(retrace_v2 PRIVATE retrace_backend_preload_elf)
 elseif(RETRACE_PLATFORM_DARWIN)
@@ -37,7 +37,7 @@ elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_
 endif()
 
 # Find the per-backend arch_spec_top.S that funcs_symbols.S includes.
-# Phase 2 of TODO.v2 moves funcs_symbols.S into each backend's directory.
+# Phase 2 of the v2 plan moves funcs_symbols.S into each backend's directory.
 if(RETRACE_PLATFORM_LINUX)
 	set(_v2_arch_dir ${CMAKE_SOURCE_DIR}/src/backends/preload_elf/x86_64)
 elseif(RETRACE_PLATFORM_DARWIN)

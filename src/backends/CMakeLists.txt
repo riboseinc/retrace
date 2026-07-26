@@ -4,7 +4,7 @@
 # Adding a new backend is purely additive: new directory + new
 # add_subdirectory call here. Engine code never changes.
 #
-# See TODO.v2/05-backend-abstraction.md and ADR-0003.
+# and ADR-0003.
 
 # Shared spawn helper for preload-* backends. Linked into each backend
 # target PRIVATE so its symbols don't leak across backends.
@@ -27,7 +27,7 @@ target_include_directories(retrace_backends
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
 # Per-backend OBJECT libraries, each owns its trampoline + bottom + backend.c.
-# Phase 2 of TODO.v2 adds aarch64/ subdirs alongside x86_64/ in each backend.
+# Phase 2 of the v2 plan adds aarch64/ subdirs alongside x86_64/ in each backend.
 
 if(RETRACE_PLATFORM_LINUX)
 	add_subdirectory(preload_elf)

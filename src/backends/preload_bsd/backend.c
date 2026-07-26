@@ -30,7 +30,7 @@
  * only the bottom.c differs (different printf-vararg parsing and
  * real-impl resolver). Spawn is the same shared helper as preload-elf.
  *
- * See TODO.v2/05-backend-abstraction.md.
+ *
  */
 
 #include <retrace/backend.h>

@@ -42,7 +42,7 @@
  * rewrite the field name to `__builtin___sprintf_chk`, breaking the
  * struct. Suppress the macros just for the struct declaration; restore
  * them after so the fortified versions remain in effect at all consumer
- * call sites (34 of them — see TODO.v2/01-darwin-macro-hygiene.md).
+ * call sites (34 of them — see the v2 plan.md).
  */
 #if defined(__clang__) || defined(__GNUC__)
 #  define RETRACE_PUSH_MACROS() \
@@ -96,7 +96,7 @@ struct RetraceRealImpls {
 	 * macro-substitutes the bare names (sprintf -> __builtin___sprintf_chk).
 	 * The macro fires both at struct declaration AND at member-access
 	 * call sites (`obj.snprintf(...)` would expand the `snprintf(...)` part).
-	 * Renaming the fields avoids both cases. See TODO.v2/01. */
+	 * Renaming the fields avoids both cases. See the v2 plan/01. */
 	int (*real_sprintf)(char *str, const char *format, ...);
 	int (*real_snprintf)(char *str, size_t size, const char *format, ...);
 

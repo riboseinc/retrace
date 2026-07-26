@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-07-26
-- **References**: TODO.roadmap/00, TODO.roadmap/02
+- **References**: the modernization plan/00, the modernization plan/02
 
 ## Context
 
@@ -44,5 +44,5 @@ include-path discipline; future clang-tidy check could enforce in CI).
 - **Positive**: each concern has one home (MECE); new backends/config sources
   are purely additive (OCP); public API is small and explicit.
 - **Negative**: more files, more CMake targets — slight complexity increase.
-- **Mitigation**: the layering is documented in TODO.roadmap/00 and the
+- **Mitigation**: the layering is documented in the modernization plan/00 and the
   architecture document (TODO 11).
