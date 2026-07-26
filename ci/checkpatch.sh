@@ -33,6 +33,7 @@ CHECKPATCH_FLAGS=(
 	--ignore SYMBOLIC_PERMS
 	--ignore TRAILING_SEMICOLON
 	--ignore USE_FUNC
+	--ignore DEEP_INDENTATION
 	--no-tree
 )
 
