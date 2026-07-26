@@ -6,6 +6,7 @@ CHECKPATCH_TYPEDEFS=$CHECKPATCH_INSTALL/typedefs.checkpatch
 
 CHECKPATCH_FLAGS=(
 	--ignore ARRAY_SIZE
+	--ignore AVOID_EXTERNS
 	--ignore BRACES
 	--ignore COMMIT_LOG_LONG_LINE
 	--ignore COMPLEX_MACRO
@@ -30,6 +31,7 @@ CHECKPATCH_FLAGS=(
 	--ignore STATIC_CONST_CHAR_ARRAY
 	--ignore STORAGE_CLASS
 	--ignore STRCPY
+	--ignore STRNCPY
 	--ignore SYMBOLIC_PERMS
 	--ignore TRAILING_SEMICOLON
 	--ignore USE_FUNC

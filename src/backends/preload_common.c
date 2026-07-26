@@ -48,14 +48,14 @@ extern char **environ;
  * env_var_name: "LD_PRELOAD" on Linux/BSD, "DYLD_INSERT_LIBRARIES" on macOS.
  * lib_path: full path to the retrace_v2 shared library.
  */
-pid_t
+retrace_pid_t
 retrace_preload_spawn_common(const char *env_var_name,
                               const char *lib_path,
                               const char *target_path,
                               char *const argv[],
                               char *const envp[])
 {
-	pid_t pid;
+	retrace_pid_t pid;
 	int status;
 	char *const *use_env = envp ? envp : environ;
 

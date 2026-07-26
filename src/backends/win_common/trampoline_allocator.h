@@ -12,8 +12,8 @@
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
  * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
  * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
  * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
@@ -23,17 +23,34 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef RETRACE_BACKENDS_PRELOAD_COMMON_H
-#define RETRACE_BACKENDS_PRELOAD_COMMON_H
+/*
+ * Trampoline allocator. Allocates PAGE_EXECUTE_READWRITE pages near the
+ * target function (within +/-2GB on x64 so rel32 jumps can reach them).
+ *
+ * On arm64, proximity is desirable (for adrp/add-based trampolines) but
+ * not strictly required because the arm64 trampoline uses an absolute
+ * 64-bit address load.
+ */
 
-#include <retrace/backend.h>
+#ifndef RETRACE_BACKENDS_WIN_COMMON_TRAMPOLINE_ALLOCATOR_H
+#define RETRACE_BACKENDS_WIN_COMMON_TRAMPOLINE_ALLOCATOR_H
 
-extern retrace_pid_t retrace_preload_spawn_common(const char *env_var_name,
-						  const char *lib_path,
-						  const char *target_path,
-						  char *const argv[],
-						  char *const envp[]);
+#include <stddef.h>
 
-extern const char *retrace_preload_detect_lib(const char *filename);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#endif /* RETRACE_BACKENDS_PRELOAD_COMMON_H */
+/* Allocate `size` bytes of executable memory within +/-2GB of `target`.
+ * Returns NULL on failure. The returned pointer is RWX and 16-byte aligned.
+ */
+void *retrace_trampoline_alloc_near(const void *target, size_t size);
+
+/* Free memory previously returned by retrace_trampoline_alloc_near. */
+void retrace_trampoline_free(void *ptr);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* RETRACE_BACKENDS_WIN_COMMON_TRAMPOLINE_ALLOCATOR_H */

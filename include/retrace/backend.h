@@ -49,6 +49,16 @@
 extern "C" {
 #endif
 
+/* Windows MSVC doesn't ship pid_t via <sys/types.h>. Backend spawning
+ * returns a process handle; on Windows the spawn path goes through
+ * CreateProcess and returns the dwProcessId as an int.
+ */
+#ifdef _WIN32
+typedef int retrace_pid_t;
+#else
+typedef pid_t retrace_pid_t;
+#endif
+
 #if defined(_WIN32) && defined(RETRACE_SHARED)
 #  define RETRACE_BACKEND_API __declspec(dllexport)
 #elif defined(__GNUC__) && (__GNUC__ >= 4)
@@ -102,14 +112,14 @@ typedef struct retrace_backend {
 
 	/* Spawn target_path with retrace already installed. Returns child PID
 	 * on success, negative on error. argv and envp are NULL-terminated. */
-	pid_t (*spawn)(struct retrace_engine *eng,
-	               const char *target_path,
-	               char *const argv[],
-	               char *const envp[]);
+	retrace_pid_t (*spawn)(struct retrace_engine *eng,
+			       const char *target_path,
+			       char *const argv[],
+			       char *const envp[]);
 
 	/* Attach to an already-running target (optional — LD_PRELOAD backends
 	 * can't, ptrace can). NULL if unsupported. */
-	pid_t (*attach)(struct retrace_engine *eng, pid_t target_pid);
+	retrace_pid_t (*attach)(struct retrace_engine *eng, retrace_pid_t target_pid);
 
 	/* Detach / uninstall. NULL if unsupported. */
 	int (*detach)(struct retrace_engine *eng);

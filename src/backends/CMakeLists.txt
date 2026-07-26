@@ -8,13 +8,17 @@
 
 # Shared spawn helper for preload-* backends. Linked into each backend
 # target PRIVATE so its symbols don't leak across backends.
-add_library(retrace_preload_common OBJECT preload_common.c)
-target_include_directories(retrace_preload_common
-	PUBLIC
-		${CMAKE_SOURCE_DIR}/include
-		${CMAKE_CURRENT_SOURCE_DIR}
-		${CMAKE_SOURCE_DIR}/src/core)
-target_link_libraries(retrace_preload_common PUBLIC retrace_headers)
+# POSIX-only: uses fork/execv/waitpid. Windows backends use
+# CreateProcess/CreateRemoteThread instead.
+if(NOT RETRACE_PLATFORM_WINDOWS)
+	add_library(retrace_preload_common OBJECT preload_common.c)
+	target_include_directories(retrace_preload_common
+		PUBLIC
+			${CMAKE_SOURCE_DIR}/include
+			${CMAKE_CURRENT_SOURCE_DIR}
+			${CMAKE_SOURCE_DIR}/src/core)
+	target_link_libraries(retrace_preload_common PUBLIC retrace_headers)
+endif()
 
 # Backend registry. Linked into the retrace_v2 shared library so its
 # exported API (retrace_backend_register/select/list/find) is visible to
@@ -40,4 +44,16 @@ endif()
 
 if(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
 	add_subdirectory(preload_bsd)
+endif()
+
+# Windows: from-scratch inline-hooking backends (ADR-0009). The hooking
+# core (win_common/) is shared; preload-msvc is the native MSVC build and
+# preload-mingw is the MSYS2/MinGW build. Only one is active per host.
+if(RETRACE_PLATFORM_WINDOWS)
+	add_subdirectory(win_common)
+	if(MSVC OR CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+		add_subdirectory(preload_msvc)
+	else()
+		add_subdirectory(preload_mingw)
+	endif()
 endif()
