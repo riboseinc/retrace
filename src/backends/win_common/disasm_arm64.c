@@ -12,8 +12,8 @@
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
  * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
  * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
  * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
@@ -23,17 +23,35 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef RETRACE_BACKENDS_PRELOAD_COMMON_H
-#define RETRACE_BACKENDS_PRELOAD_COMMON_H
+/*
+ * arm64 prologue length decoder. All arm64 instructions are 4 bytes; the
+ * prologue relocation window must therefore be a multiple of 4 bytes
+ * >= min_bytes (the patch size, which is 16 for arm64).
+ *
+ * No instruction-level safety check is performed -- arm64 prologues for
+ * typical libc functions are stp/sp-movement sequences that are safe to
+ * relocate. A full arm64 disassembler (looking for ADRP-relative loads
+ * or PC-relative branches in the prologue) would be a future improvement.
+ */
 
-#include <retrace/backend.h>
+#include "disasm.h"
 
-extern retrace_pid_t retrace_preload_spawn_common(const char *env_var_name,
-						  const char *lib_path,
-						  const char *target_path,
-						  char *const argv[],
-						  char *const envp[]);
+size_t
+retrace_disasm_arm64_prologue_len(const unsigned char *code,
+				  size_t min_bytes,
+				  size_t max_scan)
+{
+	size_t rounded;
 
-extern const char *retrace_preload_detect_lib(const char *filename);
+	(void)code;
 
-#endif /* RETRACE_BACKENDS_PRELOAD_COMMON_H */
+	if (min_bytes == 0 || min_bytes > max_scan)
+		return 0;
+
+	/* Round up to next 4-byte boundary. */
+	rounded = (min_bytes + 3u) & ~(size_t)3u;
+	if (rounded > max_scan)
+		return 0;
+
+	return rounded;
+}

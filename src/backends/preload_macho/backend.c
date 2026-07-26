@@ -49,7 +49,7 @@ preload_macho_probe(struct retrace_engine *eng, const char *target_path)
 #endif
 }
 
-static pid_t
+static retrace_pid_t
 preload_macho_spawn(struct retrace_engine *eng,
                      const char *target_path,
                      char *const argv[],

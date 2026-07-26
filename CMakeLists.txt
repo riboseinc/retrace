@@ -123,14 +123,18 @@ endif()
 # v1 source uses POSIX APIs (dlfcn, unistd, sys/socket, sys/utsname, pthread)
 # and a LD_PRELOAD/DYLD_INSERT interposition model that doesn't apply on
 # Windows native (no LD_PRELOAD; MSYS POSIX layer is a separate runtime).
-# Auto-disable v1/v2 on Windows entirely — Windows consumers use retrace
-# as a library, not as an interposer.
+# Auto-disable v1/v2 on Windows entirely -- the Windows backends
+# (preload-msvc, preload-mingw) are SHARED libraries built independently
+# of the v1/v2 shared library. They link win_common (the from-scratch
+# inline-hooking core) and inject into a target via CreateRemoteThread.
+# See ADR-0009 for the from-scratch decision.
 if(RETRACE_PLATFORM_WINDOWS)
 	if(RETRACE_BUILD_V1)
-		message(STATUS "retrace v1 requires POSIX APIs not available on Windows; disabling. Use Linux/macOS/BSD or consume retrace as a library.")
+		message(STATUS "retrace v1 requires POSIX APIs not available on Windows; disabling. Windows consumers use the preload-msvc/mingw backends.")
 		set(RETRACE_BUILD_V1 OFF)
 	endif()
 	if(RETRACE_BUILD_V2)
+		message(STATUS "retrace v2 core (engine.c) requires POSIX APIs; disabling on Windows. The Windows inline-hooking backends build standalone.")
 		set(RETRACE_BUILD_V2 OFF)
 	endif()
 endif()
@@ -332,6 +336,11 @@ if(RETRACE_BUILD_V2)
 	add_subdirectory(src/backends)
 	# v2 itself is now a thin shim that links core + config_json + backends + funcs_symbols.S.
 	add_subdirectory(src/v2)
+elseif(RETRACE_PLATFORM_WINDOWS)
+	# Windows: build the inline-hooking backends standalone (ADR-0009).
+	# The v2 core (engine.c) is POSIX-only and stays off here; the
+	# preload-msvc / preload-mingw DLLs link win_common directly.
+	add_subdirectory(src/backends)
 endif()
 
 # CLI (TODO 06) — placeholder until the new CLI lands.

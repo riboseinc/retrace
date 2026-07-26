@@ -50,7 +50,7 @@ preload_bsd_probe(struct retrace_engine *eng, const char *target_path)
 #endif
 }
 
-static pid_t
+static retrace_pid_t
 preload_bsd_spawn(struct retrace_engine *eng,
                    const char *target_path,
                    char *const argv[],
