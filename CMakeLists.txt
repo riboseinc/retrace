@@ -274,8 +274,14 @@ configure_file(
 	ESCAPE_QUOTES)
 
 # Make config.h discoverable by every target.
+# Also add src/config/json (parson.h, conf.h) and src/backends (arch_spec.h)
+# globally — OBJECT libraries don't always propagate target_include_directories
+# to their own sources across all CMake versions.
 add_compile_definitions(HAVE_CONFIG_H)
-include_directories(BEFORE "${CMAKE_BINARY_DIR}")
+include_directories(BEFORE
+	"${CMAKE_BINARY_DIR}"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/config/json"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/backends")
 
 # ---------------------------------------------------------------
 # Sanitizers and coverage (see cmake/Sanitizers.cmake)
