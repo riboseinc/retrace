@@ -103,4 +103,10 @@ jobs:
         run: cmake --build build --config ${{ env.BUILD_TYPE }}
 
       - name: Smoke test
-        run: ./build/retrace --help
+        # retrace v1/v2 auto-disable on Windows (no LD_PRELOAD); the MSYS
+        # build only exercises the library scaffold + public headers.
+        # Verify the build produced SOMETHING and the cmake package config.
+        run: |
+          ls -la build/
+          test -f build/retrace-config.cmake
+          test -f build/retrace-core.pc

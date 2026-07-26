@@ -112,12 +112,14 @@ if(RETRACE_BUILD_V2 AND RETRACE_PLATFORM_DARWIN)
 	set(RETRACE_BUILD_V2 OFF)
 endif()
 
-# v1 source uses POSIX APIs (dlfcn, unistd, sys/socket, pthread). Native
-# Windows MSVC doesn't provide these — auto-disable on MSVC; the
-# MSYS2/MinGW build (retrace-msys.yml) is the canonical Windows path.
-if(RETRACE_PLATFORM_WINDOWS AND NOT CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+# v1 source uses POSIX APIs (dlfcn, unistd, sys/socket, sys/utsname, pthread)
+# and a LD_PRELOAD/DYLD_INSERT interposition model that doesn't apply on
+# Windows native (no LD_PRELOAD; MSYS POSIX layer is a separate runtime).
+# Auto-disable v1/v2 on Windows entirely — Windows consumers use retrace
+# as a library, not as an interposer.
+if(RETRACE_PLATFORM_WINDOWS)
 	if(RETRACE_BUILD_V1)
-		message(STATUS "retrace v1 requires POSIX APIs not available under MSVC; disabling. Use the MSYS2/MinGW build (msys.yml).")
+		message(STATUS "retrace v1 requires POSIX APIs not available on Windows; disabling. Use Linux/macOS/BSD or consume retrace as a library.")
 		set(RETRACE_BUILD_V1 OFF)
 	endif()
 	if(RETRACE_BUILD_V2)
