@@ -64,20 +64,17 @@ checkpatch() {
 
 # checkpatch
 #
-# Check HEAD for pull requests.
-#
-# NOTE: $GITHUB_HEAD_REF is only set for pull requests.
-# See: https://docs.github.com/en/actions/learn-github-actions/environment-variables
-if [[ -z "${GITHUB_HEAD_REF:-}" ]]; then
-	checkpatch HEAD
-
-# XXX: HEAD^2 seems to only makes sense for merge commits
-elif git show --format=short | head -n2 | grep -q ^Merge:
-then
+# On push: HEAD is the commit to check.
+# On pull_request: actions/checkout@v4 checks out refs/pull/<N>/merge,
+#   which is an auto-generated merge commit with a generic message that
+#   fails checkpatch's commit-message checks. Check each commit in the
+#   PR branch range instead. Base SHA is injected via env (see
+#   .github/workflows/checkpatch.yml) since the runner's default fetch
+#   doesn't include origin/<base-ref>.
+if [[ -n "${GITHUB_BASE_REF:-}" && -n "${RETRACE_BASE_SHA:-}" ]]; then
 	while read -r c; do
 		checkpatch "$c"
-	done < <(git rev-list HEAD^1..HEAD^2)
+	done < <(git rev-list "${RETRACE_BASE_SHA}..HEAD" -- "${CHECKPATCH_EXCLUDE[@]}" .)
 else
-	>&2 echo "Warning: this should not be run."
-	exit 1
+	checkpatch HEAD
 fi

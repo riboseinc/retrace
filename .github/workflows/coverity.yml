@@ -1,78 +1,96 @@
-name: coverity
+# Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
+# BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+# Daily Coverity Scan. See TODO.roadmap/09-ci-cd-modernization.md.
+
+name: Coverity
 
 on:
   schedule:
-    # every day at 9:00 UTC
     - cron: '0 9 * * *'
+  workflow_dispatch:
 
 env:
   CORES: 2
 
 jobs:
   scan:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     environment:
       name: coverity-scan
       url: https://scan.coverity.com/projects/riboseinc-retrace?tab=overview
-    strategy:
-      fail-fast: false
-      matrix:
-        # os: [ubuntu-18.04, ubuntu-20.04]
-        os: [ubuntu-18.04]
-        retrace-test:
-          - v1
-          - v2
-          - v2wrapper
 
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Setup environment
-        run: |
-          echo CMOCKA_INSTALL="${HOME}/builds/cmocka-install" >> "${GITHUB_ENV}"
-      - name: Install more prerequisites
-        run: |
-          ./ci/before_install.sh
-          ./ci/install.sh cmocka libnereon
+
+      - name: Install prerequisites
+        run: sudo apt-get update && sudo apt-get install -y
+                libssl-dev cmake ninja-build
+
       - name: Configure
-        run: |
-          ./autogen.sh
-          ./configure --enable-tests
-      - name: Calculate Coverity Tool Cache Key (updates every quarter)
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DRETRACE_BUILD_TESTS=ON
+
+      - name: Calculate Coverity Tool Cache Key (quarterly)
         run: echo "COV_CACHE_KEY=$(date +%Y)-$(echo "($(date +%-m)-1)/3" | bc)" >> "$GITHUB_ENV"
+
       - name: Cache Coverity Tool
         id: coverity-tool-cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: cov-analysis-linux64
           key: cov-analysis-linux64-${{ env.COV_CACHE_KEY }}
+
       - name: Download Coverity
-        # Downloading on GHA takes about 1m20s.
-        # Use cache to speed it up.
         if: steps.coverity-tool-cache.outputs.cache-hit != 'true'
         env:
           TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
         run: |
-          wget -q https://scan.coverity.com/download/linux64 --post-data "token=$TOKEN&project=$GITHUB_REPOSITORY" -O cov-analysis-linux64.tar.gz
+          wget -q https://scan.coverity.com/download/linux64 \
+            --post-data "token=$TOKEN&project=$GITHUB_REPOSITORY" \
+            -O cov-analysis-linux64.tar.gz
           mkdir cov-analysis-linux64
           tar xzf cov-analysis-linux64.tar.gz --strip 1 -C cov-analysis-linux64
-      - name: Build
+
+      - name: Build with cov-build
         run: |
           set -x
           export PATH="$PWD/cov-analysis-linux64/bin:$PATH"
-          cov-build --dir cov-int ci/main.sh ${{ matrix.retrace-test }}
+          cov-build --dir cov-int cmake --build build
+
       - name: Submit
         env:
           TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
         run: |
           tar czvf results.tgz cov-int
-          curl \
+          curl --fail-with-body \
             --form project=$GITHUB_REPOSITORY \
             --form token=$TOKEN \
             --form email=retrace@ribose.com \
             --form file=@results.tgz \
-            --form version="$GITHUB_REF ${{ matrix.retrace-test }}" \
+            --form version="$GITHUB_REF" \
             --form description=$GITHUB_SHA \
             https://scan.coverity.com/builds?project=$GITHUB_REPOSITORY

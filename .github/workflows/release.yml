@@ -22,36 +22,56 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Linux kernel checkpatch.pl on the diff. See TODO.roadmap/09-ci-cd-modernization.md.
+# Builds a source-only retrace-<version>.tar.gz and attaches it to the
+# GitHub Release for the pushed tag. Mirrors the libemf2svg release.yml.
 
-name: Checkpatch
+name: Release
 
 on:
   push:
-    branches: [ main, 'release/**' ]
-  pull_request:
+    tags:
+      - 'v*.*.*'
+      - '*.*.*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag or ref to release'
+        required: true
+        type: string
 
-concurrency:
-  group: '${{ github.workflow }}-${{ github.head_ref || github.ref_name }}'
-  cancel-in-progress: true
+permissions:
+  contents: write
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'skip ci')"
     steps:
-      # Fetch full history so checkpatch can walk the base..HEAD commit range.
-      # Default checkout (fetch-depth: 1) only has the merge commit.
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
-      - name: Set up environment
+
+      - name: Build source tarball
+        run: ./scripts/build-release-tarball.sh "$RUNNER_TEMP"
+
+      - name: Resolve tag name
+        id: tag
         run: |
-          echo CHECKPATCH_INSTALL="${HOME}/builds/checkpatch-install" >> "${GITHUB_ENV}"
-          ./ci/before_install.sh
-      - name: Install more prerequisites
-        run: ./ci/install.sh checkpatch
-      - name: Check patch
-        env:
-          RETRACE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: ./ci/checkpatch.sh
+          if [ -n "${{ inputs.ref }}" ]; then
+            ref="${{ inputs.ref }}"
+          else
+            ref="${GITHUB_REF#refs/tags/}"
+          fi
+          ref="${ref#refs/tags/}"
+          echo "tag=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            ${{ runner.temp }}/retrace-*.tar.gz
+            ${{ runner.temp }}/retrace-*.tar.gz.sha256

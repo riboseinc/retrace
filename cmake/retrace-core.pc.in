@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# pkg-config module for the retrace core library.
+# Installed as retrace-core.pc. See TODO.roadmap/07.
+
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: retrace-core
+Description: retrace core interposition engine (no backend)
+Version: @PROJECT_VERSION@
+URL: https://github.com/riboseinc/retrace
+Requires.private: openssl
+Cflags: -I${includedir}
+Libs: -L${libdir} -lretrace

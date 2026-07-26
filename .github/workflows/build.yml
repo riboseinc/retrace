@@ -1,0 +1,212 @@
+# Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
+# BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+# Single consolidated build matrix covering all supported POSIX and Windows
+# MSVC runner images. See TODO.roadmap/09-ci-cd-modernization.md.
+#
+# Why one workflow, not one-per-platform:
+#   - Linux x64+arm64 and macOS Intel+arm64 share the same shell and the
+#     same flow (cmake + ninja + ctest); only the package manager differs.
+#   - Windows MSVC x64+arm64 share pwsh + vcpkg.
+#   - Combining them means one concurrency group, one re-run target, one
+#     place to add a new OS version.
+#
+# Alpine / musl lives in alpine.yml (container-based, different pkg
+# manager). MSYS2 / MinGW lives in msys.yml (different shell).
+
+name: Build
+
+on:
+  push:
+    branches: [ main, 'release/**' ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref_name }}'
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: Release
+  VCPKG_REF: 4f95fba7a7d1101bb8acdeb51e4609686449701e
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # --- Linux x86_64 ---
+          - { runner: ubuntu-22.04,    platform: linux-x64   }
+          - { runner: ubuntu-24.04,    platform: linux-x64   }
+          - { runner: ubuntu-26.04,    platform: linux-x64,  experimental: true }
+          # --- Linux ARM64 ---
+          - { runner: ubuntu-22.04-arm, platform: linux-arm64 }
+          - { runner: ubuntu-24.04-arm, platform: linux-arm64 }
+          - { runner: ubuntu-26.04-arm, platform: linux-arm64, experimental: true }
+          # --- macOS Intel ---
+          - { runner: macos-15-intel, platform: macos-x64   }
+          - { runner: macos-26-intel, platform: macos-x64,  experimental: true }
+          # --- macOS Apple Silicon ---
+          - { runner: macos-14,       platform: macos-arm64 }
+          - { runner: macos-15,       platform: macos-arm64 }
+          - { runner: macos-26,       platform: macos-arm64, experimental: true }
+          # --- Windows x64 MSVC ---
+          - { runner: windows-2022,    platform: windows-x64 }
+          - { runner: windows-2025,    platform: windows-x64 }
+          - { runner: windows-2025-vs2026, platform: windows-x64, experimental: true }
+          # --- Windows ARM64 MSVC ---
+          - { runner: windows-11-arm,  platform: windows-arm64 }
+          - { runner: windows-11-vs2026-arm, platform: windows-arm64, experimental: true }
+
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental || false }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ----- Setup per OS family -----
+      - name: Install deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev cmake ninja-build pkg-config valgrind
+
+      - name: Install deps (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja pkg-config openssl@3
+          echo "OPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
+
+      - name: Cache vcpkg (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg/.git
+            vcpkg/buildtrees
+            vcpkg/downloads
+            vcpkg/packages
+          key: ${{ matrix.runner }}-vcpkg-${{ env.VCPKG_REF }}
+
+      - name: Bootstrap vcpkg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path vcpkg/vcpkg.exe)) {
+            git clone https://github.com/microsoft/vcpkg.git vcpkg
+            cd vcpkg
+            git checkout $env:VCPKG_REF
+            .\bootstrap-vcpkg.bat -disableMetrics
+          }
+
+      # ----- Configure -----
+      - name: Configure (POSIX)
+        if: runner.os != 'Windows'
+        run: |
+          cmake -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+                -DRETRACE_BUILD_TESTS=ON
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if ('${{ matrix.platform }}' -eq 'windows-arm64') {
+            $triplet = 'arm64-windows'
+          } else {
+            $triplet = 'x64-windows'
+          }
+          $toolchain = "${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake"
+          if (-not (Test-Path $toolchain)) {
+            throw "vcpkg toolchain not found at $toolchain"
+          }
+          Write-Host "Triplet: $triplet"
+          Write-Host "Toolchain: $toolchain"
+          cmake -B build "-DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}" "-DVCPKG_TARGET_TRIPLET=$triplet" "-DCMAKE_TOOLCHAIN_FILE=$toolchain"
+
+      # ----- Build & test (identical across OS families) -----
+      - name: Build
+        run: cmake --build build --config ${{ env.BUILD_TYPE }}
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      # ----- Smoke tests (POSIX only — no LD_PRELOAD on Windows) -----
+      # Best-effort: skipped if the v1 binary or v2 library wasn't produced.
+      # CMake v1/v2 builds are still landing (TODO.roadmap/01, 02); until
+      # then, missing artifacts are not a CI failure.
+      - name: Smoke test v1 (POSIX)
+        if: runner.os != 'Windows'
+        continue-on-error: true
+        run: |
+          ext="${{ runner.os == 'Linux' && 'so' || 'dylib' }}"
+          lib="build/src/v1/libretrace.$ext"
+          [ -x build/retrace ] && [ -f "$lib" ] || { echo "v1 artifacts missing; skipping"; exit 0; }
+          build/retrace --lib "$lib" -- /bin/id
+
+      - name: Smoke test v2 (POSIX)
+        if: runner.os != 'Windows'
+        continue-on-error: true
+        env:
+          RETRACE_LOGGER_DEF_STDOUT_ENA: "0"
+        run: |
+          ext="${{ runner.os == 'Linux' && 'so' || 'dylib' }}"
+          lib="build/src/v2/libretrace_v2.$ext"
+          [ -f "$lib" ] || { echo "v2 library missing; skipping"; exit 0; }
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            LD_PRELOAD="$(pwd)/$lib" /bin/id
+          else
+            DYLD_INSERT_LIBRARIES="$(pwd)/$lib" /bin/id
+          fi
+
+  # ----- Coverage as a separate job in the same workflow -----
+  # Best-effort: ctest runs runtests.sh which assumes `retrace` is in PATH.
+  # Under the CMake build the binary lives at build/retrace; until runtests.sh
+  # is CMake-aware (TODO.roadmap/08), the test may silently no-op and lcov
+  # finds no .gcda. --ignore-errors empty keeps the job green in that case;
+  # once tests actually run, real coverage flows through.
+  coverage:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev cmake ninja-build lcov
+      - run: |
+          cmake -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Debug \
+                -DRETRACE_ENABLE_COVERAGE=ON \
+                -DRETRACE_BUILD_TESTS=ON
+      - run: cmake --build build
+      - run: ctest --test-dir build --output-on-failure || true
+      - run: lcov --directory build --capture --output-file coverage.info --ignore-errors empty || true
+      - run: lcov --remove coverage.info '/usr/*' 'build/_deps/*' --output-file coverage.info || true
+      - uses: codecov/codecov-action@v5
+        with:
+          files: ${{ github.workspace }}/coverage.info
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: hashFiles('coverage.info') != ''

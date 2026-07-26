@@ -16,7 +16,7 @@ test/strinject.conf
 temp
 examples/dns-fuzz/axfr
 core
-tools/stringinjector
+tools/stringinjector/stringinjector
 tools/spawn/spawn
 libnereon/
 # editors
@@ -45,12 +45,15 @@ stamp-h1
 ar-lib
 test-driver
 *.m4
-*.in
+# Autotools templates — keep CMake templates (cmake/*.in) tracked.
+Makefile.in
+config.h.in
+*.la.in
 m4/
 autom4te.cache/
 .deps/
 .libs/
-retrace
+/retrace
 retrace.la
 libretrace.la
 gmon.out
