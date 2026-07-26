@@ -489,10 +489,25 @@ int retrace_as_init_late(void)
 	return 0;
 }
 
-extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
+/* GLIBC_PRIVATE symbol exported by ld.so on older glibc (< 2.34).
+ * Declared weak so the symbol resolves to NULL on modern glibc where
+ * it's no longer exported, instead of failing at load time.
+ */
+__attribute__((weak)) void *_dl_sym(void *handle, const char *symbol,
+				    const void *rtraddr);
 
+/* Resolve the real (next-in-search-order) implementation of a libc symbol.
+ *
+ * Modern glibc (>= 2.34) no longer exports _dl_sym. Fall back to
+ * dlsym(RTLD_NEXT, ...). On x86_64 dlsym IS intercepted, but
+ * retrace_as_get_real_safe is only called from the constructor before
+ * any user code runs, so the trampoline hasn't been exercised yet and
+ * recursion risk is minimal.
+ */
 void *retrace_as_get_real_safe(const char *real_impl)
 {
-	return _dl_sym(RTLD_NEXT, real_impl, __func__);
+	if (_dl_sym != NULL)
+		return _dl_sym(RTLD_NEXT, real_impl, __func__);
+	return dlsym(RTLD_NEXT, real_impl);
 }
 
