@@ -95,24 +95,30 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "MSYS" OR CMAKE_SYSTEM_NAME STREQUAL "Windows"
 	set(RETRACE_PLATFORM_WINDOWS  TRUE)
 endif()
 
-# v2's assembly trampolines (src/v2/arch/x86-64/*) are x86-64 only until
-# arm64 backends land (the modernization plan/03). Auto-disable on non-x86-64 hosts
-# unless the user explicitly insisted.
-# macOS special-case: respect CMAKE_OSX_ARCHITECTURES if set (cross-compile).
+# v2's assembly trampolines (src/backends/preload_*/{x86_64,aarch64}/...) are
+# per-arch. Phase 2/3 of the v2 plan added aarch64 (Linux and macOS/Apple
+# Silicon) alongside the original x86_64.
 if(RETRACE_PLATFORM_DARWIN AND CMAKE_OSX_ARCHITECTURES)
-	set(_retrace_proc "${CMAKE_OSX_ARCHITECTURES}")
+	set(_retrace_proc_list "${CMAKE_OSX_ARCHITECTURES}")
 else()
-	set(_retrace_proc "${CMAKE_SYSTEM_PROCESSOR}")
+	set(_retrace_proc_list "${CMAKE_SYSTEM_PROCESSOR}")
 endif()
-if(RETRACE_BUILD_V2 AND NOT _retrace_proc MATCHES "x86_64|amd64|AMD64")
-	message(STATUS "retrace v2 requires x86-64 (per-arch trampolines not yet ported); disabling. See the v2 plan/02.")
+set(_retrace_proc_supported FALSE)
+foreach(_proc ${_retrace_proc_list})
+	if(_proc MATCHES "x86_64|amd64|AMD64|aarch64|arm64|ARM64")
+		set(_retrace_proc_supported TRUE)
+		break()
+	endif()
+endforeach()
+if(RETRACE_BUILD_V2 AND NOT _retrace_proc_supported)
+	message(STATUS "retrace v2 requires x86-64 or aarch64 (per-arch trampolines not yet ported); disabling. See the v2 plan/02.")
 	set(RETRACE_BUILD_V2 OFF)
 endif()
 
 # v2 on Darwin (macOS Intel) is now unblocked via #pragma push_macro
 # hygiene in src/v2/real_impls.h.
-# macOS arm64 (Apple Silicon) still auto-disables via the x86-64 check
-# above until the v2 plan/03 lands the AArch64 macOS trampoline.
+# macOS arm64 (Apple Silicon) is now supported via the AArch64 Mach-O
+# trampoline shipped in src/backends/preload_macho/aarch64/.
 
 # v1 source uses POSIX APIs (dlfcn, unistd, sys/socket, sys/utsname, pthread)
 # and a LD_PRELOAD/DYLD_INSERT interposition model that doesn't apply on

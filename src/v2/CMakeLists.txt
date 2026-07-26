@@ -11,9 +11,35 @@
 #
 # The v2 shared library is what consumers LD_PRELOAD/DYLD_INSERT.
 
-# Per-arch function table. Phase 2 of the v2 plan splits this per arch
-# (x86_64 vs aarch64) so each arch builds its own set.
-set(_v2_trampoline_sources funcs_symbols.S)
+# Per-arch function table. Each backend's arch subdirectory ships its own
+# copy of funcs_symbols.S that invokes the arch-specific trampoline macro
+# (WRAPPER_ENTRY_SYSTEM_V on x86_64, WRAPPER_ENTRY_AARCH64 on aarch64).
+if(RETRACE_PLATFORM_LINUX)
+	set(_v2_backend_dir ${CMAKE_SOURCE_DIR}/src/backends/preload_elf)
+elseif(RETRACE_PLATFORM_DARWIN)
+	set(_v2_backend_dir ${CMAKE_SOURCE_DIR}/src/backends/preload_macho)
+elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
+	set(_v2_backend_dir ${CMAKE_SOURCE_DIR}/src/backends/preload_bsd)
+endif()
+
+if(RETRACE_PLATFORM_DARWIN AND CMAKE_OSX_ARCHITECTURES)
+	list(GET CMAKE_OSX_ARCHITECTURES 0 _v2_darwin_arch_first)
+	if(_v2_darwin_arch_first MATCHES "aarch64|arm64|ARM64")
+		set(_v2_arch aarch64)
+	else()
+		set(_v2_arch x86_64)
+	endif()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+	set(_v2_arch aarch64)
+else()
+	set(_v2_arch x86_64)
+endif()
+
+if(EXISTS "${_v2_backend_dir}/${_v2_arch}/funcs_symbols.S")
+	set(_v2_trampoline_sources ${_v2_backend_dir}/${_v2_arch}/funcs_symbols.S)
+else()
+	set(_v2_trampoline_sources funcs_symbols.S)
+endif()
 
 add_library(retrace_v2 SHARED ${_v2_trampoline_sources})
 add_library(retrace::v2 ALIAS retrace_v2)
@@ -37,13 +63,12 @@ elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_
 endif()
 
 # Find the per-backend arch_spec_top.S that funcs_symbols.S includes.
-# Phase 2 of the v2 plan moves funcs_symbols.S into each backend's directory.
 if(RETRACE_PLATFORM_LINUX)
-	set(_v2_arch_dir ${CMAKE_SOURCE_DIR}/src/backends/preload_elf/x86_64)
+	set(_v2_arch_dir ${CMAKE_SOURCE_DIR}/src/backends/preload_elf/${_v2_arch})
 elseif(RETRACE_PLATFORM_DARWIN)
-	set(_v2_arch_dir ${CMAKE_SOURCE_DIR}/src/backends/preload_macho/x86_64)
+	set(_v2_arch_dir ${CMAKE_SOURCE_DIR}/src/backends/preload_macho/${_v2_arch})
 elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
-	set(_v2_arch_dir ${CMAKE_SOURCE_DIR}/src/backends/preload_bsd/x86_64)
+	set(_v2_arch_dir ${CMAKE_SOURCE_DIR}/src/backends/preload_bsd/${_v2_arch})
 endif()
 
 target_include_directories(retrace_v2
