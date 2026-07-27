@@ -131,6 +131,21 @@ jobs:
 
       - name: Stage binary (Linux)
         if: matrix.os == 'linux'
+        env:
+          NOTICES: |
+            retrace third-party notices
+            ===========================
+
+            retrace is BSD-2-Clause licensed.
+
+            This build does NOT link against or include:
+              - MinHook (https://github.com/TsudaKageyu/minhook)
+              - Microsoft Detours (https://github.com/microsoft/Detours)
+
+            The Windows inline-hooking backends (src/backends/win_common/) are
+            implemented from scratch per ADR-0009. The JSON parser (parson) is
+            vendored under src/config/json/parson.{c,h} and retains its MIT
+            license header in those files.
         run: |
           VERSION="$(awk -F\" '/^#define RETRACE_VERSION_STRING/ {print $2}' include/retrace/version.h)"
           STAGE="retrace-${VERSION}-${{ matrix.platform }}"
@@ -138,13 +153,23 @@ jobs:
           cp build/src/v2/libretrace.so* "$STAGE/lib/"
           cp -r include/retrace/* "$STAGE/include/"
           cp LICENSE.md README.adoc "$STAGE/"
-          cp .github/notice/THIRD_PARTY_NOTICES.posix-with-windows "$STAGE/THIRD_PARTY_NOTICES"
+          printf '%s\n' "$NOTICES" > "$STAGE/THIRD_PARTY_NOTICES"
           tar -czf "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" "$STAGE"
           sha256sum "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
             > "retrace-${VERSION}-${{ matrix.platform }}.tar.gz.sha256"
 
       - name: Stage binary (macOS)
         if: matrix.os == 'macos'
+        env:
+          NOTICES: |
+            retrace third-party notices
+            ===========================
+
+            retrace is BSD-2-Clause licensed.
+
+            The JSON parser (parson) is vendored under
+            src/config/json/parson.{c,h} and retains its MIT license
+            header in those files.
         run: |
           VERSION="$(awk -F\" '/^#define RETRACE_VERSION_STRING/ {print $2}' include/retrace/version.h)"
           STAGE="retrace-${VERSION}-${{ matrix.platform }}"
@@ -152,7 +177,7 @@ jobs:
           cp build/src/v2/libretrace.*.dylib "$STAGE/lib/"
           cp -r include/retrace/* "$STAGE/include/"
           cp LICENSE.md README.adoc "$STAGE/"
-          cp .github/notice/THIRD_PARTY_NOTICES.posix "$STAGE/THIRD_PARTY_NOTICES"
+          printf '%s\n' "$NOTICES" > "$STAGE/THIRD_PARTY_NOTICES"
           tar -czf "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" "$STAGE"
           shasum -a 256 "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
             > "retrace-${VERSION}-${{ matrix.platform }}.tar.gz.sha256"
@@ -250,6 +275,18 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
+      - name: Write THIRD_PARTY_NOTICES
+        env:
+          NOTICES: |
+            retrace third-party notices
+            ===========================
+
+            retrace is BSD-2-Clause licensed. Built against musl libc.
+            The JSON parser (parson) is vendored under
+            src/config/json/parson.{c,h} and retains its MIT license header
+            in those files.
+        run: printf '%s\n' "$NOTICES" > THIRD_PARTY_NOTICES.txt
+
       - name: Build in Alpine container
         run: |
           docker run --rm --platform linux/${{ matrix.arch }} \
@@ -265,7 +302,7 @@ jobs:
               cp build/src/v2/libretrace.so* "$STAGE/lib/"
               cp -r include/retrace/* "$STAGE/include/"
               cp LICENSE.md README.adoc "$STAGE/"
-              cp .github/notice/THIRD_PARTY_NOTICES.musl "$STAGE/THIRD_PARTY_NOTICES"
+              cp THIRD_PARTY_NOTICES.txt "$STAGE/THIRD_PARTY_NOTICES"
               tar -czf "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" "$STAGE"
               sha256sum "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
                 > "retrace-${VERSION}-${{ matrix.platform }}.tar.gz.sha256"
@@ -341,6 +378,19 @@ jobs:
           done
 
       - name: Stage binary
+        env:
+          NOTICES: |
+            retrace third-party notices
+            ===========================
+
+            retrace is BSD-2-Clause licensed. Built against OHOS musl libc.
+            The JSON parser (parson) is vendored under
+            src/config/json/parson.{c,h} and retains its MIT license header
+            in those files.
+
+            This .so is self-signed (-selfSign 1) for OHOS userland load and
+            app distribution. Production Huawei-managed deployments may
+            require re-signing with an enrolled cert.
         run: |
           VERSION="$(awk -F\" '/^#define RETRACE_VERSION_STRING/ {print $2}' include/retrace/version.h)"
           STAGE="retrace-${VERSION}-ohos-aarch64"
@@ -348,7 +398,7 @@ jobs:
           cp build-ohos/src/v2/libretrace.so* "$STAGE/lib/"
           cp -r include/retrace/* "$STAGE/include/"
           cp LICENSE.md README.adoc "$STAGE/"
-          cp .github/notice/THIRD_PARTY_NOTICES.ohos "$STAGE/THIRD_PARTY_NOTICES"
+          printf '%s\n' "$NOTICES" > "$STAGE/THIRD_PARTY_NOTICES"
           tar -czf "retrace-${VERSION}-ohos-aarch64.tar.gz" "$STAGE"
           sha256sum "retrace-${VERSION}-ohos-aarch64.tar.gz" \
             > "retrace-${VERSION}-ohos-aarch64.tar.gz.sha256"
