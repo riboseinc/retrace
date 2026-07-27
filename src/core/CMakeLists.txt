@@ -36,9 +36,19 @@ add_library(retrace_core OBJECT
 # — ELF vs Mach-O section syntax). the modernization plan/02 removes the data_types
 # dependency on this by centralizing section declaration in src/backends/.
 if(RETRACE_PLATFORM_LINUX)
-	set(_retrace_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_elf/x86_64)
+	if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+		set(_retrace_arch_dir aarch64)
+	else()
+		set(_retrace_arch_dir x86_64)
+	endif()
+	set(_retrace_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_elf/${_retrace_arch_dir})
 elseif(RETRACE_PLATFORM_DARWIN)
-	set(_retrace_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_macho/x86_64)
+	if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+		set(_retrace_arch_dir aarch64)
+	else()
+		set(_retrace_arch_dir x86_64)
+	endif()
+	set(_retrace_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_macho/${_retrace_arch_dir})
 elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
 	set(_retrace_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_bsd/x86_64)
 endif()
@@ -63,5 +73,9 @@ elseif(RETRACE_PLATFORM_DARWIN)
 	target_compile_definitions(retrace_core PRIVATE _DARWIN_C_SOURCE)
 endif()
 
-target_link_libraries(retrace_core
-	PUBLIC Threads::Threads OpenSSL::SSL)
+set(_retrace_core_libs PUBLIC Threads::Threads)
+if(OpenSSL_FOUND)
+	list(APPEND _retrace_core_libs OpenSSL::SSL)
+endif()
+
+target_link_libraries(retrace_core ${_retrace_core_libs})

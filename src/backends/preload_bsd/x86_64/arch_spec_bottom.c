@@ -26,8 +26,9 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 
-#include <printf.h>
 #include <pthread.h>
+
+#include "printf_compat.h"
 
 #include "engine.h"
 #include "real_impls.h"

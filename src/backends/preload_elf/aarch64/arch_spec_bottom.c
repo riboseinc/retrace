@@ -28,7 +28,7 @@
 #include "engine.h"
 #include "real_impls.h"
 #include "logger.h"
-#include "printf.h"
+#include "printf_compat.h"
 
 /*
  * AArch64 PCS frame captured by the trampoline.

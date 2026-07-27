@@ -85,6 +85,11 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
 	set(RETRACE_PLATFORM_OPENBSD  TRUE)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "NetBSD")
 	set(RETRACE_PLATFORM_NETBSD   TRUE)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+	# OpenHarmony / HarmonyOS — musl-based aarch64 Linux.
+	# LD_PRELOAD interposition works (preload_elf backend). See issue #443.
+	set(RETRACE_PLATFORM_OHOS     TRUE)
+	set(RETRACE_PLATFORM_LINUX    TRUE)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "MSYS" OR CMAKE_SYSTEM_NAME STREQUAL "Windows")
 	set(RETRACE_PLATFORM_WINDOWS  TRUE)
 endif()
@@ -129,6 +134,12 @@ elseif(RETRACE_PLATFORM_DARWIN)
 	add_compile_definitions(_DARWIN_C_SOURCE)
 endif()
 
+# OHOS defines __ohos__ in the toolchain; expose it as a CMake variable
+# for use in source-level conditionals.
+if(RETRACE_PLATFORM_OHOS)
+	add_compile_definitions(RETRACE_PLATFORM_OHOS=1)
+endif()
+
 set(RETRACE_INSTALL_CMAKEDIR
 	"${CMAKE_INSTALL_LIBDIR}/cmake/retrace-${PROJECT_VERSION}"
 	CACHE PATH "Install path for CMake package config files")
@@ -163,6 +174,7 @@ include(CheckCSourceCompiles)
 check_include_file(dlfcn.h    HAVE_DLFCN_H)
 check_include_file(dirent.h   HAVE_DIRENT_H)
 check_include_file(execinfo.h HAVE_EXECINFO_H)
+check_include_file(printf.h   HAVE_PRINTF_H)
 check_include_file(pthread.h  HAVE_PTHREAD_H)
 check_include_file(pthread_np.h HAVE_PTHREAD_NP_H)
 check_include_file(lwp.h      HAVE_LWP_H)
@@ -282,7 +294,11 @@ include(Sanitizers)
 # ---------------------------------------------------------------
 
 find_package(Threads REQUIRED)
-find_package(OpenSSL REQUIRED)
+# OpenSSL was used by v1's ssl.c; that source was removed in Phase 9.
+# The dependency survives as a PUBLIC link on retrace_core/retrace_v2 from
+# before the cleanup. Make it OPTIONAL so platforms without OpenSSL (OHOS)
+# can still build v2. Tracked for full removal in TODO.roadmap/02.
+find_package(OpenSSL QUIET)
 
 if(RETRACE_BUILD_TESTS)
 	find_package(Cmocka QUIET)

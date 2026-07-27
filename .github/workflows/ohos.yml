@@ -1,0 +1,196 @@
+# OHOS (OpenHarmony) cross-compile + verification workflow.
+#
+# Cross-compiles retrace v2 to aarch64-linux-ohos (musl arm64) using the
+# official OHOS NDK, code-signs the .so (required for runtime load), and
+# verifies the library loads + the public API works inside real OHOS
+# userland (ghcr.io/hqzing/dockerharmony) via QEMU binfmt on x86_64.
+#
+# See issue #443 and the porting guide:
+# https://gist.github.com/ronaldtse/dd9e08dd294f7f37fd40b0a9b84468aa
+
+name: OHOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'src/**'
+      - 'include/**'
+      - '.github/scripts/setup-ohos-ndk.sh'
+      - '.github/scripts/ohos-smoke-test.c'
+      - '.github/scripts/ohos-ldpreload-target.c'
+      - '.github/scripts/ohos-ldpreload-config.json'
+      - '.github/workflows/ohos.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'src/**'
+      - 'include/**'
+      - '.github/scripts/setup-ohos-ndk.sh'
+      - '.github/scripts/ohos-smoke-test.c'
+      - '.github/scripts/ohos-ldpreload-target.c'
+      - '.github/scripts/ohos-ldpreload-config.json'
+      - '.github/workflows/ohos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cross-compile-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+              build-essential cmake ninja-build curl jq unzip file ca-certificates
+
+      - name: Cache OHOS NDK (~4 GB)
+        id: cache-ndk
+        uses: actions/cache@v4
+        with:
+          path: /opt/ohos
+          key: ohos-ndk-${{ hashFiles('.github/scripts/setup-ohos-ndk.sh') }}
+
+      - name: Setup OHOS NDK
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: ./.github/scripts/setup-ohos-ndk.sh --prefix /opt/ohos
+
+      - name: Diagnose NDK layout
+        run: |
+          echo "=== Symlink ==="
+          ls -la /opt/ohos/ohos-sdk/linux/native/sysroot || true
+          echo "=== Sysroot top-level ==="
+          ls -la /opt/ohos/ohos-sdk/linux/native/sysroot/ 2>/dev/null || echo "(missing)"
+          echo "=== Sysroot usr ==="
+          ls -la /opt/ohos/ohos-sdk/linux/native/sysroot/usr/ 2>/dev/null || echo "(missing)"
+          echo "=== Sysroot usr/lib ==="
+          ls -la /opt/ohos/ohos-sdk/linux/native/sysroot/usr/lib/ 2>/dev/null || echo "(missing)"
+          echo "=== Crt objects ==="
+          find /opt/ohos/ohos-sdk/linux/native/sysroot -name 'Scrt1.o' -o -name 'crti.o' -o -name 'crtn.o' 2>/dev/null
+          echo "=== libm / libc ==="
+          find /opt/ohos -name 'libm.so*' -o -name 'libc.so*' 2>/dev/null | head -20
+          echo "=== LLVM-19 sysroot ==="
+          ls -la /opt/ohos/llvm-19/sysroot/ 2>/dev/null || echo "(missing)"
+          echo "=== LLVM-19 sysroot aarch64-linux-ohos ==="
+          ls -la /opt/ohos/llvm-19/sysroot/aarch64-linux-ohos/ 2>/dev/null || echo "(missing)"
+
+      - name: Cross-compile retrace v2
+        run: |
+          cmake -S . -B build-ohos \
+            -DCMAKE_TOOLCHAIN_FILE=/opt/ohos/ohos-sdk/linux/native/build/cmake/ohos.toolchain.cmake \
+            -DOHOS_ARCH=arm64-v8a -DOHOS_PLATFORM=OHOS \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DRETRACE_BUILD_SHARED=ON \
+            -DRETRACE_BUILD_STATIC=OFF \
+            -DRETRACE_BUILD_V2=ON \
+            -DRETRACE_BUILD_CLI=OFF \
+            -DRETRACE_BUILD_TESTS=OFF \
+            -G Ninja
+          cmake --build build-ohos -j"$(nproc)"
+
+      - name: Verify .so is ARM aarch64
+        run: |
+          ls -la build-ohos/src/v2/libretrace_v2.so*
+          file build-ohos/src/v2/libretrace_v2.so.2.1.0 | tee /dev/stderr | grep -q 'ELF 64-bit LSB .* ARM aarch64'
+
+      - name: Code-sign .so (required by OHOS at dlopen time)
+        run: |
+          for f in build-ohos/src/v2/libretrace_v2.so \
+                   build-ohos/src/v2/libretrace_v2.so.2 \
+                   build-ohos/src/v2/libretrace_v2.so.2.1.0; do
+            [ -e "$f" ] || continue
+            /opt/ohos/ohos-sdk/linux/toolchains/lib/binary-sign-tool sign \
+              -selfSign 1 -inFile "$f" -outFile "$f"
+          done
+
+      - name: Build smoke-test (library load)
+        run: |
+          /opt/ohos/llvm-19/llvm/bin/clang \
+            --target=aarch64-linux-ohos \
+            --sysroot=/opt/ohos/ohos-sdk/linux/native/sysroot \
+            -O2 -L build-ohos/src/v2 -Wl,-rpath='$ORIGIN' \
+            -o build-ohos/ohos-smoke-test \
+            .github/scripts/ohos-smoke-test.c -ldl
+          file build-ohos/ohos-smoke-test | grep -q 'ELF 64-bit LSB .* ARM aarch64'
+
+      - name: Build LD_PRELOAD target
+        run: |
+          /opt/ohos/llvm-19/llvm/bin/clang \
+            --target=aarch64-linux-ohos \
+            --sysroot=/opt/ohos/ohos-sdk/linux/native/sysroot \
+            -O2 \
+            -o build-ohos/ohos-ldpreload-target \
+            .github/scripts/ohos-ldpreload-target.c
+          file build-ohos/ohos-ldpreload-target | grep -q 'ELF 64-bit LSB .* ARM aarch64'
+
+      - name: Stage verification bundle
+        run: |
+          mkdir -p ohos-verify
+          cp -a build-ohos/src/v2/libretrace_v2.so           ohos-verify/
+          cp -a build-ohos/src/v2/libretrace_v2.so.2         ohos-verify/ 2>/dev/null || true
+          cp -a build-ohos/src/v2/libretrace_v2.so.2.1.0     ohos-verify/ 2>/dev/null || true
+          cp -a build-ohos/ohos-smoke-test                    ohos-verify/
+          cp -a build-ohos/ohos-ldpreload-target              ohos-verify/
+          cp -a .github/scripts/ohos-ldpreload-config.json    ohos-verify/retrace-config.json
+          ls -l ohos-verify/
+
+      - name: Setup binfmt for arm64
+        run: docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+      - name: Run smoke-test in dockerharmony (public API)
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD/ohos-verify:/work" -w /work \
+            ghcr.io/hqzing/dockerharmony:latest \
+            sh -c 'LD_LIBRARY_PATH=. ./ohos-smoke-test'
+
+      - name: Run LD_PRELOAD end-to-end in dockerharmony
+        run: |
+          # LD_PRELOAD the v2 library, run the target, capture combined
+          # output. retrace v2's default logger writes JSON to stderr.
+          # We just need to confirm at least one libc symbol appears in
+          # the trace -- that proves the trampoline + engine ran on
+          # OHOS/musl. exit() and malloc() are reliable because musl's
+          # own startup touches them.
+          set +e
+          output=$(docker run --rm --platform linux/arm64 \
+            -v "$PWD/ohos-verify:/work" -w /work \
+            ghcr.io/hqzing/dockerharmony:latest \
+            sh -c '
+              LD_LIBRARY_PATH=. LD_PRELOAD=./libretrace_v2.so.2 \
+              RETRACE_JSON_CONFIG=./retrace-config.json \
+              ./ohos-ldpreload-target 2>&1
+            ' 2>&1)
+          rc=$?
+          echo "$output"
+          if [ $rc -ne 0 ]; then
+            echo "FAIL: target exited with rc=$rc"
+            exit 1
+          fi
+          if ! echo "$output" | grep -E "exit\(\)|malloc\(\)|getuid|getgid" >/dev/null; then
+            echo "FAIL: no intercepted libc symbol found in trace"
+            exit 1
+          fi
+          echo "OK: LD_PRELOAD interposition verified on OHOS"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrace-ohos-aarch64
+          path: ohos-verify/
+          if-no-files-found: error
