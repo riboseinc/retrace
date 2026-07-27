@@ -137,7 +137,7 @@ jobs:
           mkdir -p "$STAGE/lib" "$STAGE/include"
           cp build/src/v2/libretrace.so* "$STAGE/lib/"
           cp -r include/retrace/* "$STAGE/include/"
-          cp LICENSE README.adoc "$STAGE/"
+          cp LICENSE.md README.adoc "$STAGE/"
           cp .github/notice/THIRD_PARTY_NOTICES.posix-with-windows "$STAGE/THIRD_PARTY_NOTICES"
           tar -czf "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" "$STAGE"
           sha256sum "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
@@ -151,7 +151,7 @@ jobs:
           mkdir -p "$STAGE/lib" "$STAGE/include"
           cp build/src/v2/libretrace.*.dylib "$STAGE/lib/"
           cp -r include/retrace/* "$STAGE/include/"
-          cp LICENSE README.adoc "$STAGE/"
+          cp LICENSE.md README.adoc "$STAGE/"
           cp .github/notice/THIRD_PARTY_NOTICES.posix "$STAGE/THIRD_PARTY_NOTICES"
           tar -czf "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" "$STAGE"
           shasum -a 256 "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
@@ -197,7 +197,7 @@ jobs:
           $mingwDll = "build/src/backends/preload_mingw/Release/retrace_backend_preload_mingw.dll"
           if (Test-Path $mingwDll) { Copy-Item $mingwDll "$stage/bin/" }
           Copy-Item -Recurse include/retrace/* "$stage/include/"
-          Copy-Item LICENSE, README.adoc "$stage/"
+          Copy-Item LICENSE.md, README.adoc "$stage/"
           @"
           retrace third-party notices
           ===========================
@@ -264,7 +264,7 @@ jobs:
               mkdir -p "$STAGE/lib" "$STAGE/include"
               cp build/src/v2/libretrace.so* "$STAGE/lib/"
               cp -r include/retrace/* "$STAGE/include/"
-              cp LICENSE README.adoc "$STAGE/"
+              cp LICENSE.md README.adoc "$STAGE/"
               cp .github/notice/THIRD_PARTY_NOTICES.musl "$STAGE/THIRD_PARTY_NOTICES"
               tar -czf "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" "$STAGE"
               sha256sum "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
@@ -347,7 +347,7 @@ jobs:
           mkdir -p "$STAGE/lib" "$STAGE/include"
           cp build-ohos/src/v2/libretrace.so* "$STAGE/lib/"
           cp -r include/retrace/* "$STAGE/include/"
-          cp LICENSE README.adoc "$STAGE/"
+          cp LICENSE.md README.adoc "$STAGE/"
           cp .github/notice/THIRD_PARTY_NOTICES.ohos "$STAGE/THIRD_PARTY_NOTICES"
           tar -czf "retrace-${VERSION}-ohos-aarch64.tar.gz" "$STAGE"
           sha256sum "retrace-${VERSION}-ohos-aarch64.tar.gz" \
