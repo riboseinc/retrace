@@ -1,0 +1,7 @@
+retrace third-party notices
+===========================
+
+retrace is BSD-2-Clause licensed. Built against musl libc.
+The JSON parser (parson) is vendored under
+src/config/json/parson.{c,h} and retains its MIT license header
+in those files.

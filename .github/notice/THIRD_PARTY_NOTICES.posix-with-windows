@@ -1,0 +1,13 @@
+retrace third-party notices
+===========================
+
+retrace is BSD-2-Clause licensed.
+
+This build does NOT link against or include:
+  - MinHook (https://github.com/TsudaKageyu/minhook)
+  - Microsoft Detours (https://github.com/microsoft/Detours)
+
+The Windows inline-hooking backends (src/backends/win_common/) are
+implemented from scratch per ADR-0009. The JSON parser (parson) is
+vendored under src/config/json/parson.{c,h} and retains its MIT
+license header in those files.
