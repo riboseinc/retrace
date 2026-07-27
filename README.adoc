@@ -1,330 +1,414 @@
-= Retrace
+= retrace
 
-image:https://github.com/riboseinc/retrace/actions/workflows/ubuntu.yml/badge.svg[Ubuntu, link=https://github.com/riboseinc/retrace/actions/workflows/ubuntu.yml]
-image:https://github.com/riboseinc/retrace/actions/workflows/macos.yml/badge.svg[macOS, link=https://github.com/riboseinc/retrace/actions/workflows/macos.yml]
-image:https://github.com/riboseinc/retrace/actions/workflows/windows.yml/badge.svg[Windows, link=https://github.com/riboseinc/retrace/actions/workflows/windows.yml]
+image:https://github.com/riboseinc/retrace/actions/workflows/build.yml/badge.svg?branch=main[Build, link=https://github.com/riboseinc/retrace/actions/workflows/build.yml]
+image:https://github.com/riboseinc/retrace/actions/workflows/alpine.yml/badge.svg?branch=main[Alpine, link=https://github.com/riboseinc/retrace/actions/workflows/alpine.yml]
+image:https://github.com/riboseinc/retrace/actions/workflows/msys.yml/badge.svg?branch=main[MSYS2, link=https://github.com/riboseinc/retrace/actions/workflows/msys.yml]
+image:https://github.com/riboseinc/retrace/actions/workflows/ohos.yml/badge.svg?branch=main[OHOS, link=https://github.com/riboseinc/retrace/actions/workflows/ohos.yml]
 image:https://img.shields.io/cirrus/github/riboseinc/retrace?label=freebsd&logo=cirrus%20ci["FreeBSD", link="https://cirrus-ci.com/github/riboseinc/retrace"]
-image:https://github.com/riboseinc/retrace/actions/workflows/nix.yml/badge.svg[nix, link=https://github.com/riboseinc/retrace/actions/workflows/nix.yml]
-image:https://github.com/riboseinc/retrace/actions/workflows/checkpatch.yml/badge.svg[checkpatch, link=https://github.com/riboseinc/retrace/actions/workflows/checkpatch.yml]
+image:https://github.com/riboseinc/retrace/actions/workflows/nix.yml/badge.svg?branch=main[Nix, link=https://github.com/riboseinc/retrace/actions/workflows/nix.yml]
+image:https://github.com/riboseinc/retrace/actions/workflows/checkpatch.yml/badge.svg?branch=main[checkpatch, link=https://github.com/riboseinc/retrace/actions/workflows/checkpatch.yml]
 image:https://img.shields.io/coverity/scan/12840.svg[Coverity Scan, link=https://scan.coverity.com/projects/riboseinc-retrace]
 
-`retrace` is a versatile security vulnerability / bug discovery tool
-through monitoring and modifying the behavior of compiled binaries on
-Linux, OpenBSD/FreeBSD/NetBSD (shared object) and macOS (dynamic library).
+`retrace` is a userspace security and vulnerability discovery tool that
+intercepts libc calls in dynamically-linked binaries. It works by
+preloading a shared library into the target process
+(`LD_PRELOAD` on ELF, `DYLD_INSERT_LIBRARIES` on Darwin, inline
+hooking on Windows) and either logging or rewriting each intercepted
+call's arguments and return value.
 
-`retrace` can be used to assist reverse engineering / debugging
-dynamically-linked ELF (Linux/OpenBSD/FreeBSD/NetBSD) and
-Mach-O (macOS) binary executables.
+Use cases: reverse engineering, debugging, fuzzing (malloc failure
+injection, getenv buffer-overflow / format-string / garbage fuzzing,
+incomplete I/O), redirecting network `connect()` calls, redirecting
+file `open()` paths, faking OpenSSL verify results, and more.
 
 
-== Retrace v2
+== Supported platforms (v2.1.0)
 
-Work in a new version of `retrace` is ongoing, all the documentation is only about `retrace` v1, early documentation for
-`retrace` v2 is link:READMEv2.adoc[here].
+[cols="1,1,1,1", frame=all, grid=all]
+|===
+| OS | Architecture | Interposition | Status
 
-If you want to give it a go despiste the lack of documentation you can enable it in the build using `./configure --enable-v2`.
+| Linux (glibc) | x86_64, aarch64 | `LD_PRELOAD` | Production
+| Linux (musl / Alpine) | x86_64, aarch64 | `LD_PRELOAD` | Production
+| Linux (musl / OHOS) | aarch64 | `LD_PRELOAD` | Cross-compile + signed
+| macOS | arm64 (Apple Silicon) | `DYLD_INSERT_LIBRARIES` | Production
+| macOS | x86_64 (Intel) | `DYLD_INSERT_LIBRARIES` | link:https://github.com/riboseinc/retrace/issues/452[Issue #452]
+| FreeBSD / OpenBSD / NetBSD | x86_64 | `LD_PRELOAD` | Production
+| Windows (MSVC) | x86_64, arm64 | Inline hook (from scratch, ADR-0009) | Production
+| Windows (MinGW) | x86_64 | Inline hook | Production
+| Linux (statically linked) | x86_64, aarch64 | `ptrace(2)` | Production
+|===
+
+Pre-built binaries for every platform are attached to each
+link:https://github.com/riboseinc/retrace/releases[release].
+
+
+== Build
+
+retrace uses CMake. vcpkg manifest mode pulls OpenSSL and cmocka on
+Windows automatically; system packages provide them on POSIX.
+
+[source,console]
+----
+$ cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON
+$ cmake --build build
+$ ctest --test-dir build --output-on-failure
+$ sudo cmake --install build
+----
+
+Useful CMake options:
+
+[cols="1,4", frame=all, grid=all]
+|===
+| Option | Default / purpose
+| `RETRACE_BUILD_V2` | `ON` -- build the retrace shared library (`libretrace.so` / `.dylib` / `.dll`).
+| `RETRACE_BUILD_CLI` | `ON` -- build the CLI launcher (placeholder; full CLI in a future release).
+| `RETRACE_BUILD_TESTS` | `OFF` -- build per-feature test binaries under `test/`.
+| `RETRACE_BUILD_EXAMPLES` | `OFF` -- build the demos under `examples/`.
+| `RETRACE_ENABLE_RPC` | `OFF` -- build the optional RPC subsystem under `rpc/`.
+| `RETRACE_ENABLE_ASAN` / `_UBSAN` / `_TSAN` / `_COVERAGE` | `OFF` -- instrumentation toggles.
+|===
+
+
+== Running
+
+[source,console]
+----
+$ RETRACE_JSON_CONFIG=<config.json> LD_PRELOAD=build/src/v2/libretrace.so <binary>
+----
+
+On macOS replace `LD_PRELOAD` with `DYLD_INSERT_LIBRARIES`:
+
+[source,console]
+----
+$ RETRACE_JSON_CONFIG=<config.json> DYLD_INSERT_LIBRARIES=build/src/v2/libretrace.dylib <binary>
+----
+
+Environment variables:
+
+[cols="1,4", frame=all, grid=all]
+|===
+| Variable | Purpose
+| `RETRACE_JSON_CONFIG` | Path to a JSON config file (see below). If unset, retrace uses a built-in default that activates `log_params` + `call_real` for every intercepted function.
+| `RETRACE_LOGGER_DEF_ENA` | `0` disables the logger entirely.
+| `RETRACE_LOGGER_DEF_STDOUT_ENA` | `0` keeps retrace's log off stdout so it doesn't mix with the target's own output.
+| `RETRACE_LOGGER_DEF_FN` | Path to a log file (alternative to stderr).
+|===
+
+[NOTE]
+====
+On macOS, System Integrity Protection strips `DYLD_INSERT_LIBRARIES`
+for binaries in system directories. Run `csrutil disable` and reboot
+to trace them.
+====
+
+
+== JSON configuration
+
+retrace is driven by a JSON config file. The top-level shape:
+
+[source,json]
+----
+{
+  "intercept_scripts": [
+    {
+      "func_name": "<glob or exact symbol>",
+      "actions": [
+        { "action_name": "<action>", "action_params": { ... } },
+        ...
+      ]
+    },
+    ...
+  ]
+}
+----
+
+A `func_name` of `"*"` matches every intercepted symbol. Otherwise
+the name must match a libc symbol retrace knows about (see
+`src/core/prototypes/` for the canonical list, grouped by header:
+`stdio.c`, `stdlib.c`, `unistd.c`, `dirent.c`, `uio.c`, `signal.c`,
+`ctype.c`, `locale.c`).
+
+Actions run in the order listed. Each action either observes the call,
+mutates an argument, mutates the return value, or skips the real call
+entirely.
+
+
+== Built-in actions
+
+[cols="2,4,3", frame=all, grid=all]
+|===
+| Action | Effect | Required params
+
+| `log_params`
+| Log the call (function name + arguments) to the configured logger.
+| none
+
+| `call_real`
+| Invoke the real libc implementation. Omit this action to skip the real call entirely (return zero / NULL).
+| none
+
+| `modify_in_param_str`
+| Rewrite a string argument before the real call runs.
+| `param_name`, `new_str`; optional `match_str` to gate the rewrite on the current value
+
+| `modify_in_param_int`
+| Rewrite an integer argument before the real call runs.
+| `param_name`, `new_int`; optional `match_int` to gate the rewrite
+
+| `modify_in_param_arr`
+| Rewrite an array argument before the real call runs.
+| `param_name`, `new_arr` (see `src/core/actions/basic.c` for layout)
+
+| `modify_return_value_int`
+| Override the integer return value (after `call_real` if present).
+| `retval_int`
+
+| `memory_fuzz`
+| Randomly fail `malloc` / `realloc` / `calloc` (returns NULL). Useful for finding unchecked allocator returns.
+| `fail_rate` (float, 0..1)
+|===
+
+New behaviors are added by registering a new action -- no engine change
+required (see `src/core/actions/basic.c` for the pattern).
+
+
+== Examples
+
+=== Log every libc call (the default)
+
+[source,json]
+----
+{
+  "intercept_scripts": [
+    {
+      "func_name": "*",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}
+----
+
+=== Redirect `getenv("TEST")` to `getenv("PATH")`
+
+[source,json]
+----
+{
+  "intercept_scripts": [
+    {
+      "func_name": "getenv",
+      "actions": [
+        { "action_name": "log_params" },
+        {
+          "action_name": "modify_in_param_str",
+          "action_params": { "param_name": "name", "match_str": "TEST", "new_str": "PATH" }
+        },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}
+----
+
+=== Force `getuid()` to return 42
+
+[source,json]
+----
+{
+  "intercept_scripts": [
+    {
+      "func_name": "getuid",
+      "actions": [
+        { "action_name": "call_real" },
+        { "action_name": "modify_return_value_int", "action_params": { "retval_int": 42 } }
+      ]
+    }
+  ]
+}
+----
+
+=== Fuzz malloc (10% failure rate)
+
+[source,json]
+----
+{
+  "intercept_scripts": [
+    {
+      "func_name": "malloc",
+      "actions": [
+        { "action_name": "call_real" },
+        { "action_name": "memory_fuzz", "action_params": { "fail_rate": 0.1 } }
+      ]
+    }
+  ]
+}
+----
+
+
+== End-to-end examples under `examples/`
+
+[cols="2,3", frame=all, grid=all]
+|===
+| Directory | What it demonstrates
+
+| `examples/dns-fuzz/` | Fuzz DNS resolution paths
+| `examples/getenv-fuzzing/` | Buffer-overflow and format-string fuzzing of `getenv`
+| `examples/http-server-overflow/` | HTTP server input fuzzing
+| `examples/id-redirection/` | Redirect `getuid`/`geteuid` to fake privileges
+| `examples/net-fuzzing/` | Network call fuzzing
+| `examples/stringinject/` | File/string injection helper (paired with `tools/stringinjector`)
+| `examples/unsafe-system/` | Trace `system()` invocation paths
+|===
+
+
+== Architecture
+
+retrace is built around five clean concepts. Each is a MECE module
+extensible without modifying the others (Open/Closed Principle).
+
+[cols="1,4", frame=all, grid=all]
+|===
+
+| **Per-arch trampoline**
+| One hand-written assembly trampoline per function. Pushes the SysV /
+Microsoft x64 / AArch64 PCS register arguments into a frame, calls
+`retrace_engine_wrapper(func_name, frame)`, then either tail-calls the
+real implementation (if the engine set `call_real_flag`) or returns the
+synthesized `ret_val`. Lives under
+`src/backends/preload_*/{x86_64,aarch64}/arch_spec_top.S`.
+
+| **Engine**
+| `retrace_engine_wrapper` (in `src/core/engine.c`) is the central
+dispatch. Per-thread `struct ThreadContext` holds the prototype, real
+impl pointer, and parsed params. The engine looks up the matching
+`intercept_script` and runs its `actions` in order.
+
+| **Action registry**
+| Built-in actions live in `src/core/actions/{basic,memfuzz}.c` and
+self-register into a linker section the engine scans at init. Adding a
+new behavior = adding a new action file; no engine change.
+
+| **Backend plugin system**
+| Each (OS, arch) combo has its own backend (`preload_elf`,
+`preload_macho`, `preload_bsd`, `preload_msvc`, `preload_mingw`,
+`ptrace`). Backends self-register via a constructor-section scan;
+`retrace_backend_select()` picks the highest-rank backend whose
+`probe()` succeeds. See `include/retrace/backend.h`.
+
+| **Real-impl indirection**
+| All internal libc usage inside retrace goes through
+`retrace_real_impls.<fn>` function pointers, resolved once at init via
+`dlsym(RTLD_NEXT, ...)`. This is the reentrancy guard -- bypass it and
+you recurse.
+|===
+
+Init order matters (see `src/core/main.c` constructor):
+`retrace_as_init` -> `retrace_real_impls_init` -> `retrace_logger_init`
+-> parson alloc hooks -> `retrace_conf_init` ->
+`retrace_loger_update_config` -> `retrace_engine_init` ->
+`retrace_funcs_init` -> `retrace_datatypes_init` ->
+`retrace_actions_init` -> `retrace_as_init_late`.
+
+Architecture Decision Records under `docs/adr/` capture the
+load-bearing decisions:
+
+[cols="1,4", frame=all, grid=all]
+|===
+| ADR | Topic
+| `0006` | Semantic versioning
+| `0008` | Opaque public types for ABI stability
+| `0009` | From-scratch Windows inline-hooking (no MinHook / Detours)
+| `0010` | AArch64 float params supported from day one
+| `0011` | v1 source removed at v2.1.0 (supersedes `0005`)
+|===
+
+
+== Migrating from v1
+
+v1's source code was removed at the v2.1.0 release (ADR-0011). If you
+were running v1, the table below maps every v1 concept to its v2
+equivalent.
+
+[cols="2,3", frame=all, grid=all]
+|===
+
+| **v1** | **v2**
+
+| `libretrace.so` (single library, per-function C wrappers)
+| `libretrace.so` (single library, single assembly trampoline per function + JSON-driven engine)
+
+| `retrace` shell-script CLI launcher
+| LD_PRELOAD / DYLD_INSERT_LIBRARIES directly. A native CLI is on the roadmap.
+
+| `RETRACE_CONFIG=<file>` (line-oriented text config)
+| `RETRACE_JSON_CONFIG=<file.json>` (JSON; default config activates `log_params` + `call_real` for `*`)
+
+| `getuid,0` (text: `func,value`)
+| `{ "func_name": "getuid", "actions": [{"action_name":"modify_return_value_int", "action_params":{"retval_int":0}}] }`
+
+| `fopen,/etc/passwd,/tmp/passwd`
+| `{ "action_name": "modify_in_param_str", "action_params": {"param_name":"path", "match_str":"/etc/passwd", "new_str":"/tmp/passwd"} }`
+
+| `connect,src_ip,src_port,dst_ip,dst_port`
+| Use `modify_in_param_arr` on the `sockaddr` argument (the v1 line had no exact equivalent -- v2's action is more general).
+
+| `SSL_get_verify_result,10`
+| `{ "action_name": "modify_return_value_int", "action_params": {"retval_int":10} }`
+
+| `memoryfuzzing,0.05`
+| `{ "action_name": "memory_fuzz", "action_params": {"fail_rate":0.05} }`
+
+| `incompleteio,10`
+| Not yet ported to v2's action system. Track via issue tracker if you need it.
+
+| `fuzzingseed,1498729252`
+| Not yet ported to v2. The `memory_fuzz` action uses `rand()` seeded from the PID; explicit seeding is on the roadmap.
+
+| `logtofile,retrace.log`
+| `RETRACE_LOGGER_DEF_FN=retrace.log`
+
+| `logging-global,...` / `logging-excluded-funcs,...` / `logging-allowed-funcs,...`
+| Use multiple `intercept_scripts` entries with explicit `func_name` globs (allowlist model). Per-group log levels are not yet ported.
+
+| `showtimestamp` / `showcalltime,0.0001`
+| Not yet ported to v2. On the roadmap.
+
+| Autotools build: `./configure --enable-v2 && make`
+| CMake: `cmake -B build && cmake --build build`
+
+| `RETRACE_CLI=1` (interactive pty menu)
+| Removed. Will be replaced by the native CLI when it lands.
+
+| v1 examples under `examples/*/retrace.conf`
+| Still in the tree as v1-format text configs. They will be ported to v2 JSON in a follow-up.
+|===
+
+What was **removed** in v2.1.0:
+
+* The entire v1 source tree (`src/v1/`).
+* The Autotools build system (`configure.ac`, `Makefile.am`, `m4/`, `autogen.sh`, `configure`, etc.). CMake is the only build system.
+* The `retrace` shell-script launcher. Use `LD_PRELOAD` until the native CLI lands.
+* The `RETRACE_CONFIG` text-format config file. Use `RETRACE_JSON_CONFIG`.
+* The interactive pty CLI (`RETRACE_CLI=1`).
+
+What was **renamed**:
+
+* The installed library is `libretrace.so` / `libretrace.dylib` / `retrace.dll` (was `libretrace_v2.*` briefly during the transition; the `_v2` suffix was dropped at v2.1.0 because v1 no longer exists).
 
 
 == Who is Ribose?
 
-We are https://www.ribose.com[Ribose], the secure sharing company. We believe privacy and security form the foundation of liberty.
+We are https://www.ribose.com[Ribose], the secure sharing company. We
+believe privacy and security form the foundation of liberty. We created
+`retrace` to aid developers and security researchers in building
+better, more defensible software.
 
-Our goal is to empower individuals and organizations alike to freely communicate and achieve productivity for the greater good, through our deep security and technology expertise, creating highly-secure products validated to the world’s most stringent requirements and regulations.
 
-We created `retrace` to aid developers and security researchers to develop better code that leads the world to a better place.
+== Contact
 
-
-== Contacting The Organizer
-
-The Ribose `retrace` team can be reached at retrace@ribose.com. We will answer questions to the best of our efforts.
-
-
-
-
-= Building retrace
-
-For platforms with Autotools, the generic way to build and install
-`retrace` is:
-
-[source,console]
-----
-$ sh autogen.sh
-$ ./configure --enable-tests
-$ make
-$ make check
-$ sudo make install
-----
-
-You need Autotools installed in your system (`autoconf`, `automake`,
-`libtool`, `make`, `gcc` packages).
-
-OpenSSL library and headers are automatically detected, you can specify
-an optional flag `--with-openssl=[PATH]` (to use a non-standard OpenSSL
-installation root).
-
-In order to build tests: run configure script with `--enable-tests`
-flag.  To build cmocka tests you can specify an optional flag
-`--with-cmocka=[PATH]` (to use a non-standard cmocka installation root).
-
-By the default `retrace` is installed in `/usr/bin` directory.
-
-
-= Running retrace
-
-[source,console]
-----
-$ retrace [-f configuration file location] <executable>
-----
-
-Configuration file path can be set either in `RETRACE_CONFIG`
-environment variable or by specifying `-f [path]` command line argument.
-
-= Interactive user interface
-
-Interactive control over retrace can be exercised using cli control feature
-over pseudo terminal (currently available on Linux platforms only).
-In order to enable the feature, export `RETRACE_CLI=1` environment variable.
-When enabled, the name of the pseudo device will be printed with a 3 seconds delay during the start up:
-
-[source,console]
-----
-RETRACE-INIT [INFO]: cli pts is at: /dev/pts/1
-----
-
-After that, a terminal emulator can be connected to that device:
-
-[source,console]
-----
-minicom -p /dev/pts/1
-----
-
-Hit the main Enter key, and the command menu with prompt will appear:
-
-[source,console]
-----
-Welcome to minicom 2.7.1
-
-OPTIONS: I18n
-Compiled on Aug 13 2017, 15:25:34.
-Port /dev/tty8, 13:10:04
-
-Press CTRL-A Z for help on special keys
-
-
-Failed to get command id, retry
-Retrace command menu
-\--------------------
-[0] <Main> Say Hi
-[1] <Main> Terminate process
-Enter command id>>
-----
-
-The following are the characteristics of the terminal:
-
-* Raw mode - no line processing will be performed on the input.
-* Characters are echoed back.
-* Main enter key is used to mark the end of input.
-
-== Note to developers
-In order to expose interactive commands from your module, use API defined in retrace_cli.h.
-To register commads use cli_register_command_blk(). To interact with the user use cli_printf() and cli_scanf().
-Refer to retrace_main.c for reference.
-
-= Examples
-
-== Trace usage example
-
-In its most basic form `retrace` will just print all calls that are made
-(and that are supported by retrace):
-
-[source,console]
-----
-$ retrace /usr/bin/id
-(2051) geteuid();
-(2051) getuid();
-(2051) getegid();
-(2051) getgid();
-(2051) fopen("/etc/passwd", "rce"); [3]
-(2051) fclose(3);
-(2051) fopen("/etc/group", "rce"); [3]
-(2051) fclose(3);
-(2051) fopen("/etc/group", "rce"); [3]
-(2051) fclose(3);
-(2051) fopen("/etc/group", "rce"); [3]
-(2051) fclose(3);
-uid=1000(test) gid=1000(test) groups=1000(test),10(wheel)
-(2051) exit(0);
-(2051) fileno(1);
-(2051) fclose(1);
-(2051) fileno(2);
-(2051) fclose(2);
-----
-
-== Redirect usage example
-
-The power of `retrace` lies in its ability to modify the behavior of
-the standard system calls in a number of different ways.
-This is done using a config file.
-
-An easy example is redirecting the output of the `getuid()` call:
-
-[source,console]
-----
-$ cat retrace.conf
-getuid,0
-geteuid,0
-getegid,0
-getgid,0
-
-$ retrace -f retrace.conf /usr/bin/id
-(4982) geteuid(); [redirection in effect: '0']
-(4982) getuid(); [redirection in effect: '0']
-(4982) getegid(); [redirection in effect: '0']
-(4982) getgid(); [redirection in effect: '0']
-(4982) fopen("/etc/passwd", "rce"); [3]
-(4982) fclose(3);
-(4982) fopen("/etc/group", "rce"); [3]
-(4982) fclose(3);
-(4982) fopen("/etc/group", "rce"); [3]
-(4982) fclose(3);
-(4982) fopen("/etc/group", "rce"); [3]
-(4982) fclose(3);
-uid=0(root) gid=0(root) groups=0(root)
-(4982) exit(0);
-(4982) fileno(1);
-(4982) fclose(1);
-(4982) fileno(2);
-(4982) fclose(2);
-----
-
-
-= Config Options
-
-Other useful config file options are listed below.
-
-== Connect
-
-[source,sh]
-----
-connect,127.0.0.1,8080,192.168.1.110,9090
-----
-
-Will redirect a `connect()` call from `127.0.0.1:8080` to
-`192.168.1.110:9090`.
-
-== File-related
-
-[source,sh]
-----
-fopen,/etc/passwd,/tmp/passwd
-----
-
-Will redirect a `fopen()` call from `/etc/passwd` to `/tmp/passwd`.
-
-== Logging
-
-[source,sh]
-----
-logtofile,retrace.log
-----
-
-Will send the log file to a file rather than `stderr`. You can configure
-log output to write to `/dev/null` disable logging completely.
-
-== OpenSSL
-
-[source,sh]
-----
-SSL_get_verify_result,10
-----
-
-Will cause the OpenSSL function `SSL_get_verify_result` to return any
-desired value.
-
-== Memory Fuzzing
-
-[source,sh]
-----
-memoryfuzzing,0.05
-----
-
-This option will cause a percentage of `malloc()`, `realloc()` and
-`calloc()` calls to fail.
-
-The percentage is specified in a number (`float`) from `0` (no fail) to
-`1` (all fail). This is useful to discover places in your code where you
-are not checking the return value of allocators.
-
-The seed of the random generator can be controlled with the
-`fuzzingseed,1498729252` option, so that the results are repeatable.
-
-== Incomplete I/O
-
-[source,sh]
-----
-incompleteio,10
-----
-
-This option will cause the `read()` / `write()` calls to randomly
-write/read less bytes than was asked. A common scenario that people
-forget to check.
-
-== Time tracking
-
-[source,sh]
-----
-showtimestamp
-showcalltime,0.0001
-----
-
-These two options will cause a timestamp (since the beginning of the
-tracing) to be shown and the time a call took if it's larger than
-the specified time in float seconds.
-
-== Logging
-
-[source,sh]
-----
-logging-global,LOG_GROUP_FILE|LOG_GROUP_MEM,RTR_LOG_LEVEL_ALL
-logging-excluded-funcs,free|memcpy|malloc
-logging-allowed-funcs,strlen
-stacktrace-groups,LOG_GROUP_MEM
-stacktrace-disabled-funcs,calloc
-----
-
-These options will enable or disable logging options by group or level.
-The each group, level or function may be combined by `|` character.
-
-[source,sh]
-----
-logging-global,[logging group],[logging level]
-	groups: LOG_GROUP_ALL,LOG_GROUP_MEM,LOG_GROUP_FILE,LOG_GROUP_NET,LOG_GROUP_SYS,
-		LOG_GROUP_STR,LOG_GROUP_SSL,LOG_GROUP_PROC
-	levels: LOG_LEVEL_ALL,LOG_LEVEL_NOR,LOG_LEVEL_ERR,LOG_LEVEL_FUZZ,LOG_LEVEL_REDIRECT
-
-logging-excluded-funcs,[functions list]
-logging-allowed-funcs,[functions list]
-stacktrace-groups,[logging groups]
-stacktrace-disabled-funcs,[functions list]
-----
-
-= Notes
-
-== macOS System Integrity Protection
-
-We use the DYLD_INSERT_LIBRARIES environment variable to insert `retrace` into binaries.
-Starting on Mac OS X El Capitan Apple removes the DYLD_INSERT_LIBRARIES variable for
-the environment for binaries in system directories. This means you can't trace system binaries
-using `retrace` by default.
-
-You can disable this behaviour by running `csrutil disable` and rebooting.
-
-
-= Feedback
-
-`retrace` is under heavy development and we are always looking to implement new
-and useful features that allows debugging and reverse engineering programs in
-new and interesting ways.
-
-Please send feedback and improvement suggestions either as GitHub issues or to
-retrace@ribose.com.
+* Security issues, feature requests, and bug reports:
+  link:https://github.com/riboseinc/retrace/issues[GitHub Issues]
+* General questions: `retrace@ribose.com`
