@@ -33,8 +33,9 @@
 #   macos-arm64                     (macos-x86_64 disabled pending #452)
 #   windows-x64, windows-arm64
 #   alpine-x86_64, alpine-aarch64
+#   ohos-aarch64                   (cross-compiled; self-signed for OHOS load)
 #
-# Each binary archive ships the v2 shared library, public headers, LICENSE,
+# Each binary archive ships the shared library, public headers, LICENSE,
 # README, and a THIRD_PARTY_NOTICES confirming no MinHook/Detours linkage
 # (per ADR-0009).
 
@@ -309,10 +310,104 @@ NOTICES
             retrace-*.tar.gz.sha256
 
   # ---------------------------------------------------------------
+  # OHOS (OpenHarmony) aarch64 binary -- cross-compiled from Linux
+  # x86_64 via the official OHOS NDK + LLVM-19 toolchain. The .so is
+  # self-signed with binary-sign-tool so OHOS will load it at runtime.
+  # ---------------------------------------------------------------
+  ohos-binary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+              build-essential cmake ninja-build curl jq unzip file ca-certificates
+
+      - name: Cache OHOS NDK (~4 GB)
+        id: cache-ndk
+        uses: actions/cache@v4
+        with:
+          path: /opt/ohos
+          key: ohos-ndk-${{ hashFiles('.github/scripts/setup-ohos-ndk.sh') }}
+
+      - name: Setup OHOS NDK
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: ./.github/scripts/setup-ohos-ndk.sh --prefix /opt/ohos
+
+      - name: Cross-compile retrace
+        run: |
+          cmake -S . -B build-ohos \
+            -DCMAKE_TOOLCHAIN_FILE=/opt/ohos/ohos-sdk/linux/native/build/cmake/ohos.toolchain.cmake \
+            -DOHOS_ARCH=arm64-v8a -DOHOS_PLATFORM=OHOS \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DRETRACE_BUILD_SHARED=ON \
+            -DRETRACE_BUILD_STATIC=OFF \
+            -DRETRACE_BUILD_V2=ON \
+            -DRETRACE_BUILD_CLI=OFF \
+            -DRETRACE_BUILD_TESTS=OFF \
+            -G Ninja
+          cmake --build build-ohos -j"$(nproc)"
+
+      - name: Verify .so is ARM aarch64
+        run: |
+          file build-ohos/src/v2/libretrace.so.2.1.0 | tee /dev/stderr \
+            | grep -q 'ELF 64-bit LSB .* ARM aarch64'
+
+      - name: Code-sign .so (required by OHOS at dlopen time)
+        run: |
+          for f in build-ohos/src/v2/libretrace.so \
+                   build-ohos/src/v2/libretrace.so.2 \
+                   build-ohos/src/v2/libretrace.so.2.1.0; do
+            [ -e "$f" ] || continue
+            /opt/ohos/ohos-sdk/linux/toolchains/lib/binary-sign-tool sign \
+              -selfSign 1 -inFile "$f" -outFile "$f"
+          done
+
+      - name: Stage binary
+        run: |
+          VERSION="$(awk -F\" '/^#define RETRACE_VERSION_STRING/ {print $2}' include/retrace/version.h)"
+          STAGE="retrace-${VERSION}-ohos-aarch64"
+          mkdir -p "$STAGE/lib" "$STAGE/include"
+          cp build-ohos/src/v2/libretrace.so* "$STAGE/lib/"
+          cp -r include/retrace/* "$STAGE/include/"
+          cp LICENSE README.adoc "$STAGE/"
+          cat > "$STAGE/THIRD_PARTY_NOTICES" <<'NOTICES'
+retrace third-party notices
+===========================
+
+retrace is BSD-2-Clause licensed. Built against OHOS musl libc.
+The JSON parser (parson) is vendored under
+src/config/json/parson.{c,h} and retains its MIT license header
+in those files.
+
+This .so is self-signed (-selfSign 1) for OHOS userland load and app
+distribution. Production Huawei-managed deployments may require
+re-signing with an enrolled cert.
+NOTICES
+          tar -czf "retrace-${VERSION}-ohos-aarch64.tar.gz" "$STAGE"
+          sha256sum "retrace-${VERSION}-ohos-aarch64.tar.gz" \
+            > "retrace-${VERSION}-ohos-aarch64.tar.gz.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-ohos-aarch64
+          path: |
+            retrace-*.tar.gz
+            retrace-*.tar.gz.sha256
+
+  # ---------------------------------------------------------------
   # Publish: gather all artifacts, attach to GitHub Release.
   # ---------------------------------------------------------------
   publish:
-    needs: [source-tarball, binary, alpine-binary]
+    needs: [source-tarball, binary, alpine-binary, ohos-binary]
     runs-on: ubuntu-latest
     steps:
       - name: Resolve tag name
