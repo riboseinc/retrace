@@ -9,7 +9,7 @@
 
 set(_core_sources
 	engine.c        funcs.c         actions.c      data_types.c
-	real_impls.c    logger.c        main.c)
+	real_impls.c    logger.c        main.c         as_call_real.c)
 
 set(_core_prototype_sources
 	prototypes/locale.c prototypes/ctype.c  prototypes/signal.c

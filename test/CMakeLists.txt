@@ -80,9 +80,3 @@ add_test(NAME integration-runtests
 	WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 set_tests_properties(integration-runtests PROPERTIES
 	LABELS "integration;v2")
-# v2 still segfaults mid-execution after logger_init (issue #445 has
-# findings). The dlsym-recursion fix in this PR gets v2 past the
-# constructor; the next segfault is in the engine/action handler.
-# Skip v2 tests until that's tracked down via gdb on Linux.
-set_tests_properties(integration-runtests PROPERTIES
-	ENVIRONMENT "RETRACE_SKIP_V2=1")
