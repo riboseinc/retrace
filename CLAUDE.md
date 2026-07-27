@@ -25,7 +25,7 @@ sudo cmake --install build
 
 Useful CMake options:
 
-- `RETRACE_BUILD_V2` (default ON) — build the v2 shared library (`libretrace_v2.{so,dylib}`).
+- `RETRACE_BUILD_V2` (default ON) — build the retrace shared library (`libretrace.{so,dylib}`). The internal CMake target name is `retrace_v2` for historical reasons (v1 source was deleted in Phase 9 / ADR-0011; only one library remains).
 - `RETRACE_BUILD_CLI` (default ON) — build the CLI launcher (placeholder; new CLI lands in Phase 10).
 - `RETRACE_BUILD_TESTS` (default OFF) — build the per-feature test binaries in `test/`.
 - `RETRACE_BUILD_EXAMPLES` (default OFF) — build the demos under `examples/`.
@@ -37,7 +37,7 @@ The CMake build does feature probes (`CheckIncludeFile`, `CheckSymbolExists`, `C
 ## Running
 
 ```sh
-RETRACE_JSON_CONFIG=<conf.json> LD_PRELOAD=build/src/v2/libretrace_v2.so <binary>
+RETRACE_JSON_CONFIG=<conf.json> LD_PRELOAD=build/src/v2/libretrace.so <binary>
 ```
 
 v2 reads `RETRACE_JSON_CONFIG` (path to JSON config; defaults to log_params+call_real for all funcs), `RETRACE_LOGGER_DEF_ENA`, `RETRACE_LOGGER_DEF_STDOUT_ENA`, `RETRACE_LOGGER_DEF_FN` (log output control).
