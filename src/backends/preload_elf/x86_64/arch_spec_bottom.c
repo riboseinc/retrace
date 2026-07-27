@@ -28,7 +28,7 @@
 #include "engine.h"
 #include "real_impls.h"
 #include "logger.h"
-#include "printf.h"
+#include "printf_compat.h"
 
 struct WrapperSystemVFrame {
 	/* this flag will cause the assembly portion to call the real impl */

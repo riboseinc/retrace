@@ -30,7 +30,7 @@
 #error GNU extensions are required!
 #endif
 
-#include <printf.h>
+#include "printf_compat.h"
 
 #include "data_types.h"
 #include "logger.h"

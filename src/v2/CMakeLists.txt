@@ -90,8 +90,12 @@ elseif(RETRACE_PLATFORM_DARWIN)
 	target_compile_definitions(retrace_v2 PRIVATE _DARWIN_C_SOURCE)
 endif()
 
-target_link_libraries(retrace_v2
-	PUBLIC Threads::Threads OpenSSL::SSL ${CMAKE_DL_LIBS})
+set(_retrace_v2_libs PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+if(OpenSSL_FOUND)
+	list(APPEND _retrace_v2_libs OpenSSL::SSL)
+endif()
+
+target_link_libraries(retrace_v2 ${_retrace_v2_libs})
 
 install(TARGETS retrace_v2
 	EXPORT retraceTargets

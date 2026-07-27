@@ -30,6 +30,7 @@
 #cmakedefine01 HAVE_DLFCN_H
 #cmakedefine01 HAVE_DIRENT_H
 #cmakedefine01 HAVE_EXECINFO_H
+#cmakedefine01 HAVE_PRINTF_H
 #cmakedefine01 HAVE_PTHREAD_H
 #cmakedefine01 HAVE_PTHREAD_NP_H
 #cmakedefine01 HAVE_LWP_H

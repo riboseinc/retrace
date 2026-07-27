@@ -1,0 +1,12 @@
+{
+    "version": 1,
+    "rules": [
+        {
+            "function": "*",
+            "actions": [
+                { "name": "log_params" },
+                { "name": "call_real" }
+            ]
+        }
+    ]
+}
