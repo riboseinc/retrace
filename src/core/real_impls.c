@@ -43,15 +43,21 @@ int retrace_real_impls_init(void)
 		return -1;
 
 #ifdef __linux__
-	/* load all libs that are used in safe mode,
-	 *  since the linker won't link them
+	/* On glibc < 2.34, pthreads lived in a separate libpthread.so.0 that
+	 * the dynamic linker wouldn't load unless explicitly requested.
+	 * Loading it made pthread_key_create etc. resolvable via RTLD_NEXT.
+	 *
+	 * On glibc >= 2.34, libpthread is integrated into libc -- there's no
+	 * separate libpthread.so.0 to dlopen. The dlopen call returns NULL,
+	 * and that's fine: the symbols are already in libc. Don't fail init
+	 * in that case.
 	 */
 	void *handle;
 
 	handle = retrace_real_impls.dlopen(
 			"libpthread.so.0", RTLD_NOW | RTLD_GLOBAL);
-	if (handle == NULL)
-		return -2;
+	/* handle may be NULL on glibc >= 2.34 -- not an error. */
+	(void)handle;
 #endif
 
 	retrace_real_impls.pthread_key_create =

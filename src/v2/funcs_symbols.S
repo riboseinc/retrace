@@ -224,12 +224,11 @@ WRAPPER_ENTRY_SYSTEM_V readv
 #dlfcn
 WRAPPER_ENTRY_SYSTEM_V dlopen
 WRAPPER_ENTRY_SYSTEM_V dlerror
-#if !defined(__OpenBSD__)\
- && !defined(__FreeBSD__)\
- && !defined(__NetBSD__)
-#No suitable method besides dlsym, thus cannot shim it
-WRAPPER_ENTRY_SYSTEM_V dlsym
-#endif
+/* dlsym is intentionally NOT intercepted. The engine's real-impl
+ * resolver (retrace_as_get_real_safe) uses dlsym(RTLD_NEXT, ...) as
+ * the fallback when _dl_sym (GLIBC_PRIVATE) is unavailable on
+ * glibc >= 2.34. Intercepting dlsym would cause infinite recursion
+ * inside the constructor before retrace_inited is set. */
 WRAPPER_ENTRY_SYSTEM_V dlclose
 #pthreads
 WRAPPER_ENTRY_SYSTEM_V pthread_attr_destroy
