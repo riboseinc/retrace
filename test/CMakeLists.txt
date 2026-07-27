@@ -58,9 +58,18 @@ endforeach()
 set(RETRACE_CONF_EXAMPLE "${CMAKE_SOURCE_DIR}/examples/getenv-fuzzing/retrace.conf.example")
 set(TEST_DIR "${CMAKE_BINARY_DIR}/test")
 
+# 1. configure_file(@ONLY) substitutes @TEST_DIR@ and @RETRACE_CONF_EXAMPLE@
+#    at configure time.
+# 2. file(GENERATE) then evaluates $<TARGET_FILE:retrace_v2> at build time
+#    (generator expressions aren't allowed in configure_file).
+configure_file(
+	"${CMAKE_CURRENT_SOURCE_DIR}/runtests.sh.in"
+	"${CMAKE_CURRENT_BINARY_DIR}/runtests.sh.in.configured"
+	@ONLY)
+
 file(GENERATE
 	OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/runtests.sh"
-	INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/runtests.sh.in")
+	INPUT  "${CMAKE_CURRENT_BINARY_DIR}/runtests.sh.in.configured")
 
 # ----------------------------------------------------------------
 # CTest registration with labels.
@@ -71,8 +80,3 @@ add_test(NAME integration-runtests
 	WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 set_tests_properties(integration-runtests PROPERTIES
 	LABELS "integration;v2")
-# v2's _dl_sym resolution on glibc >= 2.34 is being fixed (issue #445,
-# PR feat/phase8-test-pyramid). Skip v2 tests until verified working
-# on Linux CI.
-set_tests_properties(integration-runtests PROPERTIES
-	ENVIRONMENT "RETRACE_SKIP_V2=1")

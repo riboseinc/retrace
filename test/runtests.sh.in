@@ -10,7 +10,7 @@
 set -eu
 
 RETRACE_V2_LIB=$<TARGET_FILE:retrace_v2>
-TEST_DIR=$<TARGET_FILE_DIR:retrace_v2>
+TEST_DIR=@TEST_DIR@
 RETRACE_CONF_EXAMPLE=@RETRACE_CONF_EXAMPLE@
 
 # v2 interposition mechanism differs by OS.
