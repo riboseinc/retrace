@@ -134,7 +134,7 @@ jobs:
           VERSION="$(awk -F\" '/^#define RETRACE_VERSION_STRING/ {print $2}' include/retrace/version.h)"
           STAGE="retrace-${VERSION}-${{ matrix.platform }}"
           mkdir -p "$STAGE/lib" "$STAGE/include"
-          cp build/src/v2/libretrace_v2.so* "$STAGE/lib/"
+          cp build/src/v2/libretrace.so* "$STAGE/lib/"
           cp -r include/retrace/* "$STAGE/include/"
           cp LICENSE README.adoc "$STAGE/"
           cat > "$STAGE/THIRD_PARTY_NOTICES" <<'NOTICES'
@@ -162,7 +162,7 @@ NOTICES
           VERSION="$(awk -F\" '/^#define RETRACE_VERSION_STRING/ {print $2}' include/retrace/version.h)"
           STAGE="retrace-${VERSION}-${{ matrix.platform }}"
           mkdir -p "$STAGE/lib" "$STAGE/include"
-          cp build/src/v2/libretrace_v2.*.dylib "$STAGE/lib/"
+          cp build/src/v2/libretrace.*.dylib "$STAGE/lib/"
           cp -r include/retrace/* "$STAGE/include/"
           cp LICENSE README.adoc "$STAGE/"
           cat > "$STAGE/THIRD_PARTY_NOTICES" <<'NOTICES'
@@ -283,7 +283,7 @@ NOTICES
               VERSION=$(awk -F"\"" "/^#define RETRACE_VERSION_STRING/ {print \$2}" include/retrace/version.h)
               STAGE="retrace-${VERSION}-${{ matrix.platform }}"
               mkdir -p "$STAGE/lib" "$STAGE/include"
-              cp build/src/v2/libretrace_v2.so* "$STAGE/lib/"
+              cp build/src/v2/libretrace.so* "$STAGE/lib/"
               cp -r include/retrace/* "$STAGE/include/"
               cp LICENSE README.adoc "$STAGE/"
               cat > "$STAGE/THIRD_PARTY_NOTICES" <<"NOTICES"

@@ -104,14 +104,14 @@ jobs:
 
       - name: Verify .so is ARM aarch64
         run: |
-          ls -la build-ohos/src/v2/libretrace_v2.so*
-          file build-ohos/src/v2/libretrace_v2.so.2.1.0 | tee /dev/stderr | grep -q 'ELF 64-bit LSB .* ARM aarch64'
+          ls -la build-ohos/src/v2/libretrace.so*
+          file build-ohos/src/v2/libretrace.so.2.1.0 | tee /dev/stderr | grep -q 'ELF 64-bit LSB .* ARM aarch64'
 
       - name: Code-sign .so (required by OHOS at dlopen time)
         run: |
-          for f in build-ohos/src/v2/libretrace_v2.so \
-                   build-ohos/src/v2/libretrace_v2.so.2 \
-                   build-ohos/src/v2/libretrace_v2.so.2.1.0; do
+          for f in build-ohos/src/v2/libretrace.so \
+                   build-ohos/src/v2/libretrace.so.2 \
+                   build-ohos/src/v2/libretrace.so.2.1.0; do
             [ -e "$f" ] || continue
             /opt/ohos/ohos-sdk/linux/toolchains/lib/binary-sign-tool sign \
               -selfSign 1 -inFile "$f" -outFile "$f"
@@ -140,9 +140,9 @@ jobs:
       - name: Stage verification bundle
         run: |
           mkdir -p ohos-verify
-          cp -a build-ohos/src/v2/libretrace_v2.so           ohos-verify/
-          cp -a build-ohos/src/v2/libretrace_v2.so.2         ohos-verify/ 2>/dev/null || true
-          cp -a build-ohos/src/v2/libretrace_v2.so.2.1.0     ohos-verify/ 2>/dev/null || true
+          cp -a build-ohos/src/v2/libretrace.so           ohos-verify/
+          cp -a build-ohos/src/v2/libretrace.so.2         ohos-verify/ 2>/dev/null || true
+          cp -a build-ohos/src/v2/libretrace.so.2.1.0     ohos-verify/ 2>/dev/null || true
           cp -a build-ohos/ohos-smoke-test                    ohos-verify/
           cp -a build-ohos/ohos-ldpreload-target              ohos-verify/
           cp -a .github/scripts/ohos-ldpreload-config.json    ohos-verify/retrace-config.json
@@ -171,7 +171,7 @@ jobs:
             -v "$PWD/ohos-verify:/work" -w /work \
             ghcr.io/hqzing/dockerharmony:latest \
             sh -c '
-              LD_LIBRARY_PATH=. LD_PRELOAD=./libretrace_v2.so.2 \
+              LD_LIBRARY_PATH=. LD_PRELOAD=./libretrace.so.2 \
               RETRACE_JSON_CONFIG=./retrace-config.json \
               ./ohos-ldpreload-target 2>&1
             ' 2>&1)

@@ -78,7 +78,7 @@ target_include_directories(retrace_v2
 	PRIVATE ${CMAKE_SOURCE_DIR}/src/backends ${_v2_arch_dir})
 
 set_target_properties(retrace_v2 PROPERTIES
-	OUTPUT_NAME retrace_v2
+	OUTPUT_NAME retrace
 	VERSION ${PROJECT_VERSION}
 	SOVERSION ${PROJECT_VERSION_MAJOR}
 	C_VISIBILITY_PRESET hidden

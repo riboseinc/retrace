@@ -1,7 +1,7 @@
 /*
- * OHOS smoke test for retrace v2 library loadability.
+ * OHOS smoke test for retrace library loadability.
  *
- * The retrace v2 public API (retrace.h) is currently scaffold-only; the
+ * The retrace public API (retrace.h) is currently scaffold-only; the
  * actual entry point is `retrace_engine_wrapper`, an internal symbol
  * invoked by per-function trampolines when the library is LD_PRELOADed
  * into a target process. The symbol is hidden by default
@@ -34,12 +34,12 @@
 
 int main(void)
 {
-    void *handle = dlopen("./libretrace_v2.so.2", RTLD_NOW | RTLD_LOCAL);
+    void *handle = dlopen("./libretrace.so.2", RTLD_NOW | RTLD_LOCAL);
     if (handle == NULL) {
-        fprintf(stderr, "FAIL: dlopen(libretrace_v2.so.2) failed: %s\n", dlerror());
+        fprintf(stderr, "FAIL: dlopen(libretrace.so.2) failed: %s\n", dlerror());
         return 2;
     }
-    printf("dlopen(libretrace_v2.so.2): OK (constructor ran)\n");
+    printf("dlopen(libretrace.so.2): OK (constructor ran)\n");
     printf("OK\n");
     fflush(stdout);
 
