@@ -119,56 +119,7 @@ long retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt)
 {
-	long ret_val;
-	long *vals;
-	int i;
-	unsigned long params_cnt_uli;
-
-	register long _x0 asm("x0");
-	register long _x1 asm("x1");
-	register long _x2 asm("x2");
-	register long _x3 asm("x3");
-	register long _x4 asm("x4");
-	register long _x5 asm("x5");
-	register long _x6 asm("x6");
-	register long _x7 asm("x7");
-
-	/* prep param values to keep the asm part clean */
-	params_cnt_uli = params_cnt;
-	vals = (long *) retrace_real_impls.malloc(
-			sizeof(long) * params_cnt);
-
-	for (i = 0; i != params_cnt; i++)
-		vals[i] = params[i].val;
-
-	/* Load up to 8 integer args, then branch to real_impl. Float params
-	 * are not yet wired through here (matches the x86-64 v2 implementation).
-	 *
-	 * The register variables above tell the compiler that x0..x7 are
-	 * being used as calling-convention argument registers, so it saves
-	 * any live values beforehand and restores them afterward. We never
-	 * touch sp directly; the compiler manages the frame.
-	 */
-	_x0 = params_cnt > 0 ? vals[0] : 0;
-	_x1 = params_cnt > 1 ? vals[1] : 0;
-	_x2 = params_cnt > 2 ? vals[2] : 0;
-	_x3 = params_cnt > 3 ? vals[3] : 0;
-	_x4 = params_cnt > 4 ? vals[4] : 0;
-	_x5 = params_cnt > 5 ? vals[5] : 0;
-	_x6 = params_cnt > 6 ? vals[6] : 0;
-	_x7 = params_cnt > 7 ? vals[7] : 0;
-
-	asm volatile (
-		"blr %[fn]\n"
-		"mov %w[ret], w0\n"
-		: [ret] "=r"(ret_val)
-		: [fn] "r"(real_impl),
-		  "r"(_x0), "r"(_x1), "r"(_x2), "r"(_x3),
-		  "r"(_x4), "r"(_x5), "r"(_x6), "r"(_x7)
-		: "memory");
-
-	retrace_real_impls.free(vals);
-	return ret_val;
+	return retrace_as_call_real_dispatch(real_impl, params, params_cnt);
 }
 
 void retrace_as_abort(void *arch_spec_ctx, long ret_val)

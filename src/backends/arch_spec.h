@@ -72,6 +72,15 @@ long retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt);
 
+/* Shared per-arch implementation: plain C function pointer call.
+ * Each backend's retrace_as_call_real delegates here. Supports 0..6
+ * args; the rare >6-arg case returns -1 (no known libc symbol needs
+ * it).
+ */
+long retrace_as_call_real_dispatch(const void *real_impl,
+	const struct FuncParam params[],
+	int params_cnt);
+
 /* schedules real_impl to run after retrace_engine_wrapper */
 void retrace_as_set_ret_val(void *arch_spec_ctx,
 	long ret_val);
