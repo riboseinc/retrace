@@ -23,6 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <limits.h>
 #include <printf.h>
 #include <pthread.h>
 
@@ -83,121 +84,85 @@ static void as_thread_ctx_destructor(void *thread_ctx)
 }
 
 static int as_arginfo_function(const struct printf_info *__info,
-	     size_t __n, int *__argtypes)
+		     size_t __n, int *__argtypes)
 {
 	struct AsThreadContext *ctx =
 		(struct AsThreadContext *) __info->context;
+	int n_args = 0;
+	int type = 0;
+
+	/* Width '*' is indicated by width == INT_MIN on Darwin/FreeBSD. */
+	if (__info->width == INT_MIN) {
+		if (ctx->printf_args_cnt < ENGINE_MAXCOUNT_PARAMS)
+			ctx->printf_args_types[ctx->printf_args_cnt++] = PA_INT;
+		n_args++;
+	}
+
+	/* Precision '*' is indicated by prec == INT_MIN. */
+	if (__info->prec == INT_MIN) {
+		if (ctx->printf_args_cnt < ENGINE_MAXCOUNT_PARAMS)
+			ctx->printf_args_types[ctx->printf_args_cnt++] = PA_INT;
+		n_args++;
+	}
 
 	switch (__info->spec) {
 	case 'p':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_POINTER;
+		type = PA_POINTER;
 		break;
-
 	case 's':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_STRING;
+		type = PA_STRING;
 		break;
-
 	case 'S':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_WSTRING;
+		type = PA_WSTRING;
 		break;
-
-	case 'g':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
-		break;
-
-	case 'G':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
-		break;
-
-	case 'a':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
-		break;
-
-	case 'A':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
-		break;
-
 	case 'c':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_CHAR;
+		type = PA_CHAR;
 		break;
-
-	case 'E':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
+	case 'g': case 'G':
+	case 'a': case 'A':
+	case 'e': case 'E':
+	case 'f': case 'F':
+		type = PA_DOUBLE;
 		break;
-
-	case 'e':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
+	case 'x': case 'X':
+	case 'u': case 'o':
+	case 'd': case 'i':
+		type = PA_INT;
 		break;
-
-	case 'F':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
-		break;
-
-	case 'f':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
-		break;
-
-	case 'x':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
-
-	case 'X':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
-
-	case 'u':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
-
-	case 'o':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
-
-	case 'd':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
-
-	case 'i':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
-
+	case '%':
+		/* literal percent -- no conversion arg */
+		return n_args;
 	default:
-		ctx->printf_args_types[ctx->printf_args_cnt] = 0;
-		/*
-		 * Better not to challenge the printf here
-		 * log_err("unknown varargs format '%d'", __info->spec);
-		 */
+		type = PA_INT;
+		break;
 	}
 
-	/* setup flags */
-	if (ctx->printf_args_types[ctx->printf_args_cnt]) {
-		if (__info->is_long_double) {
-			ctx->printf_args_types[ctx->printf_args_cnt] |=
-				PA_FLAG_LONG_LONG;
-		} else if (__info->is_short) {
-			ctx->printf_args_types[ctx->printf_args_cnt] |=
-				PA_FLAG_SHORT;
-		} else if (__info->is_long) {
-			ctx->printf_args_types[ctx->printf_args_cnt] |=
-				PA_FLAG_LONG;
-		} else if (__info->is_quad) {
-			ctx->printf_args_types[ctx->printf_args_cnt] |=
-				PA_FLAG_QUAD;
-		} else if (__info->is_intmax) {
-			ctx->printf_args_types[ctx->printf_args_cnt] |=
-				PA_FLAG_INTMAX;
-		} else if (__info->is_ptrdiff) {
-			ctx->printf_args_types[ctx->printf_args_cnt] |=
-				PA_FLAG_PTRDIFF;
-		} else if (__info->is_size) {
-			ctx->printf_args_types[ctx->printf_args_cnt] |=
-				PA_FLAG_SIZE;
-		}
+	if (__info->is_long_double)
+		type |= PA_FLAG_LONG_LONG;
+	else if (__info->is_short)
+		type |= PA_FLAG_SHORT;
+	else if (__info->is_long)
+		type |= PA_FLAG_LONG;
+	else if (__info->is_quad)
+		type |= PA_FLAG_QUAD;
+	else if (__info->is_intmax)
+		type |= PA_FLAG_INTMAX;
+	else if (__info->is_ptrdiff)
+		type |= PA_FLAG_PTRDIFF;
+	else if (__info->is_size)
+		type |= PA_FLAG_SIZE;
 
-	}
+	if (ctx->printf_args_cnt < ENGINE_MAXCOUNT_PARAMS)
+		ctx->printf_args_types[ctx->printf_args_cnt++] = type;
+	n_args++;
 
-	ctx->printf_args_cnt++;
-	return 0;
+	/*
+	 * Must return the number of arguments this conversion consumes.
+	 * Returning 0 (the old code) made new_printf_comp stop processing
+	 * subsequent conversions, so printf_args_cnt stayed incomplete
+	 * and call_real only passed the format string -- crash in strlen.
+	 */
+	return n_args;
 }
 
 static int

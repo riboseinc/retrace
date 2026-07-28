@@ -23,6 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <limits.h>
 #include <printf.h>
 #include <pthread.h>
 
@@ -97,90 +98,85 @@ static void as_thread_ctx_destructor(void *thread_ctx)
 }
 
 static int as_arginfo_function(const struct printf_info *__info,
-	     size_t __n, int *__argtypes)
+		     size_t __n, int *__argtypes)
 {
 	struct AsThreadContext *ctx =
 		(struct AsThreadContext *) __info->context;
+	int n_args = 0;
+	int type = 0;
+
+	/* Width '*' is indicated by width == INT_MIN on Darwin/FreeBSD. */
+	if (__info->width == INT_MIN) {
+		if (ctx->printf_args_cnt < ENGINE_MAXCOUNT_PARAMS)
+			ctx->printf_args_types[ctx->printf_args_cnt++] = PA_INT;
+		n_args++;
+	}
+
+	/* Precision '*' is indicated by prec == INT_MIN. */
+	if (__info->prec == INT_MIN) {
+		if (ctx->printf_args_cnt < ENGINE_MAXCOUNT_PARAMS)
+			ctx->printf_args_types[ctx->printf_args_cnt++] = PA_INT;
+		n_args++;
+	}
 
 	switch (__info->spec) {
 	case 'p':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_POINTER;
+		type = PA_POINTER;
 		break;
 	case 's':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_STRING;
+		type = PA_STRING;
 		break;
 	case 'S':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_WSTRING;
-		break;
-	case 'g':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
-		break;
-	case 'G':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
-		break;
-	case 'a':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
-		break;
-	case 'A':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
+		type = PA_WSTRING;
 		break;
 	case 'c':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_CHAR;
+		type = PA_CHAR;
 		break;
-	case 'E':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
+	case 'g': case 'G':
+	case 'a': case 'A':
+	case 'e': case 'E':
+	case 'f': case 'F':
+		type = PA_DOUBLE;
 		break;
-	case 'e':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
+	case 'x': case 'X':
+	case 'u': case 'o':
+	case 'd': case 'i':
+		type = PA_INT;
 		break;
-	case 'F':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
-		break;
-	case 'f':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_DOUBLE;
-		break;
-	case 'x':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
-	case 'X':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
-	case 'u':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
-	case 'o':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
-	case 'd':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
-	case 'i':
-		ctx->printf_args_types[ctx->printf_args_cnt] = PA_INT;
-		break;
+	case '%':
+		/* literal percent -- no conversion arg */
+		return n_args;
 	default:
-		ctx->printf_args_types[ctx->printf_args_cnt] = 0;
+		type = PA_INT;
 		break;
 	}
 
-	if (ctx->printf_args_types[ctx->printf_args_cnt]) {
-		if (__info->is_long_double)
-			ctx->printf_args_types[ctx->printf_args_cnt] |= PA_FLAG_LONG_LONG;
-		else if (__info->is_short)
-			ctx->printf_args_types[ctx->printf_args_cnt] |= PA_FLAG_SHORT;
-		else if (__info->is_long)
-			ctx->printf_args_types[ctx->printf_args_cnt] |= PA_FLAG_LONG;
-		else if (__info->is_quad)
-			ctx->printf_args_types[ctx->printf_args_cnt] |= PA_FLAG_QUAD;
-		else if (__info->is_intmax)
-			ctx->printf_args_types[ctx->printf_args_cnt] |= PA_FLAG_INTMAX;
-		else if (__info->is_ptrdiff)
-			ctx->printf_args_types[ctx->printf_args_cnt] |= PA_FLAG_PTRDIFF;
-		else if (__info->is_size)
-			ctx->printf_args_types[ctx->printf_args_cnt] |= PA_FLAG_SIZE;
-	}
+	if (__info->is_long_double)
+		type |= PA_FLAG_LONG_LONG;
+	else if (__info->is_short)
+		type |= PA_FLAG_SHORT;
+	else if (__info->is_long)
+		type |= PA_FLAG_LONG;
+	else if (__info->is_quad)
+		type |= PA_FLAG_QUAD;
+	else if (__info->is_intmax)
+		type |= PA_FLAG_INTMAX;
+	else if (__info->is_ptrdiff)
+		type |= PA_FLAG_PTRDIFF;
+	else if (__info->is_size)
+		type |= PA_FLAG_SIZE;
 
-	ctx->printf_args_cnt++;
-	return 0;
+	if (ctx->printf_args_cnt < ENGINE_MAXCOUNT_PARAMS)
+		ctx->printf_args_types[ctx->printf_args_cnt++] = type;
+	n_args++;
+
+	/*
+	 * Must return the number of arguments this conversion consumes.
+	 * Returning 0 (the old code) made new_printf_comp stop processing
+	 * subsequent conversions, so printf_args_cnt stayed incomplete
+	 * and call_real only passed the format string -- crash in strlen.
+	 */
+	return n_args;
 }
 
 static int
@@ -236,21 +232,40 @@ static inline struct AsThreadContext *as_get_thread_context(void)
 	return thread_ctx;
 }
 
+/*
+ * Apple AArch64 ABI distinguishes NAMED and VARIADIC args:
+ *
+ *   - Named args (idx < named_count): passed in x0..x7 (saved in
+ *     frame->real_x0..real_x7). Beyond x7 they spill onto the caller's
+ *     stack at orig_sp + 8*(idx-8).
+ *   - Variadic args (idx >= named_count): Apple always pushes variadic
+ *     args onto the caller's stack before the call. Variadic arg k is at
+ *     orig_sp + 8*k (NOT in x1..x7 as AAPCS64 allows on Linux/BSD).
+ *
+ * This split lets the same struct + read path serve both named and
+ * variadic args for any FAT_PRINTF-style function.
+ */
 static unsigned long wrapper_frame_get_arg(
-	const struct WrapperAArch64Frame *frame, int idx)
+	const struct WrapperAArch64Frame *frame, int idx, int named_count)
 {
-	switch (idx) {
-	case 0: return frame->real_x0;
-	case 1: return frame->real_x1;
-	case 2: return frame->real_x2;
-	case 3: return frame->real_x3;
-	case 4: return frame->real_x4;
-	case 5: return frame->real_x5;
-	case 6: return frame->real_x6;
-	case 7: return frame->real_x7;
-	default:
-		return *(unsigned long *)(frame->orig_sp + sizeof(void *) * (idx - 8));
+	if (idx < named_count) {
+		switch (idx) {
+		case 0: return frame->real_x0;
+		case 1: return frame->real_x1;
+		case 2: return frame->real_x2;
+		case 3: return frame->real_x3;
+		case 4: return frame->real_x4;
+		case 5: return frame->real_x5;
+		case 6: return frame->real_x6;
+		case 7: return frame->real_x7;
+		default:
+			return *(unsigned long *)(frame->orig_sp +
+				sizeof(void *) * (idx - 8));
+		}
 	}
+
+	return *(unsigned long *)(frame->orig_sp +
+		sizeof(void *) * (idx - named_count));
 }
 
 long retrace_as_call_real(const void *real_impl,
@@ -306,7 +321,8 @@ int retrace_as_setup_params(
 		params[param_idx].data_type =
 			retrace_datatype_get(proto->params[param_idx].type_name);
 		params[param_idx].val =
-			(long) wrapper_frame_get_arg(frame, param_idx);
+			(long) wrapper_frame_get_arg(frame, param_idx,
+				proto->params_cnt);
 	}
 
 	if (proto->fmt == FAT_NOVARARGS) {
@@ -358,7 +374,8 @@ int retrace_as_setup_params(
 
 		params[param_idx].data_type = dt;
 		params[param_idx].val =
-			(long) wrapper_frame_get_arg(frame, param_idx);
+			(long) wrapper_frame_get_arg(frame, param_idx,
+				proto->params_cnt);
 	}
 
 	*params_cnt = param_idx;
