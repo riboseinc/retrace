@@ -521,16 +521,261 @@ retrace_func_define_prototypes(stdio) = {
 /* FIXME: Prototype when vararg funcs are supported by the engine */
 
 /*
+ * Variadic printf-family prototypes. fmt = FAT_PRINTF routes them through
+ * retrace_as_call_real_variadic (src/core/as_call_real.c) so the compiler
+ * emits the correct per-arch variadic ABI:
  *
- *	int fprintf(FILE *stream, const char *format, ...)
- *	int sprintf(char *str, const char *format, ...)
- *	int vfprintf(FILE *stream, const char *format, va_list arg)
- *	int vprintf(const char *format, va_list arg)
- *	int vsprintf(char *str, const char *format, va_list arg)
- *	int fscanf(FILE *stream, const char *format, ...)
- *	int scanf(const char *format, ...)
- *	int sscanf(const char *str, const char *format, ...)
+ *   - Apple AArch64: variadic args pushed to stack
+ *   - AAPCS64 (Linux/BSD ARM64): variadic args in x1..x7 then stack
+ *   - Sys V x86-64: variadic args in rsi..r9 then stack
+ *
+ * v*printf variants take a va_list (typed as ptr) -- they are NOT variadic
+ * from retrace's perspective, so they use FAT_NOVARARGS.
  */
+
+/*
+ * int fprintf(FILE *stream, const char *format, ...);
+ */
+{
+	.name = "fprintf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.fmt = FAT_PRINTF,
+	.fmt_param_idx = 1,
+	.params_cnt = 2,
+	.params = {
+		{
+			.name = "stream",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "sprintf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.fmt = FAT_PRINTF,
+	.fmt_param_idx = 1,
+	.params_cnt = 2,
+	.params = {
+		{
+			.name = "str",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER,
+			.ref_type_name = "sz",
+			.direction = PDIR_OUT
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "snprintf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.fmt = FAT_PRINTF,
+	.fmt_param_idx = 2,
+	.params_cnt = 3,
+	.params = {
+		{
+			.name = "str",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER,
+			.ref_type_name = "sz",
+			.direction = PDIR_OUT
+		},
+		{
+			.name = "size",
+			.type_name = "size_t",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "dprintf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.fmt = FAT_PRINTF,
+	.fmt_param_idx = 1,
+	.params_cnt = 2,
+	.params = {
+		{
+			.name = "fd",
+			.type_name = "int",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		}
+	}
+},
+/*
+ * v*printf variants take va_list (opaque pointer); no varargs to walk.
+ */
+{
+	.name = "vprintf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.params_cnt = 2,
+	.params = {
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "arg",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "vfprintf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.params_cnt = 3,
+	.params = {
+		{
+			.name = "stream",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "arg",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "vsprintf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.params_cnt = 3,
+	.params = {
+		{
+			.name = "str",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER,
+			.ref_type_name = "sz",
+			.direction = PDIR_OUT
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "arg",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "vsnprintf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.params_cnt = 4,
+	.params = {
+		{
+			.name = "str",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER,
+			.ref_type_name = "sz",
+			.direction = PDIR_OUT
+		},
+		{
+			.name = "size",
+			.type_name = "size_t",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "arg",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "vdprintf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.params_cnt = 3,
+	.params = {
+		{
+			.name = "fd",
+			.type_name = "int",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "arg",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		}
+	}
+},
 
 	{
 		.name = "fgetc",
