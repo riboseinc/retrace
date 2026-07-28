@@ -51,15 +51,15 @@ jobs:
   build-x86_64:
     runs-on: ubuntu-latest
     container:
-      image: alpine:${{ env.ALPINE_VERSION }}
+      image: alpine:3.21
     env:
       VCPKG_FORCE_SYSTEM_BINARIES: "1"
     steps:
       - run: |
-          apk --no-cache add
-            build-base cmake git ninja clang gcc
-            openssl-dev openssl-libs-static
-            pkgconfig python3 zip unzip curl
+          apk --no-cache add \
+            build-base cmake git ninja clang gcc \
+            openssl-dev openssl-libs-static \
+            pkgconfig python3 zip unzip curl \
             linux-headers bash
       - uses: actions/checkout@v4
       - run: git config --global --add safe.directory "$(pwd)"
@@ -109,13 +109,13 @@ jobs:
             -v "$PWD:/work" -w /work \
             "arm64v8/alpine:${{ env.ALPINE_VERSION }}" sh -c '
               set -e
-              apk --no-cache add
-                build-base cmake git ninja clang gcc
-                openssl-dev openssl-libs-static
+              apk --no-cache add \
+                build-base cmake git ninja clang gcc \
+                openssl-dev openssl-libs-static \
                 pkgconfig python3 linux-headers bash
-              cmake -B build -G Ninja
-                    -DCMAKE_BUILD_TYPE='"${{ env.BUILD_TYPE }}"'
-                    -DCMAKE_C_COMPILER=clang
+              cmake -B build -G Ninja \
+                    -DCMAKE_BUILD_TYPE='"${{ env.BUILD_TYPE }}"' \
+                    -DCMAKE_C_COMPILER=clang \
                     -DRETRACE_BUILD_TESTS=ON
               ninja -C build
               ctest --test-dir build --output-on-failure
