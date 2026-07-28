@@ -213,7 +213,7 @@ required (see `src/core/actions/basic.c` for the pattern).
 
 == Intercepted functions
 
-retrace ships ~420 prototypes grouped by libc header. The canonical
+retrace ships ~490 prototypes grouped by libc header. The canonical
 list lives under `src/core/prototypes/`. Add a function by adding a
 `struct FuncPrototype` entry to the right header file (and a
 `WRAPPER_ENTRY_*` line in the matching `funcs_symbols.S`).
@@ -226,15 +226,15 @@ list lives under `src/core/prototypes/`. Add a function by adding a
 | `dirent.h`  |  13 | `opendir`, `readdir`, `closedir`, ...
 | `locale.h`  |   4 | `setlocale`, `localeconv`, ...
 | `signal.h`  |   5 | `kill`, `signal`, `raise`, ...
-| `stdio.h`   |  94 | `fopen`, `fclose`, `fread`, `fwrite`, `printf`*, `fprintf`*, `sprintf`*, `fgets`, `perror`, `popen`, ...
+| `stdio.h`   | 165 | `fopen`, `fclose`, `fread`, `fwrite`, `printf`*, `fprintf`*, `sprintf`*, `snprintf`*, `dprintf`*, `vprintf`, `vfprintf`, `vsprintf`, `vsnprintf`, `vdprintf`, `scanf`*, `fscanf`*, `sscanf`*, `vscanf`, `vsscanf`, `vfscanf`, `fgets`, `perror`, `popen`, ...
 | `stdlib.h`  |  73 | `malloc`, `calloc`, `realloc`, `free`, `getenv`, `system`, `exit`, `atoi`, `strtol`, ...
 | `uio.h`     |   8 | `readv`, `writev`, ...
 | `unistd.h`  | 198 | `read`, `write`, `open`, `close`, `fork`, `execve`, `getuid`, `getpid`, `getenv`, `socket`, `connect`, `recv`, `send`, ...
 |===
 
-*\* Variadic.* printf-family prototypes are tagged `FAT_PRINTF` and go
-through the variadic-aware dispatcher so they work on every platform's
-ABI:
+*\* Variadic.* printf/scanf-family prototypes are tagged `FAT_PRINTF` /
+`FAT_SCANF` and go through the variadic-aware dispatcher so they work
+on every platform's ABI:
 
   - **Apple AArch64**: variadic args are pushed onto the caller's stack
     (Apple's ABI).
@@ -243,11 +243,11 @@ ABI:
   - **x86-64 (Sys V / Darwin)**: variadic args go in `rdi..r9`, then
     the stack.
 
-`sprintf` / `snprintf` / `fprintf` / `dprintf` / `vprintf` /
-`vfprintf` / `vdprintf` / `vsprintf` / `vsnprintf` are *not* currently
-in the prototype registry -- they pass through unintercepted (you'll
-see them only as direct real-impl calls). Adding prototypes is on the
-roadmap (issue #409).
+On glibc, modern gcc redirects `scanf` / `fscanf` / `sscanf` / `vscanf`
+/ `vsscanf` / `vfscanf` to `__isoc99_*` at the PLT. retrace intercepts
+both the plain names (older binaries, musl, BSD) and the `__isoc99_*`
+names (modern glibc binaries) when the CMake link-check confirms the
+symbol exists.
 
 [float varargs]
 [TIP]
@@ -501,10 +501,10 @@ What was **renamed**:
 | Falls back to named-args-only (per `src/core/printf_compat.h`). Integer, pointer, and string conversions work everywhere. Full SIMD-reg dispatch is on the roadmap (ADR-0010).
 
 | `sprintf` / `snprintf` / `fprintf` / `dprintf` interception
-| These prototypes are not yet in `src/core/prototypes/stdio.c`. They pass through unintercepted. Issue #409.
+| Added in v2.1.0 (PR #469). All printf-family + v*printf variants are now in the prototype registry.
 
 | `scanf` family interception
-| Same as above -- not in the prototype registry yet. Issue #409.
+| Added in v2.1.0 (PR #470). `scanf` / `fscanf` / `sscanf` / `vscanf` / `vsscanf` / `vfscanf` plus glibc `__isoc99_*` variants.
 
 | Native CLI launcher
 | v1's `retrace` shell-script launcher was removed (ADR-0011). Use `LD_PRELOAD` / `DYLD_INSERT_LIBRARIES` directly until the native CLI lands. Issue #358.
