@@ -86,16 +86,6 @@ should_skip() {
         esac
         ;;
     esac
-    # musl + aarch64 (Alpine arm64 under QEMU in CI; reproducible
-    # class with the macOS arm64 printf issue #451): varargs dispatch
-    # in retrace_as_call_real (as_call_real.c) does not handle the
-    # aarch64 PCS varargs convention correctly under LD_PRELOAD.
-    # x86_64 musl is fine.
-    if [ "$(uname -m)" = "aarch64" ] && [ -e /lib/ld-musl-aarch64.so.1 ]; then
-        case "$1" in
-        printf|scanf) return 0 ;;
-        esac
-    fi
     case "$1" in
     dlopen) return 0 ;;
     esac
