@@ -31,7 +31,7 @@ file `open()` paths, faking OpenSSL verify results, and more.
 | Linux (glibc) | x86_64, aarch64 | `LD_PRELOAD` | Production
 | Linux (musl / Alpine) | x86_64, aarch64 | `LD_PRELOAD` | Production
 | Linux (musl / OHOS) | aarch64 | `LD_PRELOAD` | Cross-compile + signed
-| macOS | arm64 (Apple Silicon) | `DYLD_INSERT_LIBRARIES` | Production
+| macOS | arm64 (Apple Silicon) | `DYLD_INSERT_LIBRARIES` | Production (printf fixed in v2.1.0)
 | macOS | x86_64 (Intel) | `DYLD_INSERT_LIBRARIES` | link:https://github.com/riboseinc/retrace/issues/452[Issue #452]
 | FreeBSD / OpenBSD / NetBSD | x86_64 | `LD_PRELOAD` | Production
 | Windows (MSVC) | x86_64, arm64 | Inline hook (from scratch, ADR-0009) | Production
@@ -41,6 +41,26 @@ file `open()` paths, faking OpenSSL verify results, and more.
 
 Pre-built binaries for every platform are attached to each
 link:https://github.com/riboseinc/retrace/releases[release].
+
+
+== What's new in v2.1.0
+
+* **printf variadic dispatch on Apple Silicon.** `printf("%d %s", ...)`
+  no longer segfaults under `DYLD_INSERT_LIBRARIES` on Apple Silicon.
+  retrace now reads variadic args from the caller's stack frame on
+  Darwin AArch64 (the Apple ABI puts them there, not in `x1..x7` like
+  AAPCS64 does on Linux/BSD). All printf-family tests pass on M1/M2/M3.
+* **OHOS support.** Cross-compile path for HarmonyOS / OpenHarmony
+  arm64, with NDK + binary-sign-tool integration in CI.
+* **Alpine / musl fully green.** `parse_printf_format` is implemented
+  locally where musl doesn't ship `printf.h`; integer printf/scanf
+  work end-to-end on Alpine x86_64 and aarch64.
+* **Single-library install.** The `_v2` suffix on the library name was
+  dropped (v1 source was removed per ADR-0011). Install produces
+  `libretrace.so` / `libretrace.dylib` / `retrace.dll`.
+* **Per-platform binary artifacts** in every release: 8 platforms
+  (Linux x64/arm64, macOS x64/arm64, Windows x64/arm64, Alpine
+  x64/arm64, OHOS arm64) + source tarball.
 
 
 == Build
@@ -55,6 +75,24 @@ $ cmake --build build
 $ ctest --test-dir build --output-on-failure
 $ sudo cmake --install build
 ----
+
+[TIP]
+====
+Quick smoke test without installing:
+
+[source,console]
+----
+# Linux / BSD
+LD_PRELOAD=$PWD/build/src/v2/libretrace.so /bin/id
+
+# macOS (Apple Silicon)
+DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib /bin/id
+
+# Windows (PowerShell, after install)
+$env:RETRACE_JSON_CONFIG = "config.json"
+myapp.exe  # retrace.dll is auto-attached via CreateProcess hook
+----
+====
 
 Useful CMake options:
 
@@ -171,6 +209,54 @@ entirely.
 
 New behaviors are added by registering a new action -- no engine change
 required (see `src/core/actions/basic.c` for the pattern).
+
+
+== Intercepted functions
+
+retrace ships ~420 prototypes grouped by libc header. The canonical
+list lives under `src/core/prototypes/`. Add a function by adding a
+`struct FuncPrototype` entry to the right header file (and a
+`WRAPPER_ENTRY_*` line in the matching `funcs_symbols.S`).
+
+[cols="1,1,4", frame=all, grid=all]
+|===
+| Header | Count | Notable symbols
+
+| `ctype.h`   |  28 | `isalpha`, `isdigit`, `tolower`, `toupper`, ...
+| `dirent.h`  |  13 | `opendir`, `readdir`, `closedir`, ...
+| `locale.h`  |   4 | `setlocale`, `localeconv`, ...
+| `signal.h`  |   5 | `kill`, `signal`, `raise`, ...
+| `stdio.h`   |  94 | `fopen`, `fclose`, `fread`, `fwrite`, `printf`*, `fprintf`*, `sprintf`*, `fgets`, `perror`, `popen`, ...
+| `stdlib.h`  |  73 | `malloc`, `calloc`, `realloc`, `free`, `getenv`, `system`, `exit`, `atoi`, `strtol`, ...
+| `uio.h`     |   8 | `readv`, `writev`, ...
+| `unistd.h`  | 198 | `read`, `write`, `open`, `close`, `fork`, `execve`, `getuid`, `getpid`, `getenv`, `socket`, `connect`, `recv`, `send`, ...
+|===
+
+*\* Variadic.* printf-family prototypes are tagged `FAT_PRINTF` and go
+through the variadic-aware dispatcher so they work on every platform's
+ABI:
+
+  - **Apple AArch64**: variadic args are pushed onto the caller's stack
+    (Apple's ABI).
+  - **Linux/BSD AArch64 (AAPCS64)**: variadic args go in `x1..x7`, then
+    the stack.
+  - **x86-64 (Sys V / Darwin)**: variadic args go in `rdi..r9`, then
+    the stack.
+
+`sprintf` / `snprintf` / `fprintf` / `dprintf` / `vprintf` /
+`vfprintf` / `vdprintf` / `vsprintf` / `vsnprintf` are *not* currently
+in the prototype registry -- they pass through unintercepted (you'll
+see them only as direct real-impl calls). Adding prototypes is on the
+roadmap (issue #409).
+
+[float varargs]
+[TIP]
+====
+Float varargs (`%f`, `%g`, `%e`) on AArch64 are currently bailed out
+to a "named args only" fallback (see `src/core/printf_compat.h`). The
+integer/pointer/string conversions all work; FP-on-AArch64 needs the
+SIMD-reg save-area walk that is on the roadmap (ADR-0010).
+====
 
 
 == Examples
@@ -397,6 +483,38 @@ What was **removed** in v2.1.0:
 What was **renamed**:
 
 * The installed library is `libretrace.so` / `libretrace.dylib` / `retrace.dll` (was `libretrace_v2.*` briefly during the transition; the `_v2` suffix was dropped at v2.1.0 because v1 no longer exists).
+
+
+== Known gaps (tracking in GitHub issues)
+
+[cols="2,4", frame=all, grid=all]
+|===
+| Platform / feature | Status
+
+| macOS x86_64 (Intel) under `DYLD_INSERT_LIBRARIES`
+| link:https://github.com/riboseinc/retrace/issues/452[#452]: segfault at constructor time. Skip via `test/runtests.sh.in`. Apple Silicon works.
+
+| `dlopen` under `LD_PRELOAD` on Linux
+| link:https://github.com/riboseinc/retrace/issues/450[#450]: malloc path inside libdl recurses / reenters retrace; skipped in CI.
+
+| Float varargs (`%f`, `%g`, `%e`) on AArch64
+| Falls back to named-args-only (per `src/core/printf_compat.h`). Integer, pointer, and string conversions work everywhere. Full SIMD-reg dispatch is on the roadmap (ADR-0010).
+
+| `sprintf` / `snprintf` / `fprintf` / `dprintf` interception
+| These prototypes are not yet in `src/core/prototypes/stdio.c`. They pass through unintercepted. Issue #409.
+
+| `scanf` family interception
+| Same as above -- not in the prototype registry yet. Issue #409.
+
+| Native CLI launcher
+| v1's `retrace` shell-script launcher was removed (ADR-0011). Use `LD_PRELOAD` / `DYLD_INSERT_LIBRARIES` directly until the native CLI lands. Issue #358.
+
+| Incomplete-I/O action
+| v1's `incompleteio,10` has no v2 action equivalent yet.
+
+| Explicit fuzzing seed
+| v1's `fuzzingseed,1498729252` is not yet ported. `memory_fuzz` uses `rand()` seeded from the PID.
+|===
 
 
 == Who is Ribose?
