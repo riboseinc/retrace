@@ -92,7 +92,7 @@ jobs:
         env:
           RETRACE_LOGGER_DEF_STDOUT_ENA: "0"
         run: |
-          LD_PRELOAD="$(pwd)/build/src/v2/libretrace.so" /bin/id
+          LD_PRELOAD="$(pwd)/build/src/v2/libretrace.so" id
 
   build-aarch64:
     runs-on: ubuntu-latest
