@@ -330,7 +330,7 @@ int retrace_as_setup_params(
 		return 1;
 	}
 
-	if ((proto->fmt != FAT_NOVARARGS) && (proto->fmt != FAT_PRINTF)) {
+	if ((proto->fmt != FAT_PRINTF) && (proto->fmt != FAT_SCANF)) {
 		log_err("varargs format '%d' is not supported for func '%s'",
 			proto->fmt, proto->name);
 		return 0;
