@@ -636,7 +636,8 @@ static int ia_call_real
 	 * (Linux/BSD AArch64) it puts them in x1..x7. Without this, real
 	 * printf's va_start reads garbage from the wrong place (segfault).
 	 */
-	if (t_ctx->prototype->fmt == FAT_PRINTF) {
+	if (t_ctx->prototype->fmt == FAT_PRINTF ||
+	    t_ctx->prototype->fmt == FAT_SCANF) {
 		t_ctx->ret_val = retrace_as_call_real_variadic(
 			t_ctx->real_impl,
 			t_ctx->params,

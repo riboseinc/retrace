@@ -777,6 +777,312 @@ retrace_func_define_prototypes(stdio) = {
 	}
 },
 
+/*
+ * scanf-family variadic prototypes. fmt = FAT_SCANF routes them through
+ * the same variadic dispatch as printf (retrace_as_call_real_variadic).
+ *
+ * All scanf variants write to the varargs pointers (PDIR_OUT semantics
+ * for the user), but retrace treats each vararg as PDIR_IN by default
+ * since we don't parse the format string to determine each vararg's
+ * actual direction. Logging the pointer value is enough for tracing;
+ * callers that want post-scan values can read through the pointers in
+ * their own action.
+ */
+{
+	.name = "scanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.fmt = FAT_SCANF,
+	.fmt_param_idx = 0,
+	.params_cnt = 1,
+	.params = {
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "fscanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.fmt = FAT_SCANF,
+	.fmt_param_idx = 1,
+	.params_cnt = 2,
+	.params = {
+		{
+			.name = "stream",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "sscanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.fmt = FAT_SCANF,
+	.fmt_param_idx = 1,
+	.params_cnt = 2,
+	.params = {
+		{
+			.name = "str",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		}
+	}
+},
+/*
+ * v*scanf variants take va_list (opaque pointer); no varargs to walk.
+ */
+{
+	.name = "vscanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.params_cnt = 2,
+	.params = {
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "arg",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "vsscanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.params_cnt = 3,
+	.params = {
+		{
+			.name = "str",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "arg",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "vfscanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.params_cnt = 3,
+	.params = {
+		{
+			.name = "stream",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "arg",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		}
+	}
+},
+
+/*
+ * glibc __isoc99_* variants. Modern gcc + glibc headers redirect the
+ * standard scanf-family names to these via __REDIRECT, so binaries
+ * built today call __isoc99_scanf (not scanf) at the PLT. We interpose
+ * both: the plain names above catch older binaries and non-glibc
+ * targets; the __isoc99_* names catch modern glibc binaries.
+ *
+ * Suffix is part of the C identifier, but prototype fields are
+ * per-symbol -- the engine matches func_name verbatim.
+ */
+{
+	.name = "__isoc99_scanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.fmt = FAT_SCANF,
+	.fmt_param_idx = 0,
+	.params_cnt = 1,
+	.params = {
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "__isoc99_fscanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.fmt = FAT_SCANF,
+	.fmt_param_idx = 1,
+	.params_cnt = 2,
+	.params = {
+		{
+			.name = "stream",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "__isoc99_sscanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.fmt = FAT_SCANF,
+	.fmt_param_idx = 1,
+	.params_cnt = 2,
+	.params = {
+		{
+			.name = "str",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "__isoc99_vscanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.params_cnt = 2,
+	.params = {
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "arg",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "__isoc99_vsscanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.params_cnt = 3,
+	.params = {
+		{
+			.name = "str",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "arg",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		}
+	}
+},
+{
+	.name = "__isoc99_vfscanf",
+	.conv = CC_SYSTEM_V,
+	.type_name = "int",
+	.params_cnt = 3,
+	.params = {
+		{
+			.name = "stream",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		},
+		{
+			.name = "format",
+			.type_name = "ptr",
+			.modifiers = CDM_POINTER | CDM_CONST,
+			.ref_type_name = "sz",
+			.direction = PDIR_IN
+		},
+		{
+			.name = "arg",
+			.type_name = "ptr",
+			.modifiers = CDM_NOMOD,
+			.direction = PDIR_IN
+		}
+	}
+},
+
 	{
 		.name = "fgetc",
 		.conv = CC_SYSTEM_V,

@@ -74,6 +74,24 @@ WRAPPER_ENTRY_SYSTEM_V vscanf
 WRAPPER_ENTRY_SYSTEM_V vsnprintf
 WRAPPER_ENTRY_SYSTEM_V vsprintf
 WRAPPER_ENTRY_SYSTEM_V vsscanf
+/* glibc redirects scanf/fscanf/sscanf/v*scanf to __isoc99_* when
+ * compiled with _GNU_SOURCE / recent glibc headers. Programs built
+ * with modern gcc end up calling __isoc99_scanf etc. via PLT, so we
+ * must interpose those names too. The plain names above catch older
+ * binaries and non-glibc targets (musl, BSD).
+ *
+ * RETRACE_HAVE_ISOC99_SCANF is set by CMake based on a real symbol
+ * check. The .S file is run through the C preprocessor, so the #if
+ * takes effect at assembly time.
+ */
+#if RETRACE_HAVE_ISOC99_SCANF
+WRAPPER_ENTRY_SYSTEM_V __isoc99_fscanf
+WRAPPER_ENTRY_SYSTEM_V __isoc99_scanf
+WRAPPER_ENTRY_SYSTEM_V __isoc99_sscanf
+WRAPPER_ENTRY_SYSTEM_V __isoc99_vfscanf
+WRAPPER_ENTRY_SYSTEM_V __isoc99_vscanf
+WRAPPER_ENTRY_SYSTEM_V __isoc99_vsscanf
+#endif
 WRAPPER_ENTRY_SYSTEM_V fgetc
 WRAPPER_ENTRY_SYSTEM_V fgets
 WRAPPER_ENTRY_SYSTEM_V fputc

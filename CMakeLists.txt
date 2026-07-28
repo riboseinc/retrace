@@ -273,6 +273,27 @@ configure_file(
 	"${CMAKE_BINARY_DIR}/config.h"
 	ESCAPE_QUOTES)
 
+# Detect glibc's __isoc99_* scanf variants. Modern gcc + glibc headers
+# redirect scanf/fscanf/sscanf/v*scanf to __isoc99_* via __REDIRECT, so
+# binaries built today call __isoc99_scanf (not scanf) at the PLT. We
+# must interpose both names on glibc; musl and BSDs only need the plain
+# names. The C-side prototypes are always compiled (the engine looks up
+# by name and silently skips prototypes whose wrappers aren't present),
+# but the .S wrappers must only be emitted when libc actually exports
+# the symbol or load fails.
+if(RETRACE_PLATFORM_LINUX AND NOT RETRACE_PLATFORM_OHOS)
+	# check_symbol_exists looks for a declaration in headers. __isoc99_*
+	# isn't declared publicly; we need a real link check.
+	check_c_source_compiles("
+		extern int __isoc99_scanf(const char *__restrict, ...);
+		int main(void) { return __isoc99_scanf(0); }
+	" HAVE_ISOC99_SCANF)
+endif()
+if(NOT HAVE_ISOC99_SCANF)
+	set(HAVE_ISOC99_SCANF 0)
+endif()
+add_compile_definitions(RETRACE_HAVE_ISOC99_SCANF=${HAVE_ISOC99_SCANF})
+
 # Make config.h discoverable by every target.
 # Also add src/config/json (parson.h, conf.h) and src/backends (arch_spec.h)
 # globally — OBJECT libraries don't always propagate target_include_directories
