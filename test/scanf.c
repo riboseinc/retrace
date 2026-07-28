@@ -30,17 +30,19 @@
 
 int scanf_test(void)
 {
-	FILE oldstdin;
 	char buf[1024];
 	int fd[2];
+	int saved_stdin;
 
+	saved_stdin = dup(STDIN_FILENO);
 	pipe(fd);
-	oldstdin = *stdin;
-	*stdin = *fdopen(fd[0], "r");
 	write(fd[1], "string123 ", strlen("string123 "));
-	scanf("%s", buf);
-	*stdin = oldstdin;
 	close(fd[1]);
+	dup2(fd[0], STDIN_FILENO);
+	close(fd[0]);
+	scanf("%s", buf);
+	dup2(saved_stdin, STDIN_FILENO);
+	close(saved_stdin);
 
 	printf("%s\n", buf);
 
@@ -93,17 +95,19 @@ void GetMatchesVscanf(const char *format, ...)
 
 int vscanf_test(void)
 {
-	FILE oldstdin;
 	char buf[1024];
 	int fd[2];
+	int saved_stdin;
 
+	saved_stdin = dup(STDIN_FILENO);
 	pipe(fd);
-	oldstdin = *stdin;
-	*stdin = *fdopen(fd[0], "r");
 	write(fd[1], "string12 ", strlen("string12 "));
-	GetMatchesVscanf("%s", buf);
-	*stdin = oldstdin;
 	close(fd[1]);
+	dup2(fd[0], STDIN_FILENO);
+	close(fd[0]);
+	GetMatchesVscanf("%s", buf);
+	dup2(saved_stdin, STDIN_FILENO);
+	close(saved_stdin);
 
 	printf("%s\n", buf);
 

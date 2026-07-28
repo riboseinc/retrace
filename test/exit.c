@@ -36,7 +36,8 @@ void test2(int status, void *p)
 int main(void)
 {
 	atexit(test1);
-#ifdef __linux
+#if defined(__GLIBC__)
+	/* on_exit(3) is a glibc extension; not in POSIX, not in musl. */
 	on_exit(test2, (void *)0xdeadbeef);
 #endif
 	exit(42);
