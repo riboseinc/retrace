@@ -84,14 +84,47 @@ static inline struct ThreadContext *get_thread_context(void)
 static inline void clear_context(struct ThreadContext *thread_ctx)
 {
 	int i;
-	/* free new params */
 
+	/* free new params */
 	for (i = 0; i != thread_ctx->params_cnt; i++) {
 		if (thread_ctx->params[i].free_val)
 			retrace_real_impls.free((void *) thread_ctx->params[i].val);
 	}
 
-	retrace_real_impls.memset(thread_ctx, 0, sizeof(*thread_ctx));
+	if (thread_ctx->params_modified == 0 && thread_ctx->real_impl != NULL) {
+		/* PATH A: call_real deferred to trampoline tail-call.
+		 * Keep real_impl set as the reentrance guard so that calls
+		 * made BY real_impl (e.g. setlocale -> strcpy) are skipped.
+		 * The trampoline calls retrace_path_a_cleanup after real_impl
+		 * returns to eventually clear the guard.
+		 */
+		void *saved_impl = thread_ctx->real_impl;
+
+		retrace_real_impls.memset(thread_ctx, 0, sizeof(*thread_ctx));
+		thread_ctx->real_impl = saved_impl;
+		thread_ctx->path_a_depth = 1;
+	} else {
+		retrace_real_impls.memset(thread_ctx, 0, sizeof(*thread_ctx));
+	}
+}
+
+/*
+ * Called by the trampoline's PATH A after real_impl returns.
+ * Decrements the reentrance depth; clears the guard when depth hits 0.
+ */
+void retrace_path_a_cleanup(void)
+{
+	struct ThreadContext *thread_ctx;
+
+	thread_ctx = (struct ThreadContext *)
+		retrace_real_impls.pthread_getspecific(thread_ctx_key);
+
+	if (thread_ctx == NULL || thread_ctx->path_a_depth <= 0)
+		return;
+
+	thread_ctx->path_a_depth--;
+	if (thread_ctx->path_a_depth == 0)
+		thread_ctx->real_impl = NULL;
 }
 
 static const JSON_Object *get_i_script(const JSON_Array *i_array,
@@ -234,10 +267,15 @@ void retrace_engine_wrapper(char *func_name,
 	/* set default to call real impl */
 	retrace_as_sched_real(arch_spec_ctx, real_impl);
 
-	/* do not intervene if already intercepting
+	/* do not intervene if already intercepting.
+	 * Increment path_a_depth so that the trampoline's cleanup after
+	 * THIS nested call's real_impl returns doesn't prematurely clear
+	 * the outer real_impl guard.
 	 */
-	if (thread_ctx->real_impl != NULL)
+	if (thread_ctx->real_impl != NULL) {
+		thread_ctx->path_a_depth++;
 		return;
+	}
 
 	/* save arc spec context */
 	thread_ctx->arch_spec_ctx = arch_spec_ctx;

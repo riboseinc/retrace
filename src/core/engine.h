@@ -47,6 +47,23 @@ struct ThreadContext {
 	/* valid param cnt */
 	int params_cnt;
 
+	/* set by modify_in_param_{str,int,arr}; consulted by the call_real
+	 * action to decide between the trampoline's tail-call path (which
+	 * restores x0..x7 AND v0..v7 -- works for FP varargs) and the
+	 * C-dispatch path (which only handles integer args -- needed when
+	 * any param has been modified, breaks FP varargs).
+	 */
+	int params_modified;
+
+	/* Reentrance guard for PATH A (trampoline tail-call). When PATH A
+	 * is used, real_impl stays set after engine_wrapper returns, so
+	 * that calls made BY real_impl (e.g. setlocale calling strcpy)
+	 * see the guard and skip full interception. The trampoline calls
+	 * retrace_path_a_cleanup after real_impl returns to decrement the
+	 * depth and eventually clear the guard.
+	 */
+	int path_a_depth;
+
 	void *arch_spec_ctx;
 	void *ret_addr;
 };

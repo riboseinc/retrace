@@ -81,8 +81,10 @@ should_skip() {
         case "$(uname -m)" in
         x86_64) return 0 ;;   # skip all on Intel macOS
         esac
+        # writev: the test writes to /dev/urandom with O_WRONLY, which
+        # macOS rejects with EPERM. Not a retrace bug.
         case "$1" in
-        printf|writev) return 0 ;;
+        writev) return 0 ;;
         esac
         ;;
     esac

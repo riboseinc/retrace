@@ -125,6 +125,12 @@ _\func_name\()_retrace_wrapper:
 	ldr     x9, [sp, #OFFS_CALL_REAL_FLAG]
 	cbz     x9, 1f
 
+	/* PATH A: call real_impl with the original args, then clean up
+	 * the reentrance guard. We use blr (not br) so we get control
+	 * back after real_impl returns; then we call
+	 * _retrace_path_a_cleanup to decrement the depth and return
+	 * real_impl's value to the original caller.
+	 */
 	ldr     x16, [sp, #OFFS_REAL_IMPL]
 
 	ldp     x0, x1, [sp, #OFFS_REAL_X0]
@@ -137,9 +143,20 @@ _\func_name\()_retrace_wrapper:
 	ldp     q4, q5, [sp, #OFFS_REAL_V4]
 	ldp     q6, q7, [sp, #OFFS_REAL_V6]
 
+	/* Save lr in x9 (free after reg restore), then call real_impl.
+	 * On return x0 has the result. */
+	mov     x9, x30
+	blr     x16
+	mov     x30, x9
+
+	/* Save real_impl's return value, call cleanup, restore value. */
+	str     x0, [sp, #OFFS_RET_VAL]
+	bl      _retrace_path_a_cleanup
+	ldr     x0, [sp, #OFFS_RET_VAL]
+
 	ldr     x30, [sp, #OFFS_REAL_LR]
 	add     sp, sp, #FRAME_SIZE
-	br      x16
+	ret
 
 1:
 	ldr     w17, [sp, #OFFS_RET_IS_FP]

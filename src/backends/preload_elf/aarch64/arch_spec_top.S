@@ -141,10 +141,13 @@
 	ldr     x9, [sp, #OFFS_CALL_REAL_FLAG]
 	cbz     x9, 1f
 
-	/* call_real_flag != 0: restore arg regs and tail-call real_impl.
-	 * The real function's `ret` returns directly to the original caller
-	 * (x30 was saved in the frame and we restore it here). */
-	ldr     x16, [sp, #OFFS_REAL_IMPL]   /* branch target */
+	/* PATH A: call real_impl with the original args, then clean up
+	 * the reentrance guard. We use blr (not br) so we get control
+	 * back after real_impl returns; then we call
+	 * retrace_path_a_cleanup to decrement the depth and return
+	 * real_impl's value to the original caller.
+	 */
+	ldr     x16, [sp, #OFFS_REAL_IMPL]
 
 	ldp     x0, x1, [sp, #OFFS_REAL_X0]
 	ldp     x2, x3, [sp, #OFFS_REAL_X2]
@@ -156,9 +159,20 @@
 	ldp     q4, q5, [sp, #OFFS_REAL_V4]
 	ldp     q6, q7, [sp, #OFFS_REAL_V6]
 
+	/* Save lr in x9 (free after reg restore), then call real_impl.
+	 * On return x0 has the result. */
+	mov     x9, x30
+	blr     x16
+	mov     x30, x9
+
+	/* Save real_impl's return value, call cleanup, restore value. */
+	str     x0, [sp, #OFFS_RET_VAL]
+	bl      retrace_path_a_cleanup
+	ldr     x0, [sp, #OFFS_RET_VAL]
+
 	ldr     x30, [sp, #OFFS_REAL_LR]
 	add     sp, sp, #FRAME_SIZE
-	br      x16
+	ret
 
 1:
 	/* call_real_flag == 0: the intercept already chose the return value.
@@ -173,10 +187,6 @@
 	ldr     q0, [sp, #OFFS_RET_VAL]
 
 3:
-	/* Restore the original lr (which is also where we return) and free the
-	 * frame. The original x0..x7/v0..v7 do NOT need restoring here —
-	 * the intercept dictated the return value above, and per AAPCS the
-	 * caller only observes x0/v0. */
 	ldr     x30, [sp, #OFFS_REAL_LR]
 	add     sp, sp, #FRAME_SIZE
 	ret

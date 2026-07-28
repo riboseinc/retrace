@@ -75,7 +75,6 @@ static inline int parse_printf_format(const char *fmt, int n, int *argtypes)
 	int count = 0;
 	const char *p = fmt;
 	int i = 0;
-	int has_fp = 0;
 
 	while (*p != '\0') {
 		if (*p != '%') {
@@ -177,7 +176,6 @@ static inline int parse_printf_format(const char *fmt, int n, int *argtypes)
 			 * base, with PA_FLAG_LONG_DOUBLE set).
 			 */
 			base = PA_DOUBLE;
-			has_fp = 1;
 			break;
 		case 'n':
 			/* %n writes to an int* argument; consumes a slot */
@@ -197,16 +195,6 @@ static inline int parse_printf_format(const char *fmt, int n, int *argtypes)
 			argtypes[i] = base | flag;
 		count++; i++;
 	}
-
-	/* FP varargs can't be dispatched correctly on aarch64 (trampoline
-	 * captures x0..x7 only, not v0..v7). Fall back to named-args-only
-	 * so the callee's va_arg reads the original captured registers
-	 * instead of our mis-dispatched ones. printf still produces
-	 * correct output for fmts without %f; printf with %f gets
-	 * garbage values but does not crash.
-	 */
-	if (has_fp)
-		return 0;
 
 	return count;
 }

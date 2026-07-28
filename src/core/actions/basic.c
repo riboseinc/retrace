@@ -361,6 +361,8 @@ static int ia_modify_in_param_str
 	log_info("param '%s' set to '%s'",
 		param_name, new_str);
 
+	t_ctx->params_modified = 1;
+
 	/* 0 indicates successful processing */
 	return 0;
 }
@@ -529,6 +531,8 @@ static int ia_modify_in_param_arr
 
 	json_free_serialized_string(new_str);
 
+	t_ctx->params_modified = 1;
+
 	/* 0 indicates successful processing */
 	return 0;
 }
@@ -615,6 +619,8 @@ static int ia_modify_in_param_int
 	log_info("param '%s' set to '%d'",
 		param_name, (int) new_int);
 
+	t_ctx->params_modified = 1;
+
 	/* 0 indicates successful processing */
 	return 0;
 }
@@ -628,6 +634,17 @@ static int ia_call_real
 	log_dbg("calling real at 0x%lx for %s...",
 			(long) t_ctx->real_impl,
 			t_ctx->prototype->name);
+
+	/* If no param has been modified, defer to the trampoline's tail-call
+	 * path (retrace_as_sched_real -> call_real_flag=1). That path
+	 * restores the original x0..x7 AND v0..v7 before tail-calling the
+	 * real implementation, so variadic callees (printf/scanf) read the
+	 * original integer AND FP args correctly via va_arg.
+	 */
+	if (!t_ctx->params_modified) {
+		retrace_as_sched_real(t_ctx->arch_spec_ctx, t_ctx->real_impl);
+		return 0;
+	}
 
 	t_ctx->ret_val = retrace_as_call_real(t_ctx->real_impl,
 		t_ctx->params,
