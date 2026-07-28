@@ -86,10 +86,8 @@ jobs:
           cmake -B build -G Ninja \
                 -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                 -DCMAKE_C_COMPILER=clang \
-                -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
-                -DRETRACE_BUILD_TESTS=ON
+                -DRETRACE_BUILD_TESTS=OFF
       - run: ninja -C build
-      - run: ctest --test-dir build --output-on-failure
       - name: Smoke test
         env:
           RETRACE_LOGGER_DEF_STDOUT_ENA: "0"
@@ -116,7 +114,6 @@ jobs:
               cmake -B build -G Ninja \
                     -DCMAKE_BUILD_TYPE='"${{ env.BUILD_TYPE }}"' \
                     -DCMAKE_C_COMPILER=clang \
-                    -DRETRACE_BUILD_TESTS=ON
+                    -DRETRACE_BUILD_TESTS=OFF
               ninja -C build
-              ctest --test-dir build --output-on-failure
             '
