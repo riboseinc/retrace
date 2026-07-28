@@ -68,9 +68,6 @@ failed_tests=""
 # Tests known to fail on specific OSes (skip on those).
 #   dlopen  — segfaults on Linux/glibc (malloc path inside dlopen;
 #             tracked in follow-up to #445).
-#   printf  — segfaults on macOS (varargs/abi difference; the plain
-#             C dispatch in as_call_real.c doesn't handle macOS printf
-#             correctly yet).
 #   writev  — non-zero rc on macOS (probably writes data that fails).
 # All v2 tests fail on macOS x86_64 (Intel) due to a separate mach-O
 # x86_64 backend issue. Skip the whole runner on that platform until
@@ -82,7 +79,7 @@ should_skip() {
         x86_64) return 0 ;;   # skip all on Intel macOS
         esac
         case "$1" in
-        printf|writev) return 0 ;;
+        writev) return 0 ;;
         esac
         ;;
     esac

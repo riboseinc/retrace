@@ -81,6 +81,26 @@ long retrace_as_call_real_dispatch(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt);
 
+/*
+ * Variadic-aware dispatch: casts real_impl to a variadic-typed function
+ * pointer so the compiler emits the correct ABI for variadic calls:
+ *
+ *   - Linux/BSD AArch64 (AAPCS64): variadic args up to x0..x7, then stack
+ *   - Apple AArch64: variadic args ALWAYS go on the stack
+ *   - x86-64 (System V / Darwin): variadic args in rdi..r9 then stack
+ *
+ * Without this, the non-variadic dispatch puts variadic args in registers
+ * on Apple AArch64; real printf's va_start then reads garbage from the
+ * stack (e.g. strlen(NULL) segfault).
+ *
+ * named_count is proto->params_cnt -- the number of named parameters
+ * (printf: 1 for fmt; fprintf-style: 2 for stream+fmt).
+ */
+long retrace_as_call_real_variadic(const void *real_impl,
+	const struct FuncParam params[],
+	int params_cnt,
+	int named_count);
+
 /* schedules real_impl to run after retrace_engine_wrapper */
 void retrace_as_set_ret_val(void *arch_spec_ctx,
 	long ret_val);

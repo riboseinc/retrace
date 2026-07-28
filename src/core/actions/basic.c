@@ -629,9 +629,24 @@ static int ia_call_real
 			(long) t_ctx->real_impl,
 			t_ctx->prototype->name);
 
-	t_ctx->ret_val = retrace_as_call_real(t_ctx->real_impl,
-		t_ctx->params,
-		t_ctx->params_cnt);
+	/*
+	 * Variadic dispatch: route through the variadic-aware helper so the
+	 * compiler emits the correct variadic ABI for the host arch. On
+	 * Apple AArch64 this puts varargs on the stack; on AAPCS64
+	 * (Linux/BSD AArch64) it puts them in x1..x7. Without this, real
+	 * printf's va_start reads garbage from the wrong place (segfault).
+	 */
+	if (t_ctx->prototype->fmt == FAT_PRINTF) {
+		t_ctx->ret_val = retrace_as_call_real_variadic(
+			t_ctx->real_impl,
+			t_ctx->params,
+			t_ctx->params_cnt,
+			t_ctx->prototype->params_cnt);
+	} else {
+		t_ctx->ret_val = retrace_as_call_real(t_ctx->real_impl,
+			t_ctx->params,
+			t_ctx->params_cnt);
+	}
 
 	log_dbg("real returned val=0x%lx", t_ctx->ret_val);
 
