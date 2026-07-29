@@ -28,6 +28,8 @@
 #include "real_impls.h"
 #include "data_types.h"
 
+#include <time.h>
+
 #define ARR_MAX_COUNT 64
 
 /*
@@ -641,23 +643,47 @@ static int ia_call_real
 			t_ctx->prototype->name);
 
 	/*
-	 * Variadic dispatch: route through the variadic-aware helper so the
-	 * compiler emits the correct variadic ABI for the host arch. On
-	 * Apple AArch64 this puts varargs on the stack; on AAPCS64
-	 * (Linux/BSD AArch64) it puts them in x1..x7. Without this, real
-	 * printf's va_start reads garbage from the wrong place (segfault).
+	 * Measure the real call duration. Uses clock_gettime(CLOCK_MONOTONIC)
+	 * for nanosecond precision. The result is logged as a JSON entry so
+	 * the user can profile which libc calls are slow. Issue #487.
 	 */
-	if (t_ctx->prototype->fmt == FAT_PRINTF ||
-	    t_ctx->prototype->fmt == FAT_SCANF) {
-		t_ctx->ret_val = retrace_as_call_real_variadic(
-			t_ctx->real_impl,
-			t_ctx->params,
-			t_ctx->params_cnt,
-			t_ctx->prototype->params_cnt);
-	} else {
-		t_ctx->ret_val = retrace_as_call_real(t_ctx->real_impl,
-			t_ctx->params,
-			t_ctx->params_cnt);
+	{
+		struct timespec ts_start;
+		struct timespec ts_end;
+		long duration_us;
+		JSON_Value *timing;
+		JSON_Object *timing_obj;
+
+		clock_gettime(CLOCK_MONOTONIC, &ts_start);
+
+		if (t_ctx->prototype->fmt == FAT_PRINTF ||
+		    t_ctx->prototype->fmt == FAT_SCANF) {
+			t_ctx->ret_val = retrace_as_call_real_variadic(
+				t_ctx->real_impl,
+				t_ctx->params,
+				t_ctx->params_cnt,
+				t_ctx->prototype->params_cnt);
+		} else {
+			t_ctx->ret_val = retrace_as_call_real(
+				t_ctx->real_impl,
+				t_ctx->params,
+				t_ctx->params_cnt);
+		}
+
+		clock_gettime(CLOCK_MONOTONIC, &ts_end);
+
+		duration_us = (ts_end.tv_sec - ts_start.tv_sec) * 1000000L +
+			      (ts_end.tv_nsec - ts_start.tv_nsec) / 1000L;
+
+		timing = json_value_init_object();
+		timing_obj = json_value_get_object(timing);
+		json_object_set_string(timing_obj, "func",
+			t_ctx->prototype->name);
+		json_object_set_number(timing_obj, "call_duration_us",
+			(double) duration_us);
+		json_object_set_number(timing_obj, "ret_val",
+			(double) t_ctx->ret_val);
+		retrace_logger_log_json(FUNCS, SEVERITY_INFO, timing);
 	}
 
 	log_dbg("real returned val=0x%lx", t_ctx->ret_val);
