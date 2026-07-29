@@ -14,36 +14,31 @@ jobs:
         run: cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
       - name: Build
         run: cmake --build build
-      - name: Find retrace_real_impls address and dump memory
+      - name: Trace retrace_as_get_real_safe for "dlopen"
         run: |
           cat > /tmp/lldb.txt <<'LLDB'
           settings set target.env-vars DYLD_INSERT_LIBRARIES=/Users/runner/work/retrace/retrace/build/src/v2/libretrace.dylib
-          break set -n retrace_logger_deinit
-          process launch
-          image lookup -s _retrace_real_impls
-          image lookup -vs retrace_real_impls
-          expr (void*)&retrace_real_impls
-          memory read -fA -c8 `(void*)&retrace_real_impls`
-          LLDB
-          lldb --batch -s /tmp/lldb.txt build/test/printf 2>&1 | tail -40 || true
-      - name: Check if init ran
-        run: |
-          cat > /tmp/lldb2.txt <<'LLDB'
-          settings set target.env-vars DYLD_INSERT_LIBRARIES=/Users/runner/work/retrace/retrace/build/src/v2/libretrace.dylib
-          break set -n retrace_main
-          process launch
-          expr retrace_inited
-          expr (void*)&retrace_real_impls
-          memory read -fA -c8 `(void*)&retrace_real_impls`
-          LLDB
-          lldb --batch -s /tmp/lldb2.txt build/test/printf 2>&1 | tail -30 || true
-      - name: Constructor at multiple breakpoints
-        run: |
-          cat > /tmp/lldb3.txt <<'LLDB'
-          settings set target.env-vars DYLD_INSERT_LIBRARIES=/Users/runner/work/retrace/retrace/build/src/v2/libretrace.dylib
-          break set -n retrace_real_impls_init
+          break set -n retrace_as_get_real_safe
           process launch
           bt
-          expr retrace_real_impls.malloc
+          frame variable
+          expr real_impl
+          expr (char*)real_impl
+          continue
+          bt
+          frame variable
+          expr real_impl
+          expr (char*)real_impl
+          continue
+          continue
+          continue
+          continue
+          continue
           LLDB
-          lldb --batch -s /tmp/lldb3.txt build/test/printf 2>&1 | tail -30 || true
+          lldb --batch -s /tmp/lldb.txt build/test/printf 2>&1 | grep -E "(frame|real_impl=|retrace_as_get|stopped|breakpoint|0x)" | head -60 || true
+      - name: Compare section size and content
+        run: |
+          echo "=== otool -l on libretrace.dylib ==="
+          otool -l build/src/v2/libretrace.dylib 2>&1 | grep -B 1 -A 10 "sectname __retrace_rimpls" | head -20
+          echo "=== size of __retrace_rimpls in bytes ==="
+          otool -l build/src/v2/libretrace.dylib 2>&1 | awk '/sectname __retrace_rimpls/{found=1} found && /size/{print; found=0}'
