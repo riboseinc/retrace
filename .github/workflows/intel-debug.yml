@@ -14,7 +14,7 @@ jobs:
         run: cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
       - name: Build
         run: cmake --build build
-      - name: Compare section bounds — magic symbols vs getsectiondata
+      - name: Test getsectiondata with LD_PRELOAD
         run: |
           cat > /tmp/cmp.c <<'C'
           #include <stdio.h>
@@ -22,32 +22,27 @@ jobs:
           #include <mach-o/getsect.h>
           #include <mach-o/dyld.h>
           
-          extern char start_mysection __asm("section$start$__DATA$__retrace_rimpls");
-          extern char stop_mysection __asm("section$end$__DATA$__retrace_rimpls");
-          
           int main(void) {
-              // Method 1: magic symbols
-              unsigned long magic_size = &stop_mysection - &start_mysection;
-              printf("Magic symbols: start=%p stop=%p size=%lu\n", &start_mysection, &stop_mysection, magic_size);
-              
-              // Method 2: getsectiondata
               for (uint32_t i = 0; i < _dyld_image_count(); i++) {
                   const char *name = _dyld_get_image_name(i);
                   if (strstr(name, "libretrace")) {
+                      printf("libretrace at idx %u\n", i);
                       const struct mach_header_64 *hdr = (const struct mach_header_64 *)_dyld_get_image_header(i);
                       unsigned long size = 0;
                       void *addr = getsectiondata(hdr, "__DATA", "__retrace_rimpls", &size);
-                      printf("getsectiondata: addr=%p size=%lu\n", addr, size);
+                      printf("getsectiondata: addr=%p size=%lu (%lu entries)\n", addr, size, size/72);
                       if (addr && size > 100) {
                           struct entry { char name[64]; void *real_impl; } *p = addr;
                           printf("First 3 entries:\n");
                           for (int j = 0; j < 3 && j < (int)(size/72); j++) {
                               printf("  [%d] name='%s' real_impl=%p\n", j, p[j].name, p[j].real_impl);
                           }
-                          // search for printf
                           for (unsigned long j = 0; j < size/72; j++) {
                               if (strcmp(p[j].name, "printf") == 0) {
                                   printf("FOUND printf at idx %lu: real_impl=%p\n", j, p[j].real_impl);
+                              }
+                              if (strcmp(p[j].name, "malloc") == 0) {
+                                  printf("FOUND malloc at idx %lu: real_impl=%p\n", j, p[j].real_impl);
                               }
                           }
                       }
@@ -58,7 +53,5 @@ jobs:
           }
           C
           gcc -o /tmp/cmp /tmp/cmp.c
-          echo "=== WITHOUT LD_PRELOAD ==="
-          /tmp/cmp
-          echo "=== WITH LD_PRELOAD ==="
-          DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib /tmp/cmp 2>&1 | head -30 || true
+          echo "=== with LD_PRELOAD ==="
+          DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib /tmp/cmp 2>&1 | head -20
