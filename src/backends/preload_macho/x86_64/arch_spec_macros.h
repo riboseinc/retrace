@@ -26,18 +26,62 @@
 #ifndef ARCH_SPEC_MACROS_H_
 #define ARCH_SPEC_MACROS_H_
 
+#include <mach-o/getsect.h>
+#include <mach-o/dyld.h>
+
 #define retrace_as_define_var_in_sec(type, name, seg_name, sec_name) \
 	static type name __attribute__((used, section(seg_name","sec_name)))
 
+/*
+ * Resolve section bounds via getsectiondata() instead of the
+ * section$start$ / section$end$ magic linker symbols.
+ *
+ * On x86_64 macOS, the magic symbols resolve to the SAME address for
+ * start and end (size = 0) when accessed from inside a dylib that
+ * didn't itself define the section via the magic-symbol mechanism.
+ * The result is that retrace_as_get_real_safe() walks zero entries
+ * and returns NULL for every libc symbol; init fails on the first
+ * dlopen lookup, retrace_inited stays 0, and the destructor's
+ * retrace_real_impls.printf(...) jumps to NULL (issue #452).
+ *
+ * getsectiondata() is the official API and works correctly on both
+ * Apple Silicon and Intel. We scan loaded images for the one that
+ * actually defines the section (libretrace.dylib) so the lookup is
+ * correct regardless of which image calls us.
+ */
+static inline void retrace_as_get_section_data(const char *seg_name,
+	const char *sec_name, void **addr_ptr, unsigned long *size_ptr)
+{
+	uint32_t i;
+
+	*size_ptr = 0;
+	*addr_ptr = NULL;
+
+	for (i = 0; i < _dyld_image_count(); i++) {
+		const struct mach_header *hdr = _dyld_get_image_header(i);
+		unsigned long sz = 0;
+		void *a = getsectiondata(hdr, seg_name, sec_name, &sz);
+
+		if (a != NULL && sz > 0) {
+			*addr_ptr = a;
+			*size_ptr = sz;
+			return;
+		}
+	}
+}
+
+/*
+ * Wraps retrace_as_get_section_data with a void* cast so callers can
+ * pass any T** for addr_ptr without a type-mismatch warning (C is
+ * strict about T** vs void** even though it accepts T* vs void*).
+ */
 #define retrace_as_get_section_info(seg_name, sec_name, addr_ptr, size_ptr) \
-do { \
-	extern char start_mysection \
-		__asm("section$start$"seg_name"$"sec_name); \
-	extern char stop_mysection \
-		__asm("section$end$"seg_name"$"sec_name); \
-\
-	*size_ptr = (&stop_mysection)-(&start_mysection); \
-	*addr_ptr = (void *) &start_mysection; \
-} while (0)
+	do { \
+		void *_addr; \
+		unsigned long _size; \
+		retrace_as_get_section_data(seg_name, sec_name, &_addr, &_size); \
+		*(addr_ptr) = _addr; \
+		*(size_ptr) = _size; \
+	} while (0)
 
 #endif
