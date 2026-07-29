@@ -333,6 +333,42 @@ SIMD-reg save-area walk that is on the roadmap (ADR-0010).
 }
 ----
 
+=== Fuzzing-only mode (no log noise)
+
+When you're running `memory_fuzz` over a large program, the default
+`log_params` + `call_real` for every libc call produces gigabytes of
+JSON you don't care about. Two ways to suppress it:
+
+**1. Disable the logger entirely** (zero JSON output, fuzz still runs):
+
+[source,console]
+----
+$ RETRACE_LOGGER_DEF_ENA=0 \
+  RETRACE_JSON_CONFIG=fuzz.json \
+  LD_PRELOAD=build/src/v2/libretrace.so ./your-program
+----
+
+**2. Allowlist only the function you're fuzzing** (log only malloc):
+
+[source,json]
+----
+{
+  "intercept_scripts": [
+    {
+      "func_name": "malloc",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" },
+        { "action_name": "memory_fuzz", "action_params": { "fail_rate": 0.1 } }
+      ]
+    }
+    /* NOTE: no "*" wildcard script -- every other libc call goes
+     * through retrace's trampoline but the engine finds no matching
+     * script and just calls real. No log noise. */
+  ]
+}
+----
+
 
 == End-to-end examples under `examples/`
 
