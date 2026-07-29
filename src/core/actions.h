@@ -37,6 +37,14 @@ int(*retrace_actions_get(const char *action_name))
 
 int retrace_actions_init(void);
 
+/*
+ * If the user invoked the fuzzing_seed action, re-seed rand() so the
+ * next memory_fuzz call is deterministic. Cheap no-op when no seed
+ * was set. Declared here so memfuzz.c can call it without taking a
+ * circular include on fuzzing_seed.c.
+ */
+void retrace_actions_fuzzing_seed_maybe_apply(void);
+
 struct Action {
 	char name[MAXLEN_ACTION_NAME + 1];
 

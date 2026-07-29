@@ -58,6 +58,15 @@ static int ia_memory_fuzz
 		}
 	}
 
+	/*
+	 * If the user has invoked the fuzzing_seed action at any point
+	 * (typically at the top of the script), honor it. This makes the
+	 * sequence deterministic across multiple memory_fuzz invocations
+	 * and across runs. Cheap; only fires when the user explicitly
+	 * opted in. See fuzzing_seed.c.
+	 */
+	retrace_actions_fuzzing_seed_maybe_apply();
+
 	if (!json_object_has_value(action_params, "fail_rate")) {
 		log_err("fail_rate must exist in action_params "
 			"for memory_fuzz");
