@@ -337,6 +337,116 @@ retrace_func_define_prototypes(unistd) = {
 			}
 		}
 	},
+	/*
+	 * execl / execle / execlp take a variable arg list terminated by a
+	 * (char *)NULL sentinel. They are technically variadic but the
+	 * sentinel-termination makes a va_list-style walk unsuitable.
+	 * Register them as FAT_NOVARARGS -- the engine fills just the
+	 * named params (path + first arg slot) and the asm trampoline's
+	 * tail-call path passes the original register state (including
+	 * subsequent args) to real. log_params shows the path; the rest
+	 * flow through unlogged.
+	 */
+	{
+		.name = "execl",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 2,
+		.params = {
+			{
+				.name = "path",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "arg0",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "execle",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 2,
+		.params = {
+			{
+				.name = "path",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "arg0",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "execlp",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 2,
+		.params = {
+			{
+				.name = "file",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "arg0",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "fdatasync",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 1,
+		.params = {
+			{
+				.name = "fd",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "tcsetpgrp",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 2,
+		.params = {
+			{
+				.name = "fd",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "pgrp_id",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
 	{
 		.name = "execvp",
 		.conv = CC_SYSTEM_V,

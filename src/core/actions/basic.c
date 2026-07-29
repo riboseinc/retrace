@@ -137,6 +137,17 @@ static int ia_log_params
 			 * reference each other
 			 */
 
+			/* Skip the deref step entirely when the caller passed
+			 * NULL -- common for output params (e.g., time(NULL),
+			 * gettimeofday(tv, NULL)) where libc just uses the
+			 * return value.
+			 */
+			if (param->val == 0) {
+				log_dbg("NULL pointer for param '%s' -- skip deref",
+					param->param_meta.name);
+				goto next_param;
+			}
+
 			/* TODO: Maybe should cast via data_type? */
 
 			ref_data = (void *) param->val;
