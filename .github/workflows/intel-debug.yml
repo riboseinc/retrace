@@ -14,31 +14,37 @@ jobs:
         run: cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
       - name: Build
         run: cmake --build build
-      - name: Verify getsectiondata works
+      - name: Standalone getsectiondata test
         run: |
           cat > /tmp/cmp.c <<'C'
           #include <stdio.h>
+          #include <stdlib.h>
           #include <string.h>
           #include <mach-o/getsect.h>
           #include <mach-o/dyld.h>
           
           int main(void) {
-              for (uint32_t i = 0; i < _dyld_image_count(); i++) {
+              // First, just count images
+              uint32_t count = _dyld_image_count();
+              fprintf(stderr, "image count: %u\n", count);
+              
+              // Try to find libretrace
+              for (uint32_t i = 0; i < count; i++) {
+                  const char *name = _dyld_get_image_name(i);
+                  if (name) {
+                      fprintf(stderr, "  [%u] %s\n", i, name);
+                  }
+              }
+              
+              // Now try getsectiondata
+              for (uint32_t i = 0; i < count; i++) {
                   const char *name = _dyld_get_image_name(i);
                   if (name && strstr(name, "libretrace")) {
-                      printf("libretrace at idx %u: %s\n", i, name);
+                      fprintf(stderr, "Found libretrace at idx %u: %s\n", i, name);
                       const struct mach_header_64 *hdr = (const struct mach_header_64 *)_dyld_get_image_header(i);
                       unsigned long size = 0;
                       void *addr = getsectiondata(hdr, "__DATA", "__retrace_rimpls", &size);
-                      printf("getsectiondata: addr=%p size=%lu\n", addr, size);
-                      if (addr && size > 0) {
-                          struct entry { char name[64]; void *real_impl; } *p = addr;
-                          for (unsigned long j = 0; j < size/72; j++) {
-                              if (strcmp(p[j].name, "printf") == 0) {
-                                  printf("FOUND printf at idx %lu: real_impl=%p\n", j, p[j].real_impl);
-                              }
-                          }
-                      }
+                      fprintf(stderr, "getsectiondata: addr=%p size=%lu\n", addr, size);
                       break;
                   }
               }
@@ -47,22 +53,6 @@ jobs:
           C
           gcc -o /tmp/cmp /tmp/cmp.c
           echo "=== WITHOUT LD_PRELOAD ==="
-          /tmp/cmp
+          /tmp/cmp 2>&1 | head -20
           echo "=== WITH LD_PRELOAD ==="
-          (DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib /tmp/cmp || echo "rc=$?")
-      - name: Run test/id
-        run: |
-          set +e
-          DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib build/test/id > /tmp/out 2> /tmp/err
-          rc=$?
-          echo "rc=$rc"
-          echo "stdout:"; cat /tmp/out | head -3
-          echo "stderr:"; cat /tmp/err | head -3
-      - name: Run test/printf
-        run: |
-          set +e
-          DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib build/test/printf > /tmp/out 2> /tmp/err
-          rc=$?
-          echo "rc=$rc"
-          echo "stdout:"; cat /tmp/out | head -10
-          echo "stderr:"; cat /tmp/err | head -3
+          (DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib /tmp/cmp 2>&1 | head -20) || echo "rc=$?"
