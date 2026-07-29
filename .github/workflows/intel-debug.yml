@@ -14,31 +14,86 @@ jobs:
         run: cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
       - name: Build
         run: cmake --build build
-      - name: Trace retrace_as_get_real_safe for "dlopen"
+      - name: Dump __retrace_rimpls at runtime
         run: |
-          cat > /tmp/lldb.txt <<'LLDB'
-          settings set target.env-vars DYLD_INSERT_LIBRARIES=/Users/runner/work/retrace/retrace/build/src/v2/libretrace.dylib
-          break set -n retrace_as_get_real_safe
-          process launch
-          bt
-          frame variable
-          expr real_impl
-          expr (char*)real_impl
-          continue
-          bt
-          frame variable
-          expr real_impl
-          expr (char*)real_impl
-          continue
-          continue
-          continue
-          continue
-          continue
-          LLDB
-          lldb --batch -s /tmp/lldb.txt build/test/printf 2>&1 | grep -E "(frame|real_impl=|retrace_as_get|stopped|breakpoint|0x)" | head -60 || true
-      - name: Compare section size and content
+          cat > /tmp/walk.c <<'C'
+          #include <stdio.h>
+          #include <string.h>
+          #include <dlfcn.h>
+          #include <mach-o/getsect.h>
+          #include <mach-o/dyld.h>
+          int main(void) {
+              unsigned long size = 0;
+              void *addr = NULL;
+              for (uint32_t i = 0; i < _dyld_image_count(); i++) {
+                  const char *name = _dyld_get_image_name(i);
+                  if (strstr(name, "libretrace")) {
+                      printf("Found %s at index %u\n", name, i);
+                      const struct mach_header_64 *hdr = (const struct mach_header_64 *)_dyld_get_image_header(i);
+                      addr = getsectiondata(hdr, "__DATA", "__retrace_rimpls", &size);
+                      printf("Section addr=%p size=%lu\n", addr, size);
+                      if (addr) {
+                          struct entry { char name[64]; void *real_impl; } *p = addr;
+                          struct entry *eos = (struct entry *)((char *)addr + size);
+                          printf("Walking %lu entries...\n", (size_t)((eos - p)));
+                          int count = 0;
+                          while (p < eos && count < 5) {
+                              printf("  [%d] name='%s' real_impl=%p\n", count, p->name, p->real_impl);
+                              p++;
+                              count++;
+                          }
+                          p = addr;
+                          while (p < eos) {
+                              if (strcmp(p->name, "printf") == 0) {
+                                  printf("FOUND printf: real_impl=%p\n", p->real_impl);
+                                  break;
+                              }
+                              p++;
+                          }
+                      }
+                      break;
+                  }
+              }
+              return 0;
+          }
+          C
+          gcc -o /tmp/walk /tmp/walk.c
+          DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib /tmp/walk 2>&1 | head -30
+      - name: Dump section bytes raw
         run: |
-          echo "=== otool -l on libretrace.dylib ==="
-          otool -l build/src/v2/libretrace.dylib 2>&1 | grep -B 1 -A 10 "sectname __retrace_rimpls" | head -20
-          echo "=== size of __retrace_rimpls in bytes ==="
-          otool -l build/src/v2/libretrace.dylib 2>&1 | awk '/sectname __retrace_rimpls/{found=1} found && /size/{print; found=0}'
+          python3 <<'PY'
+          import struct
+          with open('build/src/v2/libretrace.dylib', 'rb') as f:
+              data = f.read()
+          # find the section via otool-like parsing
+          # Magic + Mach-O header
+          if data[:4] == b'\xcf\xfa\xed\xfe':
+              print("64-bit Mach-O")
+              ncmds = struct.unpack('<I', data[16:20])[0]
+              offset = 32  # Mach-O 64 header size
+              for _ in range(ncmds):
+                  cmd, cmdsize = struct.unpack('<II', data[offset:offset+8])
+                  if cmd == 0x19:  # LC_SEGMENT_64
+                      segname = data[offset+8:offset+24].rstrip(b'\0').decode()
+                      nsects = struct.unpack('<I', data[offset+64:offset+68])[0]
+                      sect_offset = offset + 72
+                      for s in range(nsects):
+                          sect = data[sect_offset:sect_offset+80]
+                          sectname = sect[:16].rstrip(b'\0').decode()
+                          sectsegname = sect[16:32].rstrip(b'\0').decode()
+                          if sectname == '__retrace_rimpls':
+                              addr = struct.unpack('<Q', sect[32:40])[0]
+                              size = struct.unpack('<Q', sect[40:48])[0]
+                              fileoff = struct.unpack('<I', sect[48:52])[0]
+                              print(f"Section __retrace_rimpls: addr=0x{addr:x} size={size} fileoff={fileoff}")
+                              # Read entries
+                              sect_data = data[fileoff:fileoff+min(size, 144*3)]
+                              for i in range(0, min(len(sect_data), 144*3), 72):
+                                  entry = sect_data[i:i+72]
+                                  name = entry[:64].rstrip(b'\0').decode(errors='replace')
+                                  ptr = struct.unpack('<Q', entry[64:72])[0] if len(entry) >= 72 else 0
+                                  print(f"  [{i//72}] name='{name}' ptr=0x{ptr:x}")
+                              break
+                      sect_offset += 80
+                  offset += cmdsize
+          PY
