@@ -14,36 +14,45 @@ jobs:
         run: cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
       - name: Build
         run: cmake --build build
-      - name: Run test/printf under lldb to get crash backtrace
+      - name: Dump __retrace_rimpls section
+        run: |
+          echo "=== section info ==="
+          otool -l build/src/v2/libretrace.dylib 2>&1 | grep -A 5 "__retrace_rimpls" | head -15
+          echo "=== section contents (first 256 bytes) ==="
+          # Find file offset of __retrace_rimpls
+          python3 -c "
+          import struct
+          with open('build/src/v2/libretrace.dylib', 'rb') as f:
+              data = f.read()
+          # Find the section name string
+          marker = b'__retrace_rimpls'
+          idx = data.find(marker)
+          print(f'__retrace_rimpls marker at offset {hex(idx)}')
+          # Print context
+          print('Context:', data[idx-32:idx+64])
+          "
+          echo "=== nm printf in libretrace.dylib ==="
+          nm -m build/src/v2/libretrace.dylib 2>&1 | grep -E "printf\b|_printf$|_printf " | head
+      - name: Print retrace_real_impls state at deinit
         run: |
           cat > /tmp/lldb.txt <<'LLDB'
           settings set target.env-vars DYLD_INSERT_LIBRARIES=/Users/runner/work/retrace/retrace/build/src/v2/libretrace.dylib
+          break set -n retrace_logger_deinit
           process launch
           bt
-          bt all
-          register read
+          frame variable
+          expr retrace_real_impls.printf
+          expr retrace_real_impls.malloc
+          expr retrace_real_impls.fprintf
+          expr retrace_real_impls.fflush
           LLDB
-          lldb --batch -s /tmp/lldb.txt build/test/printf 2>&1 | tail -100 || true
-      - name: Run test/id (simpler) under lldb
+          lldb --batch -s /tmp/lldb.txt build/test/printf 2>&1 | tail -40 || true
+      - name: Print init at each step
         run: |
           cat > /tmp/lldb2.txt <<'LLDB'
           settings set target.env-vars DYLD_INSERT_LIBRARIES=/Users/runner/work/retrace/retrace/build/src/v2/libretrace.dylib
+          break set -n retrace_real_impls_init
           process launch
-          bt
-          register read
+          expr retrace_real_impls.printf
           LLDB
-          lldb --batch -s /tmp/lldb2.txt build/test/id 2>&1 | tail -60 || true
-      - name: Disassemble printf_retrace_wrapper
-        run: |
-          echo "=== symbols in libretrace.dylib ==="
-          nm -m build/src/v2/libretrace.dylib 2>&1 | grep -E "printf|__retrace_rimpls|___interpose|interpose" | head -30
-          echo "=== printf_retrace_wrapper via gdb-style disasm ==="
-          lldb --batch -o "image lookup -s _printf_retrace_wrapper" -o "quit" build/src/v2/libretrace.dylib 2>&1 | tail -10
-      - name: Test without retrace (baseline)
-        run: |
-          echo "=== baseline test/printf ==="
-          build/test/printf 2>&1 | head -10
-          echo "rc=$?"
-          echo "=== baseline test/id ==="
-          build/test/id
-          echo "rc=$?"
+          lldb --batch -s /tmp/lldb2.txt build/test/printf 2>&1 | tail -20 || true
