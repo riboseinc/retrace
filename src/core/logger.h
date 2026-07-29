@@ -49,6 +49,15 @@ void retrace_loger_update_config(void);
 void retrace_logger_log(int module, int sev, const char *fmt, ...);
 void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value);
 
+/*
+ * Per-function log filter. Returns 1 if log_params should emit a JSON
+ * entry for `func_name`, 0 if the caller asked to suppress it via the
+ * RETRACE_LOGGER_ALLOWED_FUNCS / RETRACE_LOGGER_EXCLUDED_FUNCS env
+ * vars. Cheap (O(n) walk of a short comma-separated list parsed once
+ * at init). Issue #486.
+ */
+int retrace_logger_func_loggable(const char *func_name);
+
 #define log_err(fmt, ...) \
 	retrace_logger_log(FUNCS, SEVERITY_ERROR, fmt, ##__VA_ARGS__)
 

@@ -31,10 +31,43 @@
 #include "logger.h"
 #include "real_impls.h"
 
+/*
+ * MAXLEN_FUNC_NAME from funcs.h is 64. Don't include funcs.h here -- it
+ * pulls in section macros that conflict with real_impls.h on Darwin.
+ */
+#define LOGGER_MAXLEN_FUNC_NAME 64
+
 #define ENVAR_LOGGER_DEF_ENA "RETRACE_LOGGER_DEF_ENA"
 #define ENVAR_LOGGER_DEF_DECOR_ENA "RETRACE_LOGGER_DEF_DECOR_ENA"
 #define ENVAR_LOGGER_DEF_STDOUT_ENA "RETRACE_LOGGER_DEF_STDOUT_ENA"
 #define ENVAR_LOGGER_DEF_FN "RETRACE_LOGGER_DEF_FN"
+
+/*
+ * Per-function log filter env vars (issue #486):
+ *
+ *   RETRACE_LOGGER_ALLOWED_FUNCS=malloc,free,read
+ *     Comma-separated allowlist. Only matching functions get logged
+ *     by log_params. Other functions still go through retrace (real
+ *     call runs) but emit no JSON entry.
+ *
+ *   RETRACE_LOGGER_EXCLUDED_FUNCS=printf
+ *     Comma-separated denylist. Matching functions skip logging.
+ *
+ * Both can be combined: allowlist first, denylist removes from it.
+ * If ALLOWED is unset, all functions are allowed by default; EXCLUDED
+ * then optionally removes some.
+ *
+ * Names match exactly (no globbing). 64 functions max per list --
+ * enough for any realistic filter.
+ */
+#define ENVAR_LOGGER_ALLOWED_FUNCS "RETRACE_LOGGER_ALLOWED_FUNCS"
+#define ENVAR_LOGGER_EXCLUDED_FUNCS "RETRACE_LOGGER_EXCLUDED_FUNCS"
+#define LOGGER_FUNC_FILTER_MAX 64
+
+struct LoggerFuncFilter {
+	char names[LOGGER_FUNC_FILTER_MAX][LOGGER_MAXLEN_FUNC_NAME + 1];
+	int count;
+};
 
 static struct LoggerConfig
 {
@@ -84,6 +117,86 @@ static char *g_retrace_severities[SEVERITY_CNT] = {"DEBUG",
 
 static int g_first_json;
 static pthread_mutex_t g_logger_mtx;
+
+/* Per-function log filter, populated from env at logger_init. */
+static struct LoggerFuncFilter g_logger_allowed_funcs;
+static struct LoggerFuncFilter g_logger_excluded_funcs;
+
+/*
+ * Parse a comma-separated env var (e.g. "malloc,free,read") into the
+ * filter. Truncates names > LOGGER_MAXLEN_FUNC_NAME. Stops at
+ * LOGGER_FUNC_FILTER_MAX entries.
+ */
+static void logger_parse_func_filter(const char *env_name,
+				     struct LoggerFuncFilter *filter)
+{
+	const char *p;
+	const char *start;
+	char *env_val;
+
+	env_val = retrace_real_impls.getenv(env_name);
+	if (env_val == NULL)
+		return;
+
+	filter->count = 0;
+	p = env_val;
+	start = env_val;
+
+	while (1) {
+		if (*p == ',' || *p == '\0') {
+			size_t len = (size_t)(p - start);
+
+			if (len > 0 && filter->count < LOGGER_FUNC_FILTER_MAX) {
+				if (len > LOGGER_MAXLEN_FUNC_NAME)
+					len = LOGGER_MAXLEN_FUNC_NAME;
+				retrace_real_impls.strcpy(
+					filter->names[filter->count],
+					"");
+				/* strncpy not in real_impls; manual truncation. */
+				{
+					size_t k;
+
+					for (k = 0; k < len; k++)
+						filter->names[filter->count][k] =
+							start[k];
+					filter->names[filter->count][len] = '\0';
+				}
+				filter->count++;
+			}
+			if (*p == '\0')
+				break;
+			start = p + 1;
+		}
+		p++;
+	}
+}
+
+static int logger_filter_contains(const struct LoggerFuncFilter *filter,
+				  const char *name)
+{
+	int i;
+
+	for (i = 0; i < filter->count; i++) {
+		if (!retrace_real_impls.strcmp(filter->names[i], name))
+			return 1;
+	}
+
+	return 0;
+}
+
+int retrace_logger_func_loggable(const char *func_name)
+{
+	/* If the allowlist is set and func isn't in it, suppress. */
+	if (g_logger_allowed_funcs.count > 0 &&
+	    !logger_filter_contains(&g_logger_allowed_funcs, func_name))
+		return 0;
+
+	/* If the denylist contains func, suppress. */
+	if (logger_filter_contains(&g_logger_excluded_funcs, func_name))
+		return 0;
+
+	return 1;
+}
 
 void retrace_logger_deinit(void)
 {
@@ -148,6 +261,12 @@ int retrace_logger_init(void)
 	if (env_val != NULL)
 		g_logger_config.logfile =
 			retrace_real_impls.fopen(env_val, "a");
+
+	/* parse per-function filter env vars */
+	logger_parse_func_filter(ENVAR_LOGGER_ALLOWED_FUNCS,
+		&g_logger_allowed_funcs);
+	logger_parse_func_filter(ENVAR_LOGGER_EXCLUDED_FUNCS,
+		&g_logger_excluded_funcs);
 
 	/* experimental JSON, make array of log messages */
 	if (g_logger_config.ena &&
