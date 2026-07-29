@@ -67,17 +67,15 @@ failed_tests=""
 
 # Tests known to fail on specific OSes (skip on those).
 #   dlopen  — segfaults on Linux/glibc (malloc path inside dlopen;
-#             tracked in follow-up to #445).
+#             tracked in follow-up to #445, see #450 for current
+#             investigation state).
 #   writev  — non-zero rc on macOS (probably writes data that fails).
-# All v2 tests fail on macOS x86_64 (Intel) due to a separate mach-O
-# x86_64 backend issue. Skip the whole runner on that platform until
-# debugged.
+# macOS Intel v2 was previously skipped entirely (issue #452) due to
+# a destructor NULL-deref in retrace_logger_deinit. That's fixed
+# defensively now, so Intel runs the full test set.
 should_skip() {
     case "$(uname -s)" in
     Darwin)
-        case "$(uname -m)" in
-        x86_64) return 0 ;;   # skip all on Intel macOS
-        esac
         case "$1" in
         writev) return 0 ;;
         esac

@@ -91,12 +91,22 @@ void retrace_logger_deinit(void)
 	if (g_logger_config.ena &&
 		(g_logger_config.stdout_ena || g_logger_config.logfile)) {
 
-		if (g_logger_config.stdout_ena) {
+		/*
+		 * Defensive: on some platforms retrace_real_impls may not be
+		 * fully populated when the destructor runs (issue #452 on
+		 * macOS Intel). Skip the closing "]\n" rather than crash on
+		 * a NULL function pointer; the log is already flushed.
+		 */
+		if (g_logger_config.stdout_ena &&
+			retrace_real_impls.printf &&
+			retrace_real_impls.fflush) {
 			retrace_real_impls.printf("]\n");
 			retrace_real_impls.fflush(stdout);
 		}
 
-		if (g_logger_config.logfile != NULL) {
+		if (g_logger_config.logfile != NULL &&
+			retrace_real_impls.fprintf &&
+			retrace_real_impls.fflush) {
 			retrace_real_impls.fprintf(g_logger_config.logfile, "]\n");
 			retrace_real_impls.fflush(g_logger_config.logfile);
 		}
