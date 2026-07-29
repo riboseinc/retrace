@@ -240,13 +240,18 @@ WRAPPER_ENTRY_SYSTEM_V writev
 WRAPPER_ENTRY_SYSTEM_V readv
 
 #dlfcn
-/* dlopen, dlerror, dlclose, dlsym are intentionally NOT intercepted.
- * The engine's real-impl resolver (retrace_as_get_real_safe) uses
- * dlsym(RTLD_NEXT, ...) as the fallback when _dl_sym (GLIBC_PRIVATE)
- * is unavailable on glibc >= 2.34. Intercepting any of these causes
- * recursion inside the constructor before retrace_inited is set.
- * Additionally, dlopen/dlclose are used internally by libc and the
- * dynamic linker; intercepting them destabilizes the host process. */
+/* dlopen/dlclose ARE intercepted on Linux so the engine's reentrance
+ * guard (thread_ctx->real_impl != NULL) catches their internal
+ * malloc/calloc/free calls. Without this, dlopen's internal malloc
+ * fires our wrapper with no outer interception, the engine processes
+ * it fully, and libc's internal state gets corrupted (issue #450).
+ *
+ * dlsym/dlerror stay un-intercepted: dlsym is called during our own
+ * constructor via retrace_as_get_real_safe, and intercepting it
+ * would cause infinite recursion.
+ */
+WRAPPER_ENTRY_SYSTEM_V dlopen
+WRAPPER_ENTRY_SYSTEM_V dlclose
 
 #pthreads
 WRAPPER_ENTRY_SYSTEM_V pthread_attr_destroy

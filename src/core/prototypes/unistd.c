@@ -26,6 +26,41 @@
 
 retrace_func_define_prototypes(unistd) = {
 	{
+		.name = "dlopen",
+		.conv = CC_SYSTEM_V,
+		.type_name = "ptr",
+		.params_cnt = 2,
+		.params = {
+			{
+				.name = "filename",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "flags",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "dlclose",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 1,
+		.params = {
+			{
+				.name = "handle",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
 		.name = "access",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",
