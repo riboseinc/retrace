@@ -92,6 +92,9 @@ int retrace_real_impls_init(void)
 	if (retrace_real_impls.dlsym == NULL)
 		return -9;
 
+	retrace_real_impls.dlclose = retrace_as_get_real_safe("dlclose");
+	/* dlclose may be NULL on some platforms; not fatal */
+
 	retrace_real_impls.memset = retrace_as_get_real_safe("memset");
 	if (retrace_real_impls.memset == NULL)
 		return -10;

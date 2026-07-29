@@ -11,6 +11,14 @@ set(_core_sources
 	engine.c        funcs.c         actions.c      data_types.c
 	real_impls.c    logger.c        main.c         as_call_real.c)
 
+# dlopen_guard.c is Linux-only: it exports dlopen/dlclose/dlsym/dlerror
+# as global symbols for LD_PRELOAD interposition. On macOS these symbols
+# cause dyld init issues. On macOS the guard functions are still declared
+# (in engine.h) but always return 0 (no-op).
+if(RETRACE_PLATFORM_LINUX)
+	list(APPEND _core_sources dlopen_guard.c)
+endif()
+
 set(_core_prototype_sources
 	prototypes/locale.c prototypes/ctype.c  prototypes/signal.c
 	prototypes/stdio.c  prototypes/stdlib.c prototypes/uio.c
