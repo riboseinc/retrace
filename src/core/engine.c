@@ -197,14 +197,6 @@ void retrace_engine_wrapper(char *func_name,
 	 */
 	real_impl = retrace_as_get_real_safe(func_name);
 	if (!retrace_inited) {
-		/* This can happen if constructor was not
-		 * called yet or it failed to initialize
-		 * retrace module. For example, on FreeBSD, getenv()
-		 * gets called before the constructor.
-		 * All we can do is to call the real implementation.
-		 *
-		 */
-
 		retrace_as_sched_real(arch_spec_ctx, real_impl);
 		return;
 	}

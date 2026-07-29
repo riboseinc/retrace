@@ -53,6 +53,13 @@ struct ThreadContext {
 
 extern int retrace_inited;
 
+/*
+ * dlopen reentrance guard (issue #450). Returns 1 while the current
+ * thread is inside a dlopen/dlclose/dlsym/dlerror call. The engine
+ * skips action processing while this is active.
+ */
+int retrace_dlopen_guard_active(void);
+
 /* not thread safe */
 int retrace_engine_init(void);
 

@@ -91,6 +91,7 @@ struct RetraceRealImpls {
 
 	void *(*dlopen)(const char *filename, int flag);
 	void *(*dlsym)(void *handle, const char *symbol);
+	int (*dlclose)(void *handle);
 
 	/* Field names prefixed with `real_` because macOS <stdio.h>
 	 * macro-substitutes the bare names (sprintf -> __builtin___sprintf_chk).
