@@ -15,7 +15,8 @@ set(_core_prototype_sources
 	prototypes/locale.c prototypes/ctype.c  prototypes/signal.c
 	prototypes/stdio.c  prototypes/stdlib.c prototypes/uio.c
 	prototypes/unistd.c prototypes/dirent.c
-	prototypes/string.c)
+	prototypes/string.c
+	prototypes/pthread.c)
 
 set(_core_action_sources
 	actions/basic.c actions/memfuzz.c)
