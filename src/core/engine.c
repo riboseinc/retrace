@@ -253,6 +253,17 @@ void retrace_engine_wrapper(char *func_name,
 		goto clean_up;
 	}
 
+	/*
+	 * Per-function log filter (issue #486). If the user excluded
+	 * this function (or didn't include it in the allowlist), skip
+	 * all action processing. The real call still runs via
+	 * call_real_flag (already set by retrace_as_sched_real above).
+	 */
+	if (!retrace_logger_func_loggable(func_name)) {
+		log_dbg("func '%s' filtered -- skip actions", func_name);
+		goto clean_up;
+	}
+
 	/* setup params, do not proceed if failed since
 	 * it can be dangerous to call orig with partial params
 	 */
