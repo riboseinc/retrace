@@ -58,7 +58,9 @@ static inline void retrace_as_get_section_data(const char *seg_name,
 	*addr_ptr = NULL;
 
 	for (i = 0; i < _dyld_image_count(); i++) {
-		const struct mach_header *hdr = _dyld_get_image_header(i);
+		const struct mach_header_64 *hdr =
+			(const struct mach_header_64 *)
+				_dyld_get_image_header(i);
 		unsigned long sz = 0;
 		void *a = getsectiondata(hdr, seg_name, sec_name, &sz);
 
