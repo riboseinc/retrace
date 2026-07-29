@@ -353,6 +353,26 @@ int retrace_as_setup_params(
 
 	printf_params = as_ctx->printf_args_cnt;
 
+	/*
+	 * FP-detection bail: if any vararg is a float/double, our integer-only
+	 * dispatch can't place it in the correct register file (v0..v7 for
+	 * AAPCS64, xmm0..xmm7 for Sys V x86-64, caller stack for Apple
+	 * AArch64). Return 0 to make the engine skip action processing and
+	 * let the asm trampoline tail-call real with all original regs/stack
+	 * intact. The call works correctly; users lose log_params visibility
+	 * for that specific call. See TODO.complete/01-float-varargs-aarch64.md.
+	 */
+	for (i = 0; i < printf_params; i++) {
+		int basic = as_ctx->printf_args_types[i] & ~PA_FLAG_MASK;
+
+		if (basic == PA_FLOAT || basic == PA_DOUBLE) {
+			log_dbg(
+				"FP vararg in '%s' -- deferring to asm Path A",
+				proto->name);
+			return 0;
+		}
+	}
+
 	for (i = 0; i != printf_params; i++, param_idx++) {
 		dt = retrace_datatype_printf_to_dt(as_ctx->printf_args_types[i]);
 
