@@ -14,53 +14,19 @@ jobs:
         run: cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
       - name: Build
         run: cmake --build build
-      - name: Run test/id under lldb
+      - name: Run test/id
         run: |
-          cat > /tmp/lldb.txt <<'LLDB'
-          settings set target.env-vars DYLD_INSERT_LIBRARIES=/Users/runner/work/retrace/retrace/build/src/v2/libretrace.dylib
-          break set -n retrace_real_impls_init
-          break set -n retrace_logger_deinit
-          process launch
-          bt
-          continue
-          bt
-          continue
-          bt
-          LLDB
-          lldb --batch -s /tmp/lldb.txt build/test/id 2>&1 | tail -80 || true
-      - name: Verify section access works
+          set +e
+          DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib build/test/id > /tmp/out 2> /tmp/err
+          rc=$?
+          echo "rc=$rc"
+          echo "stdout:"; head -3 /tmp/out
+          echo "stderr:"; head -3 /tmp/err
+      - name: Run test/printf
         run: |
-          cat > /tmp/cmp.c <<'C'
-          #include <stdio.h>
-          #include <string.h>
-          #include <mach-o/getsect.h>
-          #include <mach-o/dyld.h>
-          
-          int main(void) {
-              for (uint32_t i = 0; i < _dyld_image_count(); i++) {
-                  const char *name = _dyld_get_image_name(i);
-                  if (strstr(name, "libretrace")) {
-                      printf("libretrace at idx %u\n", i);
-                      const struct mach_header_64 *hdr = (const struct mach_header_64 *)_dyld_get_image_header(i);
-                      unsigned long size = 0;
-                      void *addr = getsectiondata(hdr, "__DATA", "__retrace_rimpls", &size);
-                      printf("getsectiondata: addr=%p size=%lu\n", addr, size);
-                      if (addr && size > 0) {
-                          struct entry { char name[64]; void *real_impl; } *p = addr;
-                          for (unsigned long j = 0; j < size/72; j++) {
-                              if (strcmp(p[j].name, "printf") == 0) {
-                                  printf("FOUND printf at idx %lu: real_impl=%p\n", j, p[j].real_impl);
-                              }
-                          }
-                      }
-                      break;
-                  }
-              }
-              return 0;
-          }
-          C
-          gcc -o /tmp/cmp /tmp/cmp.c
-          echo "=== WITHOUT LD_PRELOAD ==="
-          /tmp/cmp
-          echo "=== WITH LD_PRELOAD ==="
-          DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib /tmp/cmp 2>&1 | head -10 || true
+          set +e
+          DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib build/test/printf > /tmp/out 2> /tmp/err
+          rc=$?
+          echo "rc=$rc"
+          echo "stdout:"; head -10 /tmp/out
+          echo "stderr:"; head -3 /tmp/err
