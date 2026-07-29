@@ -1,0 +1,66 @@
+name: macOS Intel debug
+on:
+  push:
+    branches: [ fix/macos-intel-debug ]
+
+jobs:
+  intel-debug:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: brew install cmake ninja openssl@3
+      - name: Configure
+        run: cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+      - name: Build
+        run: cmake --build build
+      - name: Inspect libretrace.dylib
+        run: |
+          echo "=== file ==="
+          file build/src/v2/libretrace.dylib
+          echo "=== nm malloc ==="
+          nm -m build/src/v2/libretrace.dylib 2>&1 | grep -E "malloc|__retrace_rimpls" | head -10
+          echo "=== size ==="
+          ls -la build/src/v2/libretrace.dylib
+      - name: Run id under DYLD_INSERT_LIBRARIES (no logger)
+        run: |
+          set +e
+          DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib /bin/id > /tmp/out 2> /tmp/err
+          rc=$?
+          echo "rc=$rc"
+          echo "stdout:"; cat /tmp/out
+          echo "stderr:"; cat /tmp/err
+      - name: Crash info via lldb
+        run: |
+          cat > /tmp/lldb.txt <<'LLDB'
+          settings set target.env-vars DYLD_INSERT_LIBRARIES=/Users/runner/work/retrace/retrace/build/src/v2/libretrace.dylib
+          process launch --stop-at-entry
+          bt all
+          register read
+          LLDB
+          lldb --batch -s /tmp/lldb.txt build/test/id 2>&1 | tail -80 || true
+      - name: Run test/printf with crash report
+        run: |
+          set +e
+          DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib build/test/printf > /tmp/p_out 2> /tmp/p_err
+          rc=$?
+          echo "rc=$rc"
+          echo "stdout last 5:"; tail -5 /tmp/p_out
+          echo "stderr:"; cat /tmp/p_err
+          echo "--- run with dtruss ---"
+          sudo dtruss -f DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib build/test/id 2>&1 | tail -30 || true
+      - name: Check printf wrapper disasm
+        run: |
+          objdump -d build/src/v2/libretrace.dylib 2>&1 | grep -A 30 "_printf_retrace_wrapper:" | head -35
+          echo "=== _main disasm of test/id ==="
+          objdump -d build/test/id 2>&1 | grep -B 1 -A 1 "printf\|__stack_chk" | head -20
+      - name: Where in init does it crash
+        run: |
+          cat > /tmp/lldb2.txt <<'LLDB'
+          break set -n retrace_main
+          break set -n retrace_real_impls_init
+          break set -n retrace_as_get_real_safe
+          settings set target.env-vars DYLD_INSERT_LIBRARIES=/Users/runner/work/retrace/retrace/build/src/v2/libretrace.dylib
+          run
+          LLDB
+          lldb --batch -s /tmp/lldb2.txt build/test/id 2>&1 | tail -100 || true
