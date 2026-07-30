@@ -42,8 +42,6 @@
 #include "script_resolver.h"
 #include "action_runner.h"
 
-int retrace_inited;
-
 /*
  * The central dispatch entry point invoked by every per-arch asm
  * trampoline. Responsibilities, in strict order:
