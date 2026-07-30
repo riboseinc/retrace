@@ -145,25 +145,61 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
       # ----- Smoke tests (POSIX only — no LD_PRELOAD on Windows) -----
-      # Best-effort: skipped if the v2 library wasn't produced.
-      # The CMake target is `retrace_v2` for historical reasons but the
-      # output library is `libretrace.{so,dylib}` (Phase 9 / ADR-0011).
-      # Uses /usr/bin/id (works on both Linux and macOS; /bin/id does
-      # not exist on newer macOS).
+      # Two-step verification:
+      #   1. Load: library loads cleanly under LD_PRELOAD/DYLD_INSERT_LIBRARIES.
+      #   2. Intercept: a config that flips observable behavior actually
+      #      takes effect. This catches regressions where the library
+      #      loads but doesn't intercept (issue #504 — SIP hides this
+      #      on macOS if we only check the load step).
       - name: Smoke test v2 (POSIX)
         if: runner.os != 'Windows'
         continue-on-error: true
         env:
           RETRACE_LOGGER_DEF_STDOUT_ENA: "0"
         run: |
+          set -e
           ext="${{ runner.os == 'Linux' && 'so' || 'dylib' }}"
           lib="build/src/v2/libretrace.$ext"
           [ -f "$lib" ] || { echo "v2 library missing; skipping"; exit 0; }
+
+          # Build a tiny test target that calls getuid().
+          cat > /tmp/smoke_getuid.c <<'EOFC'
+          #include <unistd.h>
+          #include <stdio.h>
+          int main(void) { printf("uid=%d\n", getuid()); return 0; }
+          EOFC
+          cc /tmp/smoke_getuid.c -o /tmp/smoke_getuid
+
+          # Step 1: load the library; the binary should still run.
           if [ "${{ runner.os }}" = "Linux" ]; then
-            LD_PRELOAD="$(pwd)/$lib" /usr/bin/id
+            PRELOAD_ENV="LD_PRELOAD=$(pwd)/$lib"
           else
-            DYLD_INSERT_LIBRARIES="$(pwd)/$lib" /usr/bin/id
+            PRELOAD_ENV="DYLD_INSERT_LIBRARIES=$(pwd)/$lib"
           fi
+          env $PRELOAD_ENV /tmp/smoke_getuid >/dev/null
+
+          # Step 2: redirect getuid() to 0 via JSON config; verify the
+          # output changes from the real uid to "uid=0".
+          cat > /tmp/smoke_redirect.json <<'EOFC'
+          {
+            "intercept_scripts": [
+              {
+                "func_name": "getuid",
+                "actions": [
+                  { "action_name": "call_real" },
+                  { "action_name": "modify_return_value_int",
+                    "action_params": { "retval_int": 0 } }
+                ]
+              }
+            ]
+          }
+          EOFC
+          out=$(env $PRELOAD_ENV RETRACE_JSON_CONFIG=/tmp/smoke_redirect.json /tmp/smoke_getuid)
+          echo "intercepted output: $out"
+          case "$out" in
+            *uid=0*) echo "interception verified";;
+            *) echo "ERROR: getuid() was not intercepted"; exit 1;;
+          esac
 
   # ----- Coverage as a separate job in the same workflow -----
   # Best-effort: ctest runs runtests.sh which assumes `retrace` is in PATH.
