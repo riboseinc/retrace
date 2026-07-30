@@ -23,37 +23,54 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ARCH_SPEC_MACROS_H_
-#define ARCH_SPEC_MACROS_H_
-
-#include "macho_sections.h"
-
-#define retrace_as_define_var_in_sec(type, name, seg_name, sec_name) \
-	static type name __attribute__((used, section(seg_name","sec_name)))
-
 /*
- * Section bounds lookup.
+ * Section-bounds lookup for Mach-O backends.
  *
- * Primary path: section$start / section$end magic linker symbols
- * (works on Apple Silicon; returns size=0 on Intel — issue #479).
+ * The previous implementation used the magic linker symbols
+ * section$start$__DATA$__SEC / section$end$__DATA$__SEC via __asm().
+ * That works on Apple Silicon but returns size=0 on Intel macOS,
+ * causing retrace_real_impls_init to silently fail (issue #479).
  *
- * Fallback path: getsectiondata() iteration over loaded images.
- * Required for Intel macOS; inert on Apple Silicon where the primary
- * path already succeeds.
+ * The supported replacement is getsectiondata(), which has been
+ * available since macOS 10.6 (well below our 10.12 minimum) and
+ * works identically on Intel and Apple Silicon. We iterate every
+ * loaded image because retrace itself is loaded via
+ * DYLD_INSERT_LIBRARIES and is not necessarily image[0].
  */
-#define retrace_as_get_section_info(seg_name, sec_name, addr_ptr, size_ptr) \
-do { \
-	extern char start_mysection \
-		__asm("section$start$"seg_name"$"sec_name); \
-	extern char stop_mysection \
-		__asm("section$end$"seg_name"$"sec_name); \
-\
-	*(size_ptr) = (&stop_mysection) - (&start_mysection); \
-	*(addr_ptr) = (void *)&start_mysection; \
-\
-	if (*(size_ptr) == 0) \
-		retrace_macho_get_section((seg_name), (sec_name), \
-					  (void **)(addr_ptr), (size_ptr)); \
-} while (0)
+#ifndef PRELOAD_MACHO_MACHO_SECTIONS_H_
+#define PRELOAD_MACHO_MACHO_SECTIONS_H_
+
+#include <mach-o/getsect.h>
+#include <mach-o/dyld.h>
+
+static inline void
+retrace_macho_get_section(const char *seg_name, const char *sec_name,
+			  void **addr_ptr, unsigned long *size_ptr)
+{
+	uint32_t i;
+	uint32_t count;
+
+	*size_ptr = 0;
+	*addr_ptr = NULL;
+
+	count = _dyld_image_count();
+	for (i = 0; i < count; i++) {
+		const struct mach_header_64 *hdr;
+		unsigned long sz = 0;
+		void *a;
+
+		hdr = (const struct mach_header_64 *)
+			_dyld_get_image_header(i);
+		if (hdr == NULL)
+			continue;
+
+		a = getsectiondata(hdr, seg_name, sec_name, &sz);
+		if (a != NULL && sz > 0) {
+			*addr_ptr = a;
+			*size_ptr = sz;
+			return;
+		}
+	}
+}
 
 #endif
