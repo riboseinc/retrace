@@ -32,182 +32,113 @@
 
 #include "real_impls.h"
 #include "arch_spec.h"
+#include "logger.h"
 
 struct RetraceRealImpls retrace_real_impls;
+
+/*
+ * Each entry maps a libc symbol name to its slot in retrace_real_impls.
+ * `required` mirrors the original semantics: if the lookup returns NULL
+ * for a required entry, init fails with `-(idx + 1)`. Non-required
+ * entries (e.g. dlclose on platforms that lack it) leave the slot NULL.
+ *
+ * Adding a new libc function = appending one row to this table; no
+ * engine code changes.
+ */
+struct real_impl_init_entry {
+	const char *name;
+	void **slot;
+	int required;
+};
+
+#define SLOT(field) .slot = (void **)&retrace_real_impls.field
+
+static const struct real_impl_init_entry init_table[] = {
+	{SLOT(dlopen),                 .name = "dlopen"},
+	{SLOT(pthread_key_create),     .name = "pthread_key_create",     .required = 1},
+	{SLOT(pthread_getspecific),    .name = "pthread_getspecific",    .required = 1},
+	{SLOT(pthread_setspecific),    .name = "pthread_setspecific",    .required = 1},
+	{SLOT(pthread_key_delete),     .name = "pthread_key_delete",     .required = 1},
+	{SLOT(free),                   .name = "free",                   .required = 1},
+	{SLOT(malloc),                 .name = "malloc",                 .required = 1},
+	{SLOT(dlsym),                  .name = "dlsym",                  .required = 1},
+	{SLOT(dlclose),                .name = "dlclose"},
+	{SLOT(memset),                 .name = "memset",                 .required = 1},
+	{SLOT(memcpy),                 .name = "memcpy",                 .required = 1},
+	{SLOT(strncmp),                .name = "strncmp",                .required = 1},
+	{SLOT(strcmp),                 .name = "strcmp",                 .required = 1},
+	{SLOT(strlen),                 .name = "strlen",                 .required = 1},
+	{SLOT(strcpy),                 .name = "strcpy",                 .required = 1},
+	{SLOT(atoi),                   .name = "atoi",                   .required = 1},
+	{SLOT(real_sprintf),           .name = "sprintf",                .required = 1},
+	{SLOT(real_snprintf),          .name = "snprintf",               .required = 1},
+	{SLOT(getenv),                 .name = "getenv",                 .required = 1},
+	{SLOT(fopen),                  .name = "fopen",                  .required = 1},
+	{SLOT(fread),                  .name = "fread",                  .required = 1},
+	{SLOT(fseek),                  .name = "fseek",                  .required = 1},
+	{SLOT(ftell),                  .name = "ftell",                  .required = 1},
+	{SLOT(fclose),                 .name = "fclose",                 .required = 1},
+	{SLOT(printf),                 .name = "printf",                 .required = 1},
+	{SLOT(pthread_mutex_init),     .name = "pthread_mutex_init",     .required = 1},
+	{SLOT(pthread_mutex_lock),     .name = "pthread_mutex_lock",     .required = 1},
+	{SLOT(pthread_mutex_unlock),   .name = "pthread_mutex_unlock",   .required = 1},
+	{SLOT(real_vsnprintf),         .name = "vsnprintf",              .required = 1},
+	{SLOT(time),                   .name = "time",                   .required = 1},
+	{SLOT(localtime_r),            .name = "localtime_r",            .required = 1},
+	{SLOT(fprintf),                .name = "fprintf",                .required = 1},
+	{SLOT(fflush),                 .name = "fflush",                 .required = 1},
+	{SLOT(vprintf),                .name = "vprintf",                .required = 1},
+	{SLOT(ctime_r),                .name = "ctime_r",                .required = 1},
+};
 
 /* This should be the absolutely the first module to be inited */
 int retrace_real_impls_init(void)
 {
+	size_t i;
+	size_t table_size = sizeof(init_table) / sizeof(init_table[0]);
+	void *p;
+
+	/*
+	 * dlopen must resolve first: the Linux code path below needs it
+	 * to load libpthread.so.0 (glibc < 2.34). The table iteration
+	 * afterwards picks up the remaining symbols.
+	 */
 	retrace_real_impls.dlopen = retrace_as_get_real_safe("dlopen");
-	if (retrace_real_impls.dlopen == NULL)
+	if (retrace_real_impls.dlopen == NULL) {
+		log_err("missing required libc symbol 'dlopen'");
 		return -1;
+	}
 
 #ifdef __linux__
-	/* On glibc < 2.34, pthreads lived in a separate libpthread.so.0 that
-	 * the dynamic linker wouldn't load unless explicitly requested.
-	 * Loading it made pthread_key_create etc. resolvable via RTLD_NEXT.
-	 *
-	 * On glibc >= 2.34, libpthread is integrated into libc -- there's no
-	 * separate libpthread.so.0 to dlopen. The dlopen call returns NULL,
-	 * and that's fine: the symbols are already in libc. Don't fail init
-	 * in that case.
+	/*
+	 * On glibc < 2.34, pthreads lived in a separate libpthread.so.0
+	 * that the dynamic linker wouldn't load unless explicitly requested.
+	 * Loading it makes pthread_key_create etc. resolvable via RTLD_NEXT.
+	 * On glibc >= 2.34, libpthread is integrated into libc; this
+	 * dlopen returns NULL and that's fine.
 	 */
-	void *handle;
-
-	handle = retrace_real_impls.dlopen(
-			"libpthread.so.0", RTLD_NOW | RTLD_GLOBAL);
-	/* handle may be NULL on glibc >= 2.34 -- not an error. */
+	void *handle = retrace_real_impls.dlopen(
+		"libpthread.so.0", RTLD_NOW | RTLD_GLOBAL);
 	(void)handle;
 #endif
 
-	retrace_real_impls.pthread_key_create =
-		retrace_as_get_real_safe("pthread_key_create");
-	if (retrace_real_impls.pthread_key_create == NULL)
-		return -3;
+	for (i = 0; i < table_size; i++) {
+		/* dlopen already resolved above; skip it. */
+		if (init_table[i].slot == (void **)&retrace_real_impls.dlopen)
+			continue;
 
-	retrace_real_impls.pthread_getspecific =
-		retrace_as_get_real_safe("pthread_getspecific");
-	if (retrace_real_impls.pthread_getspecific == NULL)
-		return -4;
-
-	retrace_real_impls.pthread_setspecific =
-		retrace_as_get_real_safe("pthread_setspecific");
-	if (retrace_real_impls.pthread_setspecific == NULL)
-		return -5;
-
-	retrace_real_impls.pthread_key_delete
-		= retrace_as_get_real_safe("pthread_key_delete");
-	if (retrace_real_impls.pthread_key_delete == NULL)
-		return -6;
-
-	retrace_real_impls.free = retrace_as_get_real_safe("free");
-	if (retrace_real_impls.free == NULL)
-		return -7;
-
-	retrace_real_impls.malloc = retrace_as_get_real_safe("malloc");
-	if (retrace_real_impls.malloc == NULL)
-		return -8;
-
-	retrace_real_impls.dlsym = retrace_as_get_real_safe("dlsym");
-	if (retrace_real_impls.dlsym == NULL)
-		return -9;
-
-	retrace_real_impls.dlclose = retrace_as_get_real_safe("dlclose");
-	/* dlclose may be NULL on some platforms; not fatal */
-
-	retrace_real_impls.memset = retrace_as_get_real_safe("memset");
-	if (retrace_real_impls.memset == NULL)
-		return -10;
-
-	retrace_real_impls.memcpy = retrace_as_get_real_safe("memcpy");
-	if (retrace_real_impls.memcpy == NULL)
-		return -11;
-
-	retrace_real_impls.strncmp = retrace_as_get_real_safe("strncmp");
-	if (retrace_real_impls.strncmp == NULL)
-		return -12;
-
-	retrace_real_impls.strcmp = retrace_as_get_real_safe("strcmp");
-	if (retrace_real_impls.strcmp == NULL)
-		return -13;
-
-	retrace_real_impls.strlen = retrace_as_get_real_safe("strlen");
-	if (retrace_real_impls.strlen == NULL)
-		return -14;
-
-	retrace_real_impls.strcpy = retrace_as_get_real_safe("strcpy");
-	if (retrace_real_impls.strcpy == NULL)
-		return -15;
-
-	retrace_real_impls.atoi = retrace_as_get_real_safe("atoi");
-	if (retrace_real_impls.atoi == NULL)
-		return -16;
-
-	retrace_real_impls.real_sprintf = retrace_as_get_real_safe("sprintf");
-	if (retrace_real_impls.real_sprintf == NULL)
-		return -17;
-
-	retrace_real_impls.real_snprintf = retrace_as_get_real_safe("snprintf");
-	if (retrace_real_impls.real_snprintf == NULL)
-		return -18;
-
-	retrace_real_impls.getenv = retrace_as_get_real_safe("getenv");
-	if (retrace_real_impls.getenv == NULL)
-		return -19;
-
-	retrace_real_impls.fopen = retrace_as_get_real_safe("fopen");
-	if (retrace_real_impls.fopen == NULL)
-		return -20;
-
-	retrace_real_impls.fread = retrace_as_get_real_safe("fread");
-	if (retrace_real_impls.fread == NULL)
-		return -21;
-
-	retrace_real_impls.fseek = retrace_as_get_real_safe("fseek");
-	if (retrace_real_impls.fseek == NULL)
-		return -22;
-
-	retrace_real_impls.ftell = retrace_as_get_real_safe("ftell");
-	if (retrace_real_impls.ftell == NULL)
-		return -23;
-
-	retrace_real_impls.fclose = retrace_as_get_real_safe("fclose");
-	if (retrace_real_impls.fclose == NULL)
-		return -24;
-
-	retrace_real_impls.printf = retrace_as_get_real_safe("printf");
-	if (retrace_real_impls.printf == NULL)
-		return -25;
-
-	retrace_real_impls.pthread_mutex_init =
-		retrace_as_get_real_safe("pthread_mutex_init");
-	if (retrace_real_impls.pthread_mutex_init == NULL)
-		return -26;
-
-	retrace_real_impls.pthread_mutex_lock =
-		retrace_as_get_real_safe("pthread_mutex_lock");
-	if (retrace_real_impls.pthread_mutex_lock == NULL)
-		return -27;
-
-	retrace_real_impls.pthread_mutex_unlock =
-		retrace_as_get_real_safe("pthread_mutex_unlock");
-	if (retrace_real_impls.pthread_mutex_unlock == NULL)
-		return -28;
-
-	retrace_real_impls.real_vsnprintf =
-		retrace_as_get_real_safe("vsnprintf");
-	if (retrace_real_impls.real_vsnprintf == NULL)
-		return -29;
-
-	retrace_real_impls.time =
-		retrace_as_get_real_safe("time");
-	if (retrace_real_impls.time == NULL)
-		return -30;
-
-	retrace_real_impls.localtime_r =
-		retrace_as_get_real_safe("localtime_r");
-	if (retrace_real_impls.localtime_r == NULL)
-		return -31;
-
-	retrace_real_impls.fprintf =
-		retrace_as_get_real_safe("fprintf");
-	if (retrace_real_impls.fprintf == NULL)
-		return -32;
-
-	retrace_real_impls.fflush =
-		retrace_as_get_real_safe("fflush");
-	if (retrace_real_impls.fflush == NULL)
-		return -33;
-
-	retrace_real_impls.vprintf =
-		retrace_as_get_real_safe("vprintf");
-	if (retrace_real_impls.vprintf == NULL)
-		return -34;
-
-	retrace_real_impls.ctime_r =
-		retrace_as_get_real_safe("ctime_r");
-	if (retrace_real_impls.ctime_r == NULL)
-		return -35;
+		p = retrace_as_get_real_safe(init_table[i].name);
+		if (p == NULL) {
+			if (init_table[i].required) {
+				log_err("missing required libc symbol '%s'",
+					init_table[i].name);
+				return -((int)i + 1);
+			}
+			/* non-required: leave the slot NULL */
+			continue;
+		}
+		*init_table[i].slot = p;
+	}
 
 	return 0;
 }
