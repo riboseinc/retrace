@@ -11,9 +11,13 @@ if(RETRACE_PLATFORM_DARWIN)
 	if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
 		set(_unit_arch_include
 			${CMAKE_SOURCE_DIR}/src/backends/preload_macho/aarch64)
+		set(_unit_backend_include
+			${CMAKE_SOURCE_DIR}/src/backends/preload_macho)
 	else()
 		set(_unit_arch_include
 			${CMAKE_SOURCE_DIR}/src/backends/preload_macho/x86_64)
+		set(_unit_backend_include
+			${CMAKE_SOURCE_DIR}/src/backends/preload_macho)
 	endif()
 elseif(RETRACE_PLATFORM_LINUX)
 	if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
@@ -47,7 +51,8 @@ target_include_directories(retrace_test_registries PRIVATE
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/backends
     ${CMAKE_SOURCE_DIR}/src/config/json
-    ${_unit_arch_include})
+    ${_unit_arch_include}
+    ${_unit_backend_include})
 
 # Same feature-test macros as retrace_core
 if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
@@ -59,3 +64,20 @@ endif()
 add_test(NAME unit-test-registries
     COMMAND retrace_test_registries)
 set_tests_properties(unit-test-registries PROPERTIES LABELS "unit")
+
+#
+# parse_printf_format shim tests. The shim itself is a static inline
+# in src/core/printf_compat.h; the test renames it via macro so it
+# can be tested even on hosts that have a system parse_printf_format.
+#
+add_executable(retrace_test_printf_format test_printf_format.c)
+set_target_properties(retrace_test_printf_format PROPERTIES
+    OUTPUT_NAME test_printf_format
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_printf_format PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core)
+
+add_test(NAME unit-test-printf-format
+    COMMAND retrace_test_printf_format)
+set_tests_properties(unit-test-printf-format PROPERTIES LABELS "unit")

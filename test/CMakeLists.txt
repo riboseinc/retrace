@@ -80,3 +80,7 @@ add_test(NAME integration-runtests
 	WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 set_tests_properties(integration-runtests PROPERTIES
 	LABELS "integration;v2")
+
+# Unit tests for retrace_core internals. Links against the OBJECT
+# library so no LD_PRELOAD needed. Issue #481.
+add_subdirectory(unit)
