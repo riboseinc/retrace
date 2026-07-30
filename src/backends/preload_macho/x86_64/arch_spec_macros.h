@@ -26,9 +26,21 @@
 #ifndef ARCH_SPEC_MACROS_H_
 #define ARCH_SPEC_MACROS_H_
 
+#include "macho_sections.h"
+
 #define retrace_as_define_var_in_sec(type, name, seg_name, sec_name) \
 	static type name __attribute__((used, section(seg_name","sec_name)))
 
+/*
+ * Section bounds lookup.
+ *
+ * Primary path: section$start / section$end magic linker symbols
+ * (works on Apple Silicon; returns size=0 on Intel — issue #479).
+ *
+ * Fallback path: getsectiondata() iteration over loaded images.
+ * Required for Intel macOS; inert on Apple Silicon where the primary
+ * path already succeeds.
+ */
 #define retrace_as_get_section_info(seg_name, sec_name, addr_ptr, size_ptr) \
 do { \
 	extern char start_mysection \
@@ -36,8 +48,12 @@ do { \
 	extern char stop_mysection \
 		__asm("section$end$"seg_name"$"sec_name); \
 \
-	*size_ptr = (&stop_mysection)-(&start_mysection); \
-	*addr_ptr = (void *) &start_mysection; \
+	*(size_ptr) = (&stop_mysection) - (&start_mysection); \
+	*(addr_ptr) = (void *)&start_mysection; \
+\
+	if (*(size_ptr) == 0) \
+		retrace_macho_get_section((seg_name), (sec_name), \
+					  (void **)(addr_ptr), (size_ptr)); \
 } while (0)
 
 #endif
