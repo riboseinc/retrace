@@ -39,7 +39,7 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 |---|--------|-----------------|
 | 01 | [Trace every libc call](01-trace-all-calls.md) | The default; log every interceptable call as JSON. |
 | 02 | [Filter by function name](02-filter-by-function.md) | Use `RETRACE_LOGGER_ALLOWED_FUNCS` to focus on a handful of calls. |
-| 03 | [Count calls per function](03-count-calls.md) | Aggregate stats: which libc calls dominate your program. |
+| 03 | [Count calls per function](03-count-calls.md) | Aggregate stats: which libc calls dominate your program. *(planned)* |
 | 04 | [Time each call](04-time-each-call.md) | Find hot spots via `call_duration_us` in the log. |
 
 ### Redirection & mocking
@@ -48,7 +48,7 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 |---|--------|-----------------|
 | 05 | [Mock `getuid()` for root checks](05-mock-getuid.md) | Make a binary think it's root (or any uid). |
 | 06 | [Redirect `open()` paths](06-redirect-open.md) | Swap one file for another without touching the binary. |
-| 07 | [Redirect network connects](07-redirect-connect.md) | Point `connect()` at a different host/port. |
+| 07 | [Redirect network connects](07-redirect-connect.md) | Point `connect()` at a different host/port. *(planned)* |
 | 08 | [Mock `time()` for time-sensitive code](08-mock-time.md) | Freeze or shift time for replay / boundary tests. |
 
 ### Fuzzing & fault injection
@@ -58,7 +58,7 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 | 09 | [Fuzz `malloc` failures](09-fuzz-malloc.md) | Inject OOM into a target to test error paths. |
 | 10 | [Partial I/O (short reads/writes)](10-incomplete-io.md) | Make `read`/`write` return short to exercise retry logic. |
 | 11 | [Deterministic fuzzing seed](11-deterministic-fuzz.md) | Reproduce a fuzz run by pinning the RNG seed. |
-| 12 | [Fail specific syscalls](12-fail-specific.md) | Force `connect`/`open`/etc. to return an error code. |
+| 12 | [Fail specific syscalls](12-fail-specific.md) | Force `connect`/`open`/etc. to return an error code. *(planned)* |
 
 ### Security audit
 
@@ -73,7 +73,7 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 | # | Recipe | What it teaches |
 |---|--------|-----------------|
 | 16 | [Multi-function script](16-multi-script.md) | Compose actions across many functions in one config. |
-| 17 | [Per-return-address routing](17-return-addr-routing.md) | Different behavior for different call sites of the same function. |
+| 17 | [Per-return-address routing](17-return-addr-routing.md) | Different behavior for different call sites of the same function. *(planned)* |
 
 ## Action reference
 
