@@ -41,6 +41,7 @@
 
 .macro WRAPPER_ENTRY_SYSTEM_V func_name
 .section __TEXT, __text
+.global _\func_name\()_retrace_wrapper
 _\func_name\()_retrace_wrapper:
 
 # Build WrapperSystemVFrame from low to high. Push order is reverse:

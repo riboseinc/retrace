@@ -26,6 +26,7 @@
 #include <limits.h>
 #include <printf.h>
 #include <pthread.h>
+#include <dlfcn.h>
 
 #include "engine.h"
 #include "real_impls.h"
@@ -446,6 +447,7 @@ void *retrace_as_get_real_safe(const char *real_impl)
 {
 	unsigned long size;
 	int i;
+	void *fallback;
 
 	/* This has to be aligned with __retrace_rimpls entry emitted by
 	 * arch_spec_top.S: a MAXLEN_FUNC_NAME-wide name field followed by
@@ -470,5 +472,13 @@ void *retrace_as_get_real_safe(const char *real_impl)
 		p++;
 	}
 
-	return 0;
+	/*
+	 * Section-walk miss. On Intel macOS, ld64 silently drops the
+	 * `.quad _<name>` reference in __retrace_rimpls for some libc
+	 * symbols (malloc, realloc — issue #506). Fall back to
+	 * dlsym(RTLD_NEXT, ...). dlsym is NOT interposed by retrace
+	 * (no wrapper entry in funcs_symbols.S), so this is safe.
+	 */
+	fallback = dlsym(RTLD_NEXT, real_impl);
+	return fallback;
 }

@@ -156,14 +156,52 @@ jobs:
         env:
           RETRACE_LOGGER_DEF_STDOUT_ENA: "0"
         run: |
+          set -e
           ext="${{ runner.os == 'Linux' && 'so' || 'dylib' }}"
           lib="build/src/v2/libretrace.$ext"
           [ -f "$lib" ] || { echo "v2 library missing; skipping"; exit 0; }
+
+          # Build a tiny non-SIP binary that calls getuid().
+          cat > /tmp/smoke_getuid.c <<'EOFC'
+          #include <unistd.h>
+          #include <stdio.h>
+          int main(void) { printf("uid=%d\n", getuid()); return 0; }
+          EOFC
+          cc /tmp/smoke_getuid.c -o /tmp/smoke_getuid
+
           if [ "${{ runner.os }}" = "Linux" ]; then
-            LD_PRELOAD="$(pwd)/$lib" /usr/bin/id
+            PRELOAD_ENV="LD_PRELOAD=$(pwd)/$lib"
           else
-            DYLD_INSERT_LIBRARIES="$(pwd)/$lib" /usr/bin/id
+            PRELOAD_ENV="DYLD_INSERT_LIBRARIES=$(pwd)/$lib"
           fi
+
+          # Step 1: load — binary should still run.
+          env $PRELOAD_ENV /tmp/smoke_getuid >/dev/null
+
+          # Step 2: intercept — JSON config flips getuid() to 0; assert output.
+          cat > /tmp/smoke_redirect.json <<'EOFC'
+          {
+            "intercept_scripts": [
+              {
+                "func_name": "getuid",
+                "actions": [
+                  { "action_name": "log_params" },
+                  { "action_name": "call_real" },
+                  { "action_name": "modify_return_value_int",
+                    "action_params": { "retval_int": 0 } }
+                ]
+              }
+            ]
+          }
+          EOFC
+          out=$(env $PRELOAD_ENV RETRACE_JSON_CONFIG=/tmp/smoke_redirect.json /tmp/smoke_getuid 2>/tmp/smoke_stderr)
+          echo "intercepted output: $out"
+          echo "--- stderr from retrace ---"
+          head -10 /tmp/smoke_stderr
+          case "$out" in
+            *uid=0*) echo "interception verified";;
+            *) echo "ERROR: getuid() was not intercepted"; exit 1;;
+          esac
 
   # ----- Coverage as a separate job in the same workflow -----
   # Best-effort: ctest runs runtests.sh which assumes `retrace` is in PATH.
