@@ -1,0 +1,53 @@
+{
+  "intercept_scripts": [
+    {
+      "func_name": "fread",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "fwrite",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "fgets",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "read",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "write",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "send",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "recv",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}

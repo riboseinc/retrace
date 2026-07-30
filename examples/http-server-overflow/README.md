@@ -6,7 +6,25 @@ I included a sample http server (```http-server.c```) which runs as a single pro
 
 Disclaimer: this was written for macOS
 
-# Preparation
+## v2 JSON config
+
+`retrace.conf.json` logs every network call and applies a 10% failure
+rate to `read` calls (via `memory_fuzz`) so the server sees truncated
+or failed reads — useful for exercising its parser's error paths.
+
+```sh
+$ gcc http-server.c -o /tmp/http-server -Wall
+$ cp /usr/bin/curl /tmp/curl
+$ # Terminal 1: start the server under retrace
+$ RETRACE_JSON_CONFIG=retrace.conf.json \
+    LD_PRELOAD=../../build/src/v2/libretrace.so /tmp/http-server
+```
+
+For the historical v1 string-injection walkthrough that triggers a real
+buffer overflow in the sample server, see the archived section at the
+bottom of this file.
+
+## Preparation
 
 Compile http-server.c and copy curl to /tmp/ to bypass SIP
 

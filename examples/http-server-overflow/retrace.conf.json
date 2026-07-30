@@ -1,0 +1,47 @@
+{
+  "intercept_scripts": [
+    {
+      "func_name": "socket",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "bind",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "listen",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "accept",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "read",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" },
+        { "action_name": "memory_fuzz", "action_params": { "fail_rate": 0.1 } }
+      ]
+    },
+    {
+      "func_name": "write",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}
