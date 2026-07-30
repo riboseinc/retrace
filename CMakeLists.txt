@@ -342,10 +342,9 @@ elseif(RETRACE_PLATFORM_WINDOWS)
 	add_subdirectory(src/backends)
 endif()
 
-# CLI launcher — built unconditionally when v2 is built.
-# TODO: Phase 10 will add the new CLI binary.
+# CLI launcher -- native C binary replacing the v1 shell script (#485).
 if(RETRACE_BUILD_CLI)
-	# add_subdirectory(src/cli)
+	add_subdirectory(src/cli)
 endif()
 
 if(RETRACE_BUILD_TESTS)
