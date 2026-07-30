@@ -1,0 +1,18 @@
+{
+  "intercept_scripts": [
+    {
+      "func_name": "malloc",
+      "actions": [
+        { "action_name": "call_real" },
+        { "action_name": "memory_fuzz", "action_params": { "fail_rate": 0.1 } }
+      ]
+    },
+    {
+      "func_name": "getenv",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}

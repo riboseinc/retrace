@@ -1,0 +1,18 @@
+{
+  "intercept_scripts": [
+    {
+      "func_name": "getuid",
+      "actions": [
+        { "action_name": "call_real" },
+        { "action_name": "modify_return_value_int", "action_params": { "retval_int": 1337 } }
+      ]
+    },
+    {
+      "func_name": "geteuid",
+      "actions": [
+        { "action_name": "call_real" },
+        { "action_name": "modify_return_value_int", "action_params": { "retval_int": 1337 } }
+      ]
+    }
+  ]
+}

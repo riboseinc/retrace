@@ -1,0 +1,19 @@
+{
+  "intercept_scripts": [
+    {
+      "func_name": "getenv",
+      "actions": [
+        { "action_name": "log_params" },
+        {
+          "action_name": "modify_in_param_str",
+          "action_params": {
+            "param_name": "name",
+            "match_str": "FOOBAR",
+            "new_str": "PATH"
+          }
+        },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}
