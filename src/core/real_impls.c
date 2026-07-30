@@ -44,6 +44,12 @@ struct RetraceRealImpls retrace_real_impls;
  *
  * Adding a new libc function = appending one row to this table; no
  * engine code changes.
+ *
+ * NOTE: deliberately NOT `const`. The table holds pointers into
+ * retrace_real_impls, which require dynamic relocations at load
+ * time. A const table would land in .rodata, where some loaders
+ * (musl under qemu emulation, observed on OHOS) refuse to apply
+ * relocations — causing a segfault during the constructor.
  */
 struct real_impl_init_entry {
 	const char *name;
@@ -53,7 +59,7 @@ struct real_impl_init_entry {
 
 #define SLOT(field) .slot = (void **)&retrace_real_impls.field
 
-static const struct real_impl_init_entry init_table[] = {
+static struct real_impl_init_entry init_table[] = {
 	{SLOT(dlopen),                 .name = "dlopen"},
 	{SLOT(pthread_key_create),     .name = "pthread_key_create",     .required = 1},
 	{SLOT(pthread_getspecific),    .name = "pthread_getspecific",    .required = 1},
