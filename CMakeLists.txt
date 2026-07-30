@@ -343,7 +343,9 @@ elseif(RETRACE_PLATFORM_WINDOWS)
 endif()
 
 # CLI launcher -- native C binary replacing the v1 shell script (#485).
-if(RETRACE_BUILD_CLI)
+# POSIX-only: Windows uses CreateRemoteThread + IAT hooking (ADR-0009),
+# not LD_PRELOAD-style env var injection, so the launcher doesn't apply.
+if(RETRACE_BUILD_CLI AND NOT RETRACE_PLATFORM_WINDOWS)
 	add_subdirectory(src/cli)
 endif()
 
