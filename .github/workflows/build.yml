@@ -152,7 +152,6 @@ jobs:
       # not exist on newer macOS).
       - name: Smoke test v2 (POSIX)
         if: runner.os != 'Windows'
-        continue-on-error: true
         env:
           RETRACE_LOGGER_DEF_STDOUT_ENA: "0"
         run: |
