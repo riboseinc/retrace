@@ -32,7 +32,7 @@ file `open()` paths, faking OpenSSL verify results, and more.
 | Linux (musl / Alpine) | x86_64, aarch64 | `LD_PRELOAD` | Production
 | Linux (musl / OHOS) | aarch64 | `LD_PRELOAD` | Cross-compile + signed
 | macOS | arm64 (Apple Silicon) | `DYLD_INSERT_LIBRARIES` | Production (printf fixed in v2.1.0)
-| macOS | x86_64 (Intel) | `DYLD_INSERT_LIBRARIES` | link:https://github.com/riboseinc/retrace/issues/506[Issue #506]: library loads but interception silently no-ops. Apple Silicon works.
+| macOS | x86_64 (Intel) | `DYLD_INSERT_LIBRARIES` | Production (init + FP varargs fixed in v2.1.0)
 | FreeBSD / OpenBSD / NetBSD | x86_64 | `LD_PRELOAD` | Production
 | Windows (MSVC) | x86_64, arm64 | Inline hook (from scratch, ADR-0009) | Production
 | Windows (MinGW) | x86_64 | Inline hook | Production
@@ -45,6 +45,12 @@ link:https://github.com/riboseinc/retrace/releases[release].
 
 == What's new in v2.1.0
 
+* **macOS Intel fully working.** ld64 on Intel macOS silently drops the
+  `.quad _<name>` reference in `__DATA,__retrace_rimpls` for malloc and
+  realloc, leaving `retrace_real_impls_init` failing on the malloc lookup
+  and every wrapper call falling through to real libc. v2.1.0 adds a
+  dlsym(RTLD_NEXT, ...) fallback when the section walk misses, so init
+  completes. Intel macOS joins Apple Silicon as a fully-supported platform.
 * **FP varargs on x86_64.** The x86_64 trampoline now saves
   `xmm0..xmm7` on entry and restores them before the tail-call to
   the real libc function. Sys V passes variadic FP args in xmm
@@ -65,6 +71,11 @@ link:https://github.com/riboseinc/retrace/releases[release].
   shell script. Auto-detects the library path, sets `LD_PRELOAD` /
   `DYLD_INSERT_LIBRARIES` and the `RETRACE_*` env vars, execs the
   target. POSIX-only — Windows uses CreateRemoteThread injection.
+* **Smoke test verifies interception** in CI: builds a tiny `getuid()`
+  binary, redirects via JSON config, asserts the output is `uid=0`.
+  The previous smoke step ran `/usr/bin/id` which is SIP-protected
+  on macOS — `DYLD_INSERT_LIBRARIES` was stripped and the test passed
+  without proving interception happened.
 * **Single-library install.** The `_v2` suffix on the library name was
   dropped (v1 source was removed per ADR-0011). Install produces
   `libretrace.so` / `libretrace.dylib` / `retrace.dll`.
@@ -536,9 +547,6 @@ What was **renamed**:
 [cols="2,4", frame=all, grid=all]
 |===
 | Platform / feature | Status
-
-| macOS x86_64 (Intel) under `DYLD_INSERT_LIBRARIES`
-| link:https://github.com/riboseinc/retrace/issues/506[#506]: library loads cleanly but `modify_return_value_int` doesn't take effect — the call appears to fall through to the real libc. Apple Silicon fully works.
 
 | `dlopen` under `LD_PRELOAD` on Linux
 | link:https://github.com/riboseinc/retrace/issues/450[#450]: malloc path inside libdl recurses / reenters retrace; skipped in CI.
