@@ -45,6 +45,14 @@ struct WrapperSystemVFrame {
 	 */
 	long ret_val;
 
+	/*
+	 * FP varargs registers (xmm0..xmm7). Touched only by the asm
+	 * trampoline — saved on entry, restored before the Path A
+	 * tail-call. Required so printf("%f", ...) round-trips when the
+	 * engine defers to Path A. Issue #478.
+	 */
+	unsigned char _xmm_save[128];
+
 	/* original values of the param regs,
 	 * as seen by the assembly portion
 	 */
@@ -426,6 +434,27 @@ int retrace_as_setup_params(
 	printf_params = as_ctx->printf_args_cnt;
 	use_unk_dt = 0;
 #endif
+
+	/*
+	 * FP-detection bail: if any vararg is float/double, our integer-
+	 * only dispatch can't place it in xmm0..xmm7. Return 0 to make
+	 * the engine skip action processing and let the asm trampoline
+	 * tail-call real with all original regs (now including xmm0..7)
+	 * intact. The call works correctly; users lose log_params
+	 * visibility for that specific call.
+	 * See TODO.complete/01-float-varargs-aarch64.md (#478).
+	 */
+	for (i = 0; i < printf_params; i++) {
+		int basic = as_ctx->printf_args_types[i] & ~PA_FLAG_MASK;
+
+		if (basic == PA_FLOAT || basic == PA_DOUBLE) {
+			log_dbg(
+				"FP vararg in '%s' -- deferring to asm Path A",
+				proto->name);
+			*params_cnt = proto->params_cnt;
+			return 0;
+		}
+	}
 
 	for (i = 0; i != printf_params; i++, param_idx++) {
 		/* prep param meta */
