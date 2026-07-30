@@ -32,7 +32,7 @@ file `open()` paths, faking OpenSSL verify results, and more.
 | Linux (musl / Alpine) | x86_64, aarch64 | `LD_PRELOAD` | Production
 | Linux (musl / OHOS) | aarch64 | `LD_PRELOAD` | Cross-compile + signed
 | macOS | arm64 (Apple Silicon) | `DYLD_INSERT_LIBRARIES` | Production (printf fixed in v2.1.0)
-| macOS | x86_64 (Intel) | `DYLD_INSERT_LIBRARIES` | Production (section bounds + FP varargs fixed in v2.1.0)
+| macOS | x86_64 (Intel) | `DYLD_INSERT_LIBRARIES` | link:https://github.com/riboseinc/retrace/issues/506[Issue #506]: library loads but interception silently no-ops. Apple Silicon works.
 | FreeBSD / OpenBSD / NetBSD | x86_64 | `LD_PRELOAD` | Production
 | Windows (MSVC) | x86_64, arm64 | Inline hook (from scratch, ADR-0009) | Production
 | Windows (MinGW) | x86_64 | Inline hook | Production
@@ -45,12 +45,6 @@ link:https://github.com/riboseinc/retrace/releases[release].
 
 == What's new in v2.1.0
 
-* **macOS Intel fully working.** The `section$start` / `section$end`
-  magic linker symbols return size=0 on Intel macOS, silently
-  breaking `retrace_real_impls_init` (every libc pointer stayed NULL,
-  no interception happened). v2.1.0 falls back to `getsectiondata()`
-  when the magic symbols report size=0. Intel macOS joins Apple
-  Silicon as a fully-supported platform.
 * **FP varargs on x86_64.** The x86_64 trampoline now saves
   `xmm0..xmm7` on entry and restores them before the tail-call to
   the real libc function. Sys V passes variadic FP args in xmm
@@ -542,6 +536,9 @@ What was **renamed**:
 [cols="2,4", frame=all, grid=all]
 |===
 | Platform / feature | Status
+
+| macOS x86_64 (Intel) under `DYLD_INSERT_LIBRARIES`
+| link:https://github.com/riboseinc/retrace/issues/506[#506]: library loads cleanly but `modify_return_value_int` doesn't take effect — the call appears to fall through to the real libc. Apple Silicon fully works.
 
 | `dlopen` under `LD_PRELOAD` on Linux
 | link:https://github.com/riboseinc/retrace/issues/450[#450]: malloc path inside libdl recurses / reenters retrace; skipped in CI.
