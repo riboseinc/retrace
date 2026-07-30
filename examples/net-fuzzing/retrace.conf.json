@@ -1,0 +1,41 @@
+{
+  "intercept_scripts": [
+    {
+      "func_name": "socket",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "connect",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "getaddrinfo",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "send",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" },
+        { "action_name": "memory_fuzz", "action_params": { "fail_rate": 0.05 } }
+      ]
+    },
+    {
+      "func_name": "recv",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" },
+        { "action_name": "memory_fuzz", "action_params": { "fail_rate": 0.05 } }
+      ]
+    }
+  ]
+}

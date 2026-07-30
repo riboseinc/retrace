@@ -1,0 +1,25 @@
+{
+  "intercept_scripts": [
+    {
+      "func_name": "sendto",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "recvfrom",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "socket",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}

@@ -45,6 +45,20 @@ $
 Retrace will show any unsafe use of `system()`:
 
 ```console
+$ gcc system.c -o system
+$ RETRACE_JSON_CONFIG=examples/unsafe-system/retrace.conf.json \
+    LD_PRELOAD=build/src/v2/libretrace.so ./system
+```
+
+The JSON config tells retrace to log every `system()` and `setuid()` call. The
+retrace log entry for `system()` shows the command string — a quick scan
+tells you whether the call passes a relative path (unsafe) or an absolute
+one (safe).
+
+The legacy v1 examples below show the original text-config output; the
+v2 JSON config above produces equivalent JSON log entries.
+
+```console
 $ ../../retrace ./system
 <SNIP>
 uid=501(test) gid=20(staff) groups=20(staff)

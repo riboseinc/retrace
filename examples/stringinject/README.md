@@ -3,6 +3,21 @@
 
 stringinjector inserts strings and/or replaces bytes in ascii and binary files. As the files can be ascii in nature (XML, JSON etc) or binary (think ELF) it needs to be able to write both. It needs to be fast as some files can be several megabytes big.
 
+## v2 JSON config
+
+`retrace.conf.json` logs every I/O call (file and socket) made by the
+test program so you can see exactly what buffers flow through each
+intercept point — the input data the string injector would target.
+
+```sh
+$ cc -o strinject_test strinject_test.c
+$ RETRACE_JSON_CONFIG=retrace.conf.json \
+    LD_PRELOAD=../../build/src/v2/libretrace.so ./strinject_test
+```
+
+Pair with `tools/stringinjector/stringinjector` for the actual byte
+rewriting; retrace logs the call sequence, the tool rewrites the file.
+
 # List of the functions to apply stringinject
 
 - File I/O functions
