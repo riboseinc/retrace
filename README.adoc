@@ -32,7 +32,7 @@ file `open()` paths, faking OpenSSL verify results, and more.
 | Linux (musl / Alpine) | x86_64, aarch64 | `LD_PRELOAD` | Production
 | Linux (musl / OHOS) | aarch64 | `LD_PRELOAD` | Cross-compile + signed
 | macOS | arm64 (Apple Silicon) | `DYLD_INSERT_LIBRARIES` | Production (printf fixed in v2.1.0)
-| macOS | x86_64 (Intel) | `DYLD_INSERT_LIBRARIES` | link:https://github.com/riboseinc/retrace/issues/452[Issue #452]
+| macOS | x86_64 (Intel) | `DYLD_INSERT_LIBRARIES` | Production (section bounds + FP varargs fixed in v2.1.0)
 | FreeBSD / OpenBSD / NetBSD | x86_64 | `LD_PRELOAD` | Production
 | Windows (MSVC) | x86_64, arm64 | Inline hook (from scratch, ADR-0009) | Production
 | Windows (MinGW) | x86_64 | Inline hook | Production
@@ -45,6 +45,18 @@ link:https://github.com/riboseinc/retrace/releases[release].
 
 == What's new in v2.1.0
 
+* **macOS Intel fully working.** The `section$start` / `section$end`
+  magic linker symbols return size=0 on Intel macOS, silently
+  breaking `retrace_real_impls_init` (every libc pointer stayed NULL,
+  no interception happened). v2.1.0 falls back to `getsectiondata()`
+  when the magic symbols report size=0. Intel macOS joins Apple
+  Silicon as a fully-supported platform.
+* **FP varargs on x86_64.** The x86_64 trampoline now saves
+  `xmm0..xmm7` on entry and restores them before the tail-call to
+  the real libc function. Sys V passes variadic FP args in xmm
+  registers; previously `printf("%f", 1.5)` produced garbage because
+  the engine call clobbered them. Now correct on Linux, BSD, and
+  macOS Intel.
 * **printf variadic dispatch on Apple Silicon.** `printf("%d %s", ...)`
   no longer segfaults under `DYLD_INSERT_LIBRARIES` on Apple Silicon.
   retrace now reads variadic args from the caller's stack frame on
@@ -55,6 +67,10 @@ link:https://github.com/riboseinc/retrace/releases[release].
 * **Alpine / musl fully green.** `parse_printf_format` is implemented
   locally where musl doesn't ship `printf.h`; integer printf/scanf
   work end-to-end on Alpine x86_64 and aarch64.
+* **Native CLI launcher** (`src/cli/retrace_cli.c`) replaces the v1
+  shell script. Auto-detects the library path, sets `LD_PRELOAD` /
+  `DYLD_INSERT_LIBRARIES` and the `RETRACE_*` env vars, execs the
+  target. POSIX-only — Windows uses CreateRemoteThread injection.
 * **Single-library install.** The `_v2` suffix on the library name was
   dropped (v1 source was removed per ADR-0011). Install produces
   `libretrace.so` / `libretrace.dylib` / `retrace.dll`.
@@ -527,23 +543,17 @@ What was **renamed**:
 |===
 | Platform / feature | Status
 
-| macOS x86_64 (Intel) under `DYLD_INSERT_LIBRARIES`
-| link:https://github.com/riboseinc/retrace/issues/452[#452]: segfault at constructor time. Skip via `test/runtests.sh.in`. Apple Silicon works.
-
 | `dlopen` under `LD_PRELOAD` on Linux
 | link:https://github.com/riboseinc/retrace/issues/450[#450]: malloc path inside libdl recurses / reenters retrace; skipped in CI.
 
-| Float varargs (`%f`, `%g`, `%e`) on AArch64
-| Falls back to named-args-only (per `src/core/printf_compat.h`). Integer, pointer, and string conversions work everywhere. Full SIMD-reg dispatch is on the roadmap (ADR-0010).
+| Float varargs (`%f`, `%g`, `%e`)
+| Engine bails to asm Path A (correct output, no `log_params` entry for the call). Integer, pointer, and string conversions work end-to-end including `log_params`. Full SIMD-reg dispatch is on the roadmap (ADR-0010).
 
 | `sprintf` / `snprintf` / `fprintf` / `dprintf` interception
 | Added in v2.1.0 (PR #469). All printf-family + v*printf variants are now in the prototype registry.
 
 | `scanf` family interception
 | Added in v2.1.0 (PR #470). `scanf` / `fscanf` / `sscanf` / `vscanf` / `vsscanf` / `vfscanf` plus glibc `__isoc99_*` variants.
-
-| Native CLI launcher
-| v1's `retrace` shell-script launcher was removed (ADR-0011). Use `LD_PRELOAD` / `DYLD_INSERT_LIBRARIES` directly until the native CLI lands. Issue #358.
 
 | Incomplete-I/O action
 | v1's `incompleteio,10` has no v2 action equivalent yet.
