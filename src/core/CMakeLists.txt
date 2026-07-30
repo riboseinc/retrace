@@ -61,7 +61,6 @@ elseif(RETRACE_PLATFORM_DARWIN)
 		set(_retrace_arch_dir x86_64)
 	endif()
 	set(_retrace_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_macho/${_retrace_arch_dir})
-	set(_retrace_backend_include  ${CMAKE_SOURCE_DIR}/src/backends/preload_macho)
 elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
 	set(_retrace_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_bsd/x86_64)
 endif()
@@ -73,7 +72,6 @@ target_include_directories(retrace_core
 		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/config/json>         # conf.h, parson.h (the v2 plan/04 decouples)
 	PRIVATE
 		${_retrace_arch_include}                                       # macros.h per-platform
-		${_retrace_backend_include}                                    # macho_sections.h (Darwin only)
 		${CMAKE_CURRENT_SOURCE_DIR}/prototypes
 		${CMAKE_CURRENT_SOURCE_DIR}/actions
 		${CMAKE_CURRENT_SOURCE_DIR}/datatypes)

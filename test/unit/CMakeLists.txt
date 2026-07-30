@@ -11,14 +11,10 @@ if(RETRACE_PLATFORM_DARWIN)
 	if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
 		set(_unit_arch_include
 			${CMAKE_SOURCE_DIR}/src/backends/preload_macho/aarch64)
-		set(_unit_backend_include
-			${CMAKE_SOURCE_DIR}/src/backends/preload_macho)
 		set(_unit_backend_lib retrace_backend_preload_macho)
 	else()
 		set(_unit_arch_include
 			${CMAKE_SOURCE_DIR}/src/backends/preload_macho/x86_64)
-		set(_unit_backend_include
-			${CMAKE_SOURCE_DIR}/src/backends/preload_macho)
 		set(_unit_backend_lib retrace_backend_preload_macho)
 	endif()
 elseif(RETRACE_PLATFORM_LINUX)
@@ -56,8 +52,7 @@ target_include_directories(retrace_test_registries PRIVATE
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/backends
     ${CMAKE_SOURCE_DIR}/src/config/json
-    ${_unit_arch_include}
-    ${_unit_backend_include})
+    ${_unit_arch_include})
 
 # Same feature-test macros as retrace_core
 if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
