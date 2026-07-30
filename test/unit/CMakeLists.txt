@@ -81,3 +81,38 @@ target_include_directories(retrace_test_printf_format PRIVATE
 add_test(NAME unit-test-printf-format
     COMMAND retrace_test_printf_format)
 set_tests_properties(unit-test-printf-format PROPERTIES LABELS "unit")
+
+#
+# script_resolver tests (ADR-0013 extraction). Verifies the JSON
+# intercept_script lookup semantics against a constructed config.
+#
+add_executable(retrace_test_script_resolver test_script_resolver.c)
+set_target_properties(retrace_test_script_resolver PROPERTIES
+    OUTPUT_NAME test_script_resolver
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_script_resolver PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_script_resolver PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_script_resolver PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_script_resolver PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-script-resolver
+    COMMAND retrace_test_script_resolver)
+set_tests_properties(unit-test-script-resolver PROPERTIES LABELS "unit")
