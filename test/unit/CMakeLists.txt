@@ -13,23 +13,28 @@ if(RETRACE_PLATFORM_DARWIN)
 			${CMAKE_SOURCE_DIR}/src/backends/preload_macho/aarch64)
 		set(_unit_backend_include
 			${CMAKE_SOURCE_DIR}/src/backends/preload_macho)
+		set(_unit_backend_lib retrace_backend_preload_macho)
 	else()
 		set(_unit_arch_include
 			${CMAKE_SOURCE_DIR}/src/backends/preload_macho/x86_64)
 		set(_unit_backend_include
 			${CMAKE_SOURCE_DIR}/src/backends/preload_macho)
+		set(_unit_backend_lib retrace_backend_preload_macho)
 	endif()
 elseif(RETRACE_PLATFORM_LINUX)
 	if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
 		set(_unit_arch_include
 			${CMAKE_SOURCE_DIR}/src/backends/preload_elf/aarch64)
+		set(_unit_backend_lib retrace_backend_preload_elf)
 	else()
 		set(_unit_arch_include
 			${CMAKE_SOURCE_DIR}/src/backends/preload_elf/x86_64)
+		set(_unit_backend_lib retrace_backend_preload_elf)
 	endif()
 elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
 	set(_unit_arch_include
 		${CMAKE_SOURCE_DIR}/src/backends/preload_bsd/x86_64)
+	set(_unit_backend_lib retrace_backend_preload_bsd)
 endif()
 
 add_executable(retrace_test_registries test_registries.c)
@@ -41,7 +46,7 @@ target_link_libraries(retrace_test_registries PRIVATE
     retrace_core
     retrace_config_json
     retrace_backends
-    retrace_backend_preload_macho
+    ${_unit_backend_lib}
     retrace_preload_common
     retrace_headers
     ${CMAKE_DL_LIBS}
