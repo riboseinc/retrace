@@ -74,6 +74,7 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 |---|--------|-----------------|
 | 16 | [Multi-function script](16-multi-script.md) | Compose actions across many functions in one config. |
 | 17 | [Per-return-address routing](17-return-addr-routing.md) | Different behavior for different call sites of the same function. *(planned)* |
+| 18 | [Fuzz enprot's EPT parser](18-fuzz-enprot.md) | Cross-project recipe: stress-test [engyon/enprot](https://github.com/engyon/enprot) via retrace — audit file access, fuzz malloc, simulate short reads. |
 
 ## Action reference
 
