@@ -34,6 +34,11 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <limits.h>
+#include <errno.h>
+#include <sys/wait.h>
+#include <signal.h>
+
+#include "parson.h"
 
 #ifdef __linux__
 #define RETRACE_PRELOAD_ENV "LD_PRELOAD"
@@ -222,6 +227,98 @@ static const char *write_temp_config(const char *json)
  * the first non-option arg (or the -- position). Writes parsed
  * values into the out-params.
  */
+/*
+ * Pretty-print a retrace JSON log to stdout — no Python needed.
+ * Filters engine noise; shows one line per intercepted call.
+ *
+ * Entry types in the JSON:
+ *   - message.text = "Running action ..." → engine noise, skip
+ *   - message.text = "config file is ..." → config noise, skip
+ *   - message.func + call_duration_us     → call summary, print
+ *   - message.* (other keys)              → call args, print
+ */
+static void pp_log(const char *path)
+{
+	JSON_Value *root;
+	JSON_Array *arr;
+	JSON_Object *entry, *msg;
+	size_t i, n;
+	const char *func, *text;
+	int count = 0;
+	double total_us = 0;
+
+	root = json_parse_file(path);
+	if (root == NULL) {
+		fprintf(stderr, "retrace: cannot parse %s\n", path);
+		return;
+	}
+
+	arr = json_value_get_array(root);
+	if (arr == NULL) {
+		fprintf(stderr, "retrace: expected JSON array in %s\n", path);
+		json_value_free(root);
+		return;
+	}
+
+	n = json_array_get_count(arr);
+
+	for (i = 0; i < n; i++) {
+		entry = json_array_get_object(arr, i);
+		if (entry == NULL)
+			continue;
+
+		msg = json_object_get_object(entry, "message");
+		if (msg == NULL)
+			continue;
+
+		/* Skip engine noise: "Running action ...", "config file ..." */
+		text = json_object_get_string(msg, "text");
+		if (text != NULL)
+			continue;
+
+		/* Call summary entry: has "func" and "call_duration_us" */
+		func = json_object_get_string(msg, "func");
+		if (func != NULL && json_object_has_value(msg, "call_duration_us")) {
+			double us = json_object_get_number(msg, "call_duration_us");
+			double rv = json_object_get_number(msg, "ret_val");
+
+			total_us += us;
+			count++;
+
+			if (us < 1.0)
+				printf("  %-28s → %g  (<1µs)\n", func, rv);
+			else
+				printf("  %-28s → %g  (%.0fµs)\n", func, rv, us);
+			continue;
+		}
+
+		/* Args entry (module ACT): print key=value pairs */
+		if (func == NULL) {
+			size_t j, nkeys;
+
+			printf("    ");
+			nkeys = json_object_get_count(msg);
+			for (j = 0; j < nkeys; j++) {
+				const char *k = json_object_get_name(msg, j);
+				const char *v = json_value_get_string(
+					json_object_get_value_at(msg, j));
+
+				if (v != NULL && v[0] != '\0')
+					printf("%s=%s  ", k, v);
+				else
+					printf("%s=?  ", k);
+			}
+			printf("\n");
+		}
+	}
+
+	json_value_free(root);
+
+	if (count > 0)
+		printf("\n  %d calls, %.1fms total libc time\n",
+		       count, total_us / 1000.0);
+}
+
 static int parse_common_opts(int argc, char **argv, int start,
 			     const char **logfile, int *quiet,
 			     const char **lib_override)
@@ -298,9 +395,75 @@ static int cmd_trace(int argc, char **argv)
 	if (!config)
 		return 1;
 
-	launch_target(config, logfile, lib_override, quiet,
-		      argc - sep - 1, &argv[sep + 1]);
-	return 0;
+	/*
+	 * Trace mode: fork the target, capture JSON to a temp file
+	 * (suppress stdout), then pretty-print the result — all in C,
+	 * no external tools.
+	 */
+	{
+		char trace_log[PATH_MAX];
+		char lib_path[PATH_MAX];
+		char *found;
+		pid_t pid;
+		int status;
+
+		snprintf(trace_log, sizeof(trace_log),
+			 "/tmp/retrace-trace-%d.json", (int)getpid());
+
+		if (lib_override)
+			setenv("RETRACE_LIB", lib_override, 1);
+
+		found = find_library(lib_path, sizeof(lib_path));
+		if (!found) {
+			fprintf(stderr,
+				"retrace: cannot find %s. Set RETRACE_LIB or install it.\n",
+				RETRACE_LIB_NAME);
+			return 1;
+		}
+
+		setenv(RETRACE_PRELOAD_ENV, lib_path, 1);
+		setenv("RETRACE_JSON_CONFIG", config, 1);
+		setenv("RETRACE_LOGGER_DEF_FN", trace_log, 1);
+		setenv("RETRACE_LOGGER_DEF_STDOUT_ENA", "0", 1);
+		if (quiet)
+			setenv("RETRACE_LOGGER_DEF_ENA", "0", 1);
+
+		/* Remove old trace log so we start fresh */
+		unlink(trace_log);
+
+		pid = fork();
+		if (pid < 0) {
+			perror("retrace: fork");
+			return 1;
+		}
+
+		if (pid == 0) {
+			/* child */
+			execvp(argv[sep + 1], &argv[sep + 1]);
+			perror("retrace: exec failed");
+			_exit(127);
+		}
+
+		/* parent: wait for child, then pretty-print */
+		while (waitpid(pid, &status, 0) < 0 && errno == EINTR)
+			;
+
+		if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+			fprintf(stderr,
+				"retrace: target exited with code %d\n",
+				WEXITSTATUS(status));
+		}
+
+		/* Pretty-print the trace log */
+		pp_log(trace_log);
+
+		/* Cleanup */
+		unlink(trace_log);
+
+		if (WIFEXITED(status))
+			return WEXITSTATUS(status);
+		return 1;
+	}
 }
 
 /*
@@ -534,6 +697,15 @@ int main(int argc, char **argv)
 
 	if (strcmp(argv[1], "slow") == 0) {
 		return cmd_slow(argc - 2, &argv[2]);
+	}
+
+	if (strcmp(argv[1], "pp") == 0) {
+		if (argc < 3) {
+			fprintf(stderr, "retrace pp: usage: retrace pp <trace.json>\n");
+			return 1;
+		}
+		pp_log(argv[2]);
+		return 0;
 	}
 
 	if (strcmp(argv[1], "list-functions") == 0) {
