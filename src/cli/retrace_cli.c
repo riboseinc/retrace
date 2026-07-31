@@ -53,11 +53,21 @@ static void usage(FILE *out)
 "\n"
 "Usage:\n"
 "  retrace run [OPTIONS] -- <command> [args...]\n"
+"  retrace trace [funcs...] [OPTIONS] -- <command>\n"
+"  retrace mock <func> <retval> [OPTIONS] -- <command>\n"
+"  retrace fuzz [<func>] [--rate R] [OPTIONS] -- <command>\n"
+"  retrace slow <func> [--ms N] [OPTIONS] -- <command>\n"
 "  retrace list-functions\n"
 "  retrace list-actions\n"
 "  retrace validate <config.json>\n"
 "\n"
-"Options (run):\n"
+"Quick subcommands (no JSON needed):\n"
+"  retrace trace malloc,free -- /bin/ls\n"
+"  retrace mock getuid 0 -- ./check-root\n"
+"  retrace fuzz malloc --rate 0.1 -- ./your-program\n"
+"  retrace slow open --ms 100 -- ./your-program\n"
+"\n"
+"Options (all subcommands):\n"
 "  --config FILE     Path to JSON config (default: built-in log+call_real)\n"
 "  --log FILE        Path to log output file\n"
 "  --quiet           Suppress retrace log output (still runs interception)\n"
@@ -134,6 +144,331 @@ static char *find_library(char *buf, size_t bufsize)
 	return NULL;
 }
 
+static void launch_target(const char *config, const char *logfile,
+			  const char *lib_override, int quiet,
+			  int argc, char **argv)
+{
+	char lib_path[PATH_MAX];
+	char *found;
+
+	if (lib_override)
+		setenv("RETRACE_LIB", lib_override, 1);
+
+	found = find_library(lib_path, sizeof(lib_path));
+	if (!found) {
+		fprintf(stderr,
+			"retrace: cannot find %s. Set RETRACE_LIB or install it.\n",
+			RETRACE_LIB_NAME);
+		exit(1);
+	}
+
+	setenv(RETRACE_PRELOAD_ENV, lib_path, 1);
+
+	if (config)
+		setenv("RETRACE_JSON_CONFIG", config, 1);
+
+	if (logfile) {
+		setenv("RETRACE_LOGGER_DEF_FN", logfile, 1);
+		setenv("RETRACE_LOGGER_DEF_STDOUT_ENA", "0", 1);
+	}
+
+	if (quiet)
+		setenv("RETRACE_LOGGER_DEF_ENA", "0", 1);
+
+	execvp(argv[0], argv);
+
+	perror("retrace: exec failed");
+	exit(127);
+}
+
+/* Find "--" in argv, return its index, or -1. */
+static int find_separator(int argc, char **argv)
+{
+	int i;
+
+	for (i = 0; i < argc; i++)
+		if (strcmp(argv[i], "--") == 0)
+			return i;
+	return -1;
+}
+
+/* Write a JSON string to a temp file; return the path (static buffer). */
+static const char *write_temp_config(const char *json)
+{
+	static char path[PATH_MAX];
+	int fd;
+	FILE *f;
+
+	snprintf(path, sizeof(path), "/tmp/retrace-%d.json", (int)getpid());
+	fd = mkstemp(path);
+	if (fd < 0) {
+		perror("retrace: mkstemp");
+		return NULL;
+	}
+	f = fdopen(fd, "w");
+	if (!f) {
+		perror("retrace: fdopen");
+		close(fd);
+		return NULL;
+	}
+	fputs(json, f);
+	fclose(f);
+	return path;
+}
+
+/*
+ * Parse common --log / --quiet / --lib options that appear after
+ * subcommand-specific args and before --. Returns the index of
+ * the first non-option arg (or the -- position). Writes parsed
+ * values into the out-params.
+ */
+static int parse_common_opts(int argc, char **argv, int start,
+			     const char **logfile, int *quiet,
+			     const char **lib_override)
+{
+	int i;
+
+	for (i = start; i < argc; i++) {
+		if (strcmp(argv[i], "--") == 0)
+			return i;
+		if (strcmp(argv[i], "--log") == 0 && i + 1 < argc) {
+			*logfile = argv[++i];
+		} else if (strcmp(argv[i], "--quiet") == 0) {
+			*quiet = 1;
+		} else if (strcmp(argv[i], "--lib") == 0 && i + 1 < argc) {
+			*lib_override = argv[++i];
+		} else {
+			return i;
+		}
+	}
+	return i;
+}
+
+/*
+ * retrace trace [funcs...] [OPTIONS] -- <command>
+ *
+ * If no funcs given, trace every interceptable call (wildcard).
+ * Otherwise, trace only the named functions.
+ */
+static int cmd_trace(int argc, char **argv)
+{
+	const char *logfile = NULL;
+	const char *lib_override = NULL;
+	int quiet = 0;
+	int sep, i, nfuncs = 0;
+	char json[8192];
+	const char *config;
+
+	/* Count func names until we hit an option or -- */
+	for (i = 0; i < argc; i++) {
+		if (argv[i][0] == '-' || strcmp(argv[i], "--") == 0)
+			break;
+		nfuncs++;
+	}
+
+	i = parse_common_opts(argc, argv, i, &logfile, &quiet, &lib_override);
+	sep = find_separator(argc, argv);
+	if (sep < 0 || sep + 1 >= argc) {
+		fprintf(stderr,
+			"retrace trace: no command. Use: retrace trace [funcs...] -- <command>\n");
+		return 1;
+	}
+
+	if (nfuncs == 0) {
+		snprintf(json, sizeof(json),
+			"{\"intercept_scripts\":[{\"func_name\":\"*\","
+			"\"actions\":[{\"action_name\":\"log_params\"},"
+			"{\"action_name\":\"call_real\"}]}]}");
+	} else {
+		int pos = 0;
+
+		pos += snprintf(json + pos, sizeof(json) - pos,
+			"{\"intercept_scripts\":[");
+		for (i = 0; i < nfuncs; i++) {
+			pos += snprintf(json + pos, sizeof(json) - pos,
+				"%s{\"func_name\":\"%s\","
+				"\"actions\":[{\"action_name\":\"log_params\"},"
+				"{\"action_name\":\"call_real\"}]}",
+				i > 0 ? "," : "", argv[i]);
+		}
+		pos += snprintf(json + pos, sizeof(json) - pos, "]}");
+	}
+
+	config = write_temp_config(json);
+	if (!config)
+		return 1;
+
+	launch_target(config, logfile, lib_override, quiet,
+		      argc - sep - 1, &argv[sep + 1]);
+	return 0;
+}
+
+/*
+ * retrace mock <func> <retval> [OPTIONS] -- <command>
+ *
+ * Make <func> always return <retval> instead of its real value.
+ */
+static int cmd_mock(int argc, char **argv)
+{
+	const char *func, *retval_str;
+	const char *logfile = NULL;
+	const char *lib_override = NULL;
+	int quiet = 0, sep, idx;
+	long retval;
+	char json[1024];
+	const char *config;
+
+	if (argc < 2) {
+		fprintf(stderr,
+			"retrace mock: usage: retrace mock <func> <retval> -- <command>\n");
+		return 1;
+	}
+	func = argv[0];
+	retval_str = argv[1];
+
+	retval = strtol(retval_str, NULL, 0);
+
+	idx = parse_common_opts(argc, argv, 2, &logfile, &quiet, &lib_override);
+	sep = find_separator(argc, argv);
+	if (sep < 0 || sep + 1 >= argc) {
+		fprintf(stderr,
+			"retrace mock: no command. Use: retrace mock %s %s -- <command>\n",
+			func, retval_str);
+		return 1;
+	}
+
+	snprintf(json, sizeof(json),
+		"{\"intercept_scripts\":[{\"func_name\":\"%s\","
+		"\"actions\":[{\"action_name\":\"call_real\"},"
+		"{\"action_name\":\"modify_return_value_int\","
+		"\"action_params\":{\"retval_int\":%ld}}]}]}",
+		func, retval);
+
+	config = write_temp_config(json);
+	if (!config)
+		return 1;
+
+	launch_target(config, logfile, lib_override, quiet,
+		      argc - sep - 1, &argv[sep + 1]);
+	return 0;
+}
+
+/*
+ * retrace fuzz <func> [--rate R] [OPTIONS] -- <command>
+ *
+ * Fuzz memory allocation (or any specified func) at a configurable
+ * failure rate. Default func is malloc; default rate is 0.05 (5%).
+ */
+static int cmd_fuzz(int argc, char **argv)
+{
+	const char *func = "malloc";
+	double rate = 0.05;
+	const char *logfile = NULL;
+	const char *lib_override = NULL;
+	int quiet = 0, sep, i;
+	char json[1024];
+	const char *config;
+
+	for (i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "--") == 0)
+			break;
+		if (strcmp(argv[i], "--rate") == 0 && i + 1 < argc) {
+			rate = atof(argv[++i]);
+		} else if (strcmp(argv[i], "--log") == 0 && i + 1 < argc) {
+			logfile = argv[++i];
+		} else if (strcmp(argv[i], "--lib") == 0 && i + 1 < argc) {
+			lib_override = argv[++i];
+		} else if (strcmp(argv[i], "--quiet") == 0) {
+			quiet = 1;
+		} else if (argv[i][0] != '-') {
+			func = argv[i];
+		}
+	}
+
+	sep = find_separator(argc, argv);
+	if (sep < 0 || sep + 1 >= argc) {
+		fprintf(stderr,
+			"retrace fuzz: no command. Use: retrace fuzz [<func>] [--rate R] -- <command>\n");
+		return 1;
+	}
+
+	snprintf(json, sizeof(json),
+		"{\"intercept_scripts\":[{\"func_name\":\"%s\","
+		"\"actions\":[{\"action_name\":\"call_real\"},"
+		"{\"action_name\":\"memory_fuzz\","
+		"\"action_params\":{\"fail_rate\":%.4f}}]}]}",
+		func, rate);
+
+	config = write_temp_config(json);
+	if (!config)
+		return 1;
+
+	launch_target(config, logfile, lib_override, quiet,
+		      argc - sep - 1, &argv[sep + 1]);
+	return 0;
+}
+
+/*
+ * retrace slow <func> --ms N [OPTIONS] -- <command>
+ *
+ * Inject N milliseconds of latency into every call to <func>.
+ */
+static int cmd_slow(int argc, char **argv)
+{
+	const char *func = NULL;
+	int ms = 100;
+	const char *logfile = NULL;
+	const char *lib_override = NULL;
+	int quiet = 0, sep, i;
+	char json[1024];
+	const char *config;
+
+	for (i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "--") == 0)
+			break;
+		if (strcmp(argv[i], "--ms") == 0 && i + 1 < argc) {
+			ms = atoi(argv[++i]);
+		} else if (strcmp(argv[i], "--log") == 0 && i + 1 < argc) {
+			logfile = argv[++i];
+		} else if (strcmp(argv[i], "--lib") == 0 && i + 1 < argc) {
+			lib_override = argv[++i];
+		} else if (strcmp(argv[i], "--quiet") == 0) {
+			quiet = 1;
+		} else if (argv[i][0] != '-') {
+			func = argv[i];
+		}
+	}
+
+	if (func == NULL) {
+		fprintf(stderr,
+			"retrace slow: usage: retrace slow <func> [--ms N] -- <command>\n");
+		return 1;
+	}
+
+	sep = find_separator(argc, argv);
+	if (sep < 0 || sep + 1 >= argc) {
+		fprintf(stderr,
+			"retrace slow: no command. Use: retrace slow %s --ms %d -- <command>\n",
+			func, ms);
+		return 1;
+	}
+
+	snprintf(json, sizeof(json),
+		"{\"intercept_scripts\":[{\"func_name\":\"%s\","
+		"\"actions\":[{\"action_name\":\"call_real\"},"
+		"{\"action_name\":\"delay\","
+		"\"action_params\":{\"ms\":%d}}]}]}",
+		func, ms);
+
+	config = write_temp_config(json);
+	if (!config)
+		return 1;
+
+	launch_target(config, logfile, lib_override, quiet,
+		      argc - sep - 1, &argv[sep + 1]);
+	return 0;
+}
+
 static int cmd_run(int argc, char **argv)
 {
 	const char *config = NULL;
@@ -141,8 +476,6 @@ static int cmd_run(int argc, char **argv)
 	const char *lib_override = NULL;
 	int quiet = 0;
 	int i;
-	char lib_path[PATH_MAX];
-	char *found;
 
 	/* Parse options before -- */
 	for (i = 0; i < argc; i++) {
@@ -171,39 +504,9 @@ static int cmd_run(int argc, char **argv)
 		return 1;
 	}
 
-	/* Find the library */
-	if (lib_override) {
-		setenv("RETRACE_LIB", lib_override, 1);
-	}
-	found = find_library(lib_path, sizeof(lib_path));
-	if (!found) {
-		fprintf(stderr,
-			"retrace: cannot find %s. Set RETRACE_LIB or install it.\n",
-			RETRACE_LIB_NAME);
-		return 1;
-	}
-
-	/* Set up environment */
-	setenv(RETRACE_PRELOAD_ENV, lib_path, 1);
-
-	if (config)
-		setenv("RETRACE_JSON_CONFIG", config, 1);
-
-	if (logfile) {
-		setenv("RETRACE_LOGGER_DEF_FN", logfile, 1);
-		setenv("RETRACE_LOGGER_DEF_STDOUT_ENA", "0", 1);
-	}
-
-	if (quiet) {
-		setenv("RETRACE_LOGGER_DEF_ENA", "0", 1);
-	}
-
-	/* Exec the target command */
-	execvp(argv[i], &argv[i]);
-
-	/* If we get here, exec failed */
-	perror("retrace: exec failed");
-	return 127;
+	launch_target(config, logfile, lib_override, quiet,
+		      argc - i, &argv[i]);
+	return 0;
 }
 
 int main(int argc, char **argv)
@@ -215,6 +518,22 @@ int main(int argc, char **argv)
 
 	if (strcmp(argv[1], "run") == 0) {
 		return cmd_run(argc - 2, &argv[2]);
+	}
+
+	if (strcmp(argv[1], "trace") == 0) {
+		return cmd_trace(argc - 2, &argv[2]);
+	}
+
+	if (strcmp(argv[1], "mock") == 0) {
+		return cmd_mock(argc - 2, &argv[2]);
+	}
+
+	if (strcmp(argv[1], "fuzz") == 0) {
+		return cmd_fuzz(argc - 2, &argv[2]);
+	}
+
+	if (strcmp(argv[1], "slow") == 0) {
+		return cmd_slow(argc - 2, &argv[2]);
 	}
 
 	if (strcmp(argv[1], "list-functions") == 0) {
