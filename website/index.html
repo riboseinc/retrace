@@ -481,6 +481,62 @@ a { color: inherit; text-decoration: none; }
 .install-cmd button:hover { color: var(--text); border-color: var(--dim); }
 .install-cmd button.copied { color: var(--see); border-color: var(--see); }
 
+/* ── First-insight walkthrough ─────────────────────────────────── */
+.walkthrough {
+  margin-top: 32px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface);
+}
+@media (max-width: 860px) { .walkthrough { grid-template-columns: 1fr; } }
+
+.walk-step {
+  padding: 22px 22px 20px;
+  border-right: 1px solid var(--rule);
+  position: relative;
+}
+.walk-step:last-child { border-right: none; }
+@media (max-width: 860px) {
+  .walk-step { border-right: none; border-bottom: 1px solid var(--rule); }
+  .walk-step:last-child { border-bottom: none; }
+}
+
+.walk-step .num {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--dim);
+  margin-bottom: 10px;
+}
+.walk-step .what {
+  font-size: 13.5px;
+  color: var(--text);
+  margin-bottom: 12px;
+  line-height: 1.45;
+}
+.walk-step .what strong { font-weight: 500; }
+.walk-step pre {
+  background: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text);
+  overflow-x: auto;
+  margin: 0;
+}
+.walk-step pre .p { color: var(--break); }
+.walk-step pre .c { color: var(--dim); }
+.walk-step pre .ok { color: var(--see); }
+.walk-step pre .arg { color: var(--control); }
+
 /* ── Platforms ─────────────────────────────────────────────────── */
 .platforms-grid {
   display: grid;
@@ -696,6 +752,32 @@ footer {
         <span class="p">$</span>
         <span>curl -sSL <span class="url">https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh</span> | sh</span>
         <button id="copy-btn" type="button" aria-label="Copy install command">copy</button>
+      </div>
+    </div>
+
+    <div class="walkthrough">
+      <div class="walk-step">
+        <div class="num">01 &middot; INSTALL</div>
+        <div class="what">The script puts <strong>retrace</strong> on your <code class="mono">PATH</code> and <strong>libretrace</strong> in your loader path. About five seconds.</div>
+<pre><span class="c"># detect OS + arch, fetch the right binary</span>
+<span class="p">$</span> curl -sSL .../install.sh | sh
+<span class="ok">retrace 2.1.0 installed</span></pre>
+      </div>
+      <div class="walk-step">
+        <div class="num">02 &middot; TRACE</div>
+        <div class="what">Trace any binary. Add <code class="mono">--html</code> for an interactive report. No source. No recompile. No config file.</div>
+<pre><span class="p">$</span> retrace trace malloc,free \
+      --html -- /bin/ls
+<span class="ok">wrote /tmp/retrace-43892.html</span></pre>
+      </div>
+      <div class="walk-step">
+        <div class="num">03 &middot; OPEN</div>
+        <div class="what">Self-contained HTML &mdash; summary cards, category breakdown, filterable call table. No Python, no server, no CDN.</div>
+<pre><span class="p">$</span> open /tmp/retrace-43892.html
+
+<span class="arg">  1,247 calls · 48.3 ms · 42 functions</span>
+<span class="arg">  [ I/O ]  485 calls  32.1 ms (66%)</span>
+<span class="arg">  [ MEM ]  412 calls   8.3 ms (17%)</span></pre>
       </div>
     </div>
   </div>

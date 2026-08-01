@@ -116,4 +116,4 @@ trustworthy even when you're mocking `time()` or `gettimeofday()`
 ## See also
 
 - [01 — Trace every libc call](01-trace-all-calls.md)
-- [03 — Count calls per function](03-count-calls.md) (planned)
+- [03 — Count calls per function](03-count-calls.md)

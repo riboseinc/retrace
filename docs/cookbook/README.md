@@ -39,7 +39,7 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 |---|--------|-----------------|
 | 01 | [Trace every libc call](01-trace-all-calls.md) | The default; log every interceptable call as JSON. |
 | 02 | [Filter by function name](02-filter-by-function.md) | Use `RETRACE_LOGGER_ALLOWED_FUNCS` to focus on a handful of calls. |
-| 03 | [Count calls per function](03-count-calls.md) | Aggregate stats: which libc calls dominate your program. *(planned)* |
+| 03 | [Count calls per function](03-count-calls.md) | Aggregate stats: which libc calls dominate your program. |
 | 04 | [Time each call](04-time-each-call.md) | Find hot spots via `call_duration_us` in the log. |
 
 ### Redirection & mocking
@@ -58,7 +58,7 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 | 09 | [Fuzz `malloc` failures](09-fuzz-malloc.md) | Inject OOM into a target to test error paths. |
 | 10 | [Partial I/O (short reads/writes)](10-incomplete-io.md) | Make `read`/`write` return short to exercise retry logic. |
 | 11 | [Deterministic fuzzing seed](11-deterministic-fuzz.md) | Reproduce a fuzz run by pinning the RNG seed. |
-| 12 | [Fail specific syscalls](12-fail-specific.md) | Force `connect`/`open`/etc. to return an error code. *(planned)* |
+| 12 | [Fail specific syscalls](12-fail-specific.md) | Force `connect`/`open`/etc. to return an error code. |
 
 ### Security audit
 
@@ -80,6 +80,9 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 
 ## Action reference
 
+Compact form. For the full schema and parameter reference, see
+[configuration.md](../configuration.md#built-in-actions).
+
 | Action | Effect |
 |--------|--------|
 | `log_params` | Log call args + return value as JSON. |
@@ -96,6 +99,9 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 | `sandbox` | Deny file access by path deny-list at runtime. |
 
 ## Environment variables
+
+Compact form. For the full CLI and env var reference, see
+[cli.md](../cli.md#common-options).
 
 | Variable | Effect |
 |----------|--------|
