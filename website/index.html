@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>retrace — See. Control. Break.</title>
+<meta name="description" content="The only tool that observes, modifies, AND breaks libc calls — without code, without recompiling, on every platform.">
+<style>
+:root {
+  --bg: #0d1117;
+  --bg-card: #161b22;
+  --bg-hover: #1c2128;
+  --text: #c9d1d9;
+  --text-dim: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #f78166;
+  --green: #2ecc71;
+  --border: #30363d;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+.container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Hero */
+.hero { padding: 80px 0 60px; text-align: center; position: relative; }
+.hero::before {
+  content: '';
+  position: absolute; top: -50%; left: 50%;
+  transform: translateX(-50%);
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(88,166,255,0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+.hero h1 {
+  font-size: 3.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, #fff 0%, #8b949e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero .tag {
+  font-size: 1.3rem;
+  color: var(--text-dim);
+  font-weight: 300;
+  margin-bottom: 8px;
+}
+.hero .verbs {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 24px;
+}
+.hero .verbs span { color: var(--accent); }
+.hero .verbs span:nth-child(2) { color: var(--green); }
+.hero .verbs span:nth-child(3) { color: var(--accent2); }
+.hero .pitch {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 560px;
+  margin: 0 auto 32px;
+}
+.hero .actions {
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+}
+.btn {
+  display: inline-block;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: background 0.2s;
+}
+.btn-primary { background: var(--accent); color: #fff !important; }
+.btn-primary:hover { background: #4c96e0; text-decoration: none; }
+.btn-ghost { border: 1px solid var(--border); color: var(--text) !important; }
+.btn-ghost:hover { border-color: var(--accent); text-decoration: none; }
+
+/* Install bar */
+.install {
+  margin: 40px auto;
+  max-width: 600px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.9rem;
+  display: flex; align-items: center; gap: 12px;
+}
+.install .prompt { color: var(--accent2); }
+.install .cmd { color: var(--text); flex: 1; }
+.install .copy { color: var(--text-dim); cursor: pointer; padding: 4px; }
+.install .copy:hover { color: var(--accent); }
+
+/* Demo commands */
+.demo { margin: 48px 0; }
+.demo h2 { font-size: 1.4rem; margin-bottom: 16px; }
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.demo-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  transition: border-color 0.2s;
+}
+.demo-card:hover { border-color: var(--accent); }
+.demo-card .icon { font-size: 1.5rem; margin-bottom: 8px; }
+.demo-card h3 { font-size: 1rem; margin-bottom: 4px; }
+.demo-card p { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 12px; }
+.demo-card pre {
+  background: #0d1117;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  overflow-x: auto;
+  color: #8b949e;
+}
+.demo-card pre .c { color: var(--accent2); }
+
+/* Features */
+.features { margin: 48px 0; }
+.features h2 { font-size: 1.4rem; margin-bottom: 24px; }
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.feature {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+.feature h3 { font-size: 0.9rem; margin-bottom: 4px; color: var(--accent); }
+.feature p { font-size: 0.8rem; color: var(--text-dim); }
+
+/* Platforms */
+.platforms { margin: 48px 0; text-align: center; }
+.platforms h2 { font-size: 1.2rem; margin-bottom: 16px; color: var(--text-dim); }
+.platforms .badges {
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+}
+.platforms .pbadge {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  font-family: monospace;
+  color: var(--text-dim);
+}
+
+/* Comparison */
+.compare { margin: 48px 0; }
+.compare h2 { font-size: 1.4rem; margin-bottom: 16px; }
+.compare table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.compare th {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--border);
+  color: var(--text-dim);
+}
+.compare td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.compare .yes { color: var(--green); }
+.compare .no { color: var(--text-dim); }
+
+/* Footer */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 32px 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+footer a { color: var(--text-dim); }
+
+@media (max-width: 600px) {
+  .hero h1 { font-size: 2.5rem; }
+  .hero .tag { font-size: 1rem; }
+  .demo-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="container">
+    <h1>retrace</h1>
+    <div class="tag">Userspace libc interceptor</div>
+    <div class="verbs"><span>SEE</span> &middot; <span>CONTROL</span> &middot; <span>BREAK</span></div>
+    <p class="pitch">
+      The only tool that observes, modifies, AND breaks libc calls &mdash;
+      without code, without recompiling, on every platform.
+    </p>
+    <div class="actions">
+      <a class="btn btn-primary" href="#install">Get started</a>
+      <a class="btn btn-ghost" href="https://github.com/riboseinc/retrace">GitHub &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="container">
+    <div class="install">
+      <span class="prompt">$</span>
+      <span class="cmd">curl -sSL https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh | sh</span>
+    </div>
+  </div>
+</section>
+
+<section class="demo">
+  <div class="container">
+    <h2>One command. No config files.</h2>
+    <div class="demo-grid">
+      <div class="demo-card">
+        <div class="icon">&#128269;</div>
+        <h3>Trace</h3>
+        <p>See every libc call with args, return values, and timing.</p>
+<pre><span class="c">$</span> retrace trace malloc,free -- /bin/ls
+  malloc  &rarr; 0x7f8e2a  (&lt;1&micro;s)
+  free    &rarr; 0         (&lt;1&micro;s)
+  ...
+  1247 calls, 48.3ms total</pre>
+      </div>
+      <div class="demo-card">
+        <div class="icon">&#128163;</div>
+        <h3>Fuzz</h3>
+        <p>Inject OOM, short I/O, latency. Find error-path bugs in seconds.</p>
+<pre><span class="c">$</span> retrace fuzz malloc --rate 0.1 -- ./server
+(crash &mdash; you found an OOM bug)</pre>
+      </div>
+      <div class="demo-card">
+        <div class="icon">&#127918;</div>
+        <h3>Mock</h3>
+        <p>Make any function return whatever you want.</p>
+<pre><span class="c">$</span> retrace mock getuid 0 -- ./check-root
+welcome, root</pre>
+      </div>
+      <div class="demo-card">
+        <div class="icon">&#128737;</div>
+        <h3>Sandbox</h3>
+        <p>Block file access by path deny-list at runtime.</p>
+<pre><span class="c">$</span> retrace run --config sandbox.json -- ./app
+sandbox: DENIED '/etc/shadow'</pre>
+      </div>
+      <div class="demo-card">
+        <div class="icon">&#128202;</div>
+        <h3>HTML viewer</h3>
+        <p>Interactive trace page. No Python, no git clone.</p>
+<pre><span class="c">$</span> retrace trace --html -- ./server
+wrote /tmp/retrace-12345.html</pre>
+      </div>
+      <div class="demo-card">
+        <div class="icon">&#128054;</div>
+        <h3>Docker</h3>
+        <p>Add tracing to any container in one line.</p>
+<pre><span class="c">RUN</span> curl -sSL .../libretrace-linux-x86_64.so \
+    -o /usr/lib/libretrace.so</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <div class="container">
+    <h2>Built-in actions</h2>
+    <div class="feature-grid">
+      <div class="feature"><h3>log_params</h3><p>Log args + return as JSON</p></div>
+      <div class="feature"><h3>call_real</h3><p>Invoke real libc</p></div>
+      <div class="feature"><h3>modify_return_value_int</h3><p>Override return value</p></div>
+      <div class="feature"><h3>modify_in_param_str</h3><p>Rewrite string args</p></div>
+      <div class="feature"><h3>memory_fuzz</h3><p>Random OOM injection</p></div>
+      <div class="feature"><h3>incomplete_io</h3><p>Short read/write injection</p></div>
+      <div class="feature"><h3>delay</h3><p>Latency injection</p></div>
+      <div class="feature"><h3>call_count_limit</h3><p>Resource exhaustion</p></div>
+      <div class="feature"><h3>sandbox</h3><p>Path deny-list policy</p></div>
+      <div class="feature"><h3>fuzzing_seed</h3><p>Deterministic RNG</p></div>
+      <div class="feature"><h3>+ custom</h3><p>One .c file per action</p></div>
+      <div class="feature"><h3>CLI subcommands</h3><p>trace, mock, fuzz, slow, html</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="platforms">
+  <div class="container">
+    <h2>Works everywhere</h2>
+    <div class="badges">
+      <span class="pbadge">Linux x86_64</span>
+      <span class="pbadge">Linux aarch64</span>
+      <span class="pbadge">macOS arm64</span>
+      <span class="pbadge">macOS x86_64</span>
+      <span class="pbadge">FreeBSD</span>
+      <span class="pbadge">OpenBSD</span>
+      <span class="pbadge">NetBSD</span>
+      <span class="pbadge">Windows x64</span>
+      <span class="pbadge">Windows arm64</span>
+      <span class="pbadge">Alpine</span>
+      <span class="pbadge">OHOS</span>
+      <span class="pbadge">Android</span>
+      <span class="pbadge">Docker</span>
+    </div>
+  </div>
+</section>
+
+<section class="compare">
+  <div class="container">
+    <h2>How it compares</h2>
+    <table>
+      <thead>
+        <tr><th>Feature</th><th>retrace</th><th>strace</th><th>Frida</th><th>libFuzzer</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Observe libc calls</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td></tr>
+        <tr><td>Modify args/return</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td></tr>
+        <tr><td>Fault injection</td><td class="yes">&#10003; built-in</td><td class="no">&#10007;</td><td class="yes">via JS</td><td class="yes">&#10003;</td></tr>
+        <tr><td>No code needed</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">JS script</td><td class="no">recompile</td></tr>
+        <tr><td>No recompile</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td></tr>
+        <tr><td>Cross-platform</td><td class="yes">12 platforms</td><td class="no">Linux only</td><td class="yes">cross</td><td class="yes">cross</td></tr>
+        <tr><td>Binary size</td><td>200KB</td><td>preinstalled</td><td>40MB</td><td>linked in</td></tr>
+        <tr><td>Declarative config</td><td class="yes">JSON / CLI</td><td class="no">flags</td><td class="no">JS code</td><td class="no">C++ code</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>
+      retrace is <a href="https://github.com/riboseinc/retrace">open source</a>
+      under BSD-2-Clause. Built by <a href="https://www.ribose.com">Ribose</a>.
+    </p>
+    <p style="margin-top:8px;">
+      <a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md">Cookbook</a>
+      &middot; <a href="https://github.com/riboseinc/retrace/blob/main/docs/docker.md">Docker</a>
+      &middot; <a href="https://github.com/riboseinc/retrace/blob/main/docs/android.md">Android</a>
+      &middot; <a href="https://github.com/riboseinc/retrace/blob/main/docs/adr/">Architecture decisions</a>
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
