@@ -3,361 +3,1201 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>retrace — See. Control. Break.</title>
-<meta name="description" content="The only tool that observes, modifies, AND breaks libc calls — without code, without recompiling, on every platform.">
+<title>retrace — See. Control. Break. Every libc call.</title>
+<meta name="description" content="A userspace libc interceptor. Observe, modify, and break any libc call — without source, without recompiling, on thirteen platforms. One shared library.">
 <style>
+/* ──────────────────────────────────────────────────────────────────
+   retrace design tokens
+
+   The three product verbs carry semantic color throughout the page:
+     SEE     cyan      — observation (log_params, call_real)
+     CONTROL amber     — modification (modify_in_param_*, modify_return_value_int)
+     BREAK   vermilion — fault / state (memory_fuzz, sandbox, delay, …)
+
+   These are not decorative accents. They encode the product's thesis.
+   ────────────────────────────────────────────────────────────────── */
 :root {
-  --bg: #0d1117;
-  --bg-card: #161b22;
-  --bg-hover: #1c2128;
-  --text: #c9d1d9;
-  --text-dim: #8b949e;
-  --accent: #58a6ff;
-  --accent2: #f78166;
-  --green: #2ecc71;
-  --border: #30363d;
+  --ink:        #0B0D10;
+  --surface:    #14181E;
+  --elevated:   #1C212A;
+  --text:       #E8ECF1;
+  --dim:        #7E8694;
+  --rule:       #232936;
+
+  --see:        #5EE3FF;
+  --control:    #F2B441;
+  --break:      #FF6B5C;
+
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg);
+  font-family: var(--sans);
+  background: var(--ink);
   color: var(--text);
-  line-height: 1.6;
+  line-height: 1.55;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   overflow-x: hidden;
 }
-.container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
 
-/* Hero */
-.hero { padding: 80px 0 60px; text-align: center; position: relative; }
-.hero::before {
-  content: '';
-  position: absolute; top: -50%; left: 50%;
-  transform: translateX(-50%);
-  width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(88,166,255,0.06) 0%, transparent 60%);
-  pointer-events: none;
+a { color: inherit; text-decoration: none; }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+@media (max-width: 720px) { .wrap { padding: 0 20px; } }
+
+.mono { font-family: var(--mono); font-feature-settings: "calt" 0; }
+
+/* ── Eyebrow label ─────────────────────────────────────────────── */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
-.hero h1 {
-  font-size: 3.5rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  margin-bottom: 8px;
-  background: linear-gradient(135deg, #fff 0%, #8b949e 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 18px;
+  height: 1px;
+  background: var(--rule);
 }
-.hero .tag {
-  font-size: 1.3rem;
-  color: var(--text-dim);
-  font-weight: 300;
-  margin-bottom: 8px;
+
+/* ── Navigation ────────────────────────────────────────────────── */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(12px);
+  background: rgba(11, 13, 16, 0.78);
+  border-bottom: 1px solid var(--rule);
 }
-.hero .verbs {
-  font-size: 1.8rem;
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+.brand {
+  font-family: var(--mono);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  margin-bottom: 24px;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
-.hero .verbs span { color: var(--accent); }
-.hero .verbs span:nth-child(2) { color: var(--green); }
-.hero .verbs span:nth-child(3) { color: var(--accent2); }
-.hero .pitch {
-  font-size: 1.15rem;
-  color: var(--text-dim);
-  max-width: 560px;
-  margin: 0 auto 32px;
+.brand .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--see);
+  box-shadow: 0 0 12px rgba(94, 227, 255, 0.55);
 }
-.hero .actions {
-  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+.nav-links { display: flex; gap: 28px; font-size: 13px; color: var(--dim); }
+.nav-links a:hover { color: var(--text); }
+@media (max-width: 720px) { .nav-links { display: none; } }
+
+/* ── Hero ──────────────────────────────────────────────────────── */
+.hero { padding: 96px 0 64px; position: relative; }
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 64px;
+  align-items: center;
+}
+@media (max-width: 960px) {
+  .hero { padding: 64px 0 48px; }
+  .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+}
+
+.hero-eyebrow { margin-bottom: 28px; }
+
+/* The three verbs ARE the headline. */
+.verbs { margin-bottom: 36px; }
+.verb {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 20px;
+  align-items: baseline;
+  padding: 14px 0;
+  border-top: 1px solid var(--rule);
+}
+.verb:last-of-type { border-bottom: 1px solid var(--rule); }
+@media (max-width: 540px) {
+  .verb { grid-template-columns: 1fr; gap: 4px; padding: 12px 0; }
+}
+
+.verb .name {
+  font-family: var(--mono);
+  font-size: clamp(36px, 6vw, 56px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.verb .name::after {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 10px;
+  transform: translateY(-12px);
+  border-radius: 50%;
+}
+.verb.see     .name { color: var(--see); }
+.verb.see     .name::after { background: var(--see); }
+.verb.control .name { color: var(--control); }
+.verb.control .name::after { background: var(--control); }
+.verb.break   .name { color: var(--break); }
+.verb.break   .name::after { background: var(--break); }
+
+.verb .gloss {
+  font-size: 14px;
+  color: var(--dim);
+  line-height: 1.5;
+}
+.verb .gloss strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.hero-cta {
+  display: flex;
+  gap: 12px;
+  margin-top: 36px;
+  flex-wrap: wrap;
 }
 .btn {
-  display: inline-block;
-  padding: 10px 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  border-radius: 4px;
+  transition: all 0.18s ease;
+  border: 1px solid transparent;
+}
+.btn-primary {
+  background: var(--text);
+  color: var(--ink);
+}
+.btn-primary:hover { background: #fff; transform: translateY(-1px); }
+.btn-ghost {
+  border-color: var(--rule);
+  color: var(--text);
+}
+.btn-ghost:hover { border-color: var(--dim); }
+.btn .arrow { transition: transform 0.18s ease; }
+.btn:hover .arrow { transform: translateX(2px); }
+
+/* ── Live trace terminal ───────────────────────────────────────── */
+.terminal {
+  background: var(--surface);
+  border: 1px solid var(--rule);
   border-radius: 6px;
+  overflow: hidden;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.04) inset,
+    0 24px 60px -20px rgba(0,0,0,0.6);
+}
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rule);
+  background: rgba(255,255,255,0.015);
+}
+.terminal-dots { display: flex; gap: 6px; }
+.terminal-dots span {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--rule);
+}
+.terminal-title {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+  letter-spacing: 0.02em;
+}
+.terminal-body {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  padding: 18px 20px;
+  height: 360px;
+  overflow: hidden;
+  position: relative;
+}
+.terminal-line { white-space: pre; }
+.terminal-line .p { color: var(--break); }        /* shell prompt */
+.terminal-line .c { color: var(--dim); }          /* comment / dim */
+.terminal-line .fn { color: var(--text); font-weight: 500; }
+.terminal-line .arg { color: var(--see); }
+.terminal-line .ret { color: var(--control); }
+.terminal-line .dur { color: var(--dim); }
+.terminal-line .hdr { color: var(--see); }
+.terminal-line .tag-see    { color: var(--see); }
+.terminal-line .tag-ctrl   { color: var(--control); }
+.terminal-line .tag-break  { color: var(--break); }
+.cursor {
+  display: inline-block;
+  width: 8px;
+  height: 14px;
+  background: var(--text);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: blink 1s steps(2) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Anatomy of an intercept ───────────────────────────────────── */
+.section { padding: 80px 0; border-top: 1px solid var(--rule); }
+@media (max-width: 720px) { .section { padding: 56px 0; } }
+
+.section-head { margin-bottom: 48px; }
+.section-head .eyebrow { margin-bottom: 16px; }
+.section-head h2 {
+  font-family: var(--sans);
+  font-size: clamp(28px, 4vw, 40px);
   font-weight: 600;
-  font-size: 0.95rem;
-  transition: background 0.2s;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  max-width: 700px;
 }
-.btn-primary { background: var(--accent); color: #fff !important; }
-.btn-primary:hover { background: #4c96e0; text-decoration: none; }
-.btn-ghost { border: 1px solid var(--border); color: var(--text) !important; }
-.btn-ghost:hover { border-color: var(--accent); text-decoration: none; }
-
-/* Install bar */
-.install {
-  margin: 40px auto;
-  max-width: 600px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px 20px;
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 0.9rem;
-  display: flex; align-items: center; gap: 12px;
+.section-head p {
+  margin-top: 16px;
+  color: var(--dim);
+  font-size: 17px;
+  max-width: 640px;
 }
-.install .prompt { color: var(--accent2); }
-.install .cmd { color: var(--text); flex: 1; }
-.install .copy { color: var(--text-dim); cursor: pointer; padding: 4px; }
-.install .copy:hover { color: var(--accent); }
 
-/* Demo commands */
-.demo { margin: 48px 0; }
-.demo h2 { font-size: 1.4rem; margin-bottom: 16px; }
-.demo-grid {
+/* Anatomy diagram: caller → [wrapper] → real libc, with three taps. */
+.anatomy {
+  margin-top: 16px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 48px 32px;
+  position: relative;
+  overflow: hidden;
+}
+.anatomy-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: 1fr auto 1.4fr auto 1fr;
+  align-items: center;
+  gap: 20px;
+  font-family: var(--mono);
 }
-.demo-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 20px;
-  transition: border-color 0.2s;
+@media (max-width: 860px) {
+  .anatomy-row {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  .anatomy-arrow { display: none; }
 }
-.demo-card:hover { border-color: var(--accent); }
-.demo-card .icon { font-size: 1.5rem; margin-bottom: 8px; }
-.demo-card h3 { font-size: 1rem; margin-bottom: 4px; }
-.demo-card p { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 12px; }
-.demo-card pre {
-  background: #0d1117;
+
+.anatomy-node {
+  border: 1px solid var(--rule);
+  background: var(--ink);
+  padding: 18px 16px;
   border-radius: 4px;
-  padding: 8px 12px;
-  font-size: 0.8rem;
+  text-align: center;
+}
+.anatomy-node .label { font-size: 10px; color: var(--dim); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 6px; }
+.anatomy-node .symbol { font-size: 16px; font-weight: 600; color: var(--text); }
+
+.anatomy-node.wrapper {
+  border-color: var(--text);
+  background: var(--elevated);
+}
+.anatomy-node.wrapper .label { color: var(--see); }
+
+.anatomy-arrow {
+  color: var(--dim);
+  font-size: 14px;
+  letter-spacing: -2px;
+}
+
+.anatomy-taps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 40px;
+  border-top: 1px solid var(--rule);
+}
+@media (max-width: 720px) {
+  .anatomy-taps { grid-template-columns: 1fr; }
+}
+
+.tap {
+  padding: 24px 16px;
+  border-right: 1px solid var(--rule);
+}
+.tap:last-child { border-right: none; }
+@media (max-width: 720px) {
+  .tap { border-right: none; border-bottom: 1px solid var(--rule); }
+  .tap:last-child { border-bottom: none; }
+}
+.tap .marker {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  margin-bottom: 8px;
+}
+.tap.see     .marker { color: var(--see); }
+.tap.control .marker { color: var(--control); }
+.tap.break   .marker { color: var(--break); }
+.tap .copy { font-size: 13px; color: var(--dim); line-height: 1.5; }
+.tap .copy code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text);
+  background: var(--ink);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--rule);
+}
+
+/* ── Actions grid (MECE: observe / modify / fault / control) ───── */
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface);
+}
+@media (max-width: 960px) { .actions-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px) { .actions-grid { grid-template-columns: 1fr; } }
+
+.action-group { border-right: 1px solid var(--rule); }
+.action-group:last-child { border-right: none; }
+@media (max-width: 960px) {
+  .action-group:nth-child(2n) { border-right: none; }
+  .action-group:nth-child(1), .action-group:nth-child(2) { border-bottom: 1px solid var(--rule); }
+}
+@media (max-width: 540px) {
+  .action-group { border-right: none; border-bottom: 1px solid var(--rule); }
+}
+
+.action-group-head {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--ink);
+}
+.action-group-head .cat {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.action-group.observe .cat { color: var(--see); }
+.action-group.modify  .cat { color: var(--control); }
+.action-group.fault   .cat { color: var(--break); }
+.action-group.control .cat { color: var(--dim); }
+
+.action-group-head .scope { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+
+.action-list { padding: 8px 0; }
+.action {
+  padding: 8px 20px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+}
+.action .name { font-family: var(--mono); color: var(--text); font-size: 12.5px; }
+.action .what { color: var(--dim); font-size: 11.5px; text-align: right; }
+
+/* ── Install bar ───────────────────────────────────────────────── */
+.install-section { padding: 64px 0; border-top: 1px solid var(--rule); }
+.install-card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 28px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: center;
+}
+@media (max-width: 720px) {
+  .install-card { grid-template-columns: 1fr; padding: 22px; }
+}
+
+.install-label .eyebrow { margin-bottom: 10px; }
+.install-label h3 {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+.install-label p { color: var(--dim); font-size: 14px; margin-top: 6px; }
+
+.install-cmd {
+  background: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
   overflow-x: auto;
-  color: #8b949e;
 }
-.demo-card pre .c { color: var(--accent2); }
+.install-cmd .p { color: var(--break); }
+.install-cmd .url { color: var(--dim); }
+.install-cmd button {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.install-cmd button:hover { color: var(--text); border-color: var(--dim); }
+.install-cmd button.copied { color: var(--see); border-color: var(--see); }
 
-/* Features */
-.features { margin: 48px 0; }
-.features h2 { font-size: 1.4rem; margin-bottom: 24px; }
-.feature-grid {
+/* ── Platforms ─────────────────────────────────────────────────── */
+.platforms-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 48px;
+  align-items: start;
 }
-.feature {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px;
-}
-.feature h3 { font-size: 0.9rem; margin-bottom: 4px; color: var(--accent); }
-.feature p { font-size: 0.8rem; color: var(--text-dim); }
+@media (max-width: 860px) { .platforms-grid { grid-template-columns: 1fr; gap: 32px; } }
 
-/* Platforms */
-.platforms { margin: 48px 0; text-align: center; }
-.platforms h2 { font-size: 1.2rem; margin-bottom: 16px; color: var(--text-dim); }
-.platforms .badges {
-  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+.platforms-table {
+  font-family: var(--mono);
+  font-size: 13px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
 }
-.platforms .pbadge {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 4px 12px;
-  font-size: 0.8rem;
-  font-family: monospace;
-  color: var(--text-dim);
+.platforms-table .row {
+  display: grid;
+  grid-template-columns: 1.6fr 1.4fr 1fr;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--rule);
+  align-items: center;
 }
+.platforms-table .row:last-child { border-bottom: none; }
+.platforms-table .row.head {
+  background: var(--ink);
+  color: var(--dim);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.platforms-table .os { color: var(--text); }
+.platforms-table .arch { color: var(--dim); }
+.platforms-table .status {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--see);
+  text-align: right;
+}
+.platforms-table .status.beta { color: var(--control); }
 
-/* Comparison */
-.compare { margin: 48px 0; }
-.compare h2 { font-size: 1.4rem; margin-bottom: 16px; }
-.compare table {
+.platforms-note {
+  font-size: 14px;
+  color: var(--dim);
+  line-height: 1.6;
+}
+.platforms-note p + p { margin-top: 12px; }
+.platforms-note strong { color: var(--text); font-weight: 500; }
+
+/* ── Comparison ────────────────────────────────────────────────── */
+.compare-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 13.5px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
 }
-.compare th {
+.compare-table th, .compare-table td {
+  padding: 12px 16px;
   text-align: left;
-  padding: 8px 12px;
-  border-bottom: 2px solid var(--border);
-  color: var(--text-dim);
+  border-bottom: 1px solid var(--rule);
 }
-.compare td {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
+.compare-table tr:last-child td { border-bottom: none; }
+.compare-table th {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  background: var(--ink);
 }
-.compare .yes { color: var(--green); }
-.compare .no { color: var(--text-dim); }
+.compare-table th.retrace-col { color: var(--see); }
+.compare-table td.cap { color: var(--text); }
+.compare-table td.tool { color: var(--dim); font-family: var(--mono); font-size: 12.5px; text-align: center; }
+.compare-table td.yes { color: var(--see); }
+.compare-table td.no { color: var(--dim); }
+.compare-table td.partial { color: var(--control); }
+.compare-table td.num { font-family: var(--mono); font-size: 12px; }
+.compare-table td.retrace-col { background: rgba(94, 227, 255, 0.03); }
 
-/* Footer */
+/* ── Footer ────────────────────────────────────────────────────── */
 footer {
-  border-top: 1px solid var(--border);
-  padding: 32px 0;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 0.85rem;
+  border-top: 1px solid var(--rule);
+  padding: 48px 0 36px;
+  background: var(--surface);
 }
-footer a { color: var(--text-dim); }
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 32px;
+}
+@media (max-width: 720px) {
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: 28px; }
+}
 
-@media (max-width: 600px) {
-  .hero h1 { font-size: 2.5rem; }
-  .hero .tag { font-size: 1rem; }
-  .demo-grid { grid-template-columns: 1fr; }
+.footer-brand .brand { font-size: 16px; margin-bottom: 12px; }
+.footer-brand p { color: var(--dim); font-size: 13px; max-width: 320px; line-height: 1.55; }
+
+.footer-col h4 {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 14px;
+}
+.footer-col ul { list-style: none; }
+.footer-col li { margin-bottom: 8px; font-size: 13px; }
+.footer-col a { color: var(--text); }
+.footer-col a:hover { color: var(--see); }
+
+.footer-bottom {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--dim);
+  font-family: var(--mono);
+}
+@media (max-width: 540px) {
+  .footer-bottom { flex-direction: column; gap: 10px; align-items: flex-start; }
+}
+
+/* ── Motion respect ────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .cursor { animation: none; opacity: 1; }
 }
 </style>
 </head>
 <body>
 
+<nav class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#"><span class="dot"></span>retrace</a>
+    <div class="nav-links">
+      <a href="#anatomy">How it works</a>
+      <a href="#actions">Actions</a>
+      <a href="#platforms">Platforms</a>
+      <a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md">Cookbook</a>
+      <a href="https://github.com/riboseinc/retrace">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ───────────── Hero ───────────── -->
 <section class="hero">
-  <div class="container">
-    <h1>retrace</h1>
-    <div class="tag">Userspace libc interceptor</div>
-    <div class="verbs"><span>SEE</span> &middot; <span>CONTROL</span> &middot; <span>BREAK</span></div>
-    <p class="pitch">
-      The only tool that observes, modifies, AND breaks libc calls &mdash;
-      without code, without recompiling, on every platform.
-    </p>
-    <div class="actions">
-      <a class="btn btn-primary" href="#install">Get started</a>
-      <a class="btn btn-ghost" href="https://github.com/riboseinc/retrace">GitHub &rarr;</a>
-    </div>
-  </div>
-</section>
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow hero-eyebrow">Userspace libc interceptor &middot; v2.1.0</div>
 
-<section id="install">
-  <div class="container">
-    <div class="install">
-      <span class="prompt">$</span>
-      <span class="cmd">curl -sSL https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh | sh</span>
-    </div>
-  </div>
-</section>
+      <div class="verbs">
+        <div class="verb see">
+          <div class="name">see</div>
+          <div class="gloss"><strong>Observe</strong> every libc call. Arguments, return values, durations, in JSON or interactive HTML.</div>
+        </div>
+        <div class="verb control">
+          <div class="name">control</div>
+          <div class="gloss"><strong>Rewrite</strong> arguments and return values on the way through. No source. No recompile.</div>
+        </div>
+        <div class="verb break">
+          <div class="name">break</div>
+          <div class="gloss"><strong>Fault</strong> the call: OOM, short I/O, latency, deny-list. Find the bugs your tests can't reach.</div>
+        </div>
+      </div>
 
-<section class="demo">
-  <div class="container">
-    <h2>One command. No config files.</h2>
-    <div class="demo-grid">
-      <div class="demo-card">
-        <div class="icon">&#128269;</div>
-        <h3>Trace</h3>
-        <p>See every libc call with args, return values, and timing.</p>
-<pre><span class="c">$</span> retrace trace malloc,free -- /bin/ls
-  malloc  &rarr; 0x7f8e2a  (&lt;1&micro;s)
-  free    &rarr; 0         (&lt;1&micro;s)
-  ...
-  1247 calls, 48.3ms total</pre>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#install">
+          Install
+          <span class="arrow">&rarr;</span>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/riboseinc/retrace">
+          View source
+        </a>
       </div>
-      <div class="demo-card">
-        <div class="icon">&#128163;</div>
-        <h3>Fuzz</h3>
-        <p>Inject OOM, short I/O, latency. Find error-path bugs in seconds.</p>
-<pre><span class="c">$</span> retrace fuzz malloc --rate 0.1 -- ./server
-(crash &mdash; you found an OOM bug)</pre>
+    </div>
+
+    <div class="terminal" aria-label="Animated retrace trace example">
+      <div class="terminal-bar">
+        <div class="terminal-dots"><span></span><span></span><span></span></div>
+        <div class="terminal-title">~/proj &mdash; retrace trace</div>
       </div>
-      <div class="demo-card">
-        <div class="icon">&#127918;</div>
-        <h3>Mock</h3>
-        <p>Make any function return whatever you want.</p>
-<pre><span class="c">$</span> retrace mock getuid 0 -- ./check-root
-welcome, root</pre>
-      </div>
-      <div class="demo-card">
-        <div class="icon">&#128737;</div>
-        <h3>Sandbox</h3>
-        <p>Block file access by path deny-list at runtime.</p>
-<pre><span class="c">$</span> retrace run --config sandbox.json -- ./app
-sandbox: DENIED '/etc/shadow'</pre>
-      </div>
-      <div class="demo-card">
-        <div class="icon">&#128202;</div>
-        <h3>HTML viewer</h3>
-        <p>Interactive trace page. No Python, no git clone.</p>
-<pre><span class="c">$</span> retrace trace --html -- ./server
-wrote /tmp/retrace-12345.html</pre>
-      </div>
-      <div class="demo-card">
-        <div class="icon">&#128054;</div>
-        <h3>Docker</h3>
-        <p>Add tracing to any container in one line.</p>
-<pre><span class="c">RUN</span> curl -sSL .../libretrace-linux-x86_64.so \
-    -o /usr/lib/libretrace.so</pre>
+      <div class="terminal-body" id="terminal-body">
+        <div class="terminal-line"><span id="l1"></span></div>
+        <!-- Lines below are populated by the typing animation. -->
       </div>
     </div>
   </div>
 </section>
 
-<section class="features">
-  <div class="container">
-    <h2>Built-in actions</h2>
-    <div class="feature-grid">
-      <div class="feature"><h3>log_params</h3><p>Log args + return as JSON</p></div>
-      <div class="feature"><h3>call_real</h3><p>Invoke real libc</p></div>
-      <div class="feature"><h3>modify_return_value_int</h3><p>Override return value</p></div>
-      <div class="feature"><h3>modify_in_param_str</h3><p>Rewrite string args</p></div>
-      <div class="feature"><h3>memory_fuzz</h3><p>Random OOM injection</p></div>
-      <div class="feature"><h3>incomplete_io</h3><p>Short read/write injection</p></div>
-      <div class="feature"><h3>delay</h3><p>Latency injection</p></div>
-      <div class="feature"><h3>call_count_limit</h3><p>Resource exhaustion</p></div>
-      <div class="feature"><h3>sandbox</h3><p>Path deny-list policy</p></div>
-      <div class="feature"><h3>fuzzing_seed</h3><p>Deterministic RNG</p></div>
-      <div class="feature"><h3>+ custom</h3><p>One .c file per action</p></div>
-      <div class="feature"><h3>CLI subcommands</h3><p>trace, mock, fuzz, slow, html</p></div>
+<!-- ───────────── Install ───────────── -->
+<section class="install-section" id="install">
+  <div class="wrap">
+    <div class="install-card">
+      <div class="install-label">
+        <div class="eyebrow">One command</div>
+        <h3>Detects your OS and architecture. Downloads the right binary. No compiler, no Python, no Docker required.</h3>
+        <p>Works on Linux (glibc + musl + OHOS), macOS, FreeBSD/OpenBSD/NetBSD, Windows, Android.</p>
+      </div>
+      <div class="install-cmd" id="install-cmd">
+        <span class="p">$</span>
+        <span>curl -sSL <span class="url">https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh</span> | sh</span>
+        <button id="copy-btn" type="button" aria-label="Copy install command">copy</button>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="platforms">
-  <div class="container">
-    <h2>Works everywhere</h2>
-    <div class="badges">
-      <span class="pbadge">Linux x86_64</span>
-      <span class="pbadge">Linux aarch64</span>
-      <span class="pbadge">macOS arm64</span>
-      <span class="pbadge">macOS x86_64</span>
-      <span class="pbadge">FreeBSD</span>
-      <span class="pbadge">OpenBSD</span>
-      <span class="pbadge">NetBSD</span>
-      <span class="pbadge">Windows x64</span>
-      <span class="pbadge">Windows arm64</span>
-      <span class="pbadge">Alpine</span>
-      <span class="pbadge">OHOS</span>
-      <span class="pbadge">Android</span>
-      <span class="pbadge">Docker</span>
+<!-- ───────────── Anatomy ───────────── -->
+<section class="section" id="anatomy">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">How it works</div>
+      <h2>One shared library sits between your binary and libc.</h2>
+      <p>retrace preloads a small (<code class="mono">~200&nbsp;KB</code>) shared library into the target process. Every libc call routes through a single assembly trampoline per function. You decide — per call, per script — what happens at each of the three taps.</p>
+    </div>
+
+    <div class="anatomy">
+      <div class="anatomy-row">
+        <div class="anatomy-node">
+          <div class="label">Caller</div>
+          <div class="symbol">your binary</div>
+        </div>
+        <div class="anatomy-arrow mono">&mdash;&mdash;&rarr;</div>
+        <div class="anatomy-node wrapper">
+          <div class="label">retrace wrapper</div>
+          <div class="symbol">trampoline + engine</div>
+        </div>
+        <div class="anatomy-arrow mono">&mdash;&mdash;&rarr;</div>
+        <div class="anatomy-node">
+          <div class="label">Real libc</div>
+          <div class="symbol">malloc, open, …</div>
+        </div>
+      </div>
+
+      <div class="anatomy-taps">
+        <div class="tap see">
+          <div class="marker">&#9656; TAP 1 &mdash; SEE</div>
+          <div class="copy">Inspect arguments before the call. <code>log_params</code> emits args as JSON. <code>call_real</code> lets it proceed.</div>
+        </div>
+        <div class="tap control">
+          <div class="marker">&#9656; TAP 2 &mdash; CONTROL</div>
+          <div class="copy">Rewrite the call. <code>modify_in_param_str</code>, <code>modify_in_param_int</code>, <code>modify_return_value_int</code>.</div>
+        </div>
+        <div class="tap break">
+          <div class="marker">&#9656; TAP 3 &mdash; BREAK</div>
+          <div class="copy">Make it fail. <code>memory_fuzz</code>, <code>incomplete_io</code>, <code>delay</code>, <code>call_count_limit</code>, <code>sandbox</code>.</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="compare">
-  <div class="container">
-    <h2>How it compares</h2>
-    <table>
+<!-- ───────────── Actions ───────────── -->
+<section class="section" id="actions">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Twelve built-in actions</div>
+      <h2>Composable primitives, declared in JSON.</h2>
+      <p>Each function in your config carries an ordered list of actions. Add a new behavior by dropping one <code class="mono">.c</code> file into <code class="mono">src/core/actions/</code> &mdash; no engine change, no recompile of the binary you're tracing.</p>
+    </div>
+
+    <div class="actions-grid">
+
+      <div class="action-group observe">
+        <div class="action-group-head">
+          <div class="cat">Observe</div>
+          <div class="scope">Read-only inspection</div>
+        </div>
+        <div class="action-list">
+          <div class="action"><span class="name">log_params</span><span class="what">args + return</span></div>
+          <div class="action"><span class="name">call_real</span><span class="what">invoke libc</span></div>
+          <div class="action"><span class="name">fuzzing_seed</span><span class="what">deterministic RNG</span></div>
+        </div>
+      </div>
+
+      <div class="action-group modify">
+        <div class="action-group-head">
+          <div class="cat">Modify</div>
+          <div class="scope">Rewrite the call</div>
+        </div>
+        <div class="action-list">
+          <div class="action"><span class="name">modify_in_param_str</span><span class="what">rewrite string</span></div>
+          <div class="action"><span class="name">modify_in_param_int</span><span class="what">rewrite integer</span></div>
+          <div class="action"><span class="name">modify_in_param_arr</span><span class="what">rewrite bytes</span></div>
+          <div class="action"><span class="name">modify_return_value_int</span><span class="what">override return</span></div>
+        </div>
+      </div>
+
+      <div class="action-group fault">
+        <div class="action-group-head">
+          <div class="cat">Fault</div>
+          <div class="scope">Inject failure</div>
+        </div>
+        <div class="action-list">
+          <div class="action"><span class="name">memory_fuzz</span><span class="what">random OOM</span></div>
+          <div class="action"><span class="name">incomplete_io</span><span class="what">short read/write</span></div>
+        </div>
+      </div>
+
+      <div class="action-group control">
+        <div class="action-group-head">
+          <div class="cat">Control</div>
+          <div class="scope">Shape the run</div>
+        </div>
+        <div class="action-list">
+          <div class="action"><span class="name">delay</span><span class="what">latency inject</span></div>
+          <div class="action"><span class="name">call_count_limit</span><span class="what">exhaust resource</span></div>
+          <div class="action"><span class="name">sandbox</span><span class="what">path deny-list</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Platforms ───────────── -->
+<section class="section" id="platforms">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Thirteen platforms, one library</div>
+      <h2>From Linux on a Raspberry Pi to Windows on Arm.</h2>
+      <p>Per-platform assembly trampolines behind a uniform engine. The JSON config you write on your Mac runs unchanged on your Android device, your FreeBSD CI runner, and your Windows Server.</p>
+    </div>
+
+    <div class="platforms-grid">
+      <div class="platforms-table">
+        <div class="row head"><div>OS</div><div>Arch</div><div>Status</div></div>
+        <div class="row"><div class="os">Linux (glibc)</div><div class="arch">x86_64, aarch64</div><div class="status">production</div></div>
+        <div class="row"><div class="os">Linux (musl)</div><div class="arch">x86_64, aarch64</div><div class="status">production</div></div>
+        <div class="row"><div class="os">Linux (OHOS)</div><div class="arch">aarch64</div><div class="status">production</div></div>
+        <div class="row"><div class="os">macOS</div><div class="arch">arm64, x86_64</div><div class="status">production</div></div>
+        <div class="row"><div class="os">FreeBSD / OpenBSD / NetBSD</div><div class="arch">x86_64</div><div class="status">production</div></div>
+        <div class="row"><div class="os">Windows (MSVC)</div><div class="arch">x86_64, arm64</div><div class="status">production</div></div>
+        <div class="row"><div class="os">Windows (MinGW)</div><div class="arch">x86_64</div><div class="status">production</div></div>
+        <div class="row"><div class="os">Android</div><div class="arch">arm64, x86_64</div><div class="status">production</div></div>
+        <div class="row"><div class="os">Linux (static binary)</div><div class="arch">x86_64, aarch64</div><div class="status beta">via ptrace</div></div>
+      </div>
+
+      <div class="platforms-note">
+        <p><strong>Same engine, different trampolines.</strong> ELF, Mach-O, and PE binaries each get a from-scratch assembly trampoline &mdash; no MinHook, no Detours, BSD-2 clean.</p>
+        <p><strong>Binary releases</strong> for every platform are attached to each <a href="https://github.com/riboseinc/retrace/releases" style="color: var(--see);">GitHub release</a>. The install script picks the right one.</p>
+        <p><strong>Docker image</strong> at <code class="mono" style="font-size: 11.5px; color: var(--text);">ghcr.io/riboseinc/retrace:latest</code> &mdash; drop into any container with a one-line <code class="mono" style="font-size: 11.5px; color: var(--text);">RUN</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Comparison ───────────── -->
+<section class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">How it compares</div>
+      <h2>Observe <em>and</em> mutate, without writing code.</h2>
+      <p>The existing tools each do part of the job. strace observes but cannot mutate. Frida mutates but requires JavaScript. libFuzzer mutates but requires recompilation. retrace is the only one that does all three on a binary you didn't build.</p>
+    </div>
+
+    <table class="compare-table">
       <thead>
-        <tr><th>Feature</th><th>retrace</th><th>strace</th><th>Frida</th><th>libFuzzer</th></tr>
+        <tr>
+          <th>Capability</th>
+          <th class="retrace-col">retrace</th>
+          <th>strace</th>
+          <th>Frida</th>
+          <th>libFuzzer</th>
+        </tr>
       </thead>
       <tbody>
-        <tr><td>Observe libc calls</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td></tr>
-        <tr><td>Modify args/return</td><td class="yes">&#10003;</td><td class="no">&#10007;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td></tr>
-        <tr><td>Fault injection</td><td class="yes">&#10003; built-in</td><td class="no">&#10007;</td><td class="yes">via JS</td><td class="yes">&#10003;</td></tr>
-        <tr><td>No code needed</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">JS script</td><td class="no">recompile</td></tr>
-        <tr><td>No recompile</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&#10007;</td></tr>
-        <tr><td>Cross-platform</td><td class="yes">12 platforms</td><td class="no">Linux only</td><td class="yes">cross</td><td class="yes">cross</td></tr>
-        <tr><td>Binary size</td><td>200KB</td><td>preinstalled</td><td>40MB</td><td>linked in</td></tr>
-        <tr><td>Declarative config</td><td class="yes">JSON / CLI</td><td class="no">flags</td><td class="no">JS code</td><td class="no">C++ code</td></tr>
+        <tr>
+          <td class="cap">Observe libc calls</td>
+          <td class="retrace-col yes">&#10003;</td>
+          <td class="tool yes">&#10003;</td>
+          <td class="tool yes">&#10003;</td>
+          <td class="tool no">&mdash;</td>
+        </tr>
+        <tr>
+          <td class="cap">Modify arguments</td>
+          <td class="retrace-col yes">&#10003;</td>
+          <td class="tool no">&mdash;</td>
+          <td class="tool yes">&#10003;</td>
+          <td class="tool no">&mdash;</td>
+        </tr>
+        <tr>
+          <td class="cap">Override return value</td>
+          <td class="retrace-col yes">&#10003;</td>
+          <td class="tool no">&mdash;</td>
+          <td class="tool yes">&#10003;</td>
+          <td class="tool no">&mdash;</td>
+        </tr>
+        <tr>
+          <td class="cap">Fault injection (OOM, short I/O)</td>
+          <td class="retrace-col yes">built-in</td>
+          <td class="tool no">&mdash;</td>
+          <td class="tool partial">via JS</td>
+          <td class="tool yes">&#10003;</td>
+        </tr>
+        <tr>
+          <td class="cap">No source code needed</td>
+          <td class="retrace-col yes">&#10003;</td>
+          <td class="tool yes">&#10003;</td>
+          <td class="tool no">JS script</td>
+          <td class="tool no">recompile</td>
+        </tr>
+        <tr>
+          <td class="cap">No recompilation</td>
+          <td class="retrace-col yes">&#10003;</td>
+          <td class="tool yes">&#10003;</td>
+          <td class="tool yes">&#10003;</td>
+          <td class="tool no">&mdash;</td>
+        </tr>
+        <tr>
+          <td class="cap">Cross-platform</td>
+          <td class="retrace-col yes">13 platforms</td>
+          <td class="tool no">Linux only</td>
+          <td class="tool partial">cross</td>
+          <td class="tool partial">cross</td>
+        </tr>
+        <tr>
+          <td class="cap">Binary size</td>
+          <td class="retrace-col num">~200 KB</td>
+          <td class="tool num">preinstalled</td>
+          <td class="tool num">~40 MB</td>
+          <td class="tool num">linked in</td>
+        </tr>
+        <tr>
+          <td class="cap">Declarative config</td>
+          <td class="retrace-col yes">JSON / CLI</td>
+          <td class="tool no">flags</td>
+          <td class="tool no">JS code</td>
+          <td class="tool no">C++ code</td>
+        </tr>
       </tbody>
     </table>
   </div>
 </section>
 
+<!-- ───────────── Footer ───────────── -->
 <footer>
-  <div class="container">
-    <p>
-      retrace is <a href="https://github.com/riboseinc/retrace">open source</a>
-      under BSD-2-Clause. Built by <a href="https://www.ribose.com">Ribose</a>.
-    </p>
-    <p style="margin-top:8px;">
-      <a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md">Cookbook</a>
-      &middot; <a href="https://github.com/riboseinc/retrace/blob/main/docs/docker.md">Docker</a>
-      &middot; <a href="https://github.com/riboseinc/retrace/blob/main/docs/android.md">Android</a>
-      &middot; <a href="https://github.com/riboseinc/retrace/blob/main/docs/adr/">Architecture decisions</a>
-    </p>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="#"><span class="dot"></span>retrace</a>
+        <p>Userspace libc interception for tracing, fuzzing, mocking, and security auditing. Open source under BSD-2-Clause.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Docs</h4>
+        <ul>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/README.adoc">README</a></li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md">Cookbook</a></li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/docker.md">Docker guide</a></li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/android.md">Android guide</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/riboseinc/retrace">GitHub</a></li>
+          <li><a href="https://github.com/riboseinc/retrace/releases">Releases</a></li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/adr/">Architecture decisions</a></li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/CHANGELOG.md">Changelog</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Community</h4>
+        <ul>
+          <li><a href="https://github.com/riboseinc/retrace/issues">Issues</a></li>
+          <li><a href="https://github.com/riboseinc/retrace/discussions">Discussions</a></li>
+          <li><a href="https://www.ribose.com">Ribose</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>BSD-2-Clause &middot; built by Ribose</span>
+      <span>v2.1.0</span>
+    </div>
   </div>
 </footer>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ── Copy install command ──────────────────────────────────── */
+  var cmdEl = document.getElementById("install-cmd");
+  var copyBtn = document.getElementById("copy-btn");
+  var cmdText = "curl -sSL https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh | sh";
+  if (copyBtn && cmdEl) {
+    copyBtn.addEventListener("click", function () {
+      var done = function () {
+        copyBtn.textContent = "copied";
+        copyBtn.classList.add("copied");
+        setTimeout(function () {
+          copyBtn.textContent = "copy";
+          copyBtn.classList.remove("copied");
+        }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(cmdText).then(done, done);
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = cmdText;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+        done();
+      }
+    });
+  }
+
+  /* ── Typing animation in the hero terminal ─────────────────── */
+  var body = document.getElementById("terminal-body");
+  if (!body) return;
+
+  var reduce = window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* Each entry renders as one line. Fields:
+       text  : string or array of {t: text, c: class} spans
+       pause : ms to wait BEFORE this line appears
+       type  : if true, type out char by char (use only on short lines) */
+  var lines = [
+    { type: true,  pause: 400, parts: [
+      { t: "$ ", c: "p" },
+      { t: "retrace trace malloc,free,open,read -- /bin/ls", c: "fn" }
+    ]},
+    { pause: 240, parts: [
+      { t: "1247 calls captured · 48.3ms total · 42 functions", c: "hdr" }
+    ]},
+    { pause: 80, parts: [
+      { t: "MEM  ", c: "tag-see" },
+      { t: "malloc", c: "fn" },
+      { t: "(", c: "" },
+      { t: "size=1024", c: "arg" },
+      { t: ")", c: "" },
+      { t: "  → ", c: "" },
+      { t: "0x7f8e2a3b4000", c: "ret" },
+      { t: "                                              <1µs", c: "dur" }
+    ]},
+    { pause: 60, parts: [
+      { t: "MEM  ", c: "tag-see" },
+      { t: "free", c: "fn" },
+      { t: "(", c: "" },
+      { t: "ptr=0x7f8e2a3b4000", c: "arg" },
+      { t: ")", c: "" },
+      { t: "                                              <1µs", c: "dur" }
+    ]},
+    { pause: 60, parts: [
+      { t: "I/O  ", c: "tag-ctrl" },
+      { t: "open", c: "fn" },
+      { t: "(", c: "" },
+      { t: "path=\"/etc/passwd\", flags=O_RDONLY", c: "arg" },
+      { t: ")", c: "" },
+      { t: "  → ", c: "" },
+      { t: "3", c: "ret" },
+      { t: "                                              12µs", c: "dur" }
+    ]},
+    { pause: 60, parts: [
+      { t: "I/O  ", c: "tag-ctrl" },
+      { t: "read", c: "fn" },
+      { t: "(", c: "" },
+      { t: "fd=3, count=4096", c: "arg" },
+      { t: ")", c: "" },
+      { t: "  → ", c: "" },
+      { t: "4096", c: "ret" },
+      { t: "                                               8µs", c: "dur" }
+    ]},
+    { pause: 60, parts: [
+      { t: "I/O  ", c: "tag-ctrl" },
+      { t: "write", c: "fn" },
+      { t: "(", c: "" },
+      { t: "fd=1, count=8192", c: "arg" },
+      { t: ")", c: "" },
+      { t: " → ", c: "" },
+      { t: "8192", c: "ret" },
+      { t: "                                              11µs", c: "dur" }
+    ]},
+    { pause: 60, parts: [
+      { t: "MEM  ", c: "tag-see" },
+      { t: "malloc", c: "fn" },
+      { t: "(", c: "" },
+      { t: "size=512", c: "arg" },
+      { t: ")", c: "" },
+      { t: "    → ", c: "" },
+      { t: "0x7f8e2a3b4200", c: "ret" },
+      { t: "                                              <1µs", c: "dur" }
+    ]},
+    { pause: 60, parts: [
+      { t: "EXEC ", c: "tag-break" },
+      { t: "ioctl", c: "fn" },
+      { t: "(", c: "" },
+      { t: "fd=1, req=TIOCGWINSZ", c: "arg" },
+      { t: ")", c: "" },
+      { t: "      → ", c: "" },
+      { t: "0", c: "ret" },
+      { t: "                                               4µs", c: "dur" }
+    ]},
+    { pause: 60, parts: [
+      { t: "I/O  ", c: "tag-ctrl" },
+      { t: "close", c: "fn" },
+      { t: "(", c: "" },
+      { t: "fd=3", c: "arg" },
+      { t: ")", c: "" },
+      { t: "  → ", c: "" },
+      { t: "0", c: "ret" },
+      { t: "                                              <1µs", c: "dur" }
+    ]},
+    { pause: 120, parts: [
+      { t: "⋮ ", c: "c" },
+      { t: "(1240 more calls)", c: "c" }
+    ]},
+    { pause: 280, parts: [
+      { t: "✓ ", c: "hdr" },
+      { t: "wrote /tmp/retrace-43892.html — ", c: "c" },
+      { t: "open in browser", c: "ret" }
+    ]}
+  ];
+
+  function span(parts) {
+    var line = document.createElement("div");
+    line.className = "terminal-line";
+    if (typeof parts === "string") {
+      line.textContent = parts;
+    } else {
+      for (var i = 0; i < parts.length; i++) {
+        var s = document.createElement("span");
+        if (parts[i].c) s.className = parts[i].c;
+        s.textContent = parts[i].t;
+        line.appendChild(s);
+      }
+    }
+    return line;
+  }
+
+  function paintAll() {
+    body.innerHTML = "";
+    for (var i = 0; i < lines.length; i++) {
+      body.appendChild(span(lines[i].parts));
+    }
+    var last = document.createElement("div");
+    last.className = "terminal-line";
+    var cur = document.createElement("span");
+    cur.className = "cursor";
+    last.appendChild(cur);
+    body.appendChild(last);
+  }
+
+  function typeLine(parts, done) {
+    var line = span(parts);
+    body.appendChild(line);
+
+    /* If this line has the `type` flag, animate the last span character
+       by character. Other spans render instantly. */
+    var spans = line.querySelectorAll("span");
+    var fullParts = parts;
+    var lastIdx = fullParts.length - 1;
+    var lastSpan = spans[lastIdx];
+    var fullText = lastSpan.textContent;
+    lastSpan.textContent = "";
+    var ci = 0;
+
+    function step() {
+      if (ci <= fullText.length) {
+        lastSpan.textContent = fullText.slice(0, ci);
+        ci++;
+        setTimeout(step, 28);
+      } else {
+        done();
+      }
+    }
+    step();
+  }
+
+  function playLine(i) {
+    if (i >= lines.length) {
+      var last = document.createElement("div");
+      last.className = "terminal-line";
+      var cur = document.createElement("span");
+      cur.className = "cursor";
+      last.appendChild(cur);
+      body.appendChild(last);
+      return;
+    }
+    var ln = lines[i];
+    setTimeout(function () {
+      if (body.children.length > 7) {
+        body.removeChild(body.firstChild);
+      }
+      if (ln.type) {
+        typeLine(ln.parts, function () { playLine(i + 1); });
+      } else {
+        body.appendChild(span(ln.parts));
+        playLine(i + 1);
+      }
+    }, ln.pause || 80);
+  }
+
+  if (reduce) {
+    paintAll();
+  } else {
+    body.innerHTML = "";
+    playLine(0);
+  }
+})();
+</script>
 
 </body>
 </html>
