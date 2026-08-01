@@ -61,6 +61,54 @@ retrace_func_define_prototypes(unistd) = {
 		}
 	},
 	{
+		.name = "open",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 2,
+		.params = {
+			{
+				.name = "path",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "flags",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "openat",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 3,
+		.params = {
+			{
+				.name = "dirfd",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "path",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "flags",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
 		.name = "access",
 		.conv = CC_SYSTEM_V,
 		.type_name = "int",

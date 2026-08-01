@@ -85,6 +85,11 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
 	set(RETRACE_PLATFORM_OPENBSD  TRUE)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "NetBSD")
 	set(RETRACE_PLATFORM_NETBSD   TRUE)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+	# Android — Bionic libc (not glibc/musl). LD_PRELOAD works via
+	# wrap.sh (debug builds) or Magisk (rooted). preload_elf backend.
+	set(RETRACE_PLATFORM_ANDROID TRUE)
+	set(RETRACE_PLATFORM_LINUX   TRUE)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
 	# OpenHarmony / HarmonyOS — musl-based aarch64 Linux.
 	# LD_PRELOAD interposition works (preload_elf backend). See issue #443.
