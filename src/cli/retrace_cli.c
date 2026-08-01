@@ -342,6 +342,264 @@ static int parse_common_opts(int argc, char **argv, int start,
 }
 
 /*
+ * HTML trace viewer — built into the CLI, no Python needed.
+ * Generates a self-contained interactive HTML page from a JSON log.
+ */
+
+static const char *categorize_func(const char *func)
+{
+	struct {
+		const char *kw;
+		const char *cat;
+	} table[] = {
+		{"open", "I/O"}, {"read", "I/O"}, {"write", "I/O"},
+		{"close", "I/O"}, {"fopen", "I/O"}, {"stat", "I/O"},
+		{"access", "I/O"}, {"lseek", "I/O"},
+		{"socket", "NET"}, {"connect", "NET"}, {"bind", "NET"},
+		{"listen", "NET"}, {"accept", "NET"}, {"send", "NET"},
+		{"recv", "NET"},
+		{"malloc", "MEM"}, {"calloc", "MEM"}, {"realloc", "MEM"},
+		{"free", "MEM"}, {"memmove", "MEM"}, {"memset", "MEM"},
+		{"memcpy", "MEM"}, {"strlen", "MEM"}, {"strcmp", "MEM"},
+		{"strcpy", "MEM"},
+		{"pthread_mutex", "SYNC"}, {"pthread_cond", "SYNC"},
+		{"pthread_rwlock", "SYNC"},
+		{"system", "EXEC"}, {"exec", "EXEC"}, {"fork", "EXEC"},
+		{"exit", "EXEC"}, {"abort", "EXEC"},
+		{"getenv", "ENV"}, {"setenv", "ENV"},
+		{"time", "TIME"}, {"clock", "TIME"},
+	};
+	size_t i;
+
+	for (i = 0; i < sizeof(table) / sizeof(table[0]); i++) {
+		if (strstr(func, table[i].kw) != NULL)
+			return table[i].cat;
+	}
+	return "OTHER";
+}
+
+static const char *cat_color(const char *cat)
+{
+	struct {
+		const char *cat;
+		const char *color;
+	} colors[] = {
+		{"I/O", "#4a90d9"}, {"NET", "#e8782c"}, {"MEM", "#2ecc71"},
+		{"SYNC", "#9b59b6"}, {"EXEC", "#e74c3c"}, {"ENV", "#f1c40f"},
+		{"TIME", "#1abc9c"},
+	};
+	size_t i;
+
+	for (i = 0; i < sizeof(colors) / sizeof(colors[0]); i++) {
+		if (strcmp(cat, colors[i].cat) == 0)
+			return colors[i].color;
+	}
+	return "#95a5a6";
+}
+
+static void html_escape(FILE *out, const char *s)
+{
+	if (s == NULL)
+		return;
+
+	for (; *s; s++) {
+		switch (*s) {
+		case '<':
+			fputs("&lt;", out);
+			break;
+		case '>':
+			fputs("&gt;", out);
+			break;
+		case '&':
+			fputs("&amp;", out);
+			break;
+		case '"':
+			fputs("&quot;", out);
+			break;
+		default:
+			fputc(*s, out);
+			break;
+		}
+	}
+}
+
+static void html_log(const char *path, FILE *out)
+{
+	JSON_Value *root;
+	JSON_Array *arr;
+	JSON_Object *entry, *msg, *pending_args = NULL;
+	size_t i, n, j, ci;
+	const char *func, *text;
+	int count = 0;
+	double total_us = 0;
+	int cat_counts[8] = {0};
+	double cat_times[8] = {0};
+	static const char *cat_names[8] = {
+		"I/O", "NET", "MEM", "SYNC", "EXEC", "ENV", "TIME", "OTHER"
+	};
+
+	root = json_parse_file(path);
+	if (root == NULL) {
+		fprintf(stderr, "retrace: cannot parse %s\n", path);
+		return;
+	}
+
+	arr = json_value_get_array(root);
+	if (arr == NULL) {
+		fprintf(stderr, "retrace: expected JSON array in %s\n", path);
+		json_value_free(root);
+		return;
+	}
+
+	n = json_array_get_count(arr);
+
+	/* Pass 1: summary stats */
+	for (i = 0; i < n; i++) {
+		entry = json_array_get_object(arr, i);
+		if (entry == NULL)
+			continue;
+		msg = json_object_get_object(entry, "message");
+		if (msg == NULL)
+			continue;
+		text = json_object_get_string(msg, "text");
+		if (text != NULL)
+			continue;
+		func = json_object_get_string(msg, "func");
+		if (func && json_object_has_value(msg, "call_duration_us")) {
+			double us = json_object_get_number(msg,
+				"call_duration_us");
+			const char *cat = categorize_func(func);
+
+			count++;
+			total_us += us;
+			for (ci = 0; ci < 8; ci++) {
+				if (strcmp(cat, cat_names[ci]) == 0) {
+					cat_counts[ci]++;
+					cat_times[ci] += us;
+					break;
+				}
+			}
+		}
+	}
+
+	/* HTML prologue + summary */
+	fprintf(out,
+		"<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\">\n"
+		"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
+		"<title>retrace trace</title>\n"
+		"<style>\n"
+		"* { box-sizing:border-box; margin:0; padding:0; }\n"
+		"body { font-family:system-ui,sans-serif; background:#f8f9fa; color:#2c3e50; padding:20px; }\n"
+		"h1 { font-size:1.4rem; margin-bottom:4px; }\n"
+		".sub { color:#7f8c8d; font-size:.85rem; margin-bottom:16px; }\n"
+		".cards { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }\n"
+		".card { background:#fff; border-radius:8px; padding:10px 14px; box-shadow:0 1px 3px rgba(0,0,0,.1); }\n"
+		".card .l { font-size:.65rem; text-transform:uppercase; color:#95a5a6; }\n"
+		".card .v { font-size:1.3rem; font-weight:700; }\n"
+		".cats { margin-bottom:16px; }\n"
+		".cat { font-size:.8rem; margin-bottom:3px; }\n"
+		".badge { display:inline-block; padding:1px 7px; border-radius:3px; color:#fff; font-size:.65rem; font-weight:700; min-width:28px; text-align:center; }\n"
+		"input { padding:7px 10px; border:1px solid #ddd; border-radius:4px; font-size:.8rem; width:100%%; margin-bottom:10px; }\n"
+		"table { width:100%%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.1); }\n"
+		"th { background:#2c3e50; color:#fff; padding:7px 10px; text-align:left; font-size:.7rem; text-transform:uppercase; }\n"
+		"td { padding:5px 10px; border-bottom:1px solid #ecf0f1; font-size:.8rem; }\n"
+		"tr:hover { background:#f8f9fa; }\n"
+		".fn { font-family:monospace; font-weight:600; }\n"
+		".ar { font-family:monospace; font-size:.72rem; color:#7f8c8d; }\n"
+		".du { font-family:monospace; text-align:right; font-weight:600; }\n"
+		"</style></head><body>\n"
+		"<h1>retrace trace</h1>\n"
+		"<p class=\"sub\">%d calls intercepted &middot; %.1fms total libc time</p>\n"
+		"<div class=\"cards\">"
+		"<div class=\"card\"><div class=\"l\">Calls</div><div class=\"v\">%d</div></div>"
+		"<div class=\"card\"><div class=\"l\">Total</div><div class=\"v\">%.1fms</div></div>"
+		"<div class=\"card\"><div class=\"l\">Avg</div><div class=\"v\">%.0f&micro;s</div></div>"
+		"</div>\n<div class=\"cats\">\n",
+		count, total_us / 1000.0,
+		count, total_us / 1000.0,
+		count > 0 ? total_us / count : 0.0);
+
+	/* Category breakdown */
+	for (ci = 0; ci < 8; ci++) {
+		if (cat_counts[ci] > 0) {
+			fprintf(out,
+				"<div class=\"cat\"><span class=\"badge\" style=\"background:%s\">%s</span>"
+				" %d calls &middot; %.1fms</div>\n",
+				cat_color(cat_names[ci]), cat_names[ci],
+				cat_counts[ci], cat_times[ci] / 1000.0);
+		}
+	}
+	fprintf(out, "</div>\n");
+
+	/* Filter + table */
+	fprintf(out,
+		"<input type=\"text\" placeholder=\"Filter by function name...\" "
+		"id=\"f\" onkeyup=\"var q=this.value.toLowerCase();"
+		"document.querySelectorAll('.r').forEach(function(r){"
+		"r.style.display=r.textContent.toLowerCase().includes(q)?'':'none';})\">\n"
+		"<table><thead><tr><th>Cat</th><th>Function</th>"
+		"<th>Args</th><th>Return</th><th>Duration</th></tr></thead><tbody>\n");
+
+	/* Pass 2: data rows */
+	for (i = 0; i < n; i++) {
+		entry = json_array_get_object(arr, i);
+		if (entry == NULL)
+			continue;
+		msg = json_object_get_object(entry, "message");
+		if (msg == NULL)
+			continue;
+		text = json_object_get_string(msg, "text");
+		if (text != NULL)
+			continue;
+		func = json_object_get_string(msg, "func");
+		if (func && json_object_has_value(msg, "call_duration_us")) {
+			double us = json_object_get_number(msg,
+				"call_duration_us");
+			double rv = json_object_get_number(msg, "ret_val");
+			const char *cat = categorize_func(func);
+
+			fprintf(out,
+				"<tr class=\"r\" style=\"border-left:3px solid %s\">"
+				"<td><span class=\"badge\" style=\"background:%s\">%s</span></td>"
+				"<td class=\"fn\">", cat_color(cat),
+				cat_color(cat), cat);
+			html_escape(out, func);
+			fprintf(out, "</td><td class=\"ar\">");
+			if (pending_args != NULL) {
+				size_t nk = json_object_get_count(pending_args);
+
+				for (j = 0; j < nk; j++) {
+					const char *k = json_object_get_name(
+						pending_args, j);
+					const char *v = json_value_get_string(
+						json_object_get_value_at(
+							pending_args, j));
+
+					fprintf(out, "%s=", k);
+					html_escape(out, v);
+					fprintf(out, " ");
+				}
+				pending_args = NULL;
+			}
+			fprintf(out, "</td><td>%g</td>", rv);
+			if (us < 1.0)
+				fprintf(out,
+					"<td class=\"du\">&lt;1&micro;s</td>");
+			else
+				fprintf(out,
+					"<td class=\"du\">%.0f&micro;s</td>",
+					us);
+			fprintf(out, "</tr>\n");
+		} else if (func == NULL) {
+			pending_args = msg;
+		}
+	}
+
+	fprintf(out, "</tbody></table>\n</body></html>\n");
+	json_value_free(root);
+}
+
+/*
  * retrace trace [funcs...] [OPTIONS] -- <command>
  *
  * If no funcs given, trace every interceptable call (wildcard).
@@ -352,6 +610,7 @@ static int cmd_trace(int argc, char **argv)
 	const char *logfile = NULL;
 	const char *lib_override = NULL;
 	int quiet = 0;
+	int html_mode = 0;
 	int sep, i, nfuncs = 0;
 	char json[8192];
 	const char *config;
@@ -361,6 +620,16 @@ static int cmd_trace(int argc, char **argv)
 		if (argv[i][0] == '-' || strcmp(argv[i], "--") == 0)
 			break;
 		nfuncs++;
+	}
+
+	/* Check for --html before parse_common_opts */
+	for (sep = 0; sep < argc; sep++) {
+		if (strcmp(argv[sep], "--html") == 0) {
+			html_mode = 1;
+			break;
+		}
+		if (strcmp(argv[sep], "--") == 0)
+			break;
 	}
 
 	i = parse_common_opts(argc, argv, i, &logfile, &quiet, &lib_override);
@@ -454,8 +723,25 @@ static int cmd_trace(int argc, char **argv)
 				WEXITSTATUS(status));
 		}
 
-		/* Pretty-print the trace log */
-		pp_log(trace_log);
+		/* Pretty-print or generate HTML from the trace log */
+		if (html_mode) {
+			char html_path[PATH_MAX];
+			FILE *hf;
+
+			snprintf(html_path, sizeof(html_path),
+				 "/tmp/retrace-%d.html", (int)getpid());
+			hf = fopen(html_path, "w");
+			if (hf) {
+				html_log(trace_log, hf);
+				fclose(hf);
+				fprintf(stderr, "wrote %s\n", html_path);
+			} else {
+				perror("retrace: html");
+				html_log(trace_log, stdout);
+			}
+		} else {
+			pp_log(trace_log);
+		}
 
 		/* Cleanup */
 		unlink(trace_log);
@@ -705,6 +991,27 @@ int main(int argc, char **argv)
 			return 1;
 		}
 		pp_log(argv[2]);
+		return 0;
+	}
+
+	if (strcmp(argv[1], "html") == 0) {
+		if (argc < 3) {
+			fprintf(stderr, "retrace html: usage: retrace html <trace.json> [-o output.html]\n");
+			return 1;
+		}
+		if (argc >= 5 && strcmp(argv[3], "-o") == 0) {
+			FILE *f = fopen(argv[4], "w");
+
+			if (!f) {
+				perror("retrace html");
+				return 1;
+			}
+			html_log(argv[2], f);
+			fclose(f);
+			fprintf(stderr, "wrote %s\n", argv[4]);
+		} else {
+			html_log(argv[2], stdout);
+		}
 		return 0;
 	}
 
