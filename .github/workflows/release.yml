@@ -97,7 +97,9 @@ jobs:
           - platform: macos-arm64
             runner: macos-14
             os: macos
-          # macos-x86_64 disabled until #452 is fixed.
+          - platform: macos-x86_64
+            runner: macos-15-intel
+            os: macos
           - platform: windows-x64
             runner: windows-2022
             os: windows
@@ -157,6 +159,10 @@ jobs:
           tar -czf "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" "$STAGE"
           sha256sum "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
             > "retrace-${VERSION}-${{ matrix.platform }}.tar.gz.sha256"
+          # Also produce a bare library for curl + LD_PRELOAD use case
+          cp build/src/v2/libretrace.so.2.1.0 "libretrace-${{ matrix.platform }}.so"
+          sha256sum "libretrace-${{ matrix.platform }}.so" \
+            > "libretrace-${{ matrix.platform }}.so.sha256"
 
       - name: Stage binary (macOS)
         if: matrix.os == 'macos'
@@ -181,6 +187,10 @@ jobs:
           tar -czf "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" "$STAGE"
           shasum -a 256 "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
             > "retrace-${VERSION}-${{ matrix.platform }}.tar.gz.sha256"
+          # Bare library for curl + DYLD_INSERT use case
+          cp build/src/v2/libretrace.2.1.0.dylib "libretrace-${{ matrix.platform }}.dylib"
+          shasum -a 256 "libretrace-${{ matrix.platform }}.dylib" \
+            > "libretrace-${{ matrix.platform }}.dylib.sha256"
 
       # ----- Windows (MSVC) -----
       - name: Set up vcpkg (Windows)
@@ -249,6 +259,10 @@ jobs:
           path: |
             retrace-*.tar.gz
             retrace-*.tar.gz.sha256
+            libretrace-*.so
+            libretrace-*.so.sha256
+            libretrace-*.dylib
+            libretrace-*.dylib.sha256
             retrace-*.zip
             retrace-*.zip.sha256
 
@@ -449,3 +463,7 @@ jobs:
             artifacts/retrace-*.tar.gz.sha256
             artifacts/retrace-*.zip
             artifacts/retrace-*.zip.sha256
+            artifacts/libretrace-*.so
+            artifacts/libretrace-*.so.sha256
+            artifacts/libretrace-*.dylib
+            artifacts/libretrace-*.dylib.sha256
