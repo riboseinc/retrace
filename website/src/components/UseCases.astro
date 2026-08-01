@@ -1,0 +1,165 @@
+---
+// Use cases — five personas. NEW section framing the audience.
+const personas = [
+  {
+    tag: "security",
+    accent: "see",
+    who: "Security researcher",
+    what: "Reverse-engineer a binary you don't have source for. Map every <code>open</code>, every <code>connect</code>, every <code>system</code> call.",
+    cmd: "retrace trace open,connect,system -- ./suspicious",
+  },
+  {
+    tag: "qa",
+    accent: "break",
+    who: "QA engineer",
+    what: "Find error-path bugs without writing fixtures. Inject OOM, short I/O, and latency directly into your test runs in CI.",
+    cmd: "retrace fuzz malloc --rate 0.1 -- ./server",
+  },
+  {
+    tag: "dev",
+    accent: "control",
+    who: "Backend developer",
+    what: "Find the hot path. See per-call timings on every libc call. Redirect a file open to a stub without rebuilding.",
+    cmd: "retrace trace --html -- ./api-server",
+  },
+  {
+    tag: "devops",
+    accent: "see",
+    who: "DevOps / SRE",
+    what: "Trace any containerized binary in one line. Drop the library into your image; no recompile, no restart, no APM agent.",
+    cmd: "RUN curl -sSL .../libretrace-linux.so -o /usr/lib/libretrace.so",
+  },
+  {
+    tag: "pentest",
+    accent: "break",
+    who: "Penetration tester",
+    what: "Sandbox an untrusted binary at runtime. Block <code>/etc/shadow</code>, <code>/root/.ssh/</code>, network egress — without SELinux or AppArmor.",
+    cmd: "retrace run --config sandbox.json -- ./untrusted",
+  },
+  {
+    tag: "edu",
+    accent: "control",
+    who: "Educator / student",
+    what: "See exactly what <code>ls</code>, <code>cat</code>, <code>grep</code> actually do. The trace is the lesson — every libc call, in order, with timings.",
+    cmd: "retrace trace --html -- /bin/ls",
+  },
+];
+---
+
+<section class="section" id="use-cases">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Who uses retrace</div>
+      <h2>One tool, six jobs.</h2>
+      <p>
+        retrace is small enough to slip into a one-off debugging session, generic enough to anchor a CI
+        fuzzing pipeline, principled enough to back a security audit. Below: who reaches for it, and the
+        command they reach for first.
+      </p>
+    </div>
+
+    <div class="persona-grid">
+      {
+        personas.map((p, i) => (
+          <article class={`persona glass glass-hover reveal accent-${p.accent}`} style={`transition-delay: ${i * 60}ms`}>
+            <div class="tag-row">
+              <div class={`tag tag-${p.accent}`}>{p.tag}</div>
+              <div class="verb-mark">
+                <span class={`vm vm-${p.accent}`}>{p.accent}</span>
+              </div>
+            </div>
+            <h3>{p.who}</h3>
+            <p set:html={p.what} />
+            <pre class="cmd"><span class="prompt">$</span> {p.cmd}</pre>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+.persona-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 960px) { .persona-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .persona-grid { grid-template-columns: 1fr; } }
+
+.persona {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tag-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--color-dim);
+}
+.tag-see { color: var(--color-see); border-color: rgba(94, 227, 255, 0.25); }
+.tag-control { color: var(--color-control); border-color: rgba(242, 180, 65, 0.25); }
+.tag-break { color: var(--color-break); border-color: rgba(255, 107, 92, 0.25); }
+
+.verb-mark .vm {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  opacity: 0.7;
+}
+.vm-see { color: var(--color-see); }
+.vm-control { color: var(--color-control); }
+.vm-break { color: var(--color-break); }
+
+.persona h3 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.persona p {
+  font-size: 13.5px;
+  color: var(--color-dim);
+  line-height: 1.55;
+  flex: 1;
+}
+.persona p :global(code) {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.persona .cmd {
+  background: rgba(7, 9, 13, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--color-text);
+  overflow-x: auto;
+  margin: 0;
+}
+.persona .cmd .prompt { color: var(--color-break); margin-right: 6px; }
+
+/* Subtle accent edge per persona — left border tinted by verb color. */
+.accent-see { border-left: 2px solid rgba(94, 227, 255, 0.35); }
+.accent-control { border-left: 2px solid rgba(242, 180, 65, 0.35); }
+.accent-break { border-left: 2px solid rgba(255, 107, 92, 0.35); }
+</style>

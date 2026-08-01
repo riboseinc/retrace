@@ -25,6 +25,11 @@ libnereon/
 *~
 .vscode/
 
+# website (Astro) build output and deps
+website/node_modules/
+website/dist/
+website/.astro/
+
 # archives
 *.tar.gz
 

@@ -1,0 +1,223 @@
+---
+// Install bar + 3-step walkthrough. The walkthrough bridges "I installed"
+// to "first insight" with concrete commands.
+
+const steps = [
+  {
+    num: "01 · INSTALL",
+    what: `The script puts <strong>retrace</strong> on your <code>PATH</code> and <strong>libretrace</strong> in your loader path. About five seconds.`,
+    code: [
+      { c: "c", t: "# detect OS + arch, fetch the right binary" },
+      { c: "p", t: "$ " },
+      { c: "", t: "curl -sSL .../install.sh | sh\n" },
+      { c: "ok", t: "retrace 2.1.0 installed" },
+    ],
+  },
+  {
+    num: "02 · TRACE",
+    what: `Trace any binary. Add <code>--html</code> for an interactive report. No source. No recompile. No config file.`,
+    code: [
+      { c: "p", t: "$ " },
+      { c: "", t: "retrace trace malloc,free \\\n      --html -- /bin/ls\n" },
+      { c: "ok", t: "wrote /tmp/retrace-43892.html" },
+    ],
+  },
+  {
+    num: "03 · OPEN",
+    what: `Self-contained HTML — summary cards, category breakdown, filterable call table. No Python, no server, no CDN.`,
+    code: [
+      { c: "p", t: "$ " },
+      { c: "", t: "open /tmp/retrace-43892.html\n\n" },
+      { c: "arg", t: "  1,247 calls · 48.3 ms · 42 functions\n" },
+      { c: "arg", t: "  [ I/O ]  485 calls  32.1 ms (66%)\n" },
+      { c: "arg", t: "  [ MEM ]  412 calls   8.3 ms (17%)" },
+    ],
+  },
+];
+---
+
+<section class="install-section" id="install">
+  <div class="wrap">
+    <div class="install-card glass reveal">
+      <div class="install-label">
+        <div class="eyebrow">One command</div>
+        <h3>
+          Detects your OS and architecture. Downloads the right binary.
+          No compiler, no Python, no Docker required.
+        </h3>
+        <p>
+          Works on Linux (glibc + musl + OHOS), macOS, FreeBSD/OpenBSD/NetBSD, Windows, Android.
+        </p>
+      </div>
+      <div class="install-cmd" id="install-cmd">
+        <span class="p">$</span>
+        <span class="cmd-text">
+          curl -sSL <span class="url">https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh</span> | sh
+        </span>
+        <button id="copy-btn" type="button" aria-label="Copy install command">copy</button>
+      </div>
+    </div>
+
+    <div class="walkthrough reveal">
+      {
+        steps.map((step) => (
+          <div class="walk-step glass-tight glass-hover">
+            <div class="num">{step.num}</div>
+            <div class="what" set:html={step.what} />
+            <pre>{step.code.map((line) => (<span class={line.c}>{line.t}</span>))}</pre>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  (function () {
+    var btn = document.getElementById("copy-btn");
+    var cmd = "curl -sSL https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh | sh";
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      var done = function () {
+        btn.textContent = "copied";
+        btn.classList.add("copied");
+        setTimeout(function () {
+          btn.textContent = "copy";
+          btn.classList.remove("copied");
+        }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(cmd).then(done, done);
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = cmd;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+        done();
+      }
+    });
+  })();
+</script>
+
+<style>
+.install-section { padding: 64px 0; }
+
+.install-card {
+  padding: 28px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: center;
+}
+@media (max-width: 720px) {
+  .install-card { grid-template-columns: 1fr; padding: 22px; }
+}
+
+.install-label .eyebrow { margin-bottom: 10px; }
+.install-label h3 {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+.install-label p {
+  color: var(--color-dim);
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+.install-cmd {
+  background: rgba(7, 9, 13, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow-x: auto;
+  backdrop-filter: blur(8px);
+}
+.install-cmd .p { color: var(--color-break); }
+.install-cmd .url { color: var(--color-dim); }
+.install-cmd button {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.install-cmd button:hover {
+  color: var(--color-text);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.install-cmd button.copied {
+  color: var(--color-see);
+  border-color: var(--color-see);
+}
+
+.walkthrough {
+  margin-top: 32px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 860px) {
+  .walkthrough { grid-template-columns: 1fr; }
+}
+
+.walk-step {
+  padding: 22px 22px 20px;
+}
+.walk-step .num {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--color-dim);
+  margin-bottom: 10px;
+}
+.walk-step .what {
+  font-size: 13.5px;
+  color: var(--color-text);
+  margin-bottom: 12px;
+  line-height: 1.45;
+}
+.walk-step .what :global(strong) { font-weight: 500; }
+.walk-step .what :global(code) {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.walk-step pre {
+  background: rgba(7, 9, 13, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--color-text);
+  overflow-x: auto;
+  margin: 0;
+  white-space: pre-wrap;
+}
+.walk-step pre :global(.p) { color: var(--color-break); }
+.walk-step pre :global(.c) { color: var(--color-dim); }
+.walk-step pre :global(.ok) { color: var(--color-see); }
+.walk-step pre :global(.arg) { color: var(--color-control); }
+</style>
