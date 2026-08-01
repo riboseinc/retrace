@@ -1,49 +1,86 @@
 # Docker integration
 
 retrace ships as a Docker image for zero-config tracing/fuzzing of
-containerized applications.
+containerized applications. Three ways to add it to your container:
 
-## Quick start: trace any binary
+## Option 1: Direct download (simplest)
+
+No multi-stage build needed. One RUN line downloads the pre-built
+library from GitHub releases:
+
+```dockerfile
+FROM your-app:latest
+RUN apt-get update && apt-get install -y curl \
+    && curl -sSL https://github.com/riboseinc/retrace/releases/latest/download/libretrace-linux-x86_64.so \
+       -o /usr/lib/libretrace.so \
+    && rm -rf /var/lib/apt/lists/*
+ENV LD_PRELOAD=/usr/lib/libretrace.so
+```
+
+Or with the install script:
+
+```dockerfile
+FROM your-app:latest
+RUN curl -sSL https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh | sh
+ENV LD_PRELOAD=/usr/local/lib/libretrace.so
+```
+
+## Option 2: Multi-stage build (recommended for production)
+
+Copies from the pre-built Docker image — no curl, no download in
+the final image:
+
+```dockerfile
+FROM ghcr.io/riboseinc/retrace:latest AS retrace
+FROM your-app:latest
+COPY --from=retrace /usr/lib/libretrace.so* /usr/lib/
+ENV LD_PRELOAD=/usr/lib/libretrace.so
+```
+
+## Option 3: Run retrace as a container
 
 ```sh
 $ docker run --rm ghcr.io/riboseinc/retrace:latest \
     trace malloc -- /bin/ls
 ```
 
-## Add tracing to your own container (one line)
-
-```dockerfile
-FROM ghcr.io/riboseinc/retrace:latest AS retrace
-FROM your-app:latest
-COPY --from=retrace /usr/lib/libretrace.so* /usr/lib/
-ENV LD_PRELOAD=/usr/lib/libretrace.so
-```
-
-Now every libc call in `your-app` is automatically traced.
-
 ## Add fuzzing to CI (one line)
 
 ```dockerfile
-FROM ghcr.io/riboseinc/retrace:latest AS retrace
 FROM your-app:latest
-COPY --from=retrace /usr/lib/libretrace.so* /usr/lib/
+RUN curl -sSL https://github.com/riboseinc/retrace/releases/latest/download/libretrace-linux-x86_64.so \
+    -o /usr/lib/libretrace.so
 ENV LD_PRELOAD=/usr/lib/libretrace.so
 ENV RETRACE_JSON_CONFIG=/etc/retrace/fuzz.json
 RUN echo '{"intercept_scripts":[{"func_name":"malloc","actions":[{"action_name":"call_real"},{"action_name":"memory_fuzz","action_params":{"fail_rate":0.01}}]}]}' \
     > /etc/retrace/fuzz.json
 ```
 
-Every `docker run` of this image now fuzzes malloc at 1% failure rate.
-Run your test suite; if it crashes, you found an OOM bug.
+Every `docker run` now fuzzes malloc at 1% failure rate.
 
 ## Use cases
 
-| Goal | What to do |
-|------|------------|
-| See what files your app opens | `ENV RETRACE_JSON_CONFIG=/etc/retrace/trace-open.json` + a config that traces `open` |
-| Find OOM bugs | Set `fail_rate` to 0.01 in the fuzz config |
-| Profile hot spots | Run under trace config, then `retrace-flamegraph trace.json -o profile.svg` |
-| Security audit | Set `RETRACE_LOGGER_ALLOWED_FUNCS=system,execve` to see every command execution |
+| Goal | Config |
+|------|--------|
+| See what files your app opens | Trace `open`, `read` |
+| Find OOM bugs | `memory_fuzz` with `fail_rate=0.01` |
+| Profile hot spots | Trace all, then render flamegraph from JSON log |
+| Security audit | Trace `system`, `execve`, `open` |
+| Sandbox untrusted code | `sandbox` action with path deny-list |
+
+## Available download URLs
+
+Stable URLs that always point to the latest release:
+
+| Platform | URL |
+|----------|-----|
+| Linux x86_64 | `https://github.com/riboseinc/retrace/releases/latest/download/libretrace-linux-x86_64.so` |
+| Linux aarch64 | `https://github.com/riboseinc/retrace/releases/latest/download/libretrace-linux-aarch64.so` |
+| macOS arm64 | `https://github.com/riboseinc/retrace/releases/latest/download/libretrace-macos-arm64.dylib` |
+| macOS x86_64 | `https://github.com/riboseinc/retrace/releases/latest/download/libretrace-macos-x86_64.dylib` |
+
+Replace `latest` with a version tag (e.g., `v2.1.0`) for reproducible
+builds.
 
 ## Build locally
 
@@ -52,12 +89,9 @@ $ docker build -t retrace .
 $ docker run --rm retrace trace malloc -- /bin/ls
 ```
 
-## How it works
+## Install without Docker
 
-The image is based on Ubuntu 24.04 with `LD_PRELOAD` set by default.
-When you `COPY --from=retrace /usr/lib/libretrace.so* /usr/lib/` into
-your app image, the library is loaded into every process. The
-`RETRACE_JSON_CONFIG` env var controls which actions run.
-
-The image is ~150MB (Ubuntu base + retrace library + CLI). For a
-smaller image, use Alpine as the base (retrace builds on musl).
+```sh
+$ curl -sSL https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh | sh
+$ LD_PRELOAD=/usr/local/lib/libretrace.so /bin/ls
+```
