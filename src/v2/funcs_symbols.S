@@ -43,10 +43,13 @@
  * __isoc99_* via __REDIRECT. Binaries built with modern gcc call
  * __isoc99_scanf (not scanf) at the PLT. We must interpose both
  * names on glibc; musl and BSDs only need the plain names.
+ * RETRACE_HAVE_ISOC99_SCANF is 0 on macOS/musl/BSD.
  */
+#if RETRACE_HAVE_ISOC99_SCANF
 WRAPPER_ENTRY_SYSTEM_V __isoc99_fscanf
 WRAPPER_ENTRY_SYSTEM_V __isoc99_scanf
 WRAPPER_ENTRY_SYSTEM_V __isoc99_sscanf
 WRAPPER_ENTRY_SYSTEM_V __isoc99_vfscanf
 WRAPPER_ENTRY_SYSTEM_V __isoc99_vscanf
 WRAPPER_ENTRY_SYSTEM_V __isoc99_vsscanf
+#endif
