@@ -1,0 +1,121 @@
+---
+// Recipes preview — bridge from the marketing site to the cookbook.
+const recipes = [
+  {
+    n: "09",
+    accent: "break",
+    title: "Fuzz malloc failures",
+    problem: "Inject OOM at 10% to find leak paths and unhandled NULL returns.",
+    href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/09-fuzz-malloc.md",
+  },
+  {
+    n: "20",
+    accent: "control",
+    title: "Sandbox a binary",
+    problem: "Block /etc/shadow, /root/.ssh/, and friends — without SELinux or AppArmor.",
+    href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/20-sandbox.md",
+  },
+  {
+    n: "19",
+    accent: "break",
+    title: "CI fuzzing",
+    problem: "Drop-in GitHub Action that catches OOM and short-IO bugs on every PR.",
+    href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/19-ci-fuzzing.md",
+  },
+  {
+    n: "05",
+    accent: "control",
+    title: "Mock getuid for root checks",
+    problem: "Make a binary think it's root (or any uid) without actually being root.",
+    href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/05-mock-getuid.md",
+  },
+];
+---
+
+<section class="section recipes" id="recipes">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Recipes</div>
+      <h2>Twenty cookbook recipes. Four favorites to start with.</h2>
+      <p>
+        Each recipe is self-contained: copy the JSON, run the command, see the result. Browse the
+        <a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md">full cookbook</a>
+        for all twenty.
+      </p>
+    </div>
+
+    <div class="recipe-grid">
+      {
+        recipes.map((r, i) => (
+          <a class={`recipe glass glass-hover reveal accent-${r.accent}`} style={`transition-delay: ${i * 60}ms`} href={r.href}>
+            <div class="recipe-top">
+              <div class="recipe-n">{r.n}</div>
+              <div class={`recipe-arrow arrow-${r.accent}`}>→</div>
+            </div>
+            <h3>{r.title}</h3>
+            <p>{r.problem}</p>
+          </a>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+.recipe-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+@media (max-width: 960px) { .recipe-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px) { .recipe-grid { grid-template-columns: 1fr; } }
+
+.recipe {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--color-text);
+}
+.recipe-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.recipe-n {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--color-dim);
+}
+.recipe-arrow {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  opacity: 0.4;
+  transition: transform 0.25s var(--ease-glass), opacity 0.25s var(--ease-glass);
+}
+.recipe:hover .recipe-arrow {
+  transform: translateX(4px);
+  opacity: 1;
+}
+.arrow-see { color: var(--color-see); }
+.arrow-control { color: var(--color-control); }
+.arrow-break { color: var(--color-break); }
+
+.recipe h3 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.recipe p {
+  font-size: 13px;
+  color: var(--color-dim);
+  line-height: 1.5;
+}
+
+.accent-see { border-left: 2px solid rgba(94, 227, 255, 0.35); }
+.accent-control { border-left: 2px solid rgba(242, 180, 65, 0.35); }
+.accent-break { border-left: 2px solid rgba(255, 107, 92, 0.35); }
+</style>

@@ -1,0 +1,138 @@
+---
+const cols = [
+  {
+    title: "Docs",
+    links: [
+      { label: "README", href: "https://github.com/riboseinc/retrace/blob/main/README.adoc" },
+      { label: "CLI reference", href: "https://github.com/riboseinc/retrace/blob/main/docs/cli.md" },
+      { label: "Config reference", href: "https://github.com/riboseinc/retrace/blob/main/docs/configuration.md" },
+      { label: "Cookbook", href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md" },
+      { label: "Docker guide", href: "https://github.com/riboseinc/retrace/blob/main/docs/docker.md" },
+      { label: "Android guide", href: "https://github.com/riboseinc/retrace/blob/main/docs/android.md" },
+    ],
+  },
+  {
+    title: "Project",
+    links: [
+      { label: "GitHub", href: "https://github.com/riboseinc/retrace" },
+      { label: "Releases", href: "https://github.com/riboseinc/retrace/releases" },
+      { label: "Architecture decisions", href: "https://github.com/riboseinc/retrace/blob/main/docs/adr/" },
+      { label: "Changelog", href: "https://github.com/riboseinc/retrace/blob/main/CHANGELOG.md" },
+    ],
+  },
+  {
+    title: "Community",
+    links: [
+      { label: "Issues", href: "https://github.com/riboseinc/retrace/issues" },
+      { label: "Discussions", href: "https://github.com/riboseinc/retrace/discussions" },
+      { label: "Ribose", href: "https://www.ribose.com" },
+    ],
+  },
+];
+---
+
+<footer class="footer-glass">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="#top">
+          <span class="dot"></span>retrace
+        </a>
+        <p>
+          Userspace libc interception for tracing, fuzzing, mocking, and security auditing. Open source
+          under BSD-2-Clause.
+        </p>
+      </div>
+      {
+        cols.map((col) => (
+          <div class="footer-col">
+            <h4>{col.title}</h4>
+            <ul>
+              {col.links.map((l) => (
+                <li><a href={l.href}>{l.label}</a></li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+    <div class="footer-bottom">
+      <span>BSD-2-Clause · built by Ribose</span>
+      <span>v2.1.0</span>
+    </div>
+  </div>
+</footer>
+
+<style>
+.footer-glass {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 48px 0 36px;
+  background: rgba(11, 13, 18, 0.5);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  gap: 32px;
+}
+@media (max-width: 720px) {
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: 28px; }
+}
+
+.footer-brand .brand {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text);
+  margin-bottom: 12px;
+}
+.footer-brand .brand .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-see);
+  box-shadow: 0 0 12px rgba(94, 227, 255, 0.55);
+}
+.footer-brand p {
+  color: var(--color-dim);
+  font-size: 13px;
+  max-width: 320px;
+  line-height: 1.55;
+}
+
+.footer-col h4 {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+  margin-bottom: 14px;
+}
+.footer-col ul { list-style: none; }
+.footer-col li {
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.footer-col a { color: var(--color-text); transition: color 0.15s; }
+.footer-col a:hover { color: var(--color-see); }
+
+.footer-bottom {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--color-dim);
+  font-family: var(--font-mono);
+}
+@media (max-width: 540px) {
+  .footer-bottom { flex-direction: column; gap: 10px; align-items: flex-start; }
+}
+</style>

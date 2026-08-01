@@ -1,0 +1,41 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Hero from "../components/Hero.astro";
+import Install from "../components/Install.astro";
+import Anatomy from "../components/Anatomy.astro";
+import Actions from "../components/Actions.astro";
+import UseCases from "../components/UseCases.astro";
+import Platforms from "../components/Platforms.astro";
+import Comparison from "../components/Comparison.astro";
+import Recipes from "../components/Recipes.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<Layout>
+  <Nav />
+  <Hero />
+  <Install />
+  <Anatomy />
+  <Actions />
+  <UseCases />
+  <Platforms />
+  <Comparison />
+  <Recipes />
+  <Footer />
+</Layout>
+
+<style is:global>
+  /* Shared layout helpers — available to every component. */
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+  @media (max-width: 720px) {
+    .wrap { padding: 0 20px; }
+  }
+  .mono {
+    font-family: var(--font-mono);
+  }
+</style>

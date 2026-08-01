@@ -1,0 +1,152 @@
+---
+// 12 actions, grouped MECE into four categories that mirror
+// src/core/actions/.
+const groups = [
+  {
+    cls: "observe",
+    cat: "Observe",
+    scope: "Read-only inspection",
+    actions: [
+      { name: "log_params", what: "args + return" },
+      { name: "call_real", what: "invoke libc" },
+      { name: "fuzzing_seed", what: "deterministic RNG" },
+    ],
+  },
+  {
+    cls: "modify",
+    cat: "Modify",
+    scope: "Rewrite the call",
+    actions: [
+      { name: "modify_in_param_str", what: "rewrite string" },
+      { name: "modify_in_param_int", what: "rewrite integer" },
+      { name: "modify_in_param_arr", what: "rewrite bytes" },
+      { name: "modify_return_value_int", what: "override return" },
+    ],
+  },
+  {
+    cls: "fault",
+    cat: "Fault",
+    scope: "Inject failure",
+    actions: [
+      { name: "memory_fuzz", what: "random OOM" },
+      { name: "incomplete_io", what: "short read/write" },
+    ],
+  },
+  {
+    cls: "control",
+    cat: "Control",
+    scope: "Shape the run",
+    actions: [
+      { name: "delay", what: "latency inject" },
+      { name: "call_count_limit", what: "exhaust resource" },
+      { name: "sandbox", what: "path deny-list" },
+    ],
+  },
+];
+---
+
+<section class="section" id="actions">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Twelve built-in actions</div>
+      <h2>Composable primitives, declared in JSON.</h2>
+      <p>
+        Each function in your config carries an ordered list of actions. Add a new behavior by dropping one
+        <code class="mono">.c</code> file into <code class="mono">src/core/actions/</code> — no engine change,
+        no recompile of the binary you're tracing.
+      </p>
+    </div>
+
+    <div class="actions-grid reveal">
+      {
+        groups.map((g) => (
+          <div class={`action-group ${g.cls}`}>
+            <div class="action-group-head">
+              <div class="cat">{g.cat}</div>
+              <div class="scope">{g.scope}</div>
+            </div>
+            <div class="action-list">
+              {g.actions.map((a) => (
+                <div class="action">
+                  <span class="name">{a.name}</span>
+                  <span class="what">{a.what}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(20, 24, 30, 0.4);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+}
+@media (max-width: 960px) { .actions-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px) { .actions-grid { grid-template-columns: 1fr; } }
+
+.action-group {
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+.action-group:last-child { border-right: none; }
+@media (max-width: 960px) {
+  .action-group:nth-child(2n) { border-right: none; }
+  .action-group:nth-child(1), .action-group:nth-child(2) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+}
+@media (max-width: 540px) {
+  .action-group { border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+}
+
+.action-group-head {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(7, 9, 13, 0.35);
+}
+.action-group-head .cat {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.action-group.observe .cat { color: var(--color-see); }
+.action-group.modify .cat { color: var(--color-control); }
+.action-group.fault .cat { color: var(--color-break); }
+.action-group.control .cat { color: var(--color-dim); }
+.action-group-head .scope {
+  font-size: 11.5px;
+  color: var(--color-dim);
+  margin-top: 2px;
+}
+
+.action-list { padding: 8px 0; }
+.action {
+  padding: 8px 20px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+}
+.action .name {
+  font-family: var(--font-mono);
+  color: var(--color-text);
+  font-size: 12.5px;
+}
+.action .what {
+  color: var(--color-dim);
+  font-size: 11.5px;
+  text-align: right;
+}
+</style>

@@ -1,0 +1,175 @@
+---
+import TraceTerminal from "./TraceTerminal.vue";
+
+const verbs = [
+  {
+    cls: "see",
+    name: "see",
+    gloss: "<strong>Observe</strong> every libc call. Arguments, return values, durations — in JSON or interactive HTML.",
+  },
+  {
+    cls: "control",
+    name: "control",
+    gloss: "<strong>Rewrite</strong> arguments and return values on the way through. No source. No recompile.",
+  },
+  {
+    cls: "break",
+    name: "break",
+    gloss: "<strong>Fault</strong> the call: OOM, short I/O, latency, deny-list. Find the bugs your tests can't reach.",
+  },
+];
+---
+
+<section class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow hero-eyebrow">Userspace libc interceptor &middot; v2.1.0</div>
+
+      <div class="verbs">
+        {
+          verbs.map((v) => (
+            <div class={`verb ${v.cls}`}>
+              <div class="name">
+                <span class={`v-${v.cls}`}>{v.name}</span>
+                <span class={`dot dot-${v.cls}`}></span>
+              </div>
+              <div class="gloss" set:html={v.gloss} />
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#install">
+          Install
+          <span class="arrow">→</span>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/riboseinc/retrace">
+          View source
+        </a>
+      </div>
+    </div>
+
+    <div class="terminal-wrap">
+      <TraceTerminal client:load />
+    </div>
+  </div>
+</section>
+
+<style>
+.hero {
+  padding: 96px 0 64px;
+  position: relative;
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 64px;
+  align-items: center;
+}
+@media (max-width: 960px) {
+  .hero { padding: 64px 0 48px; }
+  .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+}
+
+.hero-eyebrow { margin-bottom: 28px; }
+
+.verbs { margin-bottom: 36px; }
+.verb {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 20px;
+  align-items: baseline;
+  padding: 14px 0;
+  border-top: 1px solid var(--color-rule);
+}
+.verb:last-of-type { border-bottom: 1px solid var(--color-rule); }
+@media (max-width: 540px) {
+  .verb { grid-template-columns: 1fr; gap: 4px; padding: 12px 0; }
+}
+
+.verb .name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: clamp(38px, 6vw, 60px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.verb .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  align-self: center;
+  transform: translateY(-6px);
+}
+.v-see, .dot-see { color: var(--color-see); background: var(--color-see); }
+.dot-see { box-shadow: 0 0 12px rgba(94, 227, 255, 0.55); }
+.v-control { color: var(--color-control); }
+.dot-control { background: var(--color-control); box-shadow: 0 0 12px rgba(242, 180, 65, 0.55); }
+.v-break { color: var(--color-break); }
+.dot-break { background: var(--color-break); box-shadow: 0 0 12px rgba(255, 107, 92, 0.55); }
+
+.verb .gloss {
+  font-size: 14px;
+  color: var(--color-dim);
+  line-height: 1.5;
+}
+.verb .gloss :global(strong) {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.hero-cta {
+  display: flex;
+  gap: 12px;
+  margin-top: 36px;
+  flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  border-radius: 6px;
+  transition: all 0.25s var(--ease-glass);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.btn-primary {
+  background: linear-gradient(180deg, #ffffff 0%, #d8dde6 100%);
+  color: var(--color-ink);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 16px 36px -12px rgba(255, 255, 255, 0.25);
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 20px 48px -10px rgba(255, 255, 255, 0.35);
+}
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--color-text);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.btn-ghost:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+.btn .arrow { transition: transform 0.18s ease; }
+.btn:hover .arrow { transform: translateX(2px); }
+
+.terminal-wrap {
+  position: relative;
+}
+</style>

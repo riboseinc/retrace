@@ -1,0 +1,123 @@
+---
+// Platforms table + side note.
+const platforms = [
+  { os: "Linux (glibc)", arch: "x86_64, aarch64", status: "production" },
+  { os: "Linux (musl)", arch: "x86_64, aarch64", status: "production" },
+  { os: "Linux (OHOS)", arch: "aarch64", status: "production" },
+  { os: "macOS", arch: "arm64, x86_64", status: "production" },
+  { os: "FreeBSD / OpenBSD / NetBSD", arch: "x86_64", status: "production" },
+  { os: "Windows (MSVC)", arch: "x86_64, arm64", status: "production" },
+  { os: "Windows (MinGW)", arch: "x86_64", status: "production" },
+  { os: "Android", arch: "arm64, x86_64", status: "production" },
+  { os: "Linux (static binary)", arch: "x86_64, aarch64", status: "via ptrace", beta: true },
+];
+---
+
+<section class="section" id="platforms">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Thirteen platforms, one library</div>
+      <h2>From Linux on a Raspberry Pi to Windows on Arm.</h2>
+      <p>
+        Per-platform assembly trampolines behind a uniform engine. The JSON config you write on your Mac
+        runs unchanged on your Android device, your FreeBSD CI runner, and your Windows Server.
+      </p>
+    </div>
+
+    <div class="platforms-grid">
+      <div class="platforms-table glass-tight reveal">
+        <div class="row head">
+          <div>OS</div>
+          <div>Arch</div>
+          <div>Status</div>
+        </div>
+        {
+          platforms.map((p) => (
+            <div class="row">
+              <div class="os">{p.os}</div>
+              <div class="arch">{p.arch}</div>
+              <div class={`status ${p.beta ? "beta" : ""}`}>{p.status}</div>
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="platforms-note reveal">
+        <p>
+          <strong>Same engine, different trampolines.</strong> ELF, Mach-O, and PE binaries each get a
+          from-scratch assembly trampoline — no MinHook, no Detours, BSD-2 clean.
+        </p>
+        <p>
+          <strong>Binary releases</strong> for every platform are attached to each
+          <a href="https://github.com/riboseinc/retrace/releases">GitHub release</a>. The install script
+          picks the right one.
+        </p>
+        <p>
+          <strong>Docker image</strong> at
+          <code>ghcr.io/riboseinc/retrace:latest</code> — drop into any container with a one-line
+          <code>RUN</code>.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+.platforms-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 48px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .platforms-grid { grid-template-columns: 1fr; gap: 32px; }
+}
+
+.platforms-table {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  overflow: hidden;
+}
+.platforms-table .row {
+  display: grid;
+  grid-template-columns: 1.6fr 1.4fr 1fr;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  align-items: center;
+}
+.platforms-table .row:last-child { border-bottom: none; }
+.platforms-table .row.head {
+  background: rgba(7, 9, 13, 0.5);
+  color: var(--color-dim);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.platforms-table .os { color: var(--color-text); }
+.platforms-table .arch { color: var(--color-dim); }
+.platforms-table .status {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-see);
+  text-align: right;
+}
+.platforms-table .status.beta { color: var(--color-control); }
+
+.platforms-note {
+  font-size: 14px;
+  color: var(--color-dim);
+  line-height: 1.6;
+}
+.platforms-note p + p { margin-top: 12px; }
+.platforms-note strong { color: var(--color-text); font-weight: 500; }
+.platforms-note a { color: var(--color-see); }
+.platforms-note code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+</style>

@@ -1,0 +1,273 @@
+/*
+ * retrace — global styles.
+ *
+ * Tailwind 4 uses a CSS-first theme via @theme. Project-specific tokens
+ * (colors, fonts, motion) are declared here. Utility classes are
+ * generated on demand from these tokens.
+ *
+ * The three product verbs carry semantic color throughout the page:
+ *   see     cyan      — observation (log_params, call_real)
+ *   control amber     — modification (modify_in_param_*, modify_return_value_int)
+ *   break   vermilion — fault / state (memory_fuzz, sandbox, delay, ...)
+ *
+ * These are not decorative accents. They encode the product's thesis.
+ */
+
+@import "tailwindcss";
+
+@theme {
+  /* ── Ink & surfaces ────────────────────────────────────────── */
+  --color-ink: #07090d;
+  --color-ink-2: #0b0d12;
+  --color-surface: #14181e;
+  --color-elevated: #1c212a;
+
+  /* ── Verb palette (semantic, not decorative) ───────────────── */
+  --color-see: #5ee3ff;
+  --color-see-soft: #5ee3ff22;
+  --color-control: #f2b441;
+  --color-control-soft: #f2b44122;
+  --color-break: #ff6b5c;
+  --color-break-soft: #ff6b5c22;
+
+  /* ── Text ──────────────────────────────────────────────────── */
+  --color-text: #e8ecf1;
+  --color-dim: #7e8694;
+  --color-rule: #232936;
+
+  /* ── Fonts ─────────────────────────────────────────────────── */
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono",
+    Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
+
+  /* ── Motion ────────────────────────────────────────────────── */
+  --ease-glass: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-liquid: cubic-bezier(0.65, 0.05, 0.36, 1);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Base
+   ──────────────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+  background: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  line-height: 1.55;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background: var(--color-ink);
+  overflow-x: hidden;
+  position: relative;
+  min-height: 100vh;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Background — three slowly drifting verb-colored orbs.
+   These give the page its liquid depth without competing with content.
+   Respect prefers-reduced-motion.
+   ──────────────────────────────────────────────────────────────── */
+.orb-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      rgba(94, 227, 255, 0.045),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 100% 100%,
+      rgba(242, 180, 65, 0.035),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 50% 40% at 0% 80%,
+      rgba(255, 107, 92, 0.03),
+      transparent 60%
+    ),
+    var(--color-ink);
+}
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.55;
+  will-change: transform;
+}
+.orb-1 {
+  width: 540px;
+  height: 540px;
+  top: -120px;
+  left: -120px;
+  background: radial-gradient(circle, rgba(94, 227, 255, 0.18), transparent 70%);
+  animation: drift1 28s var(--ease-liquid) infinite alternate;
+}
+.orb-2 {
+  width: 620px;
+  height: 620px;
+  bottom: -200px;
+  right: -160px;
+  background: radial-gradient(circle, rgba(242, 180, 65, 0.13), transparent 70%);
+  animation: drift2 34s var(--ease-liquid) infinite alternate;
+}
+.orb-3 {
+  width: 460px;
+  height: 460px;
+  top: 40%;
+  right: 10%;
+  background: radial-gradient(circle, rgba(255, 107, 92, 0.1), transparent 70%);
+  animation: drift3 40s var(--ease-liquid) infinite alternate;
+}
+@keyframes drift1 {
+  0%   { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(120px, 60px) scale(1.1); }
+}
+@keyframes drift2 {
+  0%   { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-140px, -80px) scale(1.08); }
+}
+@keyframes drift3 {
+  0%   { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-80px, 120px) scale(0.92); }
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Liquid glass surfaces.
+
+   Two layers:
+     1. Translucent fill + backdrop blur — the "glass".
+     2. Inset highlight on top edge — the "specular".
+   Borders are subtly refractive (gradient).
+   ──────────────────────────────────────────────────────────────── */
+.glass {
+  background: linear-gradient(
+    180deg,
+    rgba(28, 33, 42, 0.55) 0%,
+    rgba(20, 24, 30, 0.45) 100%
+  );
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    0 24px 60px -20px rgba(0, 0, 0, 0.55);
+  border-radius: 14px;
+  position: relative;
+}
+.glass::before {
+  /* Refractive sheen along the top edge — catches the eye. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0) 70%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass-tight {
+  /* Slightly thinner glass for nested surfaces (action cards, etc.) */
+  background: linear-gradient(
+    180deg,
+    rgba(28, 33, 42, 0.42) 0%,
+    rgba(20, 24, 30, 0.32) 100%
+  );
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+/* Hover lift for interactive glass cards. */
+.glass-hover {
+  transition:
+    transform 0.4s var(--ease-glass),
+    box-shadow 0.4s var(--ease-glass),
+    border-color 0.4s var(--ease-glass);
+}
+.glass-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 32px 80px -24px rgba(0, 0, 0, 0.7);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Typography helpers
+   ──────────────────────────────────────────────────────────────── */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 18px;
+  height: 1px;
+  background: var(--color-rule);
+}
+
+.verb-name {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Scroll reveal — applied via IntersectionObserver in Layout.
+   ──────────────────────────────────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.7s var(--ease-glass),
+    transform 0.7s var(--ease-glass);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Motion preference
+   ──────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .orb { animation: none !important; }
+  .reveal { opacity: 1; transform: none; }
+}

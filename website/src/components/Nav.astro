@@ -1,0 +1,71 @@
+---
+// Top navigation — sticky glass bar.
+---
+
+<nav class="nav-glass">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <span class="dot"></span>retrace
+    </a>
+    <div class="nav-links">
+      <a href="#anatomy">How it works</a>
+      <a href="#actions">Actions</a>
+      <a href="#use-cases">Use cases</a>
+      <a href="#platforms">Platforms</a>
+      <a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md">Cookbook</a>
+      <a href="https://github.com/riboseinc/retrace">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<style>
+.nav-glass {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(7, 9, 13, 0.6);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+.brand {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text);
+}
+.brand .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-see);
+  box-shadow:
+    0 0 12px rgba(94, 227, 255, 0.55),
+    0 0 2px rgba(94, 227, 255, 0.9);
+}
+.nav-links {
+  display: flex;
+  gap: 28px;
+  font-size: 13px;
+  color: var(--color-dim);
+}
+.nav-links a {
+  transition: color 0.2s;
+}
+.nav-links a:hover {
+  color: var(--color-text);
+}
+@media (max-width: 720px) {
+  .nav-links { display: none; }
+}
+</style>
