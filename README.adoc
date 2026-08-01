@@ -33,6 +33,7 @@ file `open()` paths, faking OpenSSL verify results, and more.
 | Linux (musl / OHOS) | aarch64 | `LD_PRELOAD` | Cross-compile + signed
 | macOS | arm64 (Apple Silicon) | `DYLD_INSERT_LIBRARIES` | Production (printf fixed in v2.1.0)
 | macOS | x86_64 (Intel) | `DYLD_INSERT_LIBRARIES` | Production (init + FP varargs fixed in v2.1.0)
+| Android | arm64, x86_64 | `LD_PRELOAD` (wrap.sh / Magisk) | Cross-compile via NDK
 | FreeBSD / OpenBSD / NetBSD | x86_64 | `LD_PRELOAD` | Production
 | Windows (MSVC) | x86_64, arm64 | Inline hook (from scratch, ADR-0009) | Production
 | Windows (MinGW) | x86_64 | Inline hook | Production
@@ -41,47 +42,75 @@ file `open()` paths, faking OpenSSL verify results, and more.
 
 Pre-built binaries for every platform are attached to each
 link:https://github.com/riboseinc/retrace/releases[release].
+Install with one command:
+
+[source,console]
+----
+$ curl -sSL https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh | sh
+----
+
+
+== Quick start
+
+[source,console]
+----
+# Install
+$ curl -sSL https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh | sh
+
+# Trace libc calls (text output)
+$ retrace trace malloc,free -- /bin/ls
+
+# Trace libc calls (interactive HTML)
+$ retrace trace malloc --html -- /bin/ls
+
+# Fuzz malloc at 10% failure rate
+$ retrace fuzz malloc --rate 0.1 -- ./your-program
+
+# Mock a return value
+$ retrace mock getuid 0 -- ./check-root
+
+# Or use a JSON config for advanced scenarios
+$ retrace run --config docs/cookbook/09-fuzz-malloc.json -- ./your-program
+----
+
+See the link:https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md[cookbook]
+for 20+ recipes covering tracing, fuzzing, mocking, redirection,
+security auditing, and CI integration.
 
 
 == What's new in v2.1.0
 
-* **macOS Intel fully working.** ld64 on Intel macOS silently drops the
-  `.quad _<name>` reference in `__DATA,__retrace_rimpls` for malloc and
-  realloc, leaving `retrace_real_impls_init` failing on the malloc lookup
-  and every wrapper call falling through to real libc. v2.1.0 adds a
-  dlsym(RTLD_NEXT, ...) fallback when the section walk misses, so init
-  completes. Intel macOS joins Apple Silicon as a fully-supported platform.
-* **FP varargs on x86_64.** The x86_64 trampoline now saves
-  `xmm0..xmm7` on entry and restores them before the tail-call to
-  the real libc function. Sys V passes variadic FP args in xmm
-  registers; previously `printf("%f", 1.5)` produced garbage because
-  the engine call clobbered them. Now correct on Linux, BSD, and
-  macOS Intel.
-* **printf variadic dispatch on Apple Silicon.** `printf("%d %s", ...)`
-  no longer segfaults under `DYLD_INSERT_LIBRARIES` on Apple Silicon.
-  retrace now reads variadic args from the caller's stack frame on
-  Darwin AArch64 (the Apple ABI puts them there, not in `x1..x7` like
-  AAPCS64 does on Linux/BSD). All printf-family tests pass on M1/M2/M3.
-* **OHOS support.** Cross-compile path for HarmonyOS / OpenHarmony
-  arm64, with NDK + binary-sign-tool integration in CI.
-* **Alpine / musl fully green.** `parse_printf_format` is implemented
-  locally where musl doesn't ship `printf.h`; integer printf/scanf
-  work end-to-end on Alpine x86_64 and aarch64.
-* **Native CLI launcher** (`src/cli/retrace_cli.c`) replaces the v1
-  shell script. Auto-detects the library path, sets `LD_PRELOAD` /
-  `DYLD_INSERT_LIBRARIES` and the `RETRACE_*` env vars, execs the
-  target. POSIX-only — Windows uses CreateRemoteThread injection.
-* **Smoke test verifies interception** in CI: builds a tiny `getuid()`
-  binary, redirects via JSON config, asserts the output is `uid=0`.
-  The previous smoke step ran `/usr/bin/id` which is SIP-protected
-  on macOS — `DYLD_INSERT_LIBRARIES` was stripped and the test passed
-  without proving interception happened.
-* **Single-library install.** The `_v2` suffix on the library name was
-  dropped (v1 source was removed per ADR-0011). Install produces
-  `libretrace.so` / `libretrace.dylib` / `retrace.dll`.
-* **Per-platform binary artifacts** in every release: 8 platforms
-  (Linux x64/arm64, macOS x64/arm64, Windows x64/arm64, Alpine
-  x64/arm64, OHOS arm64) + source tarball.
+* **Quick CLI subcommands** &mdash; `retrace trace malloc -- /bin/ls`,
+  `retrace fuzz malloc --rate 0.1 -- ./server`, `retrace mock getuid 0`,
+  `retrace slow open --ms 100`. No JSON needed for the 90% use case.
+  Plus `retrace pp` (built-in text pretty-printer) and
+  `retrace html` (interactive HTML trace viewer).
+* **Built-in HTML trace viewer** &mdash; `retrace trace --html -- /bin/ls`
+  generates a self-contained interactive HTML page. No Python, no git
+  clone. Summary cards, category breakdown, filterable call table.
+* **Docker integration** &mdash; one-line tracing/fuzzing for any container:
+  `RUN curl ... -o /usr/lib/libretrace.so`. Pre-built image at
+  `ghcr.io/riboseinc/retrace:latest`.
+* **Binary releases** &mdash; pre-built `.so`/`.dylib`/`.dll` for 8 platforms.
+  Install via `scripts/install.sh` (detects OS + arch, downloads the
+  right binary). Stable URLs for Dockerfiles.
+* **12 built-in actions** &mdash; log_params, call_real, modify_in_param_*,
+  modify_return_value_int, memory_fuzz, incomplete_io, fuzzing_seed,
+  delay (latency injection), call_count_limit (resource exhaustion),
+  sandbox (runtime path deny-list).
+* **Android support** &mdash; cross-compile via NDK for arm64-v8a and x86_64.
+* **Engine MECE refactor** &mdash; engine.c split into thread_context,
+  script_resolver, action_runner (ADR-0013).
+* **macOS Intel fixed** &mdash; dlsym(RTLD_NEXT) fallback for ld64's silent
+  symbol-drop bug. Intel macOS is now fully production.
+* **FP varargs on x86_64** &mdash; xmm0..7 saved in trampoline; printf("%f")
+  works correctly on Linux, BSD, macOS.
+* **Homebrew formula** &mdash; `brew tap riboseinc/retrace && brew install retrace`.
+* **Cookbook** &mdash; 20+ recipes: tracing, fuzzing, mocking, redirection,
+  security audit, CI integration, sandbox, enprot cross-link.
+* **Tools** &mdash; flamegraph (SVG), logpp (text), benchmark (overhead).
+* **Per-platform binary artifacts** in every release: 10 platforms +
+  source tarball.
 
 
 == Build

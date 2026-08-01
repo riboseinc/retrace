@@ -76,6 +76,7 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 | 17 | [Per-return-address routing](17-return-addr-routing.md) | Different behavior for different call sites of the same function. *(planned)* |
 | 18 | [Fuzz enprot's EPT parser](18-fuzz-enprot.md) | Cross-project recipe: stress-test [engyon/enprot](https://github.com/engyon/enprot) via retrace — audit file access, fuzz malloc, simulate short reads. |
 | 19 | [CI fuzzing](19-ci-fuzzing.md) | Drop-in `.github/workflows/retrace-fuzz.yml` that catches OOM + short-IO bugs on every PR. |
+| 20 | [Sandbox a binary](20-sandbox.md) | Runtime file-access deny-list: block `/etc/shadow`, `/root/.ssh/`, etc. |
 
 ## Action reference
 
@@ -90,8 +91,9 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 | `memory_fuzz` | Randomly fail `malloc`/`calloc`/`realloc` at a configurable rate. |
 | `incomplete_io` | Truncate read/write return values at a configurable rate. |
 | `fuzzing_seed` | Pin the RNG seed for deterministic fuzzing. |
-| `delay` | Inject N ms of latency before the call returns. *(new)* |
-| `call_count_limit` | Fail the call once count crosses a per-function threshold. *(new)* |
+| `delay` | Inject N ms of latency before the call returns. |
+| `call_count_limit` | Fail the call once count crosses a per-function threshold. |
+| `sandbox` | Deny file access by path deny-list at runtime. |
 
 ## Environment variables
 
