@@ -10,6 +10,9 @@ const {
   title = "retrace — See. Control. Break. Every libc call.",
   description = "A userspace libc interceptor. Observe, modify, and break any libc call — without source, without recompiling, on thirteen platforms. One shared library.",
 } = Astro.props;
+
+const site = "https://riboseinc.github.io/retrace";
+const ogImage = `${site}/og-image.svg`;
 ---
 
 <!doctype html>
@@ -20,7 +23,78 @@ const {
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="generator" content={Astro.generator} />
-    <link rel="icon" href="data:," />
+
+    {/* Favicon — inline SVG dot matching the brand wordmark */}
+    <link rel="icon" type="image/svg+xml" href="/retrace/favicon.svg" />
+    <link rel="apple-touch-icon" href="/retrace/favicon.svg" />
+
+    {/* Canonical */}
+    <link rel="canonical" href={site} />
+
+    {/* Open Graph */}
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="retrace" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={site} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="retrace — See. Control. Break. Every libc call." />
+
+    {/* Twitter / X */}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content="retrace — See. Control. Break." />
+    <meta name="twitter:site" content="@riboseinc" />
+
+    {/* Theme color */}
+    <meta name="theme-color" content="#07090d" />
+    <meta name="color-scheme" content="dark" />
+
+    {/* Sitemap */}
+    <link rel="sitemap" type="application/xml" href="/retrace/sitemap.xml" />
+
+    {/* Structured data — SoftwareApplication per schema.org */}
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        name: "retrace",
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "Linux, macOS, Windows, FreeBSD, OpenBSD, NetBSD, Android",
+        url: site,
+        downloadUrl: "https://github.com/riboseinc/retrace/releases",
+        description,
+        softwareVersion: "2.1.0",
+        license: "https://opensource.org/licenses/BSD-2-Clause",
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "USD",
+        },
+        publisher: {
+          "@type": "Organization",
+          name: "Ribose",
+          url: "https://www.ribose.com",
+        },
+        featureList: [
+          "log_params — observe libc calls as JSON",
+          "call_real — invoke real libc implementation",
+          "modify_in_param_str/int/arr — rewrite arguments",
+          "modify_return_value_int — override return values",
+          "memory_fuzz — random OOM injection",
+          "incomplete_io — short read/write injection",
+          "delay — latency injection",
+          "call_count_limit — resource exhaustion simulation",
+          "sandbox — runtime path deny-list",
+          "fuzzing_seed — deterministic RNG for reproducibility",
+        ],
+      })}
+    />
   </head>
   <body>
     <div class="orb-bg" aria-hidden="true">
