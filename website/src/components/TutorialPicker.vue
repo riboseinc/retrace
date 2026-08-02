@@ -1,6 +1,43 @@
 <script setup>
 import { ref, computed } from "vue";
 
+// Goal-oriented tags. Looked up by scenario id so the scenario
+// definitions stay compact. A scenario can carry multiple tags.
+const TAGS = {
+  slow:      ["debug", "performance"],
+  oom:       ["test", "fault"],
+  sandbox:   ["security", "production"],
+  reverse:   ["debug", "security", "reverse"],
+  root:      ["test", "mock"],
+  leak:      ["debug", "performance"],
+  ci:        ["test", "ci", "fault"],
+  android:   ["mobile"],
+  netfail:   ["test", "fault"],
+  time:      ["test", "mock"],
+  redirect:  ["test", "mock"],
+  envaudit:  ["security", "debug"],
+  traffic:   ["security", "debug"],
+  static:    ["debug", "reverse"],
+  auditexec: ["security"],
+  airgap:    ["security"],
+  flamegraph:["performance", "debug"],
+  locks:     ["performance", "debug"],
+};
+
+// Tag display metadata: label + accent color.
+const TAG_META = {
+  debug:       { label: "Debugging",       accent: "see" },
+  test:        { label: "Testing",         accent: "control" },
+  security:    { label: "Security",        accent: "break" },
+  performance: { label: "Performance",     accent: "see" },
+  fault:       { label: "Fault injection", accent: "break" },
+  mock:        { label: "Mocking",         accent: "control" },
+  mobile:      { label: "Mobile",          accent: "control" },
+  production:  { label: "Production-safe", accent: "see" },
+  ci:          { label: "CI/CD",           accent: "break" },
+  reverse:     { label: "Reverse eng.",    accent: "see" },
+};
+
 // Each scenario is a clickable card. Selecting one reveals the
 // step-by-step walkthrough. Steps carry a description, a command
 // (optional, copyable), and an expected result.
@@ -610,9 +647,60 @@ const selected = computed(() =>
   scenarios.find((s) => s.id === selectedId.value)
 );
 
+// Search + tag filter state.
+const query = ref("");
+const activeTags = ref([]);
+
+const availableTags = computed(() => {
+  // Only show tags that at least one scenario uses.
+  const used = new Set();
+  for (const s of scenarios) {
+    for (const t of TAGS[s.id] || []) used.add(t);
+  }
+  return Array.from(used)
+    .map((t) => ({ id: t, ...TAG_META[t] }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+});
+
+const filteredScenarios = computed(() => {
+  const q = query.value.trim().toLowerCase();
+  const tags = activeTags.value;
+  return scenarios.filter((s) => {
+    if (q && !s.title.toLowerCase().includes(q) && !s.summary.toLowerCase().includes(q)) {
+      return false;
+    }
+    if (tags.length === 0) return true;
+    const sTags = TAGS[s.id] || [];
+    return tags.every((t) => sTags.includes(t));
+  });
+});
+
 function select(id) {
   selectedId.value = id;
 }
+
+function toggleTag(tag) {
+  const i = activeTags.value.indexOf(tag);
+  if (i === -1) {
+    activeTags.value = [...activeTags.value, tag];
+  } else {
+    activeTags.value = activeTags.value.filter((t) => t !== tag);
+  }
+}
+
+function clearFilters() {
+  query.value = "";
+  activeTags.value = [];
+}
+
+// Watch filtered list: if the currently-selected scenario gets
+// filtered out, jump to the first visible one.
+import { watch } from "vue";
+watch(filteredScenarios, (list) => {
+  if (list.length > 0 && !list.find((s) => s.id === selectedId.value)) {
+    selectedId.value = list[0].id;
+  }
+});
 
 async function copyCmd(cmd) {
   if (!cmd) return;
@@ -632,10 +720,40 @@ async function copyCmd(cmd) {
 <template>
   <div class="tutorial-grid">
     <aside class="scenario-rail">
+      <div class="filter-block">
+        <div class="search-wrap">
+          <input
+            v-model="query"
+            type="search"
+            class="search-input"
+            placeholder="Search tutorials…"
+            aria-label="Search tutorials"
+          />
+          <span class="search-icon" aria-hidden="true">⌕</span>
+        </div>
+        <div class="tag-row">
+          <button
+            v-for="t in availableTags"
+            :key="t.id"
+            :class="['tag-chip', `accent-${t.accent}`, { active: activeTags.includes(t.id) }]"
+            @click="toggleTag(t.id)"
+          >
+            {{ t.label }}
+          </button>
+        </div>
+        <div v-if="query || activeTags.length" class="filter-meta">
+          <span>{{ filteredScenarios.length }} of {{ scenarios.length }} tutorials</span>
+          <button class="clear-btn" @click="clearFilters">clear</button>
+        </div>
+      </div>
+
       <div class="rail-label">Pick your scenario</div>
       <ul class="scenario-list">
+        <li v-if="filteredScenarios.length === 0" class="empty">
+          No tutorials match. <button class="clear-btn" @click="clearFilters">clear filters</button>
+        </li>
         <li
-          v-for="s in scenarios"
+          v-for="s in filteredScenarios"
           :key="s.id"
           :class="['scenario-item', `accent-${s.accent}`, { active: s.id === selectedId }]"
           @click="select(s.id)"
@@ -654,6 +772,11 @@ async function copyCmd(cmd) {
         <div class="walk-eyebrow">{{ selected.icon }} {{ selected.accent }}</div>
         <h3>{{ selected.title }}</h3>
         <p class="walk-summary">{{ selected.summary }}</p>
+        <div class="walk-tags">
+          <span v-for="t in (TAGS[selected.id] || [])" :key="t" :class="['walk-tag', `accent-${TAG_META[t].accent}`]">
+            {{ TAG_META[t].label }}
+          </span>
+        </div>
       </header>
 
       <ol class="steps">
@@ -697,6 +820,103 @@ async function copyCmd(cmd) {
 @media (max-width: 860px) {
   .scenario-rail { position: static; }
 }
+
+.filter-block {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.search-wrap {
+  position: relative;
+  margin-bottom: 10px;
+}
+.search-input {
+  width: 100%;
+  background: rgba(7, 9, 13, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 12px 8px 30px;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input:focus {
+  outline: none;
+  border-color: rgba(94, 227, 255, 0.4);
+  box-shadow: 0 0 0 3px rgba(94, 227, 255, 0.1);
+}
+.search-input::placeholder { color: var(--color-dim); }
+.search-input::-webkit-search-cancel-button { display: none; }
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-dim);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.tag-chip {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--color-dim);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s var(--ease-glass);
+}
+.tag-chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text);
+}
+.tag-chip.accent-see.active {
+  background: rgba(94, 227, 255, 0.15);
+  border-color: rgba(94, 227, 255, 0.5);
+  color: var(--color-see);
+}
+.tag-chip.accent-control.active {
+  background: rgba(242, 180, 65, 0.15);
+  border-color: rgba(242, 180, 65, 0.5);
+  color: var(--color-control);
+}
+.tag-chip.accent-break.active {
+  background: rgba(255, 107, 92, 0.15);
+  border-color: rgba(255, 107, 92, 0.5);
+  color: var(--color-break);
+}
+
+.filter-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-dim);
+}
+.clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.15);
+}
+.clear-btn:hover { color: var(--color-text); }
 
 .rail-label {
   font-family: var(--font-mono);
@@ -771,6 +991,13 @@ async function copyCmd(cmd) {
   text-transform: uppercase;
 }
 
+.empty {
+  padding: 18px 14px;
+  font-size: 13px;
+  color: var(--color-dim);
+  text-align: center;
+}
+
 .walkthrough-pane {
   background: linear-gradient(180deg, rgba(28, 33, 42, 0.55) 0%, rgba(20, 24, 30, 0.45) 100%);
   backdrop-filter: blur(22px) saturate(180%);
@@ -811,6 +1038,36 @@ async function copyCmd(cmd) {
   font-size: 14px;
   color: var(--color-dim);
   line-height: 1.5;
+}
+
+.walk-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.walk-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.walk-tag.accent-see {
+  color: var(--color-see);
+  border-color: rgba(94, 227, 255, 0.25);
+}
+.walk-tag.accent-control {
+  color: var(--color-control);
+  border-color: rgba(242, 180, 65, 0.25);
+}
+.walk-tag.accent-break {
+  color: var(--color-break);
+  border-color: rgba(255, 107, 92, 0.25);
 }
 
 .steps {

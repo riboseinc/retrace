@@ -107,6 +107,34 @@ const personas = [
     what: "Confirm your library's ABI surface in practice. Trace which functions downstream callers actually invoke, with what arguments, and how often.",
     cmd: "retrace trace 'mylib_*' -- ./downstream-app",
   },
+  {
+    tag: "red team",
+    accent: "break",
+    who: "Red team operator",
+    what: "Test defensive controls end-to-end. Sandbox your own dropper, fuzz its malloc paths to find crash points defenders could exploit, verify EDR detection logic triggers.",
+    cmd: "retrace run --config sandbox-and-fuzz.json -- ./dropper",
+  },
+  {
+    tag: "IR",
+    accent: "see",
+    who: "Incident responder",
+    what: "Capture a malicious binary's libc activity in a controlled sandbox. Re-run the captured trace to build an evidence timeline without giving the binary network access.",
+    cmd: "retrace run --config sandbox.json --log /tmp/evidence.json -- ./seized-binary",
+  },
+  {
+    tag: "perf",
+    accent: "see",
+    who: "Performance engineer",
+    what: "Quantify libc overhead before optimizing. See per-function totals across the whole run, then zoom into the top 1% of calls by duration.",
+    cmd: "retrace pp /tmp/trace.json | head -10",
+  },
+  {
+    tag: "vr",
+    accent: "break",
+    who: "Vulnerability researcher",
+    what: "Hunt for zero-days by exhausting every boundary. Make the 1000th call fail, the buffer exactly full, the path exactly too long. See what breaks.",
+    cmd: "retrace run --config edge-cases.json -- ./target",
+  },
 ];
 ---
 
@@ -114,7 +142,7 @@ const personas = [
   <div class="wrap">
     <div class="section-head reveal">
       <div class="eyebrow">Who uses retrace</div>
-      <h2>Fifteen jobs. One shared library.</h2>
+      <h2>Nineteen jobs. One shared library.</h2>
       <p>
         retrace is small enough to slip into a one-off debugging session, generic enough to anchor a
         CI fuzzing pipeline, principled enough to back a security audit. Below: every audience that
