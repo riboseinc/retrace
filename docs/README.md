@@ -8,6 +8,7 @@ install, quick start, and platform support.
 
 | You want to… | Go to |
 |--------------|-------|
+| Solve a specific problem step-by-step | [Tutorials](tutorials.md) — 8 scenario-driven walkthroughs |
 | Look up a CLI subcommand or env var | [CLI reference](cli.md) |
 | Look up an action or write a JSON config | [Configuration reference](configuration.md) |
 | Run a specific scenario (trace, fuzz, mock, sandbox) | [Cookbook](cookbook/README.md) — 20 recipes with copy-paste JSON |
@@ -21,6 +22,7 @@ install, quick start, and platform support.
 ```
 docs/
 ├── README.md              ← you are here
+├── tutorials.md           ← 8 scenario-driven step-by-step walkthroughs
 ├── cli.md                 ← CLI subcommand + env var reference
 ├── configuration.md       ← JSON config schema + action parameter reference
 ├── cookbook/              ← 20 recipe-driven walkthroughs

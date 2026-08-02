@@ -1,0 +1,53 @@
+---
+import TutorialPicker from "./TutorialPicker.vue";
+---
+
+<section class="section tutorials" id="tutorials">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Tutorials</div>
+      <h2>Pick your scenario. We'll walk you through it.</h2>
+      <p>
+        Every newcomer's question is the same: <em>"I have this problem — how do I use retrace to solve it?"</em>
+        Click your scenario on the left; the steps appear on the right with copy-paste commands and expected
+        output. No prior retrace knowledge assumed.
+      </p>
+    </div>
+
+    <div class="reveal">
+      <TutorialPicker client:visible />
+    </div>
+
+    <p class="more-link reveal">
+      Looking for something else? The <a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md">cookbook</a>
+      has 20 more recipe-style walkthroughs — each is a single JSON config plus the command to run it.
+    </p>
+  </div>
+</section>
+
+<style>
+.tutorials {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(94, 227, 255, 0.03), transparent 60%);
+}
+
+.more-link {
+  margin-top: 28px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--color-dim);
+}
+.more-link a {
+  color: var(--color-see);
+  border-bottom: 1px solid rgba(94, 227, 255, 0.3);
+  padding-bottom: 1px;
+  transition: border-color 0.2s;
+}
+.more-link a:hover {
+  border-color: var(--color-see);
+}
+.more-link em {
+  color: var(--color-text);
+  font-style: italic;
+}
+</style>
