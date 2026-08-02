@@ -135,6 +135,27 @@ const personas = [
     what: "Hunt for zero-days by exhausting every boundary. Make the 1000th call fail, the buffer exactly full, the path exactly too long. See what breaks.",
     cmd: "retrace run --config edge-cases.json -- ./target",
   },
+  {
+    tag: "game",
+    accent: "control",
+    who: "Game developer",
+    what: "Trace native game libraries. Find the asset load that's slow, the audio callback that allocates, the render path that reads from disk mid-frame.",
+    cmd: "retrace trace fopen,read,mmap -- ./game-binary",
+  },
+  {
+    tag: "compiler",
+    accent: "see",
+    who: "Compiler engineer",
+    what: "Validate your libc intercept before shipping. Trace every call to a target function across all your test workloads; flag any unexpected arg shape.",
+    cmd: "retrace trace 'your_lib_*' --log ./baseline.json -- ./test-suite",
+  },
+  {
+    tag: "build",
+    accent: "control",
+    who: "Build / release engineer",
+    what: "Wire fault-injection into CI. Run the test suite under <code>memory_fuzz</code> on every PR; catch OOM-as-bug before users do.",
+    cmd: "retrace fuzz malloc --rate 0.05 -- ./run-tests",
+  },
 ];
 ---
 
@@ -142,7 +163,7 @@ const personas = [
   <div class="wrap">
     <div class="section-head reveal">
       <div class="eyebrow">Who uses retrace</div>
-      <h2>Nineteen jobs. One shared library.</h2>
+      <h2>Twenty-two jobs. One shared library.</h2>
       <p>
         retrace is small enough to slip into a one-off debugging session, generic enough to anchor a
         CI fuzzing pipeline, principled enough to back a security audit. Below: every audience that

@@ -28,6 +28,9 @@ Pick the one that matches your situation.
 16. [Verify a binary makes no outbound network calls](#16-verify-a-binary-makes-no-outbound-network-calls)
 17. [Generate a flamegraph of libc calls](#17-generate-a-flamegraph-of-libc-calls)
 18. [Profile lock contention](#18-profile-lock-contention)
+19. [Write a custom action](#19-write-a-custom-action)
+20. [Debug a production issue (safely)](#20-debug-a-production-issue-safely)
+21. [Integrate retrace into your build](#21-integrate-retrace-into-your-build)
 
 ---
 
@@ -776,6 +779,151 @@ Compare to total wall time to decide if it's worth fixing.
 
 For which call site is contended, pair with a debugger or use the
 return-address routing pattern (cookbook recipe 17, planned).
+
+---
+
+## 19. Write a custom action
+
+**Time:** 25 minutes.
+**Goal:** extend retrace with your own action — a single .c file that registers itself.
+
+### Step 1 — actions live in `src/core/actions/`
+
+Each action is a `.c` file that defines a `struct RetraceAction` and
+registers via the `RETRACE_ACTION_REGISTER` macro. Existing actions
+to read first:
+
+- `basic.c` — `log_params`, `call_real`, `modify_in_*`, `modify_return_value_int`
+- `memfuzz.c` — `memory_fuzz`
+- `incomplete_io.c` — `incomplete_io`
+- `delay.c`, `call_count_limit.c`, `sandbox.c`, `fuzzing_seed.c`
+
+### Step 2 — pick a template
+
+The interface you implement is per-action: parse your JSON params,
+decide whether to mutate the call, set the return value.
+
+### Step 3 — drop your file in
+
+```sh
+ls src/core/actions/
+# add your heuristic_action.c alongside the others
+```
+
+The build system auto-includes the directory.
+
+### Step 4 — build and run
+
+```sh
+cmake --build build
+retrace run --config your-config.json -- ./your-target
+```
+
+Your action is now first-class: it shows up in `retrace list-actions`
+and can be referenced in any JSON config.
+
+### Step 5 — for the full interface definition
+
+See `include/retrace/retrace_action.h` and the existing actions in
+`src/core/actions/`.
+
+---
+
+## 20. Debug a production issue (safely)
+
+**Time:** 15 minutes.
+**Goal:** capture a production trace without restarting or modifying the binary — only the path you care about.
+
+### Step 1 — restrict to suspects
+
+Logging everything in production is overkill. Restrict to the
+functions relevant to the incident.
+
+```sh
+RETRACE_LOGGER_ALLOWED_FUNCS=open,openat,read,write,connect,recv,send
+```
+
+### Step 2 — limit the trace window
+
+A 60-second slice is enough to catch a slow path; a full hour is
+enough to fill a disk.
+
+```sh
+timeout 60 retrace trace --log /tmp/incident.json -- ./your-service &
+PID=$!
+# ... wait, gather data, then:
+wait $PID
+```
+
+### Step 3 — scrub before persisting
+
+The log may contain PII, secrets, or sensitive paths. Grep out
+known-sensitive patterns before sharing.
+
+```sh
+grep -v 'SECRET\|password\|/etc/shadow' /tmp/incident.json > /tmp/incident-scrubbed.json
+```
+
+### Step 4 — analyze locally
+
+```sh
+retrace html /tmp/incident-scrubbed.json -o /tmp/postmortem.html && open /tmp/postmortem.html
+```
+
+Interactive page: filter by function, sort by duration, find the
+outlier.
+
+### Step 5 — the critical safety step
+
+Never set `RETRACE_LOGGER_DEF_ENA=1` with write access to the log
+file from the same user as the target. Stash everything in a
+directory only root can read.
+
+---
+
+## 21. Integrate retrace into your build
+
+**Time:** 20 minutes.
+**Goal:** run the test suite under retrace-fault-injection on every CI build. Catch error-path bugs before users do.
+
+### Step 1 — add a `fuzz-test` target
+
+```make
+# Makefile
+fuzz-test: tests
+    LD_PRELOAD=$$RETRACE_LIB retrace fuzz malloc --rate 0.05 \
+      --log test-output/fuzz.json -- ./run-tests
+```
+
+### Step 2 — or in CMake
+
+```cmake
+add_custom_target(fuzz-test
+    COMMAND $<TARGET_FILE:run-tests>
+    ENVIRONMENT LD_PRELOAD=$<TARGET_FILE:libretrace.so>
+    COMMAND retrace fuzz malloc --rate 0.05
+    USES_TERMINAL)
+add_dependencies(fuzz-test run-tests)
+```
+
+### Step 3 — try it locally first
+
+```sh
+make fuzz-test
+```
+
+Either the tests pass cleanly (good — your code handles OOM), or
+they crash (that's the bug you wanted to catch).
+
+### Step 4 — wire it into CI
+
+See the `retrace-fuzz.yml` workflow in [cookbook recipe 19](cookbook/19-ci-fuzzing.md)
+— a drop-in GitHub Actions workflow that runs on every PR.
+
+### Step 5 — when CI fuzz fails
+
+The seed is captured in the log. Replay locally with the fixed seed
+to debug.
 
 ---
 
