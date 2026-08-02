@@ -1,0 +1,56 @@
+---
+import FunctionCatalog from "./FunctionCatalog.vue";
+---
+
+<section class="section catalog-section" id="functions">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Function catalog</div>
+      <h2>What can you intercept? About eighty common calls.</h2>
+      <p>
+        retrace ships with prototypes for nearly three hundred libc functions out of the box. Below
+        is a curated tour of the most-traced, grouped by what they're for. Click any function to see
+        its signature and the one-liner to trace it. Use <code class="mono">retrace list-functions</code>
+        for the full list.
+      </p>
+    </div>
+
+    <div class="reveal">
+      <FunctionCatalog client:visible />
+    </div>
+
+    <p class="more-link reveal">
+      Looking for <code>socket</code>, <code>connect</code>, <code>send</code>, <code>recv</code>?
+      Network functions are not yet in the default intercept set — tracked in
+      <a href="https://github.com/riboseinc/retrace/issues">issues</a>. Until they ship, use
+      <code>strace</code> for raw syscall-level network observation, or write a custom action.
+    </p>
+  </div>
+</section>
+
+<style>
+.catalog-section {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(242, 180, 65, 0.03), transparent 60%);
+}
+
+.more-link {
+  margin-top: 28px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-dim);
+  line-height: 1.6;
+}
+.more-link code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.more-link a {
+  color: var(--color-see);
+  border-bottom: 1px solid rgba(94, 227, 255, 0.3);
+}
+</style>
