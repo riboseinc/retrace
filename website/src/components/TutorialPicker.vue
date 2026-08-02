@@ -281,6 +281,210 @@ EOF`,
       },
     ],
   },
+  {
+    id: "netfail",
+    title: "Test how my code handles network failures",
+    icon: "📡",
+    accent: "break",
+    summary: "Force connect() to fail with ECONNREFUSED or ENETUNREACH — without pulling the network cable.",
+    minutes: 4,
+    steps: [
+      {
+        what: "Decide which network error to inject. Common POSIX errnos: ECONNREFUSED=111, ENETUNREACH=101, ETIMEDOUT=110, EHOSTUNREACH=113.",
+        out: "",
+      },
+      {
+        what: "Write a config that overrides connect's return value to -111 (ECONNREFUSED). Without call_real, the real connect never runs.",
+        cmd: `cat > /tmp/netfail.json <<'EOF'
+{
+  "intercept_scripts": [
+    { "func_name": "connect",
+      "actions": [{ "action_name": "modify_return_value_int",
+        "action_params": { "retval_int": -111 } }] }
+  ]
+}
+EOF`,
+        out: "",
+      },
+      {
+        what: "Run your client under the fault. Every outbound connect() returns -111 immediately.",
+        cmd: "retrace run --config /tmp/netfail.json -- ./your-client",
+        out: "connect: Connection refused (os error 111)",
+      },
+      {
+        what: "If your client has retry / fallback logic, this is how you test it without iptables or a flaky WiFi.",
+        out: "",
+      },
+      {
+        what: "To fail only specific destinations, combine with sandbox or write a custom action that inspects the sockaddr. See docs/configuration.md.",
+        out: "",
+      },
+    ],
+  },
+  {
+    id: "time",
+    title: "Mock the system clock for time-sensitive tests",
+    icon: "🕒",
+    accent: "control",
+    summary: "Freeze time, shift it, or replay a sequence — for testing expiry, schedules, and TTLs.",
+    minutes: 3,
+    steps: [
+      {
+        what: "Override time() to always return a fixed timestamp (Unix epoch seconds).",
+        cmd: `retrace mock time 1735689600 -- ./your-program
+# or, equivalently:
+echo '{"intercept_scripts":[{"func_name":"time","actions":[{"action_name":"modify_return_value_int","action_params":{"retval_int":1735689600}}]}]}' > /tmp/freeze.json
+retrace run --config /tmp/freeze.json -- ./your-program`,
+        out: "(program now believes it's 2025-01-01 00:00:00 UTC)",
+      },
+      {
+        what: "Most programs also call gettimeofday() or clock_gettime(). Mock them too:",
+        cmd: `cat > /tmp/freeze.json <<'EOF'
+{
+  "intercept_scripts": [
+    { "func_name": "time",      "actions": [{ "action_name": "modify_return_value_int", "action_params": { "retval_int": 1735689600 } }] },
+    { "func_name": "gettimeofday", "actions": [{ "action_name": "call_real" }] }
+  ]
+}
+EOF`,
+        out: "(extend as needed — clock_gettime uses a struct, which requires a custom action to fully mock)",
+      },
+      {
+        what: "Verify your time-sensitive logic: token expiry, schedule triggers, rate-limit windows.",
+        out: "(tests that depended on `sleep` now run instantly and deterministically)",
+      },
+    ],
+  },
+  {
+    id: "redirect",
+    title: "Redirect a file path to somewhere else",
+    icon: "🔀",
+    accent: "control",
+    summary: "Swap /etc/config for /tmp/fake without modifying the binary or root filesystem.",
+    minutes: 3,
+    steps: [
+      {
+        what: "Use modify_in_param_str to rewrite the path argument before open runs.",
+        cmd: `cat > /tmp/redirect.json <<'EOF'
+{
+  "intercept_scripts": [
+    { "func_name": "open",
+      "actions": [
+        { "action_name": "modify_in_param_str",
+          "action_params": { "param_name": "path", "match_str": "/etc/config", "new_str": "/tmp/fake-config" } },
+        { "action_name": "call_real" }
+      ] }
+  ]
+}
+EOF`,
+        out: "",
+      },
+      {
+        what: "Prepare the fake file at the new path.",
+        cmd: "echo 'debug = true' > /tmp/fake-config",
+        out: "",
+      },
+      {
+        what: "Run the binary. Every open(\"/etc/config\") is transparently redirected to /tmp/fake-config.",
+        cmd: "retrace run --config /tmp/redirect.json -- ./your-program",
+        out: "(binary reads your fake config — no root, no chroot, no namespace)",
+      },
+      {
+        what: "This is also how you A/B test config files, swap certificates, or feed known-bad inputs to parsers.",
+        out: "",
+      },
+    ],
+  },
+  {
+    id: "envaudit",
+    title: "Audit what environment variables a binary reads",
+    icon: "🗝️",
+    accent: "see",
+    summary: "Map every getenv() call a binary makes — catch secret leaks, config sniffing, debug backdoors.",
+    minutes: 2,
+    steps: [
+      {
+        what: "Trace getenv specifically. Each call's argument is the variable name being read.",
+        cmd: "retrace trace getenv --log /tmp/env.json -- ./your-program",
+        out: "(program runs; every getenv call is captured with its argument)",
+      },
+      {
+        what: "Pretty-print to see which variables were read, in order:",
+        cmd: "retrace pp /tmp/env.json",
+        out: "getenv      42 calls\n  getenv(name=PATH)\n  getenv(name=HOME)\n  getenv(name=LD_LIBRARY_PATH)\n  getenv(name=DEBUG)         ← suspicious\n  getenv(name=SECRET_TOKEN)  ← very suspicious\n  ...",
+      },
+      {
+        what: "Anything sensitive in that list is a finding. Document it; report it; or feed it garbage via modify_in_param_str to test handling.",
+        out: "(does the binary crash on a malformed env value? does it leak it to a log?)",
+      },
+      {
+        what: "Same pattern works for tracing execve (what commands does it spawn?), system (what shell does it run?), dlopen (what libraries does it load at runtime?).",
+        out: "",
+      },
+    ],
+  },
+  {
+    id: "traffic",
+    title: "Capture all network traffic as JSON",
+    icon: "📥",
+    accent: "see",
+    summary: "Log every send/recv with payload — a pcap-style stream without tcpdump or root.",
+    minutes: 3,
+    steps: [
+      {
+        what: "Trace send, sendto, recv, recvfrom, write (for sockets), read (for sockets).",
+        cmd: "retrace trace send,sendto,recv,recvfrom --log /tmp/net.json -- ./your-server",
+        out: "(server runs; every network I/O is captured)",
+      },
+      {
+        what: "Pretty-print to see per-call summaries:",
+        cmd: "retrace pp /tmp/net.json | head -10",
+        out: "sendto    248 calls   2.1 MB total\nrecvfrom  247 calls   1.8 MB total\n...",
+      },
+      {
+        what: "For full payloads, generate an interactive HTML view and filter by function:",
+        cmd: "retrace html /tmp/net.json -o /tmp/net.html && open /tmp/net.html",
+        out: "(browser opens; click any row to see args including buffer addresses)",
+      },
+      {
+        what: "Compare to tcpdump: no root required, payloads are linked to the calling code, and you can mix in malloc/open traces for full context.",
+        out: "",
+      },
+    ],
+  },
+  {
+    id: "static",
+    title: "Trace a statically-linked binary",
+    icon: "🧱",
+    accent: "see",
+    summary: "LD_PRELOAD doesn't work on static binaries. Use the ptrace backend instead.",
+    minutes: 8,
+    steps: [
+      {
+        what: "Confirm the binary is statically linked. If it has no INTERP segment, LD_PRELOAD can't intercept it.",
+        cmd: "file ./your-static-binary\n# ./your-static-binary: ELF ... statically linked",
+        out: "",
+      },
+      {
+        what: "Build retrace with the ptrace backend enabled.",
+        cmd: "cmake -B build -DRETRACE_BACKEND_PTRACE=ON\ncmake --build build",
+        out: "build/src/backends/ptrace/libretrace_ptrace.so",
+      },
+      {
+        what: "Use the ptrace launcher. It attaches to the target, sets breakpoints on libc entry points, and reconstructs the calls.",
+        cmd: "retrace ptrace --log /tmp/trace.json -- ./your-static-binary",
+        out: "(binary runs; libc calls captured via ptrace)",
+      },
+      {
+        what: "Caveat: ptrace is slower than LD_PRELOAD (each call is a context switch). Reserve it for static binaries; use preload everywhere else.",
+        out: "",
+      },
+      {
+        what: "See src/backends/ptrace/README.md for the full ptrace backend reference.",
+        out: "",
+      },
+    ],
+  },
 ];
 
 const selectedId = ref(scenarios[0].id);

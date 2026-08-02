@@ -86,6 +86,27 @@ const personas = [
     what: "Diagnose why a service is misbehaving without restarting it. Trace a single command's libc activity to see what's really being read, written, connected to.",
     cmd: "retrace trace --html -- $(which dig) example.com",
   },
+  {
+    tag: "crypto",
+    accent: "control",
+    who: "Cryptography auditor",
+    what: "Verify a binary uses the right crypto primitives. Trace <code>RAND_bytes</code>, <code>EVP_DigestInit</code>, <code>SSL_CTX_set_verify</code> — see every algorithm and parameter.",
+    cmd: "retrace trace RAND_bytes,EVP_* -- ./crypto-app",
+  },
+  {
+    tag: "embedded",
+    accent: "break",
+    who: "Embedded developer",
+    what: "Stress-test firmware error paths. Inject short reads on flash, ENOSPC on write, timeouts on i2c-sysfs — without desoldering a thing.",
+    cmd: "retrace run --config incomplete-io.json -- ./firmware-test",
+  },
+  {
+    tag: "lib author",
+    accent: "see",
+    who: "Library author",
+    what: "Confirm your library's ABI surface in practice. Trace which functions downstream callers actually invoke, with what arguments, and how often.",
+    cmd: "retrace trace 'mylib_*' -- ./downstream-app",
+  },
 ];
 ---
 
@@ -93,7 +114,7 @@ const personas = [
   <div class="wrap">
     <div class="section-head reveal">
       <div class="eyebrow">Who uses retrace</div>
-      <h2>Twelve jobs. One shared library.</h2>
+      <h2>Fifteen jobs. One shared library.</h2>
       <p>
         retrace is small enough to slip into a one-off debugging session, generic enough to anchor a
         CI fuzzing pipeline, principled enough to back a security audit. Below: every audience that
