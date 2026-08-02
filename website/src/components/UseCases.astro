@@ -1,11 +1,12 @@
 ---
-// Use cases — five personas. NEW section framing the audience.
+// Use cases — twelve personas. Covers the full audience spectrum:
+// security research, testing, development, ops, education, forensics.
 const personas = [
   {
     tag: "security",
     accent: "see",
     who: "Security researcher",
-    what: "Reverse-engineer a binary you don't have source for. Map every <code>open</code>, every <code>connect</code>, every <code>system</code> call.",
+    what: "Reverse-engineer a binary you don't have source for. Map every <code>open</code>, every <code>connect</code>, every <code>system</code> call — in seconds, without a disassembler.",
     cmd: "retrace trace open,connect,system -- ./suspicious",
   },
   {
@@ -43,6 +44,48 @@ const personas = [
     what: "See exactly what <code>ls</code>, <code>cat</code>, <code>grep</code> actually do. The trace is the lesson — every libc call, in order, with timings.",
     cmd: "retrace trace --html -- /bin/ls",
   },
+  {
+    tag: "ctf",
+    accent: "control",
+    who: "CTF player",
+    what: "Solve tracing challenges fast. Watch the binary leak the flag through <code>write</code>, find the comparison via <code>strcmp</code>, time the side channel.",
+    cmd: "retrace trace strcmp,write -- ./challenge",
+  },
+  {
+    tag: "re",
+    accent: "see",
+    who: "Reverse engineer",
+    what: "Understand a closed-source binary's behavior without firing up IDA. Trace the calls; reconstruct the logic from observable I/O.",
+    cmd: "retrace trace -- ./closed-source-binary",
+  },
+  {
+    tag: "forensics",
+    accent: "see",
+    who: "Forensics analyst",
+    what: "Post-incident analysis: replay a captured trace to see exactly what a process did — files touched, sockets opened, env vars read.",
+    cmd: "retrace pp /tmp/trace.json",
+  },
+  {
+    tag: "bounty",
+    accent: "break",
+    who: "Bug bounty hunter",
+    what: "Find vulns by exhausting resources. Make the 1000th <code>malloc</code> fail, the 50th <code>open</code> return ENOENT, see if the program survives.",
+    cmd: "retrace run --config limit-then-fail.json -- ./target",
+  },
+  {
+    tag: "mobile",
+    accent: "control",
+    who: "Mobile developer",
+    what: "Trace any Android app's native libraries via <code>wrap.sh</code> or Magisk. Cross-compile once with the NDK; same JSON config as your desktop.",
+    cmd: "LD_PRELOAD=libretrace.so /data/local/tmp/wrap.sh",
+  },
+  {
+    tag: "sysadmin",
+    accent: "see",
+    who: "System administrator",
+    what: "Diagnose why a service is misbehaving without restarting it. Trace a single command's libc activity to see what's really being read, written, connected to.",
+    cmd: "retrace trace --html -- $(which dig) example.com",
+  },
 ];
 ---
 
@@ -50,18 +93,21 @@ const personas = [
   <div class="wrap">
     <div class="section-head reveal">
       <div class="eyebrow">Who uses retrace</div>
-      <h2>One tool, six jobs.</h2>
+      <h2>Twelve jobs. One shared library.</h2>
       <p>
-        retrace is small enough to slip into a one-off debugging session, generic enough to anchor a CI
-        fuzzing pipeline, principled enough to back a security audit. Below: who reaches for it, and the
-        command they reach for first.
+        retrace is small enough to slip into a one-off debugging session, generic enough to anchor a
+        CI fuzzing pipeline, principled enough to back a security audit. Below: every audience that
+        reaches for it, and the command they reach for first.
       </p>
     </div>
 
     <div class="persona-grid">
       {
         personas.map((p, i) => (
-          <article class={`persona glass glass-hover reveal accent-${p.accent}`} style={`transition-delay: ${i * 60}ms`}>
+          <article
+            class={`persona glass glass-hover reveal accent-${p.accent}`}
+            style={`transition-delay: ${Math.min(i, 8) * 50}ms`}
+          >
             <div class="tag-row">
               <div class={`tag tag-${p.accent}`}>{p.tag}</div>
               <div class="verb-mark">
@@ -81,14 +127,15 @@ const personas = [
 <style>
 .persona-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
 }
-@media (max-width: 960px) { .persona-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px) { .persona-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .persona-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 860px) { .persona-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px) { .persona-grid { grid-template-columns: 1fr; } }
 
 .persona {
-  padding: 22px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -127,19 +174,20 @@ const personas = [
 .vm-break { color: var(--color-break); }
 
 .persona h3 {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
+  line-height: 1.25;
 }
 .persona p {
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--color-dim);
   line-height: 1.55;
   flex: 1;
 }
 .persona p :global(code) {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--color-text);
   background: rgba(255, 255, 255, 0.05);
   padding: 1px 5px;
@@ -149,16 +197,16 @@ const personas = [
   background: rgba(7, 9, 13, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 6px;
-  padding: 10px 12px;
+  padding: 9px 11px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--color-text);
   overflow-x: auto;
   margin: 0;
+  line-height: 1.4;
 }
 .persona .cmd .prompt { color: var(--color-break); margin-right: 6px; }
 
-/* Subtle accent edge per persona — left border tinted by verb color. */
 .accent-see { border-left: 2px solid rgba(94, 227, 255, 0.35); }
 .accent-control { border-left: 2px solid rgba(242, 180, 65, 0.35); }
 .accent-break { border-left: 2px solid rgba(255, 107, 92, 0.35); }

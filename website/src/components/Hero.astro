@@ -44,9 +44,28 @@ const verbs = [
           Install
           <span class="arrow">→</span>
         </a>
-        <a class="btn btn-ghost" href="https://github.com/riboseinc/retrace">
-          View source
+        <a class="btn btn-ghost" href="#tutorials">
+          Try a tutorial
         </a>
+      </div>
+
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="stat-num">13</div>
+          <div class="stat-label">platforms</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">12</div>
+          <div class="stat-label">actions</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">~200 KB</div>
+          <div class="stat-label">binary</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">0</div>
+          <div class="stat-label">recompiles</div>
+        </div>
       </div>
     </div>
 
@@ -168,6 +187,37 @@ const verbs = [
 }
 .btn .arrow { transition: transform 0.18s ease; }
 .btn:hover .arrow { transform: translateX(2px); }
+
+.hero-stats {
+  display: flex;
+  gap: 28px;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stat-num {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--color-text);
+}
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+}
+@media (max-width: 540px) {
+  .hero-stats { gap: 18px; }
+  .stat-num { font-size: 18px; }
+}
 
 .terminal-wrap {
   position: relative;
