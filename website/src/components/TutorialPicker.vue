@@ -22,9 +22,13 @@ const TAGS = {
   airgap:    ["security"],
   flamegraph:["performance", "debug"],
   locks:     ["performance", "debug"],
+  custom:    ["extend", "ci"],
+  prod:      ["debug", "production"],
+  build:     ["ci", "test", "fault"],
 };
 
-// Tag display metadata: label + accent color.
+// Register tags that aren't auto-derived from scenarios (extend doesn't
+// appear in any scenario's TAGS list otherwise).
 const TAG_META = {
   debug:       { label: "Debugging",       accent: "see" },
   test:        { label: "Testing",         accent: "control" },
@@ -36,6 +40,7 @@ const TAG_META = {
   production:  { label: "Production-safe", accent: "see" },
   ci:          { label: "CI/CD",           accent: "break" },
   reverse:     { label: "Reverse eng.",    accent: "see" },
+  extend:      { label: "Extend",          accent: "control" },
 };
 
 // Each scenario is a clickable card. Selecting one reveals the
@@ -636,6 +641,105 @@ EOF`,
       },
       {
         what: "For finer detail (which call site is contended), pair with a debugger or use the return-address routing pattern (cookbook recipe 17, planned).",
+        out: "",
+      },
+    ],
+  },
+  {
+    id: "custom",
+    title: "Write a custom action",
+    icon: "🛠️",
+    accent: "control",
+    summary: "Extend retrace with your own action — a single .c file that registers itself.",
+    minutes: 25,
+    steps: [
+      {
+        what: "Actions live in src/core/actions/. Each is a .c file that defines a struct RetraceAction and registers via the RETRACE_ACTION_REGISTER macro.",
+        out: "src/core/actions/basic.c     -- log_params, call_real, modify_in_*, modify_return_value_int\nsrc/core/actions/memfuzz.c     -- memory_fuzz\nsrc/core/actions/incomplete_io.c -- incomplete_io\n...",
+      },
+      {
+        what: "Pick a src/core/actions/*.c file like basic.c as a template. The interface you implement is per-action: parse your JSON params, decide whether to mutate the call, set the return value.",
+        out: "",
+      },
+      {
+        what: "Drop your new file in. Add an entry to Make-equivalent / CMakeLists (the build system auto-includes the directory).",
+        cmd: "ls src/core/actions/\n# add your heuristic_action.c alongside the others",
+        out: "",
+      },
+      {
+        what: "Build and run. Your action is now first-class: it shows up in `retrace list-actions` and can be referenced in any JSON config.",
+        cmd: "cmake --build build\nretrace run --config your-config.json -- ./your-target",
+        out: "your action runs at every call to the function it intercepts",
+      },
+      {
+        what: "For the full interface definition, see include/retrace/retrace_action.h and the existing actions in src/core/actions/.",
+        out: "",
+      },
+    ],
+  },
+  {
+    id: "prod",
+    title: "Debug a production issue (safely)",
+    icon: "🚑",
+    accent: "see",
+    summary: "Capture a production trace without restarting or modifying the binary — only the path you care about.",
+    minutes: 15,
+    steps: [
+      {
+        what: "Decide which functions are relevant. Logging everything in production is overkill; restrict to the suspects.",
+        cmd: "RETRACE_LOGGER_ALLOWED_FUNCS=open,openat,read,write,connect,recv,send",
+        out: "",
+      },
+      {
+        what: "Limit the trace to a short window. A 60-second slice is enough to catch a slow path; a full hour is enough to fill a disk.",
+        cmd: "timeout 60 retrace trace --log /tmp/incident.json -- ./your-service &\nPID=$!\n# ... wait, gather data, then:\nwait $PID",
+        out: "(trace stops after 60 seconds; log is bounded)",
+      },
+      {
+        what: "Scrub before persisting. The log may contain PII, secrets, or sensitive paths. Run a grep -v pass for known-sensitive patterns.",
+        cmd: "grep -v 'SECRET\\|password\\|/etc/shadow' /tmp/incident.json > /tmp/incident-scrubbed.json",
+        out: "(scrubbed file is safe to share with the post-mortem author)",
+      },
+      {
+        what: "Analyze locally with the HTML viewer.",
+        cmd: "retrace html /tmp/incident-scrubbed.json -o /tmp/postmortem.html && open /tmp/postmortem.html",
+        out: "(interactive page; filter by function, sort by duration, find the outlier)",
+      },
+      {
+        what: "The critical safety step: NEVER set RETRACE_LOGGER_DEF_ENA=1 with write access to the log file from the same user as the target. Stash everything in a directory only root can read.",
+        out: "",
+      },
+    ],
+  },
+  {
+    id: "build",
+    title: "Integrate retrace into your build",
+    icon: "🏗️",
+    accent: "control",
+    summary: "Run the test suite under retrace-fault-injection on every CI build. Catch error-path bugs before users do.",
+    minutes: 20,
+    steps: [
+      {
+        what: "Add a `fuzz-test` target to your project's build system that runs the test suite under a deterministic fuzz.",
+        cmd: "make fuzz-test\n# which is, in your Makefile:\n# fuzz-test: tests\n# \tLD_PRELOAD=$$RETRACE_LIB retrace fuzz malloc --rate 0.05 \\\\\n# \t  --log test-output/fuzz.json -- ./run-tests",
+        out: "",
+      },
+      {
+        what: "Or, in CMake, add a custom target that wires the library automatically:",
+        cmd: "add_custom_target(fuzz-test\n    COMMAND $<TARGET_FILE:run-tests>\n    ENVIRONMENT LD_PRELOAD=$<TARGET_FILE:libretrace.so>\n    COMMAND retrace fuzz malloc --rate 0.05\n    USES_TERMINAL)\nadd_dependencies(fuzz-test run-tests)",
+        out: "",
+      },
+      {
+        what: "Run it locally first to confirm your tests survive 5% OOM. If they crash, that's the bug you wanted to catch.",
+        cmd: "make fuzz-test",
+        out: "(either tests pass cleanly, or you find a handlenull-on-failure path that needs fixing)",
+      },
+      {
+        what: "Wire it into CI. See the retrace-fuzz.yml workflow in the cookbook recipe 19 — a drop-in GitHub Actions workflow that runs on every PR.",
+        out: "",
+      },
+      {
+        what: "When a CI fuzz run fails, the seed is captured in the log. Replay locally with the fixed seed to debug.",
         out: "",
       },
     ],

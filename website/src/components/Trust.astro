@@ -1,0 +1,128 @@
+---
+// Trust section — the "is this safe to run?" receipts block sceptical
+// visitors look for between the pitch and the install. Single glass
+// card with a row of receipt-style items.
+
+const items = [
+  {
+    label: "License",
+    value: "BSD-2-Clause",
+    note: "No copyleft. Use in commercial, academic, and proprietary code.",
+    accent: "see",
+  },
+  {
+    label: "Telemetry",
+    value: "None",
+    note: "No network calls, no phone-home, no usage data. The library doesn't even depend on a network stack.",
+    accent: "control",
+  },
+  {
+    label: "Dependencies",
+    value: "Zero at runtime",
+    note: "Links only against the platform's libc. No third-party C libraries. No JavaScript runtime. No Python.",
+    accent: "see",
+  },
+  {
+    label: "Code of conduct",
+    value: "Ribose community",
+    note: "Same standard Ribose applies to its open-source projects: respectful, technical, no jerks.",
+    accent: "control",
+  },
+  {
+    label: "Maintainer",
+    value: "Ribose",
+    note: "Open-source subsidiary of Ribose, an ISO/IEC 27001 + 27701 certified company. Active since 2017.",
+    accent: "see",
+  },
+  {
+    label: "CVE status",
+    value: "None reported",
+    note: "No known security vulnerabilities in retrace itself. Tracked via GitHub Security Advisories.",
+    accent: "control",
+  },
+];
+---
+
+<section class="section trust" id="trust">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Trust</div>
+      <h2>The receipts. Read them before you install.</h2>
+      <p>
+        retrace preloads a shared library into the target process. That's the same mechanism that
+        malware uses to inject code. You should be skeptical. Here's what we have to say about it.
+      </p>
+    </div>
+
+    <div class="trust-grid glass reveal">
+      {
+        items.map((it, i) => (
+          <div class={`trust-item accent-${it.accent}`}>
+            <div class="trust-label">{it.label}</div>
+            <div class="trust-value">{it.value}</div>
+            <div class="trust-note">{it.note}</div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+.trust-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+@media (max-width: 960px) { .trust-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px) { .trust-grid { grid-template-columns: 1fr; } }
+
+.trust-item {
+  padding: 22px 24px;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.trust-item:nth-child(3n) { border-right: none; }
+.trust-item:nth-last-child(-n+3) { border-bottom: none; }
+@media (max-width: 960px) {
+  .trust-item:nth-child(3n) { border-right: 1px solid rgba(255, 255, 255, 0.05); }
+  .trust-item:nth-child(2n) { border-right: none; }
+  .trust-item:nth-last-child(-n+3) { border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+  .trust-item:nth-last-child(-n+2) { border-bottom: none; }
+  .trust-item:nth-child(2n+1):nth-last-child(2) { border-bottom: none; }
+}
+@media (max-width: 540px) {
+  .trust-item { border-right: none !important; }
+  .trust-item:nth-child(3n) { border-right: none; }
+  .trust-item:not(:last-child) { border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+}
+
+.trust-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+  margin-bottom: 8px;
+}
+.trust-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+.trust-item.accent-see .trust-value { color: var(--color-see); }
+.trust-item.accent-control .trust-value { color: var(--color-control); }
+.trust-item.accent-break .trust-value { color: var(--color-break); }
+.trust-note {
+  font-size: 13px;
+  color: var(--color-dim);
+  line-height: 1.5;
+}
+</style>
