@@ -77,6 +77,7 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 | 18 | [Fuzz enprot's EPT parser](18-fuzz-enprot.md) | Cross-project recipe: stress-test [engyon/enprot](https://github.com/engyon/enprot) via retrace — audit file access, fuzz malloc, simulate short reads. |
 | 19 | [CI fuzzing](19-ci-fuzzing.md) | Drop-in `.github/workflows/retrace-fuzz.yml` that catches OOM + short-IO bugs on every PR. |
 | 20 | [Sandbox a binary](20-sandbox.md) | Runtime file-access deny-list: block `/etc/shadow`, `/root/.ssh/`, etc. |
+| 21 | [Mock SSL certificate verification](21-mock-ssl-verify.md) | Force `SSL_get_verify_result` to any X509_V_* code — test cert handling without standing up servers. |
 
 ## Action reference
 
