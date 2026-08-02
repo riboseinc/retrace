@@ -156,6 +156,27 @@ const personas = [
     what: "Wire fault-injection into CI. Run the test suite under <code>memory_fuzz</code> on every PR; catch OOM-as-bug before users do.",
     cmd: "retrace fuzz malloc --rate 0.05 -- ./run-tests",
   },
+  {
+    tag: "db",
+    accent: "see",
+    who: "Database engineer",
+    what: "Trace a DB client's libc surface to find the slow query path. See which <code>read</code>/<code>write</code> syscalls each query triggers, and where time goes.",
+    cmd: "retrace trace read,write,fsync --log /tmp/db.json -- ./db-client",
+  },
+  {
+    tag: "dist",
+    accent: "control",
+    who: "Distributed systems engineer",
+    what: "Reproduce a flaky consensus vote by mocking <code>time</code>, fuzzing <code>malloc</code>, and forcing <code>fsync</code> to fail. The bug only happens under specific conditions — retrace makes them deterministic.",
+    cmd: "retrace run --config consensus-repro.json -- ./raft-node",
+  },
+  {
+    tag: "ml",
+    accent: "see",
+    who: "ML engineer",
+    what: "Debug a Python/C++ native binding. Trace the interpreter's libc calls to find which model-loading step is bottlenecked on disk I/O vs. computation.",
+    cmd: "retrace trace fopen,read,mmap -- python3 train.py",
+  },
 ];
 ---
 
@@ -163,7 +184,7 @@ const personas = [
   <div class="wrap">
     <div class="section-head reveal">
       <div class="eyebrow">Who uses retrace</div>
-      <h2>Twenty-two jobs. One shared library.</h2>
+      <h2>Twenty-five jobs. One shared library.</h2>
       <p>
         retrace is small enough to slip into a one-off debugging session, generic enough to anchor a
         CI fuzzing pipeline, principled enough to back a security audit. Below: every audience that
