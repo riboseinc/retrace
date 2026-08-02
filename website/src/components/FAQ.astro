@@ -1,0 +1,158 @@
+---
+// FAQ — handles the adoption objections that don't fit elsewhere.
+// Mirrored in docs/faq.md.
+const faqs = [
+  {
+    q: "Does retrace work with my language?",
+    a: "Yes, as long as the program compiles to a native binary. C, C++, Rust, Go (with cgo enabled or on Linux where Go's runtime uses libc for some syscalls), Swift, Zig, D, Pascal — all work. Pure managed runtimes (JIT-compiled Java, JavaScript, pure-Go without cgo) make fewer libc calls and are less useful to trace, but the libc calls they do make are still captured. Interpreters (Python, Ruby, Node) — retrace traces the interpreter's own libc activity, which often reveals what the script is doing.",
+  },
+  {
+    q: "Does it work on stripped binaries?",
+    a: "Yes. retrace intercepts at the libc symbol level, not the binary's own symbols. A fully stripped binary still calls libc functions by name; those are the symbols retrace hooks. You don't need debug info, source, or symbols in the target.",
+  },
+  {
+    q: "Does it work on PIE / ASLR binaries?",
+    a: "Yes. Position-Independent Executables and ASLR don't affect retrace — interposition happens at the dynamic linker level, before the binary's load address matters. The same goes for stacked/relro/fortify hardening flags.",
+  },
+  {
+    q: "How much overhead does it add?",
+    a: "Single-digit microseconds per intercepted call, plus JSON serialization proportional to argument size. Most programs see wall-clock overhead of 5–15% under default logging. Crank RETRACE_LOGGER_ALLOWED_FUNCS down to the functions you care about and overhead drops sharply. The fork+engine path is assembly; there is no interpreter in the hot loop.",
+  },
+  {
+    q: "Can I use retrace in production?",
+    a: "Yes, with care. Logs may contain argument values (file paths, buffer contents, environment variable names) — scrub or redact before persisting. For long-running processes, log to a file with rotation, not stdout. The sandbox and mock actions are stateless and safe; the fuzzing actions are not — they will crash your program by design.",
+  },
+  {
+    q: "Is retrace safe to run on the binary I'm investigating?",
+    a: "retrace itself doesn't modify the target binary — it preloads a library and intercepts calls at runtime. The target runs with its normal privileges under your normal user. The untrusted-binary workflow (sandbox action, deny-list) is specifically designed for running code you don't trust; see cookbook recipe 20.",
+  },
+  {
+    q: "How does retrace compare to eBPF?",
+    a: "Different layers. eBPF runs in kernel context, observes syscalls, and can't (portably) modify arguments or skip calls. retrace runs in userspace, observes libc calls, and can mutate arguments, override return values, and inject failures. They're complementary — eBPF for system-wide observability, retrace for per-process control. eBPF is Linux-only; retrace works on 13 platforms.",
+  },
+  {
+    q: "How does it compare to strace?",
+    a: "strace observes syscalls (kernel boundary) and writes them as text. It cannot modify arguments, override returns, or inject failures. retrace observes libc calls (userspace boundary), can mutate them, runs on more platforms, and produces structured JSON plus interactive HTML. Use strace for 'what is this binary doing right now?' — use retrace for 'what does this binary do under failure conditions I control?'",
+  },
+  {
+    q: "Can I write my own actions?",
+    a: "Yes. Add one .c file under src/core/actions/ that registers itself via the RETRACE_ACTION_REGISTER macro. The action receives the thread context (parsed args, return value pointer) and the JSON action_params. No engine change needed. See src/core/actions/basic.c for the pattern.",
+  },
+  {
+    q: "What's the deal with macOS SIP?",
+    a: "Apple's System Integrity Protection blocks DYLD_INSERT_LIBRARIES for binaries in /usr/bin and similar protected paths. Either copy the target to /tmp/ first, or disable SIP via csrutil (not recommended for daily use). Third-party binaries in /Applications or your home directory are unaffected.",
+  },
+  {
+    q: "Is the JSON log format stable?",
+    a: "Within a major version, yes. New fields may be added (parse defensively); existing fields are not renamed or removed. See the configuration reference for the schema. The interactive HTML viewer handles whatever fields are present.",
+  },
+  {
+    q: "How do I cite retrace in academic work?",
+    a: "Cite the repository: riboseinc/retrace, version 2.1.0, BSD-2-Clause license, available at https://github.com/riboseinc/retrace. There is no formal paper yet; if you'd like one, open an issue.",
+  },
+];
+---
+
+<section class="section faq" id="faq">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Frequently asked</div>
+      <h2>The questions every evaluator asks.</h2>
+      <p>
+        Eight years of issues, PR reviews, and conference hallway-track conversations have distilled
+        into these twelve. If yours isn't here, open an
+        <a href="https://github.com/riboseinc/retrace/issues">issue</a>.
+      </p>
+    </div>
+
+    <div class="faq-list">
+      {
+        faqs.map((f, i) => (
+          <details class="faq-item glass-tight reveal" open={i < 2}>
+            <summary>
+              <span class="q">{f.q}</span>
+              <span class="chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="a">
+              <p set:html={f.a} />
+            </div>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.faq-item {
+  padding: 0;
+  overflow: hidden;
+}
+.faq-item summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  transition: background 0.2s;
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+.faq-item .q {
+  font-size: 15px;
+  color: var(--color-text);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  line-height: 1.4;
+}
+.faq-item .chevron {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-right: 1.5px solid var(--color-dim);
+  border-bottom: 1.5px solid var(--color-dim);
+  transform: rotate(45deg);
+  transition: transform 0.25s var(--ease-glass);
+  margin-top: -4px;
+}
+.faq-item[open] .chevron {
+  transform: rotate(-135deg);
+  margin-top: 4px;
+  border-color: var(--color-see);
+}
+
+.faq-item .a {
+  padding: 0 20px 18px;
+  color: var(--color-dim);
+  font-size: 14px;
+  line-height: 1.65;
+  max-width: 740px;
+}
+.faq-item .a :global(code) {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.faq-item .a :global(a) {
+  color: var(--color-see);
+  border-bottom: 1px solid rgba(94, 227, 255, 0.3);
+}
+
+@media (max-width: 540px) {
+  .faq-item summary { padding: 14px 16px; }
+  .faq-item .a { padding: 0 16px 16px; font-size: 13.5px; }
+}
+</style>
