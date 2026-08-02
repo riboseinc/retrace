@@ -31,6 +31,7 @@ Pick the one that matches your situation.
 19. [Write a custom action](#19-write-a-custom-action)
 20. [Debug a production issue (safely)](#20-debug-a-production-issue-safely)
 21. [Integrate retrace into your build](#21-integrate-retrace-into-your-build)
+22. [Build retrace from source](#22-build-retrace-from-source)
 
 ---
 
@@ -924,6 +925,68 @@ See the `retrace-fuzz.yml` workflow in [cookbook recipe 19](cookbook/19-ci-fuzzi
 
 The seed is captured in the log. Replay locally with the fixed seed
 to debug.
+
+---
+
+## 22. Build retrace from source
+
+**Time:** 10 minutes.
+**Goal:** skip the install script — clone, build, install in three commands. CMake + Ninja.
+
+### Step 1 — clone
+
+```sh
+git clone https://github.com/riboseinc/retrace.git
+cd retrace
+```
+
+### Step 2 — configure with CMake
+
+Ninja is the recommended generator (faster, handles the per-arch
+trampoline objects cleanly).
+
+```sh
+cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON
+```
+
+CMake probes feature flags and writes `build/config.h` from
+`cmake/config.h.cmake.in`.
+
+### Step 3 — build
+
+The default target produces `libretrace.so` / `.dylib` / `.dll` and
+the `retrace` CLI binary.
+
+```sh
+cmake --build build
+# build/src/libretrace.so
+# build/src/cli/retrace
+```
+
+### Step 4 — run the tests
+
+```sh
+ctest --test-dir build --output-on-failure
+```
+
+All tests should pass on a clean checkout on supported platforms.
+
+### Step 5 — install system-wide (optional)
+
+You can also use the build output directly via `RETRACE_LIB` without
+installing.
+
+```sh
+sudo cmake --install build
+# /usr/local/lib/libretrace.so
+# /usr/local/bin/retrace
+```
+
+### Step 6 — build options
+
+For build options (sanitizers, vcpkg, Android NDK cross-compile,
+OHOS, Windows arm64, static ptrace backend), see `CMakeLists.txt`
+and the platform-specific toolchain files under `cmake/`.
 
 ---
 

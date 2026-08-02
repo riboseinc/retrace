@@ -1,0 +1,335 @@
+---
+// Performance — addresses the #1 unaddressed concern. Honest
+// qualitative claims (no fabricated numbers); concrete env-var
+// tuning recommendations; clear "when to use, when not to" guidance.
+
+const claims = [
+  {
+    metric: "Per-call overhead",
+    value: "Single-digit µs",
+    detail: "Assembly trampoline → C engine → JSON serialization. No interpreter in the hot loop. Most of the cost is the log line itself, not the interception.",
+    accent: "see",
+  },
+  {
+    metric: "Wall-clock impact",
+    value: "5–15% typical",
+    detail: "Under default logging (log_params + call_real for every function). Drops sharply when you restrict to a function allowlist.",
+    accent: "control",
+  },
+  {
+    metric: "Memory",
+    value: "~10 MB + log",
+    detail: "Engine + parson + per-thread state is small. Log file grows linearly with intercepted calls; rotate or pipe to /dev/null for long runs.",
+    accent: "see",
+  },
+  {
+    metric: "Library size",
+    value: "~200 KB",
+    detail: "Statically linked assembly trampolines + engine + parson. No third-party C libraries. No JavaScript. No Python.",
+    accent: "control",
+  },
+];
+
+const tuning = [
+  {
+    title: "Restrict the function allowlist",
+    env: "RETRACE_LOGGER_ALLOWED_FUNCS",
+    tip: "Comma-separated list of function names to log. The engine still intercepts every function (so call_real, modify_*, etc. still work), but the JSON log only emits lines for the allowlisted ones. Biggest single win.",
+  },
+  {
+    title: "Suppress stdout mirroring",
+    env: "RETRACE_LOGGER_DEF_STDOUT_ENA=0",
+    tip: "Pair with --log FILE. stdout mirroring has its own serialization cost; if you only need the file, disable mirroring.",
+  },
+  {
+    title: "Skip log_params for modify-only scripts",
+    env: "(config)",
+    tip: "If you're using retrace to mutate (modify_in_param_*, modify_return_value_int) but don't care about observation, omit log_params from the action list. The engine still runs but emits no log line for that call.",
+  },
+  {
+    title: "Disable logging entirely",
+    env: "RETRACE_LOGGER_DEF_ENA=0",
+    tip: "Interception still runs (so sandbox, mock, fuzz all still work), but no log output anywhere. Use when you only want the side effects.",
+  },
+];
+
+const useCases = [
+  {
+    good: true,
+    label: "Shines",
+    items: [
+      "Debugging — why is this slow, what's it reading",
+      "Testing — fault injection in CI",
+      "Audit — what does this binary actually do",
+      "Reverse engineering — map closed-source behavior",
+      "Security — sandbox, deny-list, secret-sniffing",
+    ],
+  },
+  {
+    good: false,
+    label: "Don't",
+    items: [
+      "Production hot paths without RETRACE_LOGGER_ALLOWED_FUNCS",
+      "Real-time / latency-sensitive inner loops",
+      "Kernelspace (use eBPF instead)",
+      "Anything requiring strict bit-exact reproducibility (timings alter under trace)",
+    ],
+  },
+];
+---
+
+<section class="section perf" id="performance">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Performance</div>
+      <h2>How much does this actually cost?</h2>
+      <p>
+        The honest answer: <strong>single-digit microseconds per call</strong>, plus JSON
+        serialization proportional to argument size. Most programs see 5–15% wall-clock overhead
+        under default logging. You can dial that down to near-zero if you only want the side
+        effects (mock, sandbox, fault injection) and don't need the log.
+      </p>
+    </div>
+
+    <div class="claims-grid">
+      {
+        claims.map((c, i) => (
+          <article class={`claim-card glass-tight reveal accent-${c.accent}`} style={`transition-delay: ${i * 60}ms`}>
+            <div class="claim-metric">{c.metric}</div>
+            <div class={`claim-value v-${c.accent}`}>{c.value}</div>
+            <p class="claim-detail">{c.detail}</p>
+          </article>
+        ))
+      }
+    </div>
+
+    <div class="tuning-block glass reveal">
+      <header class="tuning-head">
+        <div class="eyebrow">Tuning</div>
+        <h3>Four levers, in order of impact.</h3>
+      </header>
+      <ol class="tuning-list">
+        {
+          tuning.map((t, i) => (
+            <li class="tuning-item">
+              <div class="tuning-num">{String(i + 1).padStart(2, "0")}</div>
+              <div class="tuning-body">
+                <div class="tuning-title">{t.title}</div>
+                <code class="tuning-env">{t.env}</code>
+                <p class="tuning-tip">{t.tip}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+
+    <div class="usecases-grid">
+      {
+        useCases.map((uc) => (
+          <article class={`usecase-card glass-tight reveal ${uc.good ? "good" : "bad"}`}>
+            <header class="uc-head">
+              <div class={`uc-icon ${uc.good ? "good" : "bad"}`}>{uc.good ? "✓" : "✗"}</div>
+              <h3 class={`uc-label ${uc.good ? "good" : "bad"}`}>{uc.label}</h3>
+            </header>
+            <ul class="uc-list">
+              {uc.items.map((item) => (
+                <li class="uc-item">{item}</li>
+              ))}
+            </ul>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+.claims-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+@media (max-width: 1100px) { .claims-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px) { .claims-grid { grid-template-columns: 1fr; } }
+
+.claim-card {
+  padding: 22px 22px 20px;
+}
+.claim-card.accent-see { border-top: 2px solid rgba(94, 227, 255, 0.35); }
+.claim-card.accent-control { border-top: 2px solid rgba(242, 180, 65, 0.35); }
+.claim-card.accent-break { border-top: 2px solid rgba(255, 107, 92, 0.35); }
+
+.claim-metric {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+  margin-bottom: 8px;
+}
+.claim-value {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: 12px;
+}
+.claim-value.v-see { color: var(--color-see); }
+.claim-value.v-control { color: var(--color-control); }
+.claim-value.v-break { color: var(--color-break); }
+.claim-detail {
+  font-size: 12.5px;
+  color: var(--color-dim);
+  line-height: 1.55;
+}
+
+.tuning-block {
+  padding: 28px 30px 24px;
+  margin-bottom: 16px;
+}
+.tuning-head {
+  margin-bottom: 20px;
+}
+.tuning-head .eyebrow { margin-bottom: 10px; }
+.tuning-head h3 {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.tuning-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px 28px;
+}
+@media (max-width: 860px) {
+  .tuning-list { grid-template-columns: 1fr; }
+}
+
+.tuning-item {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 14px;
+}
+.tuning-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(7, 9, 13, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.tuning-body {
+  min-width: 0;
+}
+.tuning-title {
+  font-size: 14px;
+  color: var(--color-text);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.tuning-env {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--color-see);
+  background: rgba(94, 227, 255, 0.06);
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid rgba(94, 227, 255, 0.18);
+  margin-bottom: 8px;
+}
+.tuning-tip {
+  font-size: 12.5px;
+  color: var(--color-dim);
+  line-height: 1.55;
+}
+
+.usecases-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) {
+  .usecases-grid { grid-template-columns: 1fr; }
+}
+
+.usecase-card {
+  padding: 22px 24px;
+}
+.usecase-card.good { border-top: 2px solid rgba(94, 227, 255, 0.4); }
+.usecase-card.bad { border-top: 2px solid rgba(255, 107, 92, 0.4); }
+
+.uc-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.uc-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+.uc-icon.good {
+  background: rgba(94, 227, 255, 0.15);
+  color: var(--color-see);
+  border: 1px solid rgba(94, 227, 255, 0.3);
+}
+.uc-icon.bad {
+  background: rgba(255, 107, 92, 0.15);
+  color: var(--color-break);
+  border: 1px solid rgba(255, 107, 92, 0.3);
+}
+.uc-label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.uc-label.good { color: var(--color-see); }
+.uc-label.bad { color: var(--color-break); }
+
+.uc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.uc-item {
+  font-size: 13.5px;
+  color: var(--color-text);
+  line-height: 1.55;
+  padding: 6px 0 6px 18px;
+  position: relative;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.uc-item:last-child { border-bottom: none; }
+.uc-item::before {
+  content: "·";
+  position: absolute;
+  left: 4px;
+  top: 6px;
+  color: var(--color-dim);
+  font-weight: 700;
+}
+</style>

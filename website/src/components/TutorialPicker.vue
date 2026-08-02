@@ -25,6 +25,7 @@ const TAGS = {
   custom:    ["extend", "ci"],
   prod:      ["debug", "production"],
   build:     ["ci", "test", "fault"],
+  source:    ["extend"],
 };
 
 // Register tags that aren't auto-derived from scenarios (extend doesn't
@@ -740,6 +741,45 @@ EOF`,
       },
       {
         what: "When a CI fuzz run fails, the seed is captured in the log. Replay locally with the fixed seed to debug.",
+        out: "",
+      },
+    ],
+  },
+  {
+    id: "source",
+    title: "Build retrace from source",
+    icon: "📦",
+    accent: "control",
+    summary: "Skip the install script — clone, build, install in three commands. CMake + Ninja.",
+    minutes: 10,
+    steps: [
+      {
+        what: "Clone the repository.",
+        cmd: "git clone https://github.com/riboseinc/retrace.git\ncd retrace",
+        out: "",
+      },
+      {
+        what: "Configure with CMake. Ninja is the recommended generator (faster, handles the per-arch trampoline objects cleanly).",
+        cmd: "cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON",
+        out: "(CMake probes feature flags and writes build/config.h from cmake/config.h.cmake.in)",
+      },
+      {
+        what: "Build. The default target produces libretrace.so / .dylib / .dll and the retrace CLI binary.",
+        cmd: "cmake --build build",
+        out: "build/src/libretrace.so\nbuild/src/cli/retrace",
+      },
+      {
+        what: "Run the test suite to confirm your build is healthy.",
+        cmd: "ctest --test-dir build --output-on-failure",
+        out: "(all tests pass on a clean checkout on supported platforms)",
+      },
+      {
+        what: "Install system-wide (optional — you can also use the build output directly via RETRACE_LIB).",
+        cmd: "sudo cmake --install build\n# which puts:\n#   /usr/local/lib/libretrace.so\n#   /usr/local/bin/retrace",
+        out: "",
+      },
+      {
+        what: "For build options (sanitizers, vcpkg, Android NDK cross-compile, OHOS, Windows arm64, static ptrace backend), see CMakeLists.txt and the platform-specific toolchain files under cmake/.",
         out: "",
       },
     ],
