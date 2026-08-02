@@ -1,0 +1,167 @@
+---
+// Why retrace — the problem statement. Sits between Hero and Install
+// to anchor the pitch: existing tools each do part of the job; retrace
+// is the only one that does all three on any binary.
+
+const competitors = [
+  {
+    name: "strace",
+    oneLiner: "Tells you what happened.",
+    gap: "Cannot modify arguments, override returns, or inject failures. Observe-only.",
+    accent: "see",
+  },
+  {
+    name: "Frida",
+    oneLiner: "Lets you script it.",
+    gap: "Requires JavaScript. 40 MB runtime. Heavyweight for simple interception.",
+    accent: "control",
+  },
+  {
+    name: "libFuzzer",
+    oneLiner: "Finds bugs in your own code.",
+    gap: "Requires source and recompilation. Cannot target binaries you didn't build.",
+    accent: "break",
+  },
+];
+---
+
+<section class="section why" id="why">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Why retrace exists</div>
+      <h2>Every existing tool does part of the job. None does all of it.</h2>
+      <p>
+        strace observes. Frida mutates. libFuzzer fuzzes. Each is excellent at its verb and silent
+        on the other two. retrace is the first tool that does all three — observe, mutate, break —
+        on any dynamically-linked binary, without source, without recompiling, on thirteen platforms.
+      </p>
+    </div>
+
+    <div class="why-grid">
+      {
+        competitors.map((c, i) => (
+          <article class={`why-card glass-tight reveal accent-${c.accent}`} style={`transition-delay: ${i * 80}ms`}>
+            <div class={`why-tag tag-${c.accent}`}>{c.name}</div>
+            <p class="why-liner">{c.oneLiner}</p>
+            <p class="why-gap">{c.gap}</p>
+          </article>
+        ))
+      }
+    </div>
+
+    <div class="why-synthesis glass reveal">
+      <div class="syn-label">retrace</div>
+      <div class="syn-line">
+        <span class="syn-verb v-see">see</span>
+        <span class="syn-plus">+</span>
+        <span class="syn-verb v-control">control</span>
+        <span class="syn-plus">+</span>
+        <span class="syn-verb v-break">break</span>
+        <span class="syn-eq">=</span>
+        <span class="syn-result">every libc call, your decision</span>
+      </div>
+      <p class="syn-note">
+        One ~200 KB shared library. Twelve built-in actions. JSON config you can write in five
+        minutes. Runs on the binary you already have.
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+.why-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+@media (max-width: 860px) {
+  .why-grid { grid-template-columns: 1fr; }
+}
+
+.why-card {
+  padding: 22px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.why-tag {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 3px;
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.why-tag.tag-see { color: var(--color-see); border-color: rgba(94, 227, 255, 0.25); }
+.why-tag.tag-control { color: var(--color-control); border-color: rgba(242, 180, 65, 0.25); }
+.why-tag.tag-break { color: var(--color-break); border-color: rgba(255, 107, 92, 0.25); }
+
+.why-liner {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text);
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+}
+.why-gap {
+  font-size: 13.5px;
+  color: var(--color-dim);
+  line-height: 1.55;
+  flex: 1;
+}
+
+.why-card.accent-see { border-left: 2px solid rgba(94, 227, 255, 0.35); }
+.why-card.accent-control { border-left: 2px solid rgba(242, 180, 65, 0.35); }
+.why-card.accent-break { border-left: 2px solid rgba(255, 107, 92, 0.35); }
+
+.why-synthesis {
+  margin-top: 8px;
+  padding: 28px 30px;
+  text-align: center;
+}
+.syn-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+  margin-bottom: 16px;
+}
+.syn-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 14px;
+  font-family: var(--font-mono);
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.syn-verb { font-weight: 700; }
+.v-see { color: var(--color-see); }
+.v-control { color: var(--color-control); }
+.v-break { color: var(--color-break); }
+.syn-plus, .syn-eq { color: var(--color-dim); font-weight: 400; }
+.syn-result {
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: clamp(15px, 2vw, 18px);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.syn-note {
+  margin-top: 18px;
+  font-size: 13.5px;
+  color: var(--color-dim);
+  line-height: 1.55;
+  max-width: 580px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>

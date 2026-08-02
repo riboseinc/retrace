@@ -1,0 +1,7 @@
+# retrace robots
+# Site: https://riboseinc.github.io/retrace/
+
+User-agent: *
+Allow: /
+
+Sitemap: https://riboseinc.github.io/retrace/sitemap.xml
