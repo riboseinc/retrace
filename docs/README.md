@@ -8,10 +8,11 @@ install, quick start, and platform support.
 
 | You want to… | Go to |
 |--------------|-------|
-| Solve a specific problem step-by-step | [Tutorials](tutorials.md) — 8 scenario-driven walkthroughs |
+| Solve a specific problem step-by-step | [Tutorials](tutorials.md) — 18 scenario-driven walkthroughs |
+| Get an answer to a common question | [FAQ](faq.md) — language support, overhead, production use, more |
 | Look up a CLI subcommand or env var | [CLI reference](cli.md) |
 | Look up an action or write a JSON config | [Configuration reference](configuration.md) |
-| Run a specific scenario (trace, fuzz, mock, sandbox) | [Cookbook](cookbook/README.md) — 20 recipes with copy-paste JSON |
+| Run a specific scenario (trace, fuzz, mock, sandbox) | [Cookbook](cookbook/README.md) — 21 recipes with copy-paste JSON |
 | Add retrace to a Dockerfile or compose stack | [Docker guide](docker.md) |
 | Trace an Android app via `wrap.sh` or Magisk | [Android guide](android.md) |
 | Understand a design decision | [Architecture decisions (ADR)](adr/README.md) |
@@ -22,14 +23,15 @@ install, quick start, and platform support.
 ```
 docs/
 ├── README.md              ← you are here
-├── tutorials.md           ← 8 scenario-driven step-by-step walkthroughs
+├── tutorials.md           ← 18 scenario-driven step-by-step walkthroughs
+├── faq.md                 ← common questions: language support, overhead, etc.
 ├── cli.md                 ← CLI subcommand + env var reference
 ├── configuration.md       ← JSON config schema + action parameter reference
-├── cookbook/              ← 20 recipe-driven walkthroughs
+├── cookbook/              ← 21 recipe-driven walkthroughs
 │   ├── README.md          ← index + compact action reference
 │   ├── 01-trace-all-calls.md
 │   ├── …
-│   └── 20-sandbox.md
+│   └── 21-mock-ssl-verify.md
 ├── docker.md              ← container integration patterns
 ├── android.md             ← Android cross-compile + deploy
 └── adr/                   ← architecture decision records
