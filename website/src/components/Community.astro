@@ -1,0 +1,212 @@
+---
+// Community — the standard "how do I get involved?" section that
+// every OSS project site has. Three paths: Contribute, Discuss,
+// Get support. Closes the loop after the visitor has evaluated
+// retrace and decided they want in.
+
+const paths = [
+  {
+    id: "contribute",
+    icon: "🛠️",
+    accent: "control",
+    title: "Contribute",
+    blurb: "PRs welcome. Bug fixes, new actions, new backend ports, docs improvements — all of it counts.",
+    cta: "Browse good first issues",
+    href: "https://github.com/riboseinc/retrace/contribute",
+    secondary: [
+      { label: "CONTRIBUTING.md", href: "https://github.com/riboseinc/retrace/blob/main/CONTRIBUTING.md" },
+      { label: "Open a PR", href: "https://github.com/riboseinc/retrace/compare" },
+    ],
+  },
+  {
+    id: "discuss",
+    icon: "💬",
+    accent: "see",
+    title: "Discuss",
+    blurb: "Q&A, design ideas, use-case walkthroughs. GitHub Discussions is the canonical channel.",
+    cta: "Open a discussion",
+    href: "https://github.com/riboseinc/retrace/discussions",
+    secondary: [
+      { label: "Issue tracker", href: "https://github.com/riboseinc/retrace/issues" },
+      { label: "ADRs", href: "https://github.com/riboseinc/retrace/blob/main/docs/adr/" },
+    ],
+  },
+  {
+    id: "support",
+    icon: "🏢",
+    accent: "break",
+    title: "Get commercial support",
+    blurb: "Ribose offers support contracts, training, and custom development around retrace and its ecosystem.",
+    cta: "Contact Ribose",
+    href: "https://www.ribose.com/contact",
+    secondary: [
+      { label: "About Ribose", href: "https://www.ribose.com" },
+      { label: "Security disclosures", href: "https://github.com/riboseinc/retrace/security" },
+    ],
+  },
+];
+---
+
+<section class="section community" id="community">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Get involved</div>
+      <h2>Picked a path? Here's how to go further.</h2>
+      <p>
+        retrace is BSD-2-Clause open source. The three doors below cover the common reasons people
+        come back after their first successful trace. Pick the one that matches your situation.
+      </p>
+    </div>
+
+    <div class="community-grid">
+      {
+        paths.map((p, i) => (
+          <article class={`community-card glass glass-hover reveal accent-${p.accent}`} style={`transition-delay: ${i * 70}ms`}>
+            <header class="com-head">
+              <div class={`com-icon icon-${p.accent}`}>{p.icon}</div>
+              <h3>{p.title}</h3>
+            </header>
+            <p class="com-blurb">{p.blurb}</p>
+            <a class={`com-cta cta-${p.accent}`} href={p.href}>
+              {p.cta}
+              <span class="arrow">→</span>
+            </a>
+            <ul class="com-secondary">
+              {p.secondary.map((s) => (
+                <li><a href={s.href}>{s.label}</a></li>
+              ))}
+            </ul>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+.community-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 960px) { .community-grid { grid-template-columns: 1fr; } }
+
+.community-card {
+  padding: 26px 28px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.community-card.accent-see { border-top: 2px solid rgba(94, 227, 255, 0.4); }
+.community-card.accent-control { border-top: 2px solid rgba(242, 180, 65, 0.4); }
+.community-card.accent-break { border-top: 2px solid rgba(255, 107, 92, 0.4); }
+
+.com-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+.com-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border: 1px solid;
+}
+.icon-see {
+  background: rgba(94, 227, 255, 0.08);
+  border-color: rgba(94, 227, 255, 0.25);
+}
+.icon-control {
+  background: rgba(242, 180, 65, 0.08);
+  border-color: rgba(242, 180, 65, 0.25);
+}
+.icon-break {
+  background: rgba(255, 107, 92, 0.08);
+  border-color: rgba(255, 107, 92, 0.25);
+}
+.com-head h3 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.com-blurb {
+  font-size: 14px;
+  color: var(--color-dim);
+  line-height: 1.55;
+  flex: 1;
+}
+
+.com-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s var(--ease-glass);
+  align-self: flex-start;
+}
+.com-cta .arrow { transition: transform 0.18s; }
+.com-cta:hover .arrow { transform: translateX(3px); }
+
+.cta-see {
+  background: rgba(94, 227, 255, 0.12);
+  color: var(--color-see);
+  border: 1px solid rgba(94, 227, 255, 0.35);
+}
+.cta-see:hover {
+  background: rgba(94, 227, 255, 0.18);
+  border-color: rgba(94, 227, 255, 0.5);
+}
+.cta-control {
+  background: rgba(242, 180, 65, 0.12);
+  color: var(--color-control);
+  border: 1px solid rgba(242, 180, 65, 0.35);
+}
+.cta-control:hover {
+  background: rgba(242, 180, 65, 0.18);
+  border-color: rgba(242, 180, 65, 0.5);
+}
+.cta-break {
+  background: rgba(255, 107, 92, 0.12);
+  color: var(--color-break);
+  border: 1px solid rgba(255, 107, 92, 0.35);
+}
+.cta-break:hover {
+  background: rgba(255, 107, 92, 0.18);
+  border-color: rgba(255, 107, 92, 0.5);
+}
+
+.com-secondary {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.com-secondary li {
+  font-size: 12.5px;
+}
+.com-secondary a {
+  color: var(--color-dim);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.com-secondary a:hover {
+  color: var(--color-text);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+</style>
