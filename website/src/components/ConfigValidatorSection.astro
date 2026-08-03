@@ -1,0 +1,36 @@
+---
+import ConfigValidator from "./ConfigValidator.vue";
+---
+
+<section class="section validator-section" id="validator">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Validate your config</div>
+      <h2>Paste a JSON config. Get immediate feedback.</h2>
+      <p>
+        The browser equivalent of <code class="mono">retrace validate</code>. JSON parses in your
+        page; nothing is sent anywhere. Five pre-baked examples below the input let you see what
+        valid (and invalid) configs look like.
+      </p>
+    </div>
+
+    <div class="reveal">
+      <ConfigValidator client:visible />
+    </div>
+  </div>
+</section>
+
+<style>
+.validator-section {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255, 107, 92, 0.03), transparent 60%);
+}
+.section-head code {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+</style>
