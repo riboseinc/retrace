@@ -1,0 +1,360 @@
+---
+// What's new — recent feature velocity + roadmap. Sceptical visitors
+// want to know: "is this project alive?" Yes — v2.1.0 shipped 8
+// major additions, and v2.2.0 is in flight.
+
+const shipped = [
+  {
+    title: "Quick CLI subcommands",
+    detail: "trace, mock, fuzz, slow, pp, html, list-actions, list-functions, validate. JSON config no longer required for the 90% case.",
+    accent: "control",
+    tag: "v2.1.0",
+  },
+  {
+    title: "Built-in HTML trace viewer",
+    detail: "retrace trace --html produces an interactive self-contained page. No Python, no git clone, no server. Summary cards + filterable call table.",
+    accent: "see",
+    tag: "v2.1.0",
+  },
+  {
+    title: "Docker integration",
+    detail: "Pre-built image at ghcr.io/riboseinc/retrace:latest. One-line RUN curl in any Dockerfile. Same JSON config across all 13 platforms.",
+    accent: "control",
+    tag: "v2.1.0",
+  },
+  {
+    title: "Binary releases",
+    detail: "Pre-built .so/.dylib/.dll for 8 platforms. install.sh detects OS + arch and picks the right one. Stable URLs for Dockerfiles.",
+    accent: "see",
+    tag: "v2.1.0",
+  },
+  {
+    title: "Three new actions",
+    detail: "delay (latency injection), call_count_limit (resource exhaustion), sandbox (runtime path deny-list). 12 total — fully composable.",
+    accent: "break",
+    tag: "v2.1.0",
+  },
+  {
+    title: "Android support",
+    detail: "Cross-compile via NDK for arm64 + x86_64. wrap.sh for debuggable apps, Magisk Zygisk for production. Same JSON config.",
+    accent: "control",
+    tag: "v2.1.0",
+  },
+  {
+    title: "macOS Intel + Apple Silicon fixed",
+    detail: "Section-walk bug on Intel (getsectiondata recursion) and FP varargs on both arches. Both production-ready now.",
+    accent: "break",
+    tag: "v2.1.0",
+  },
+  {
+    title: "Engine MECE refactor",
+    detail: "Thread context, script resolver, action runner extracted from monolithic engine. Adding new behaviors no longer requires engine changes.",
+    accent: "control",
+    tag: "v2.1.0",
+  },
+];
+
+const roadmap = [
+  {
+    title: "Network functions in default intercept set",
+    detail: "socket, connect, send, recv, sendto, recvfrom — currently tracked in issues. Will ship with prototypes for sockaddr inspection.",
+    eta: "v2.2.0",
+    accent: "see",
+  },
+  {
+    title: "Per-return-address routing",
+    detail: "Different scripts for different call sites of the same function. Enables 'fail this open() when called from auth.c, but not from main.c'.",
+    eta: "v2.2.0",
+    accent: "control",
+  },
+  {
+    title: "Real-time trace streaming over WebSocket",
+    detail: "Live trace view in the browser — no file roundtrip. Pairs with the built-in HTML viewer for post-hoc analysis.",
+    eta: "v2.3.0",
+    accent: "see",
+  },
+  {
+    title: "Frida backend (optional)",
+    detail: "For binaries where LD_PRELOAD doesn't reach (heavily-stripped, anti-instrumentation). Plugin backend; same JSON config.",
+    eta: "v2.3.0",
+    accent: "break",
+  },
+];
+
+const stats = [
+  { value: "13",   label: "platforms" },
+  { value: "12",   label: "actions" },
+  { value: "291",  label: "functions" },
+  { value: "21",   label: "cookbook recipes" },
+  { value: "0",    label: "external deps" },
+];
+---
+
+<section class="section whats-new" id="whats-new">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Recently shipped · What's next</div>
+      <h2>The project is alive. v2.1.0 landed eight major features.</h2>
+      <p>
+        retrace has shipped continuously since 2017. The list below is what landed in the latest
+        release and what's queued for the next two. Star
+        <a href="https://github.com/riboseinc/retrace">the repo</a> or watch
+        <a href="https://github.com/riboseinc/retrace/releases">releases</a> to follow along.
+      </p>
+    </div>
+
+    <div class="stats-row reveal">
+      {
+        stats.map((s) => (
+          <div class="stat-cell">
+            <div class="stat-num">{s.value}</div>
+            <div class="stat-label">{s.label}</div>
+          </div>
+        ))
+      }
+    </div>
+
+    <div class="shipped-block">
+      <header class="block-head reveal">
+        <div class="block-tag accent-control">SHIPPED IN v2.1.0</div>
+        <h3>Eight features that materially changed what retrace can do.</h3>
+      </header>
+      <div class="shipped-grid">
+        {
+          shipped.map((s, i) => (
+            <article class={`ship-card glass-tight reveal accent-${s.accent}`} style={`transition-delay: ${Math.min(i, 6) * 50}ms`}>
+              <div class="ship-head">
+                <div class="ship-version">{s.tag}</div>
+                <div class={`ship-marker marker-${s.accent}`}>{s.accent}</div>
+              </div>
+              <h4>{s.title}</h4>
+              <p>{s.detail}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+
+    <div class="roadmap-block glass reveal">
+      <header class="block-head">
+        <div class="block-tag accent-break">ROADMAP</div>
+        <h3>What's coming in v2.2.0 and v2.3.0.</h3>
+      </header>
+      <ul class="roadmap-list">
+        {
+          roadmap.map((r, i) => (
+            <li class={`roadmap-item accent-${r.accent}`}>
+              <div class="roadmap-num">{String(i + 1).padStart(2, "0")}</div>
+              <div class="roadmap-body">
+                <div class="roadmap-head">
+                  <h4>{r.title}</h4>
+                  <span class={`roadmap-eta eta-${r.accent}`}>{r.eta}</span>
+                </div>
+                <p>{r.detail}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+</section>
+
+<style>
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-bottom: 32px;
+  padding: 22px 24px;
+  background: rgba(11, 13, 18, 0.4);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+@media (max-width: 720px) {
+  .stats-row { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 420px) {
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+.stat-cell {
+  text-align: center;
+}
+.stat-num {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  background: linear-gradient(180deg, #ffffff 0%, #b5bdc9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+}
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+}
+
+.shipped-block { margin-bottom: 32px; }
+.block-head {
+  margin-bottom: 18px;
+}
+.block-tag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.block-tag.accent-control { color: var(--color-control); }
+.block-tag.accent-break { color: var(--color-break); }
+.block-head h3 {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--color-text);
+  letter-spacing: -0.005em;
+}
+
+.shipped-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1100px) { .shipped-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px) { .shipped-grid { grid-template-columns: 1fr; } }
+
+.ship-card {
+  padding: 18px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ship-card.accent-see { border-top: 2px solid rgba(94, 227, 255, 0.35); }
+.ship-card.accent-control { border-top: 2px solid rgba(242, 180, 65, 0.35); }
+.ship-card.accent-break { border-top: 2px solid rgba(255, 107, 92, 0.35); }
+
+.ship-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ship-version {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--color-dim);
+  padding: 2px 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ship-marker {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.marker-see { color: var(--color-see); }
+.marker-control { color: var(--color-control); }
+.marker-break { color: var(--color-break); }
+
+.ship-card h4 {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+}
+.ship-card p {
+  font-size: 12.5px;
+  color: var(--color-dim);
+  line-height: 1.55;
+  flex: 1;
+}
+
+.roadmap-block {
+  padding: 28px 30px 24px;
+}
+.roadmap-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.roadmap-item {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 14px;
+  padding: 14px 16px;
+  background: rgba(7, 9, 13, 0.4);
+  border-radius: 8px;
+  border-left: 2px solid;
+}
+.roadmap-item.accent-see { border-left-color: rgba(94, 227, 255, 0.45); }
+.roadmap-item.accent-control { border-left-color: rgba(242, 180, 65, 0.45); }
+.roadmap-item.accent-break { border-left-color: rgba(255, 107, 92, 0.45); }
+
+.roadmap-num {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(7, 9, 13, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+.roadmap-body { min-width: 0; }
+.roadmap-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.roadmap-head h4 {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--color-text);
+}
+.roadmap-eta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+.roadmap-eta.eta-see { color: var(--color-see); border-color: rgba(94, 227, 255, 0.3); }
+.roadmap-eta.eta-control { color: var(--color-control); border-color: rgba(242, 180, 65, 0.3); }
+.roadmap-eta.eta-break { color: var(--color-break); border-color: rgba(255, 107, 92, 0.3); }
+.roadmap-body p {
+  font-size: 13px;
+  color: var(--color-dim);
+  line-height: 1.55;
+}
+
+.section-head a {
+  color: var(--color-see);
+  border-bottom: 1px solid rgba(94, 227, 255, 0.3);
+}
+</style>
