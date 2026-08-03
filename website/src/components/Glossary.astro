@@ -1,0 +1,224 @@
+---
+// Glossary — define the technical terms the rest of the site uses.
+// Alphabetical within each category. Each term is a glass-tight row
+// with the name, a one-sentence definition, and a "see also" if
+// relevant.
+
+const groups = [
+  {
+    title: "The core model",
+    accent: "control",
+    terms: [
+      {
+        name: "Interception",
+        def: "What retrace does to a libc call. The call routes through retrace's wrapper before reaching libc, so retrace can observe, modify, or fail it.",
+      },
+      {
+        name: "Trampoline",
+        def: "A small piece of assembly that 'bounces' a libc call into retrace's engine. One per intercepted function. Lives in src/backends/preload_*/<arch>/arch_spec_top.S.",
+        see: "Wrapper, Frame",
+      },
+      {
+        name: "Wrapper",
+        def: "The retrace-defined symbol that replaces a libc function in the target's symbol table. Caller invokes the wrapper; wrapper runs the engine; engine decides whether to invoke the real libc function.",
+        see: "Engine, Real impl",
+      },
+      {
+        name: "Engine",
+        def: "The C function (retrace_engine_wrapper) that receives every wrapped call. Looks up the matching intercept script, parses args, runs the script's actions in order, and synthesizes the return value.",
+        see: "Action, Script",
+      },
+      {
+        name: "Frame",
+        def: "A C struct (WrapperSystemVFrame or WrapperAArch64Frame) that captures the call's register arguments. The engine reads args from the frame and writes the return value back into it.",
+      },
+      {
+        name: "Real impl",
+        def: "The actual libc function (e.g., the real malloc). retrace resolves these once at init via dlsym(RTLD_NEXT, ...) and stores them in a function-pointer struct. call_real invokes the matching pointer.",
+        see: "Real-impl indirection",
+      },
+      {
+        name: "Real-impl indirection",
+        def: "The pattern where every libc call inside retrace itself goes through the retrace_real_impls struct, never direct. This is the reentrancy guard — bypass it and you recurse.",
+      },
+    ],
+  },
+  {
+    title: "Configuration",
+    accent: "see",
+    terms: [
+      {
+        name: "Script (intercept script)",
+        def: "A JSON object binding a function name (or wildcard) to an ordered list of actions. The unit of configuration.",
+        see: "Action",
+      },
+      {
+        name: "Action",
+        def: "A named primitive that runs when its script matches. log_params, call_real, modify_in_param_*, modify_return_value_int, memory_fuzz, incomplete_io, delay, call_count_limit, sandbox, fuzzing_seed. New actions = one .c file, no engine change.",
+        see: "Script",
+      },
+      {
+        name: "Prototype",
+        def: "A C struct (struct FuncPrototype) describing a function's name, calling convention, return type, and parameter types. Lives in src/core/prototypes/. The engine uses prototypes to parse args from the frame.",
+      },
+      {
+        name: "JSON config",
+        def: "A file containing one or more intercept scripts. Loaded at startup via RETRACE_JSON_CONFIG. Default config (no file) is log_params + call_real for every function.",
+      },
+      {
+        name: "Log",
+        def: "The JSON-lines output stream. One object per intercepted call, with function name, arguments, return value, and call_duration_us. View with retrace pp (text) or retrace html (interactive).",
+      },
+    ],
+  },
+  {
+    title: "Mechanism",
+    accent: "break",
+    terms: [
+      {
+        name: "Preload",
+        def: "Setting LD_PRELOAD (ELF), DYLD_INSERT_LIBRARIES (Darwin), or in-process inline hooking (Windows) so the dynamic linker resolves libc symbols to retrace's wrappers instead of the real ones.",
+      },
+      {
+        name: "Backend",
+        def: "A platform-specific implementation of the interposition mechanism. preload_elf, preload_macho, preload_bsd, preload_msvc, preload_mingw, ptrace. Each backend self-registers via a constructor-section scan.",
+        see: "ptrace",
+      },
+      {
+        name: "ptrace",
+        def: "The Linux kernel debugging primitive. retrace's ptrace backend uses it to intercept calls in statically-linked binaries that LD_PRELOAD can't reach. Slower than preload; reserved for that case.",
+      },
+      {
+        name: "ABI",
+        def: "Application Binary Interface — the register/stack convention for passing arguments. Sys V x86-64, AAPCS64, Microsoft x64. retrace's trampolines are per-ABI.",
+      },
+      {
+        name: "AAPCS64",
+        def: "The AArch64 Procedure Call Standard. Integer args in x0–x7, FP args in v0–v7, return in x0 (or v0). Variadic args spill to the stack on Darwin but stay in registers on Linux.",
+      },
+    ],
+  },
+];
+---
+
+<section class="section glossary" id="glossary">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Glossary</div>
+      <h2>Every term the rest of the page uses, in one place.</h2>
+      <p>
+        retrace has its own vocabulary — trampolines, wrappers, frames, scripts, prototypes. The
+        definitions below are the canonical reference. Cross-references point to related terms.
+      </p>
+    </div>
+
+    <div class="glossary-grid">
+      {
+        groups.map((g, gi) => (
+          <article class={`gloss-group glass reveal accent-${g.accent}`}>
+            <header class="gloss-head">
+              <div class={`gloss-tag accent-${g.accent}`}>{g.title}</div>
+              <div class="gloss-count">{g.terms.length} terms</div>
+            </header>
+            <dl class="gloss-list">
+              {g.terms.map((t, ti) => (
+                <div class="gloss-row" style={`transition-delay: ${(gi * 3 + ti) * 30}ms`}>
+                  <dt className={`term accent-${g.accent}`}>{t.name}</dt>
+                  <dd>
+                    <p className="def">{t.def}</p>
+                    {t.see && (
+                      <p className="see">See also: <span className={`see-also accent-${g.accent}`}>{t.see}</span></p>
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+.glossary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 1100px) { .glossary-grid { grid-template-columns: 1fr; } }
+
+.gloss-group {
+  padding: 24px 26px 22px;
+  align-self: start;
+}
+.gloss-group.accent-control { border-top: 2px solid rgba(242, 180, 65, 0.35); }
+.gloss-group.accent-see { border-top: 2px solid rgba(94, 227, 255, 0.35); }
+.gloss-group.accent-break { border-top: 2px solid rgba(255, 107, 92, 0.35); }
+
+.gloss-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.gloss-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.gloss-tag.accent-control { color: var(--color-control); }
+.gloss-tag.accent-see { color: var(--color-see); }
+.gloss-tag.accent-break { color: var(--color-break); }
+.gloss-count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--color-dim);
+  letter-spacing: 0.08em;
+}
+
+.gloss-list {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.gloss-row {
+  padding-left: 0;
+}
+
+.term {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 0 0 6px;
+}
+.term.accent-control { color: var(--color-control); }
+.term.accent-see { color: var(--color-see); }
+.term.accent-break { color: var(--color-break); }
+
+.def {
+  font-size: 13px;
+  color: var(--color-text);
+  line-height: 1.55;
+  margin: 0;
+}
+.see {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-dim);
+  margin: 6px 0 0;
+}
+.see-also {
+  font-weight: 500;
+}
+.see-also.accent-control { color: var(--color-control); }
+.see-also.accent-see { color: var(--color-see); }
+.see-also.accent-break { color: var(--color-break); }
+</style>
