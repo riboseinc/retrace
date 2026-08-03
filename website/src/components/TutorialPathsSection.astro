@@ -1,0 +1,28 @@
+---
+import TutorialPaths from "./TutorialPaths.vue";
+---
+
+<section class="section paths-section reveal" id="paths">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Don't know where to start?</div>
+      <h2>Pick a path. We've charted it for you.</h2>
+      <p>
+        Twenty-two tutorials is a lot to navigate. Below are six pre-defined sequences through them,
+        each chosen for a specific role or goal. Click a chip to see the sequence — every step links
+        into the matching tutorial below.
+      </p>
+    </div>
+
+    <TutorialPaths client:visible />
+  </div>
+</section>
+
+<style>
+.paths-section {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(242, 180, 65, 0.03), transparent 60%);
+  padding-bottom: 32px;
+  border-bottom: none;
+}
+</style>
