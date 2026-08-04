@@ -1,5 +1,6 @@
 ---
 // Top navigation — sticky glass bar.
+import SiteSearch from "./SiteSearch.vue";
 ---
 
 <nav class="nav-glass">
@@ -18,6 +19,9 @@
       <a href="#platforms">Platforms</a>
       <a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md">Cookbook</a>
       <a href="https://github.com/riboseinc/retrace">GitHub</a>
+    </div>
+    <div class="nav-search">
+      <SiteSearch client:load />
     </div>
   </div>
 </nav>
@@ -71,5 +75,10 @@
 }
 @media (max-width: 720px) {
   .nav-links { display: none; }
+}
+.nav-search {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
 }
 </style>
