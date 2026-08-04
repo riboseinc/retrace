@@ -84,3 +84,7 @@ set_tests_properties(integration-runtests PROPERTIES
 # Unit tests for retrace_core internals. Links against the OBJECT
 # library so no LD_PRELOAD needed. Issue #481.
 add_subdirectory(unit)
+
+# Property-based tests for the third-party surfaces (parson, etc.).
+# Pure C, no engine state. See TODO.complete/16-property-based-tests.md.
+add_subdirectory(property)
