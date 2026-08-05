@@ -188,3 +188,78 @@ endif()
 add_test(NAME unit-test-addr-deny
     COMMAND retrace_test_addr_deny)
 set_tests_properties(unit-test-addr-deny PROPERTIES LABELS "unit")
+
+#
+# modify_return_value_int action unit tests (TODO.complete/14).
+#
+add_executable(retrace_test_modify_return_value_int
+    test_modify_return_value_int.c)
+set_target_properties(retrace_test_modify_return_value_int PROPERTIES
+    OUTPUT_NAME test_modify_return_value_int
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_modify_return_value_int PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_modify_return_value_int PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_modify_return_value_int PRIVATE
+        _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_modify_return_value_int PRIVATE
+        _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-modify-return-value-int
+    COMMAND retrace_test_modify_return_value_int)
+set_tests_properties(unit-test-modify-return-value-int PROPERTIES
+    LABELS "unit")
+
+#
+# call_count_limit action unit tests (TODO.complete/14).
+#
+add_executable(retrace_test_call_count_limit test_call_count_limit.c)
+set_target_properties(retrace_test_call_count_limit PROPERTIES
+    OUTPUT_NAME test_call_count_limit
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_call_count_limit PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_call_count_limit PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_call_count_limit PRIVATE
+        _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_call_count_limit PRIVATE
+        _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-call-count-limit
+    COMMAND retrace_test_call_count_limit)
+set_tests_properties(unit-test-call-count-limit PROPERTIES
+    LABELS "unit")
