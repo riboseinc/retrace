@@ -48,6 +48,8 @@ trace
 log
 writev
 readv
+sock
+sock_srv
 "
 
 # expected_rc <prog> — prints the test's expected exit code (0 default).
