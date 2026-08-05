@@ -152,3 +152,39 @@ endif()
 add_test(NAME unit-test-sockaddr-inspect
     COMMAND retrace_test_sockaddr_inspect)
 set_tests_properties(unit-test-sockaddr-inspect PROPERTIES LABELS "unit")
+
+#
+# addr_deny action unit tests (TODO.complete/15). The action is
+# looked up by name via retrace_actions_get(); ThreadContext is
+# constructed inline. No engine, no LD_PRELOAD.
+#
+add_executable(retrace_test_addr_deny test_addr_deny.c)
+set_target_properties(retrace_test_addr_deny PROPERTIES
+    OUTPUT_NAME test_addr_deny
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_addr_deny PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_addr_deny PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_addr_deny PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_addr_deny PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-addr-deny
+    COMMAND retrace_test_addr_deny)
+set_tests_properties(unit-test-addr-deny PROPERTIES LABELS "unit")
