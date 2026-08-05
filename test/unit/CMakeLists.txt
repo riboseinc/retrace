@@ -116,3 +116,39 @@ endif()
 add_test(NAME unit-test-script-resolver
     COMMAND retrace_test_script_resolver)
 set_tests_properties(unit-test-script-resolver PROPERTIES LABELS "unit")
+
+#
+# sockaddr_inspect tests (TODO.complete/15). The helper is a pure C
+# function -- no engine, no LD_PRELOAD. Minimal real_impls setup in
+# the test main().
+#
+add_executable(retrace_test_sockaddr_inspect test_sockaddr_inspect.c)
+set_target_properties(retrace_test_sockaddr_inspect PROPERTIES
+    OUTPUT_NAME test_sockaddr_inspect
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_sockaddr_inspect PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_sockaddr_inspect PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_sockaddr_inspect PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_sockaddr_inspect PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-sockaddr-inspect
+    COMMAND retrace_test_sockaddr_inspect)
+set_tests_properties(unit-test-sockaddr-inspect PROPERTIES LABELS "unit")
