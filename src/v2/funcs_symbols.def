@@ -289,3 +289,22 @@ RETRACE_WRAP readdir
 RETRACE_WRAP telldir
 RETRACE_WRAP seekdir
 RETRACE_WRAP rewinddir
+
+/*
+ * sys/socket.h — network sockets (TODO.complete/15-network-functions).
+ * 11 entries: socket/connect/bind/listen/accept/send/recv/sendto/recvfrom
+ * /setsockopt/getsockopt. All use the SysV (x86-64) or AArch64 PCS
+ * calling conventions; prototype metadata lives in
+ * src/core/prototypes/sys_socket.c.
+ */
+RETRACE_WRAP socket
+RETRACE_WRAP connect
+RETRACE_WRAP bind
+RETRACE_WRAP listen
+RETRACE_WRAP accept
+RETRACE_WRAP send
+RETRACE_WRAP recv
+RETRACE_WRAP sendto
+RETRACE_WRAP recvfrom
+RETRACE_WRAP setsockopt
+RETRACE_WRAP getsockopt
