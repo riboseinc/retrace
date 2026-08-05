@@ -308,3 +308,26 @@ RETRACE_WRAP sendto
 RETRACE_WRAP recvfrom
 RETRACE_WRAP setsockopt
 RETRACE_WRAP getsockopt
+
+/*
+ * Second slice (TODO.complete/15): remaining 16 socket-family
+ * functions. Prototypes live in src/core/prototypes/sys_socket.c.
+ */
+RETRACE_WRAP socketpair
+#if RETRACE_HAVE_ACCEPT4
+RETRACE_WRAP accept4
+#endif
+RETRACE_WRAP shutdown
+RETRACE_WRAP sendmsg
+RETRACE_WRAP recvmsg
+RETRACE_WRAP gethostbyname
+RETRACE_WRAP getaddrinfo
+RETRACE_WRAP freeaddrinfo
+RETRACE_WRAP gai_strerror
+RETRACE_WRAP inet_pton
+RETRACE_WRAP inet_ntop
+RETRACE_WRAP inet_addr
+RETRACE_WRAP inet_aton
+RETRACE_WRAP inet_network
+RETRACE_WRAP getpeername
+RETRACE_WRAP getsockname

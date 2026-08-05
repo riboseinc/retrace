@@ -10,7 +10,8 @@
 set(_core_sources
 	engine.c        funcs.c         actions.c      data_types.c
 	real_impls.c    logger.c        main.c         as_call_real.c
-	thread_context.c script_resolver.c action_runner.c)
+	thread_context.c script_resolver.c action_runner.c
+	sockaddr_inspect.c)
 
 # dlopen_guard.c is Linux-only: it exports dlopen/dlclose/dlsym/dlerror
 # as global symbols for LD_PRELOAD interposition. On macOS these symbols
@@ -32,7 +33,7 @@ set(_core_action_sources
 	actions/basic.c actions/memfuzz.c
 	actions/incomplete_io.c actions/fuzzing_seed.c
 	actions/delay.c actions/call_count_limit.c
-	actions/sandbox.c)
+	actions/sandbox.c actions/addr_deny.c)
 
 set(_core_datatype_sources
 	datatypes/basic.c datatypes/uio.c datatypes/unistd.c)

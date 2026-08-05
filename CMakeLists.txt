@@ -299,6 +299,21 @@ if(NOT HAVE_ISOC99_SCANF)
 endif()
 add_compile_definitions(RETRACE_HAVE_ISOC99_SCANF=${HAVE_ISOC99_SCANF})
 
+# accept4() is a Linux-ism (glibc 2.10+, kernel 2.6.28+). FreeBSD,
+# OpenBSD, and NetBSD adopted it later. macOS does NOT ship it. The
+# trampoline .S references the symbol directly, so we must only emit
+# the wrapper on platforms that actually export it. Same pattern as
+# RETRACE_HAVE_ISOC99_SCANF above.
+check_c_source_compiles("
+	#include <sys/types.h>
+	#include <sys/socket.h>
+	int main(void) { return accept4(0, (void *)0, (void *)0, 0); }
+" HAVE_ACCEPT4)
+if(NOT HAVE_ACCEPT4)
+	set(HAVE_ACCEPT4 0)
+endif()
+add_compile_definitions(RETRACE_HAVE_ACCEPT4=${HAVE_ACCEPT4})
+
 # Make config.h discoverable by every target.
 # Also add src/config/json (parson.h, conf.h) and src/backends (arch_spec.h)
 # globally — OBJECT libraries don't always propagate target_include_directories

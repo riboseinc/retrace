@@ -397,5 +397,410 @@ retrace_func_define_prototypes(sys_socket) = {
 				.direction = PDIR_OUT
 			}
 		}
+	},
+	/*
+	 * Second slice (TODO.complete/15 follow-up): the remaining 16
+	 * socket-family functions.
+	 *
+	 *   - socketpair, accept4, shutdown: simple int args
+	 *   - sendmsg, recvmsg: msghdr* (opaque; msghdr inspect deferred)
+	 *   - gethostbyname: returns opaque hostent*
+	 *   - getaddrinfo/freeaddrinfo/gai_strerror: addrinfo family
+	 *   - inet_pton/ntop/addr/aton/network: string/addr conversions
+	 *   - getpeername/getsockname: sockaddr out, mirror bind
+	 *
+	 * ssize_t returns are declared as int (engine treats them as
+	 * 64-bit on the wire; matches the first slice).
+	 */
+	{
+		.name = "socketpair",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 4,
+		.params = {
+			{
+				.name = "domain",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "type",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "protocol",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "sv",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "int",
+				.direction = PDIR_OUT
+			}
+		}
+	},
+	{
+		.name = "accept4",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 4,
+		.params = {
+			{
+				.name = "sockfd",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "addr",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_OUT
+			},
+			{
+				.name = "addrlen",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "int",
+				.direction = PDIR_INOUT
+			},
+			{
+				.name = "flags",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "shutdown",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 2,
+		.params = {
+			{
+				.name = "sockfd",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "how",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "sendmsg",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 3,
+		.params = {
+			{
+				.name = "sockfd",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "msg",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "flags",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "recvmsg",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 3,
+		.params = {
+			{
+				.name = "sockfd",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "msg",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_INOUT
+			},
+			{
+				.name = "flags",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "gethostbyname",
+		.conv = CC_SYSTEM_V,
+		.type_name = "ptr",
+		.params_cnt = 1,
+		.params = {
+			{
+				.name = "name",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "getaddrinfo",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 4,
+		.params = {
+			{
+				.name = "node",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "service",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "hints",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "void",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "res",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "ptr",
+				.direction = PDIR_OUT
+			}
+		}
+	},
+	{
+		.name = "freeaddrinfo",
+		.conv = CC_SYSTEM_V,
+		.type_name = "void",
+		.params_cnt = 1,
+		.params = {
+			{
+				.name = "res",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "gai_strerror",
+		.conv = CC_SYSTEM_V,
+		.type_name = "ptr",
+		.params_cnt = 1,
+		.params = {
+			{
+				.name = "errcode",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "inet_pton",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 3,
+		.params = {
+			{
+				.name = "af",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "src",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "dst",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_OUT
+			}
+		}
+	},
+	{
+		.name = "inet_ntop",
+		.conv = CC_SYSTEM_V,
+		.type_name = "ptr",
+		.params_cnt = 4,
+		.params = {
+			{
+				.name = "af",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "src",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "void",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "dst",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "sz",
+				.direction = PDIR_OUT
+			},
+			{
+				.name = "size",
+				.type_name = "sz",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "inet_addr",
+		.conv = CC_SYSTEM_V,
+		.type_name = "unsigned int",
+		.params_cnt = 1,
+		.params = {
+			{
+				.name = "cp",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "inet_aton",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 2,
+		.params = {
+			{
+				.name = "cp",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "inp",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_OUT
+			}
+		}
+	},
+	{
+		.name = "inet_network",
+		.conv = CC_SYSTEM_V,
+		.type_name = "unsigned int",
+		.params_cnt = 1,
+		.params = {
+			{
+				.name = "cp",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "sz",
+				.direction = PDIR_IN
+			}
+		}
+	},
+	{
+		.name = "getpeername",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 3,
+		.params = {
+			{
+				.name = "sockfd",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "addr",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_OUT
+			},
+			{
+				.name = "addrlen",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "int",
+				.direction = PDIR_INOUT
+			}
+		}
+	},
+	{
+		.name = "getsockname",
+		.conv = CC_SYSTEM_V,
+		.type_name = "int",
+		.params_cnt = 3,
+		.params = {
+			{
+				.name = "sockfd",
+				.type_name = "int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "addr",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_OUT
+			},
+			{
+				.name = "addrlen",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "int",
+				.direction = PDIR_INOUT
+			}
+		}
 	}
 };
