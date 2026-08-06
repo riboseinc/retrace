@@ -638,3 +638,38 @@ endif()
 add_test(NAME unit-test-modify-in-param-arr
     COMMAND retrace_test_modify_in_param_arr)
 set_tests_properties(unit-test-modify-in-param-arr PROPERTIES LABELS "unit")
+
+#
+# JSON config loader unit tests (TODO.complete/14). conf.c lives
+# in src/config/json/, so we add that to includes.
+#
+add_executable(retrace_test_conf test_conf.c)
+set_target_properties(retrace_test_conf PROPERTIES
+    OUTPUT_NAME test_conf
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_conf PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_conf PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_conf PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_conf PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-conf
+    COMMAND retrace_test_conf)
+set_tests_properties(unit-test-conf PROPERTIES LABELS "unit")
