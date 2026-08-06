@@ -39,6 +39,7 @@
 #include "conf.h"
 #include "logger.h"
 #include "thread_context.h"
+#include "reentrance_guard.h"
 #include "script_resolver.h"
 #include "action_runner.h"
 
@@ -102,15 +103,15 @@ void retrace_engine_wrapper(char *func_name,
 	/* set default to call real impl */
 	retrace_as_sched_real(arch_spec_ctx, real_impl);
 
-	/* do not intervene if already intercepting */
-	if (thread_ctx->real_impl != NULL)
+	/* Reentrance guard: nested libc calls from inside an action
+	 * would recurse unbounded. Bail if the current thread is
+	 * already inside an intercept (reentrance_guard.c).
+	 */
+	if (retrace_reentrance_guard_active(thread_ctx))
 		return;
 
-	/* save arch spec context */
-	thread_ctx->arch_spec_ctx = arch_spec_ctx;
-
-	/* Mark active interception for cases of nested calls */
-	thread_ctx->real_impl = real_impl;
+	retrace_reentrance_guard_enter(thread_ctx, real_impl,
+		arch_spec_ctx);
 
 	thread_ctx->prototype = retrace_func_get(func_name);
 

@@ -10,7 +10,8 @@
 set(_core_sources
 	engine.c        funcs.c         actions.c      data_types.c
 	real_impls.c    logger.c        main.c         as_call_real.c
-	thread_context.c script_resolver.c action_runner.c
+	thread_context.c reentrance_guard.c
+	script_resolver.c action_runner.c
 	sockaddr_inspect.c)
 
 # dlopen_guard.c is Linux-only: it exports dlopen/dlclose/dlsym/dlerror

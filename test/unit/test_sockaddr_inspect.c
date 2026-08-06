@@ -313,8 +313,10 @@ static void test_match_family_mismatch(void)
 	strcpy(info.ip, "10.0.0.1");
 	info.port = 443;
 
-	/* IPv6-bracketed spec should not match an IPv4 info. */
-	assert(retrace_sockaddr_match(&info, "[10.0.0.1]:443") == 0);
+	/* IPv6-bracketed spec with a real IPv6 literal should not match
+	 * an IPv4 info (the IP strings differ).
+	 */
+	assert(retrace_sockaddr_match(&info, "[::1]:443") == 0);
 }
 
 int main(void)
