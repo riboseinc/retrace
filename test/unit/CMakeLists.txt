@@ -263,3 +263,139 @@ add_test(NAME unit-test-call-count-limit
     COMMAND retrace_test_call_count_limit)
 set_tests_properties(unit-test-call-count-limit PROPERTIES
     LABELS "unit")
+
+#
+# sandbox action unit tests (TODO.complete/14).
+#
+add_executable(retrace_test_sandbox test_sandbox.c)
+set_target_properties(retrace_test_sandbox PROPERTIES
+    OUTPUT_NAME test_sandbox
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_sandbox PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_sandbox PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_sandbox PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_sandbox PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-sandbox
+    COMMAND retrace_test_sandbox)
+set_tests_properties(unit-test-sandbox PROPERTIES LABELS "unit")
+
+#
+# modify_in_param_int action unit tests (TODO.complete/14).
+#
+add_executable(retrace_test_modify_in_param_int test_modify_in_param_int.c)
+set_target_properties(retrace_test_modify_in_param_int PROPERTIES
+    OUTPUT_NAME test_modify_in_param_int
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_modify_in_param_int PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_modify_in_param_int PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_modify_in_param_int PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_modify_in_param_int PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-modify-in-param-int
+    COMMAND retrace_test_modify_in_param_int)
+set_tests_properties(unit-test-modify-in-param-int PROPERTIES LABELS "unit")
+
+#
+# fuzzing_seed action unit tests (TODO.complete/14).
+#
+add_executable(retrace_test_fuzzing_seed test_fuzzing_seed.c)
+set_target_properties(retrace_test_fuzzing_seed PROPERTIES
+    OUTPUT_NAME test_fuzzing_seed
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_fuzzing_seed PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_fuzzing_seed PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_fuzzing_seed PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_fuzzing_seed PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-fuzzing-seed
+    COMMAND retrace_test_fuzzing_seed)
+set_tests_properties(unit-test-fuzzing-seed PROPERTIES LABELS "unit")
+
+#
+# delay action unit tests (TODO.complete/14).
+#
+add_executable(retrace_test_delay test_delay.c)
+set_target_properties(retrace_test_delay PROPERTIES
+    OUTPUT_NAME test_delay
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_delay PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_delay PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_delay PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_delay PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-delay
+    COMMAND retrace_test_delay)
+set_tests_properties(unit-test-delay PROPERTIES LABELS "unit")
