@@ -31,6 +31,7 @@ docs/
 ├── configuration.md       ← JSON config schema + action parameter reference
 ├── development.md         ← building, testing, contributing, debugging retrace
 ├── architecture.md        ← how engine, backends, and actions fit together
+├── engine-state-machine.md ← per-call lifecycle (engine_wrapper flow)
 ├── cookbook/              ← 21 recipe-driven walkthroughs
 │   ├── README.md          ← index + compact action reference
 │   ├── 01-trace-all-calls.md
