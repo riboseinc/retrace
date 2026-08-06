@@ -467,3 +467,105 @@ endif()
 add_test(NAME unit-test-call-real
     COMMAND retrace_test_call_real)
 set_tests_properties(unit-test-call-real PROPERTIES LABELS "unit")
+
+#
+# incomplete_io action unit tests (TODO.complete/14).
+#
+add_executable(retrace_test_incomplete_io test_incomplete_io.c)
+set_target_properties(retrace_test_incomplete_io PROPERTIES
+    OUTPUT_NAME test_incomplete_io
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_incomplete_io PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_incomplete_io PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_incomplete_io PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_incomplete_io PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-incomplete-io
+    COMMAND retrace_test_incomplete_io)
+set_tests_properties(unit-test-incomplete-io PROPERTIES LABELS "unit")
+
+#
+# memory_fuzz action unit tests (TODO.complete/14).
+#
+add_executable(retrace_test_memory_fuzz test_memory_fuzz.c)
+set_target_properties(retrace_test_memory_fuzz PROPERTIES
+    OUTPUT_NAME test_memory_fuzz
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_memory_fuzz PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_memory_fuzz PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_memory_fuzz PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_memory_fuzz PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-memory-fuzz
+    COMMAND retrace_test_memory_fuzz)
+set_tests_properties(unit-test-memory-fuzz PROPERTIES LABELS "unit")
+
+#
+# modify_in_param_str action unit tests (TODO.complete/14).
+#
+add_executable(retrace_test_modify_in_param_str test_modify_in_param_str.c)
+set_target_properties(retrace_test_modify_in_param_str PROPERTIES
+    OUTPUT_NAME test_modify_in_param_str
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_modify_in_param_str PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_modify_in_param_str PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_modify_in_param_str PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_modify_in_param_str PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-modify-in-param-str
+    COMMAND retrace_test_modify_in_param_str)
+set_tests_properties(unit-test-modify-in-param-str PROPERTIES LABELS "unit")
