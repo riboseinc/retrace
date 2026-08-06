@@ -23,55 +23,39 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "thread_context.h"
+/*
+ * Post-intercept cleanup for ThreadContext.
+ *
+ * Distinct from thread_context.c's lifecycle (alloc / free / get),
+ * this module owns the reset-between-uses semantic. After each
+ * intercepted call completes, the engine calls clear() to:
+ *   1. Free any param buffers the actions allocated (free_val=1).
+ *   2. Zero the whole context so the next intercept starts clean.
+ *
+ * Why a separate module (ADR-0013):
+ *   - Lifecycle (create once per thread, destroy on thread exit)
+ *     and post-intercept reset (run after every call) are
+ *     different cadences with different concerns.
+ *   - Unit-testing the param-buffer free loop separately from
+ *     pthread_key management is cleaner.
+ *
+ * The function lives here; thread_context.h still declares it for
+ * backward compatibility with engine.c.
+ */
 
-#include <pthread.h>
+#ifndef RETRACE_CORE_CLEANUP_H_
+#define RETRACE_CORE_CLEANUP_H_
 
-#include "real_impls.h"
-#include "logger.h"
+#include "engine.h"
 
-static pthread_key_t thread_ctx_key;
+/*
+ * Reset the context to a pristine state. Frees any param buffers
+ * flagged with free_val=1 (typically set by modify_in_param_str
+ * or modify_in_param_arr). After this call, the context is ready
+ * for the next intercepted call.
+ *
+ * Safe to call on a zeroed context (no-op).
+ */
+void retrace_thread_context_clear(struct ThreadContext *thread_ctx);
 
-static void thread_ctx_destructor(void *thread_ctx)
-{
-	retrace_real_impls.free(thread_ctx);
-	retrace_real_impls.pthread_key_delete(thread_ctx_key);
-}
-
-int retrace_thread_context_init(void)
-{
-	int rc = retrace_real_impls.pthread_key_create(&thread_ctx_key,
-		thread_ctx_destructor);
-
-	if (rc)
-		log_err("failed to create pthread_key");
-
-	return rc;
-}
-
-struct ThreadContext *retrace_thread_context_get(void)
-{
-	struct ThreadContext *thread_ctx;
-
-	thread_ctx = (struct ThreadContext *)
-		retrace_real_impls.pthread_getspecific(thread_ctx_key);
-
-	if (thread_ctx == NULL) {
-		thread_ctx = (struct ThreadContext *)
-			retrace_real_impls.malloc(sizeof(struct ThreadContext));
-
-		if (thread_ctx == NULL)
-			return NULL;
-
-		if (retrace_real_impls.pthread_setspecific(
-			thread_ctx_key, thread_ctx)) {
-
-			retrace_real_impls.free(thread_ctx);
-			return NULL;
-		}
-
-		retrace_real_impls.memset(thread_ctx, 0, sizeof(*thread_ctx));
-	}
-
-	return thread_ctx;
-}
+#endif /* RETRACE_CORE_CLEANUP_H_ */

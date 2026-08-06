@@ -33,12 +33,19 @@
 /*
  * Per-thread interception state. Owns the pthread_key that holds the
  * ThreadContext pointer. Extracted from engine.c per ADR-0013 (#480).
+ *
+ * Post-intercept reset (retrace_thread_context_clear) lives in
+ * cleanup.c -- different cadence (every call vs once per thread),
+ * different concern (free + zero vs alloc + register).
  */
 
 int retrace_thread_context_init(void);
 
 struct ThreadContext *retrace_thread_context_get(void);
 
+/* Declared in cleanup.h. Kept here as a forward declaration for
+ * callers that already include this header.
+ */
 void retrace_thread_context_clear(struct ThreadContext *thread_ctx);
 
 #endif
