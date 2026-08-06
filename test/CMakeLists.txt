@@ -88,3 +88,8 @@ add_subdirectory(unit)
 # Property-based tests for the third-party surfaces (parson, etc.).
 # Pure C, no engine state. See TODO.complete/16-property-based-tests.md.
 add_subdirectory(property)
+
+# Stress tests (TODO.complete/35). Multi-threaded / high-event-rate
+# scenarios that run under LD_PRELOAD. Labeled "stress" so default
+# ctest skips them; run via `ctest -L stress`.
+add_subdirectory(stress)
