@@ -178,11 +178,31 @@ static void test_limit_one_second_aborts(void)
 
 static void test_independent_functions(void)
 {
+	/* Two distinct contexts so the action sees two different
+	 * prototype->name values. The shared static ctx in
+	 * build_ctx_for_func would make both pointers alias the
+	 * same memory, causing both function names to resolve to
+	 * whichever was set last.
+	 */
+	static struct ThreadContext ctx_a_storage;
+	static struct ThreadContext ctx_b_storage;
+	static struct FuncPrototype proto_a;
+	static struct FuncPrototype proto_b;
+	struct ThreadContext *ctx_a = &ctx_a_storage;
+	struct ThreadContext *ctx_b = &ctx_b_storage;
 	action_fn_t action = retrace_actions_get("call_count_limit");
-	struct ThreadContext *ctx_a = build_ctx_for_func("indep_func_a");
-	struct ThreadContext *ctx_b = build_ctx_for_func("indep_func_b");
 	JSON_Object *params = build_params_with_number("limit", 2.0);
 	int rc;
+
+	memset(&ctx_a_storage, 0, sizeof(ctx_a_storage));
+	memset(&ctx_b_storage, 0, sizeof(ctx_b_storage));
+	memset(&proto_a, 0, sizeof(proto_a));
+	memset(&proto_b, 0, sizeof(proto_b));
+
+	strncpy(proto_a.name, "indep_func_a", sizeof(proto_a.name) - 1);
+	strncpy(proto_b.name, "indep_func_b", sizeof(proto_b.name) - 1);
+	ctx_a->prototype = &proto_a;
+	ctx_b->prototype = &proto_b;
 
 	/* A: 2 calls pass */
 	rc = action(ctx_a, params);

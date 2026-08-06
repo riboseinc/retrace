@@ -569,3 +569,37 @@ endif()
 add_test(NAME unit-test-modify-in-param-str
     COMMAND retrace_test_modify_in_param_str)
 set_tests_properties(unit-test-modify-in-param-str PROPERTIES LABELS "unit")
+
+#
+# reentrance_guard unit tests (TODO.complete/13).
+#
+add_executable(retrace_test_reentrance_guard test_reentrance_guard.c)
+set_target_properties(retrace_test_reentrance_guard PROPERTIES
+    OUTPUT_NAME test_reentrance_guard
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_reentrance_guard PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_reentrance_guard PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_reentrance_guard PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_reentrance_guard PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-reentrance-guard
+    COMMAND retrace_test_reentrance_guard)
+set_tests_properties(unit-test-reentrance-guard PROPERTIES LABELS "unit")
