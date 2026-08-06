@@ -399,3 +399,71 @@ endif()
 add_test(NAME unit-test-delay
     COMMAND retrace_test_delay)
 set_tests_properties(unit-test-delay PROPERTIES LABELS "unit")
+
+#
+# log_params action unit tests (TODO.complete/14).
+#
+add_executable(retrace_test_log_params test_log_params.c)
+set_target_properties(retrace_test_log_params PROPERTIES
+    OUTPUT_NAME test_log_params
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_log_params PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_log_params PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_log_params PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_log_params PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-log-params
+    COMMAND retrace_test_log_params)
+set_tests_properties(unit-test-log-params PROPERTIES LABELS "unit")
+
+#
+# call_real action unit tests (TODO.complete/14).
+#
+add_executable(retrace_test_call_real test_call_real.c)
+set_target_properties(retrace_test_call_real PROPERTIES
+    OUTPUT_NAME test_call_real
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_call_real PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_call_real PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_call_real PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_call_real PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-call-real
+    COMMAND retrace_test_call_real)
+set_tests_properties(unit-test-call-real PROPERTIES LABELS "unit")
