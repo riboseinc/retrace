@@ -1,0 +1,11 @@
+{
+  "intercept_scripts": [
+    {
+      "func_name": "*",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}

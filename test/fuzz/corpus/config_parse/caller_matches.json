@@ -1,0 +1,14 @@
+{
+  "intercept_scripts": [
+    {
+      "func_name": "open",
+      "caller_matches": [
+        { "match_type": "symbol", "value": "load_config_file" }
+      ],
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}

@@ -78,3 +78,7 @@ src/v2/retrace_v2.nos.h
 
 # Nix
 result
+
+# Auto-generated fuzz corpus entries (libFuzzer writes them as
+# SHA1-named files; only the hand-written .json seeds are tracked).
+test/fuzz/corpus/*/!(*.json)
