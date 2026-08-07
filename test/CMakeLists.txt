@@ -98,3 +98,8 @@ add_subdirectory(stress)
 # RETRACE_BUILD_FUZZERS=ON. The CMakeLists.txt in fuzz/ no-ops
 # otherwise.
 add_subdirectory(fuzz)
+
+# Performance benchmarks (TODO.complete/34). Each runs an op many
+# times and reports min/p50/p95/p99/max nanoseconds. Labeled
+# "perf" so `ctest -L perf` opts in.
+add_subdirectory(perf)
