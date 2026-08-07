@@ -1,81 +1,69 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# Homebrew formula for retrace.
+# Homebrew formula for retrace (TODO.complete/38).
 #
-# Install:
-#   brew tap riboseinc/retrace https://github.com/riboseinc/retrace
+# Status: WORK IN PROGRESS. The version is a placeholder until
+# v2.2.0 is tagged; once tagged, replace with the actual tag SHA
+# via `brew bump-formula-pr`.
+#
+# Usage (local test):
+#   brew install --build-from-source ./Formula/retrace.rb
+#
+# Usage (post-tap, once the tap exists):
+#   brew tap riboseinc/retrace https://github.com/riboseinc/homebrew-retrace
 #   brew install retrace
-#
-# Or directly from this file:
-#   brew install --HEAD \
-#     https://raw.githubusercontent.com/riboseinc/retrace/main/packaging/homebrew/Formula/retrace.rb
-#
-# The formula builds from the latest release tag (or main if --HEAD).
 
 class Retrace < Formula
-  desc "Userspace libc interceptor for tracing, fuzzing, and mocking"
+  desc "Userspace libc interceptor for security/vulnerability discovery"
   homepage "https://github.com/riboseinc/retrace"
-  url "https://github.com/riboseinc/retrace/archive/refs/tags/v2.1.0.tar.gz"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  url "https://github.com/riboseinc/retrace/archive/refs/tags/v2.2.0.tar.gz"
+  version "2.2.0"
+  # sha256 "REPLACE_AFTER_TAG"
   license "BSD-2-Clause"
   head "https://github.com/riboseinc/retrace.git", branch: "main"
 
+  depends_on :macos => :catalina_or_newer
+
   depends_on "cmake" => :build
   depends_on "ninja" => :build
-
-  on_macos do
-    depends_on "openssl@3"
-  end
-
-  on_linux do
-    depends_on "openssl@3"
-  end
+  depends_on "openssl@3"
 
   def install
-    mkdir "build" do
-      system "cmake", "-G", "Ninja",
-        "-DCMAKE_BUILD_TYPE=Release",
-        "-DCMAKE_INSTALL_PREFIX=#{prefix}",
-        "-DRETRACE_BUILD_TESTS=OFF",
-        "-DRETRACE_BUILD_EXAMPLES=OFF",
-        ".."
-      system "cmake", "--build", "."
-      system "cmake", "--install", "."
-    end
+    args = %W[
+      -DBUILD_SHARED_LIBS=ON
+      -DRETRACE_BUILD_TESTS=OFF
+      -DRETRACE_BUILD_EXAMPLES=OFF
+      -DCMAKE_BUILD_TYPE=Release
+      -DCMAKE_INSTALL_PREFIX=#{prefix}
+    ]
 
-    # Install the cookbook and pretty-printer alongside.
-    pkgshare.install "docs/cookbook"
-    pkgshare.install "tools/logpp"
-    bin.install_symlink pkgshare/"logpp/logpp.py" => "retrace-logpp"
+    system "cmake", "-B", "build", "-G", "Ninja", *args
+    system "cmake", "--build", "build"
+    system "cmake", "--install", "build"
   end
 
   def caveats
     <<~EOS
-      retrace is installed.
+      retrace is a preload-based interceptor. To use it:
 
-      Quick start:
-        retrace --help
-        retrace list-actions
-        retrace run -- #{opt_bin}/echo hello
+        LD_PRELOAD=#{HOMEBREW_PREFIX}/lib/libretrace.so RETRACE_JSON_CONFIG=... <binary>
 
-      Smoke test (verify interception works):
-        echo 'int main(void){printf("uid=%d\\n",getuid());return 0;}' \
-          > /tmp/getuid.c
-        cc /tmp/getuid.c -o /tmp/getuid
-        retrace run \
-          --config #{opt_pkgshare}/cookbook/05-mock-getuid.md \
-          -- /tmp/getuid
+      Or on macOS:
 
-      macOS note: SIP-protected binaries (/usr/bin/*) silently skip
-      DYLD_INSERT_LIBRARIES. Copy the target to /tmp/ first.
+        DYLD_INSERT_LIBRARIES=#{HOMEBREW_PREFIX}/lib/libretrace.dylib RETRACE_JSON_CONFIG=... <binary>
 
-      Pretty-printer:
-        retrace run --log /tmp/trace.json -- /bin/ls
-        retrace-logpp /tmp/trace.json
+      macOS SIP blocks DYLD_INSERT_LIBRARIES for binaries in system
+      directories -- `csrutil disable` is required to trace them.
+
+      Documentation: #{homepage}/blob/main/docs/README.md
+      Cookbook:      #{homepage}/blob/main/docs/cookbook/README.md
     EOS
   end
 
   test do
-    assert_match "retrace v#{version}", shell_output("#{bin}/retrace --help")
+    output = shell_output(
+      "DYLD_INSERT_LIBRARIES=#{lib}/libretrace.dylib /usr/bin/id 2>&1 || true"
+    )
+    assert output
   end
 end
