@@ -27,6 +27,78 @@
 
 #include "real_impls.h"
 #include "logger.h"
+#include "caller_match.h"
+
+/* Evaluate one caller_matches entry against ret_addr.
+ * Returns 1 on match, 0 on no-match, -1 on hard failure.
+ */
+static int eval_caller_match_entry(void *ret_addr,
+				   const JSON_Object *entry)
+{
+	const char *match_type;
+	const char *str_value;
+	double num_value;
+	const char *module;
+	enum retrace_caller_match_kind kind;
+
+	if (entry == NULL)
+		return -1;
+
+	match_type = json_object_get_string(entry, "match_type");
+	kind = retrace_caller_match_kind_from_string(match_type);
+
+	switch (kind) {
+	case RETRACE_CALLER_MATCH_ADDRESS:
+		num_value = json_object_get_number(entry, "value");
+		return retrace_caller_match_address(ret_addr,
+			(unsigned long long)num_value);
+
+	case RETRACE_CALLER_MATCH_SYMBOL:
+		str_value = json_object_get_string(entry, "value");
+		return retrace_caller_match_symbol(ret_addr, str_value);
+
+	case RETRACE_CALLER_MATCH_MODULE_OFFSET:
+		module = json_object_get_string(entry, "module");
+		num_value = json_object_get_number(entry, "offset");
+		return retrace_caller_match_module_offset(ret_addr, module,
+			(unsigned long long)num_value);
+
+	case RETRACE_CALLER_MATCH_UNKNOWN:
+	default:
+		log_warn("caller_match: unknown match_type '%s'",
+			match_type ? match_type : "(null)");
+		return -1;
+	}
+}
+
+/* Evaluate the caller_matches array (OR-semantics: any match wins).
+ * Returns 1 if any entry matches, 0 if none match, -1 if no
+ * caller_matches array is present or all entries failed dladdr.
+ */
+static int eval_caller_matches(void *ret_addr,
+			       const JSON_Object *i_script)
+{
+	JSON_Array *matches;
+	size_t i, n;
+	int any_evaluated = 0;
+
+	matches = json_object_get_array(i_script, "caller_matches");
+	if (matches == NULL)
+		return -1;
+
+	n = json_array_get_count(matches);
+	for (i = 0; i < n; i++) {
+		const JSON_Object *entry = json_array_get_object(matches, i);
+		int rc = eval_caller_match_entry(ret_addr, entry);
+
+		if (rc == 1)
+			return 1;
+		if (rc != -1)
+			any_evaluated = 1;
+	}
+
+	return any_evaluated ? 0 : -1;
+}
 
 const JSON_Object *retrace_script_find(const JSON_Array *i_array,
 	const char *func_name,
@@ -55,6 +127,25 @@ const JSON_Object *retrace_script_find(const JSON_Array *i_array,
 
 		/* func_name match? */
 		if (!retrace_real_impls.strcmp(i_func, func_name)) {
+			int caller_matches_rc;
+
+			/* caller_matches array (TODO.complete/17) --
+			 * any-match-wins semantics. If the array is
+			 * absent, fall through to the legacy
+			 * return_addr single-value handling.
+			 */
+			caller_matches_rc = eval_caller_matches(ret_addr,
+				i_script);
+			if (caller_matches_rc == 1)
+				return i_script;
+			if (caller_matches_rc == 0)
+				continue;  /* array present, no match */
+
+			/* caller_matches_rc == -1: array absent OR all
+			 * entries failed dladdr. Fall through to
+			 * legacy return_addr handling.
+			 */
+
 			if (!ret_addr)
 				return i_script;
 
