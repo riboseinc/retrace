@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.2.1] - 2026-08-08
+
+### Added
+
+#### Filter action (TODO 20 MVP)
+
+- New `filter` action for conditional guards in intercept scripts.
+  Evaluates a single param comparison (`==`, `!=`, `>`, `<`, `>=`,
+  `<=`). If false, aborts the script (no logging, no modification,
+  no `call_real`). Compose multiple filter actions for AND
+  semantics.
+
+  ```json
+  {
+    "actions": [
+      { "action_name": "filter",
+        "action_params": { "param_name": "flags", "op": "==", "value": 0 } },
+      { "action_name": "log_params" },
+      { "action_name": "call_real" }
+    ]
+  }
+  ```
+
+  Eliminates the "log everything, grep later" pattern for the
+  common case of param-value filtering.
+
 ## [2.2.0] - 2026-08-08
 
 ### Added

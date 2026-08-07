@@ -160,7 +160,7 @@ jobs:
           sha256sum "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
             > "retrace-${VERSION}-${{ matrix.platform }}.tar.gz.sha256"
           # Also produce a bare library for curl + LD_PRELOAD use case
-          cp build/src/v2/libretrace.so.2.2.0 "libretrace-${{ matrix.platform }}.so"
+          cp build/src/v2/libretrace.so.2.2.1 "libretrace-${{ matrix.platform }}.so"
           sha256sum "libretrace-${{ matrix.platform }}.so" \
             > "libretrace-${{ matrix.platform }}.so.sha256"
 
@@ -188,7 +188,7 @@ jobs:
           shasum -a 256 "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
             > "retrace-${VERSION}-${{ matrix.platform }}.tar.gz.sha256"
           # Bare library for curl + DYLD_INSERT use case
-          cp build/src/v2/libretrace.2.2.0.dylib "libretrace-${{ matrix.platform }}.dylib"
+          cp build/src/v2/libretrace.2.2.1.dylib "libretrace-${{ matrix.platform }}.dylib"
           shasum -a 256 "libretrace-${{ matrix.platform }}.dylib" \
             > "libretrace-${{ matrix.platform }}.dylib.sha256"
 
@@ -378,14 +378,14 @@ jobs:
 
       - name: Verify .so is ARM aarch64
         run: |
-          file build-ohos/src/v2/libretrace.so.2.2.0 | tee /dev/stderr \
+          file build-ohos/src/v2/libretrace.so.2.2.1 | tee /dev/stderr \
             | grep -q 'ELF 64-bit LSB .* ARM aarch64'
 
       - name: Code-sign .so (required by OHOS at dlopen time)
         run: |
           for f in build-ohos/src/v2/libretrace.so \
                    build-ohos/src/v2/libretrace.so.2 \
-                   build-ohos/src/v2/libretrace.so.2.2.0; do
+                   build-ohos/src/v2/libretrace.so.2.2.1; do
             [ -e "$f" ] || continue
             /opt/ohos/ohos-sdk/linux/toolchains/lib/binary-sign-tool sign \
               -selfSign 1 -inFile "$f" -outFile "$f"
