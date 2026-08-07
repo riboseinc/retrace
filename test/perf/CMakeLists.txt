@@ -68,3 +68,5 @@ endfunction()
 
 add_retrace_bench(bench_script_resolve bench_script_resolve.c)
 add_retrace_bench(bench_caller_match bench_caller_match.c)
+add_retrace_bench(bench_action_log_params bench_action_log_params.c)
+add_retrace_bench(bench_action_call_real bench_action_call_real.c)
