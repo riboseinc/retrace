@@ -30,6 +30,7 @@
 
 #include "real_impls.h"
 #include "logger.h"
+#include "caller_cache.h"
 
 /* Find the basename (chars after last '/') of a path. Returns
  * the input pointer if no '/' present.
@@ -53,6 +54,27 @@ static const char *path_basename(const char *path)
 	return slash ? slash + 1 : path;
 }
 
+/* Cached dladdr lookup. On cache miss, calls dladdr and inserts.
+ * On cache hit, returns the stored Dl_info without calling dladdr.
+ * Returns 1 on populated info, 0 on dladdr failure.
+ */
+static int cached_dladdr(void *ret_addr, Dl_info *info)
+{
+	Dl_info local = {0};
+
+	if (retrace_caller_cache_lookup(ret_addr, &local)) {
+		*info = local;
+		return 1;
+	}
+
+	if (dladdr(ret_addr, &local) == 0)
+		return 0;
+
+	retrace_caller_cache_insert(ret_addr, &local);
+	*info = local;
+	return 1;
+}
+
 int retrace_caller_match_address(void *ret_addr,
 				 unsigned long long expected_address)
 {
@@ -72,8 +94,8 @@ int retrace_caller_match_symbol(void *ret_addr,
 	    expected_symbol[0] == '\0')
 		return -1;
 
-	/* dladdr is in libc on POSIX. */
-	if (dladdr(ret_addr, &info) == 0) {
+	/* dladdr is in libc on POSIX; cache avoids repeat calls. */
+	if (!cached_dladdr(ret_addr, &info)) {
 		log_dbg("caller_match_symbol: dladdr failed for %p",
 			ret_addr);
 		return -1;
@@ -98,7 +120,7 @@ int retrace_caller_match_module_offset(void *ret_addr,
 	    expected_module_basename[0] == '\0')
 		return -1;
 
-	if (dladdr(ret_addr, &info) == 0) {
+	if (!cached_dladdr(ret_addr, &info)) {
 		log_dbg("caller_match_module_offset: dladdr failed for %p",
 			ret_addr);
 		return -1;
