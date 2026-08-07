@@ -73,7 +73,7 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 | # | Recipe | What it teaches |
 |---|--------|-----------------|
 | 16 | [Multi-function script](16-multi-script.md) | Compose actions across many functions in one config. |
-| 17 | [Per-return-address routing](17-return-addr-routing.md) | Different behavior for different call sites of the same function. *(planned)* |
+| 17 | [Per-return-address routing](17-per-return-address.md) | Different behavior for different call sites of the same function. |
 | 18 | [Fuzz enprot's EPT parser](18-fuzz-enprot.md) | Cross-project recipe: stress-test [engyon/enprot](https://github.com/engyon/enprot) via retrace — audit file access, fuzz malloc, simulate short reads. |
 | 19 | [CI fuzzing](19-ci-fuzzing.md) | Drop-in `.github/workflows/retrace-fuzz.yml` that catches OOM + short-IO bugs on every PR. |
 | 20 | [Sandbox a binary](20-sandbox.md) | Runtime file-access deny-list: block `/etc/shadow`, `/root/.ssh/`, etc. |
