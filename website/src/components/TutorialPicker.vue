@@ -59,7 +59,7 @@ const scenarios = [
       {
         what: "Install retrace if you haven't already.",
         cmd: "curl -sSL https://raw.githubusercontent.com/riboseinc/retrace/main/scripts/install.sh | sh",
-        out: "retrace 2.2.0 installed",
+        out: "retrace 2.2.1 installed",
       },
       {
         what: "Run your program under retrace with HTML output. The --html flag generates a self-contained interactive page.",
