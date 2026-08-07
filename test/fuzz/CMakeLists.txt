@@ -48,6 +48,61 @@ endfunction()
 
 add_retrace_fuzzer(fuzz_config_parse fuzz_config_parse.c)
 
+# The script_resolver fuzzer needs retrace_core (for script_resolver
+# + real_impls definition). Can't use the parson-only stub because
+# the resolver calls into real_impls.strcmp at runtime.
+if(RETRACE_PLATFORM_DARWIN)
+    set(_fuzz_arch_include
+        ${CMAKE_SOURCE_DIR}/src/backends/preload_macho/aarch64)
+    set(_fuzz_backend_lib retrace_backend_preload_macho)
+elseif(RETRACE_PLATFORM_LINUX)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+        set(_fuzz_arch_include
+            ${CMAKE_SOURCE_DIR}/src/backends/preload_elf/aarch64)
+        set(_fuzz_backend_lib retrace_backend_preload_elf)
+    else()
+        set(_fuzz_arch_include
+            ${CMAKE_SOURCE_DIR}/src/backends/preload_elf/x86_64)
+        set(_fuzz_backend_lib retrace_backend_preload_elf)
+    endif()
+elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
+    set(_fuzz_arch_include
+        ${CMAKE_SOURCE_DIR}/src/backends/preload_bsd/x86_64)
+    set(_fuzz_backend_lib retrace_backend_preload_bsd)
+endif()
+
+add_executable(fuzz_script_resolve
+    fuzz_script_resolve.c)
+set_target_properties(fuzz_script_resolve PROPERTIES
+    OUTPUT_NAME fuzz_script_resolve
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/fuzz")
+target_compile_options(fuzz_script_resolve PRIVATE ${_fuzz_compile_flags})
+target_link_options(fuzz_script_resolve PRIVATE ${_fuzz_link_flags})
+target_link_libraries(fuzz_script_resolve PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_fuzz_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+target_include_directories(fuzz_script_resolve PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_fuzz_arch_include}
+    ${CMAKE_BINARY_DIR})
+
+add_test(NAME fuzz-script-resolve-smoke
+    COMMAND ${CMAKE_BINARY_DIR}/test/fuzz/fuzz_script_resolve
+        -max_total_time=5
+        ${CMAKE_CURRENT_SOURCE_DIR}/corpus/script_resolve
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(fuzz-script-resolve-smoke PROPERTIES
+    LABELS "fuzz"
+    TIMEOUT 30)
+
 # Manual test target -- runs the fuzzer for 5 seconds when invoked
 # via `ctest -L fuzz`. Not in the default suite (too slow).
 add_test(NAME fuzz-config-parse-smoke
