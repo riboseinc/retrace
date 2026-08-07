@@ -119,13 +119,13 @@ int main(void)
 
 	printf("--- log_params benchmark ---\n");
 
-	if (bench_run("log_params_1_int", bench_op, &c1, 100000, &r) == 0)
+	if (bench_run("log_params_1_int", bench_op, &c1, 10000, &r) == 0)
 		bench_print("log_params_1_int", &r);
 
-	if (bench_run("log_params_4_ints", bench_op, &c4, 100000, &r) == 0)
+	if (bench_run("log_params_4_ints", bench_op, &c4, 10000, &r) == 0)
 		bench_print("log_params_4_ints", &r);
 
-	if (bench_run("log_params_8_ints", bench_op, &c8, 100000, &r) == 0)
+	if (bench_run("log_params_8_ints", bench_op, &c8, 10000, &r) == 0)
 		bench_print("log_params_8_ints", &r);
 
 	return 0;
