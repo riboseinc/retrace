@@ -1,0 +1,13 @@
+// Line comment
+/* block comment */
+{
+  "intercept_scripts": [
+    /* another comment */
+    {
+      "func_name": "open", // trailing comment
+      "actions": [
+        { "action_name": "log_params" }
+      ]
+    }
+  ]
+}

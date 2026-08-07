@@ -93,3 +93,8 @@ add_subdirectory(property)
 # scenarios that run under LD_PRELOAD. Labeled "stress" so default
 # ctest skips them; run via `ctest -L stress`.
 add_subdirectory(stress)
+
+# Fuzz harnesses (TODO.complete/33). libFuzzer targets, gated by
+# RETRACE_BUILD_FUZZERS=ON. The CMakeLists.txt in fuzz/ no-ops
+# otherwise.
+add_subdirectory(fuzz)
