@@ -76,15 +76,14 @@ typedef int (*action_fn_t)(struct ThreadContext *t_ctx,
 	printf("OK\n"); \
 } while (0)
 
-/* Print summary and return exit code. Not a macro (checkpatch
- * flags do-while with return). Must be called as the last
- * statement in main().
+/* Print summary and return exit code. Pass the counters from
+ * DECLARE_TEST_STATE(). Usage: return finish_tests(tests_run,
+ * tests_pass, tests_fail);
  */
-static inline int finish_tests(void)
+static inline int finish_tests(int run, int pass, int fail)
 {
-	printf("\nPass: %d, Fail: %d (of %d)\n",
-		tests_pass, tests_fail, tests_run);
-	return tests_fail == 0 ? 0 : 1;
+	printf("\nPass: %d, Fail: %d (of %d)\n", pass, fail, run);
+	return fail == 0 ? 0 : 1;
 }
 
 /* --- JSON builder helpers --- */
