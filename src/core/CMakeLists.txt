@@ -37,7 +37,7 @@ set(_core_action_sources
 	actions/incomplete_io.c actions/fuzzing_seed.c
 	actions/delay.c actions/call_count_limit.c
 	actions/sandbox.c actions/addr_deny.c
-	actions/filter.c)
+	actions/filter.c actions/decode_http.c)
 
 set(_core_datatype_sources
 	datatypes/basic.c datatypes/uio.c datatypes/unistd.c)

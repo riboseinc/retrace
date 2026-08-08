@@ -3,7 +3,7 @@
 # Homebrew formula for retrace (TODO.complete/38).
 #
 # Status: WORK IN PROGRESS. The version is a placeholder until
-# v2.2.1 is tagged; once tagged, replace with the actual tag SHA
+# v2.2.2 is tagged; once tagged, replace with the actual tag SHA
 # via `brew bump-formula-pr`.
 #
 # Usage (local test):
@@ -16,8 +16,8 @@
 class Retrace < Formula
   desc "Userspace libc interceptor for security/vulnerability discovery"
   homepage "https://github.com/riboseinc/retrace"
-  url "https://github.com/riboseinc/retrace/archive/refs/tags/v2.2.1.tar.gz"
-  version "2.2.1"
+  url "https://github.com/riboseinc/retrace/archive/refs/tags/v2.2.2.tar.gz"
+  version "2.2.2"
   # sha256 "REPLACE_AFTER_TAG"
   license "BSD-2-Clause"
   head "https://github.com/riboseinc/retrace.git", branch: "main"

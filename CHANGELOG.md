@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.2.2] - 2026-08-08
+
+### Added
+
+#### HTTP/1.x protocol decoder (TODO 23 MVP)
+
+- New `decode_http` action that reads a named buffer param
+  (typically from `send`/`recv`), parses the first line as
+  HTTP/1.x, and logs the decoded fields.
+
+  ```json
+  {
+    "func_name": "send",
+    "actions": [
+      { "action_name": "decode_http",
+        "action_params": { "param_name": "buf" } },
+      { "action_name": "log_params" },
+      { "action_name": "call_real" }
+    ]
+  }
+  ```
+
+  Parses both request lines (GET/POST/PUT/DELETE/PATCH/HEAD/
+  OPTIONS/CONNECT/TRACE) and response lines (HTTP/1.1 STATUS).
+  Non-HTTP data is silently skipped (no-op).
+
 ## [2.2.1] - 2026-08-08
 
 ### Added
