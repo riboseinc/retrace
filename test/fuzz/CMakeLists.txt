@@ -113,3 +113,36 @@ add_test(NAME fuzz-config-parse-smoke
 set_tests_properties(fuzz-config-parse-smoke PROPERTIES
     LABELS "fuzz"
     TIMEOUT 30)
+
+# fuzz_action_run -- links against retrace_core (like fuzz_script_resolve)
+# because it calls retrace_actions_get + retrace_actions_init.
+add_executable(fuzz_action_run fuzz_action_run.c)
+set_target_properties(fuzz_action_run PROPERTIES
+    OUTPUT_NAME fuzz_action_run
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/fuzz")
+target_compile_options(fuzz_action_run PRIVATE ${_fuzz_compile_flags})
+target_link_options(fuzz_action_run PRIVATE ${_fuzz_link_flags})
+target_link_libraries(fuzz_action_run PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_fuzz_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+target_include_directories(fuzz_action_run PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_fuzz_arch_include}
+    ${CMAKE_BINARY_DIR})
+
+add_test(NAME fuzz-action-run-smoke
+    COMMAND ${CMAKE_BINARY_DIR}/test/fuzz/fuzz_action_run
+        -max_total_time=5
+        ${CMAKE_CURRENT_SOURCE_DIR}/corpus/action_run
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(fuzz-action-run-smoke PROPERTIES
+    LABELS "fuzz"
+    TIMEOUT 30)
