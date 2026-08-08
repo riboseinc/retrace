@@ -28,6 +28,7 @@
 #include "real_impls.h"
 #include "logger.h"
 #include "caller_match.h"
+#include "config_cache.h"
 
 /* Evaluate one caller_matches entry against ret_addr.
  * Returns 1 on match, 0 on no-match, -1 on hard failure.
@@ -109,6 +110,27 @@ const JSON_Object *retrace_script_find(const JSON_Array *i_array,
 	const char *i_func;
 	double i_ret_addr;
 	const JSON_Object *ret_cand = NULL;
+
+	/* Fast path: check the config cache for an exact-name match
+	 * that has no caller_matches and no return_addr constraints.
+	 * If found, return immediately -- this is the common case
+	 * (most scripts are simple name + actions, no call-site
+	 * filtering).
+	 */
+	{
+		const JSON_Object *cached =
+			retrace_config_cache_lookup(func_name);
+
+		if (cached != NULL) {
+			JSON_Array *cm = json_object_get_array(cached,
+				"caller_matches");
+			double ra = json_object_get_number(cached,
+				"return_addr");
+
+			if (cm == NULL && ra == 0.0)
+				return cached;
+		}
+	}
 
 	for (i = 0; i < json_array_get_count(i_array); i++) {
 		i_script = json_array_get_object(i_array, i);
