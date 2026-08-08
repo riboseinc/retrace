@@ -102,7 +102,7 @@ security auditing, and CI integration.
 * **Property-based test suite** &mdash; ~26 properties across parson,
   `sockaddr_inspect`, actions, `script_resolver`, `caller_match`
   (~26,000 evaluations per `ctest` run).
-* **Action unit-test sweep** &mdash; all 14 built-in actions have unit
+* **Action unit-test sweep** &mdash; all 13 built-in actions have unit
   tests; the test pyramid now spans unit / property / stress / fuzz
   / perf.
 * **libFuzzer harnesses** &mdash; `fuzz_config_parse` + `fuzz_script_resolve`.

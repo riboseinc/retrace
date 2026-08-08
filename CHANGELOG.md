@@ -85,7 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Spec coverage (TODO 14)
 
-- Unit tests for all 14 built-in actions: `addr_deny`,
+- Unit tests for all 13 built-in actions: `addr_deny`,
   `modify_return_value_int`, `call_count_limit`, `sandbox`,
   `modify_in_param_int`, `fuzzing_seed`, `delay`, `log_params`,
   `call_real`, `incomplete_io`, `memory_fuzz`, `modify_in_param_str`,
