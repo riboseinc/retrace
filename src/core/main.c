@@ -36,6 +36,7 @@
 #include "funcs.h"
 #include "actions.h"
 #include "data_types.h"
+#include "config_cache.h"
 
 int retrace_inited;
 
@@ -67,6 +68,8 @@ static void retrace_main(void)
 		log_err("retrace_conf_init() failed, ret = %d", ret);
 		return;
 	}
+
+	retrace_config_cache_build(retrace_conf);
 
 	retrace_loger_update_config();
 
