@@ -59,3 +59,25 @@ add_test(NAME stress-large-args
 set_tests_properties(stress-large-args PROPERTIES
     LABELS "stress"
     TIMEOUT 60)
+
+add_executable(retrace_stress_long_run stress_long_run.c)
+set_target_properties(retrace_stress_long_run PROPERTIES
+    OUTPUT_NAME stress_long_run
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/stress")
+
+add_test(NAME stress-long-run
+    COMMAND retrace_stress_long_run)
+set_tests_properties(stress-long-run PROPERTIES
+    LABELS "stress"
+    TIMEOUT 90)
+
+add_executable(retrace_stress_event_rate stress_event_rate.c)
+set_target_properties(retrace_stress_event_rate PROPERTIES
+    OUTPUT_NAME stress_event_rate
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/stress")
+
+add_test(NAME stress-event-rate
+    COMMAND retrace_stress_event_rate)
+set_tests_properties(stress-event-rate PROPERTIES
+    LABELS "stress"
+    TIMEOUT 30)
