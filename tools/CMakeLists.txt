@@ -4,3 +4,4 @@
 
 add_subdirectory(spawn)
 add_subdirectory(stringinjector)
+add_subdirectory(otlp-converter)
