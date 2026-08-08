@@ -761,6 +761,7 @@ target_link_libraries(retrace_test_filter PRIVATE
     Threads::Threads)
 
 target_include_directories(retrace_test_filter PRIVATE
+    ${CMAKE_SOURCE_DIR}/test/helpers
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/backends
     ${CMAKE_SOURCE_DIR}/src/config/json
