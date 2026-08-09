@@ -1,0 +1,290 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# retrace-ws: real-time WebSocket streamer for retrace's JSON log
+# (TODO.complete/22 MVP).
+#
+# Tails the JSON log file written by retrace (one entry per array
+# element, comma-separated, wrapped in `[` ... `]`), parses each
+# entry as it lands, and broadcasts it to every connected
+# WebSocket client.
+#
+# Standalone Python -- no engine change, no runtime overhead on
+# the target. Pairs naturally with the lock-free logger (TODO 19)
+# for high-volume tracing, but works fine with the existing
+# mutex-based logger too.
+#
+# Usage:
+#   retrace run --log /tmp/trace.json -- ./your-binary &
+#   retrace-ws /tmp/trace.json
+#
+# Then open ws://localhost:8765/ in any WebSocket client to receive
+# a stream of `{...}` JSON objects (one per log entry). A simple
+# browser-based viewer is served at http://localhost:8765/.
+
+import argparse
+import asyncio
+import json
+import sys
+from pathlib import Path
+
+try:
+    import websockets
+    from websockets.server import serve
+except ImportError:
+    print(
+        "retrace-ws: this tool needs the `websockets` package.\n"
+        "Install it via:\n"
+        "  pip install websockets",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+
+# Simple browser viewer. Each WebSocket connection receives JSON
+# entries as they arrive; the HTML page just appends them to a
+# scrollable <pre>.
+VIEWER_HTML = """<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>retrace live</title>
+<style>
+body { font-family: monospace; margin: 0; padding: 8px; background: #1a1a1a; color: #e8e8e8; }
+#status { position: fixed; top: 0; right: 8px; padding: 4px 8px; background: #2a2a2a; border-radius: 0 0 4px 4px; font-size: 12px; }
+#events { white-space: pre-wrap; word-break: break-all; padding-top: 24px; }
+.event { padding: 2px 0; border-bottom: 1px solid #2a2a2a; }
+.func { color: #6ed6ff; font-weight: bold; }
+.severity-WARN { color: #ffcc66; }
+.severity-ERROR { color: #ff6666; }
+</style>
+</head>
+<body>
+<div id="status">connecting...</div>
+<div id="events"></div>
+<script>
+const ws = new WebSocket('ws://' + location.host + '/ws');
+const status = document.getElementById('status');
+const events = document.getElementById('events');
+let count = 0;
+ws.onopen = () => status.textContent = 'live (0 events)';
+ws.onclose = () => status.textContent = 'disconnected';
+ws.onerror = () => status.textContent = 'error';
+ws.onmessage = (e) => {
+    try {
+        const entry = JSON.parse(e.data);
+        const div = document.createElement('div');
+        div.className = 'event severity-' + (entry.severity || 'INFO');
+        const func = (entry.message && entry.message.func) || entry.message?.text || '?';
+        div.innerHTML = '<span class="func">' + func + '</span> ' + e.data;
+        events.appendChild(div);
+        count++;
+        status.textContent = 'live (' + count + ' events)';
+        window.scrollTo(0, document.body.scrollHeight);
+    } catch (err) {
+        events.appendChild(document.createTextNode(e.data));
+    }
+};
+</script>
+</body>
+</html>
+"""
+
+CLIENTS = set()
+
+
+async def handler(websocket):
+    """Per-connection handler. The path decides what we serve."""
+    path = websocket.request.path if hasattr(websocket, "request") else (
+        websocket.path
+    )
+
+    if path == "/ws" or path == "/ws/":
+        CLIENTS.add(websocket)
+        try:
+            # Keep the connection open; we don't expect inbound messages.
+            # The tail loop broadcasts to all clients via broadcast().
+            await websocket.wait_closed()
+        finally:
+            CLIENTS.discard(websocket)
+        return
+
+    if path == "/" or path == "/index.html":
+        await websocket.respond(
+            websockets.http11.ResponseEntity(200, "OK", websockets.datastructures.Headers(
+                [("Content-Type", "text/html; charset=utf-8")]
+            ), VIEWER_HTML.encode("utf-8"))
+        ) if hasattr(websocket, "respond") else None
+        return
+
+
+async def broadcast(message):
+    """Send a JSON string to every connected client. Silently
+    drops clients that have disconnected since the last send.
+    """
+    if not CLIENTS:
+        return
+    dead = []
+    for ws in CLIENTS:
+        try:
+            await ws.send(message)
+        except websockets.ConnectionClosed:
+            dead.append(ws)
+    for ws in dead:
+        CLIENTS.discard(ws)
+
+
+def parse_retrace_log_line(line):
+    """Parse one line from a retrace JSON log.
+
+    The log is a JSON array with one entry per line, comma-separated:
+
+        [
+        {...entry1...}
+        ,
+        {...entry2...}
+        ]
+
+    Each entry is itself a multi-line pretty-printed JSON object.
+    We can't parse line-by-line naively. Instead, we buffer text
+    and try to parse JSON objects out of the buffer.
+
+    For the MVP, we use a simple brace-counting approach: scan for
+    `{`, count depth, on `}` returning to depth 0 we have an object.
+    """
+    pass  # Implemented in the streamer below
+
+
+class JSONExtractor:
+    """Extracts complete top-level JSON objects from a text buffer.
+
+    Feed it text from a retrace log; call next_object() repeatedly
+    to get each entry as a Python dict. Robust to partial objects
+    (the tail loop feeds text incrementally as the writer produces
+    it).
+    """
+
+    def __init__(self):
+        self._buf = ""
+        self._depth = 0
+        self._start = -1
+        self._in_string = False
+        self._escape = False
+
+    def feed(self, text):
+        self._buf += text
+
+    def next_object(self):
+        """Returns the next complete top-level JSON object as a dict,
+        or None if the buffer doesn't have one yet."""
+        i = 0
+        while i < len(self._buf):
+            c = self._buf[i]
+
+            if self._in_string:
+                if self._escape:
+                    self._escape = False
+                elif c == "\\":
+                    self._escape = True
+                elif c == '"':
+                    self._in_string = False
+                i += 1
+                continue
+
+            if c == '"':
+                self._in_string = True
+            elif c == "{":
+                if self._depth == 0:
+                    self._start = i
+                self._depth += 1
+            elif c == "}":
+                self._depth -= 1
+                if self._depth == 0 and self._start >= 0:
+                    obj_text = self._buf[self._start : i + 1]
+                    self._buf = self._buf[i + 1 :]
+                    self._start = -1
+                    try:
+                        return json.loads(obj_text)
+                    except json.JSONDecodeError:
+                        # Malformed object -- skip and try again.
+                        return None
+            i += 1
+
+        return None
+
+
+async def tail_log(path, poll_interval=0.05):
+    """Tail the retrace JSON log, broadcasting each entry.
+
+    The log writer (retrace) opens the file in append mode and
+    writes one entry at a time. We watch for size growth, read
+    the new bytes, and feed them to the JSON extractor.
+
+    poll_interval: how often (seconds) to check for new bytes.
+    50ms is responsive enough for human-paced viewing; for
+    machine consumers, drop to 5ms.
+    """
+    extractor = JSONExtractor()
+
+    # Wait for the file to exist (retrace creates it on first log).
+    sys.stderr.write(f"retrace-ws: watching {path}\n")
+    sys.stderr.flush()
+    while not Path(path).exists():
+        await asyncio.sleep(poll_interval)
+
+    with open(path, "r") as f:
+        # Skip the leading "[" -- the extractor's brace counter
+        # would treat it as junk and ignore it (no { to start
+        # an object).
+        while True:
+            chunk = f.read(4096)
+            if not chunk:
+                await asyncio.sleep(poll_interval)
+                # Detect file truncation/rotation.
+                try:
+                    pos = f.tell()
+                    size = Path(path).stat().st_size
+                    if size < pos:
+                        f.seek(0)
+                        extractor = JSONExtractor()
+                except OSError:
+                    pass
+                continue
+
+            extractor.feed(chunk)
+            while True:
+                obj = extractor.next_object()
+                if obj is None:
+                    break
+                await broadcast(json.dumps(obj))
+
+
+async def main():
+    parser = argparse.ArgumentParser(
+        prog="retrace-ws",
+        description=(
+            "WebSocket streamer for retrace's JSON log "
+            "(TODO.complete/22 MVP)"
+        ),
+    )
+    parser.add_argument("log", help="Path to the retrace JSON log file")
+    parser.add_argument(
+        "--host", default="localhost", help="Bind host (default: localhost)"
+    )
+    parser.add_argument(
+        "--port", type=int, default=8765, help="Bind port (default: 8765)"
+    )
+    args = parser.parse_args()
+
+    sys.stderr.write(
+        f"retrace-ws: serving on http://{args.host}:{args.port}/\n"
+    )
+    sys.stderr.flush()
+
+    async with serve(handler, args.host, args.port):
+        await tail_log(args.log)
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        sys.stderr.write("\nretrace-ws: stopping\n")
