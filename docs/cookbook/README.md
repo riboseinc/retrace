@@ -79,6 +79,12 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 | 20 | [Sandbox a binary](20-sandbox.md) | Runtime file-access deny-list: block `/etc/shadow`, `/root/.ssh/`, etc. |
 | 21 | [Mock SSL certificate verification](21-mock-ssl-verify.md) | Force `SSL_get_verify_result` to any X509_V_* code — test cert handling without standing up servers. |
 
+### Protocol decoding
+
+| # | Recipe | What it teaches |
+|---|--------|-----------------|
+| 22 | [Decode HTTP and DNS wire formats](22-decode-protocols.md) | Parse `send`/`recv` buffers as HTTP/DNS and log structured fields instead of raw bytes. |
+
 ## Action reference
 
 Compact form. For the full schema and parameter reference, see
@@ -98,6 +104,10 @@ Compact form. For the full schema and parameter reference, see
 | `delay` | Inject N ms of latency before the call returns. |
 | `call_count_limit` | Fail the call once count crosses a per-function threshold. |
 | `sandbox` | Deny file access by path deny-list at runtime. |
+| `addr_deny` | Deny network connects to a list of IP addresses. |
+| `filter` | Run the next actions only if a param matches an operator/value. |
+| `decode_http` | Parse a buffer as HTTP/1.x and log method/path/status. |
+| `decode_dns` | Parse a buffer as DNS wire format and log id/qname/qtype/answers. |
 
 ## Environment variables
 
