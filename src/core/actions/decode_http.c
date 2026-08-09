@@ -68,6 +68,7 @@
 #include "actions.h"
 #include "logger.h"
 #include "real_impls.h"
+#include "action_utils.h"
 
 #define HTTP_MAX_LINE 8192
 
@@ -221,13 +222,8 @@ static int ia_decode_http(struct ThreadContext *t_ctx,
 		return -1;
 	}
 
-	for (param_idx = 0; param_idx < t_ctx->params_cnt; param_idx++) {
-		if (retrace_real_impls.strcmp(
-			    t_ctx->params[param_idx].param_meta.name,
-			    param_name) == 0)
-			break;
-	}
-	if (param_idx == t_ctx->params_cnt) {
+	param_idx = retrace_action_find_param(t_ctx, param_name);
+	if (param_idx < 0) {
 		log_dbg("decode_http: param '%s' not found", param_name);
 		return 0;
 	}

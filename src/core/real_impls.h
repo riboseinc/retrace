@@ -23,6 +23,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef RETRACE_REAL_IMPLS_H_
+#define RETRACE_REAL_IMPLS_H_
+
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -125,4 +128,6 @@ RETRACE_POP_MACROS()
 extern struct RetraceRealImpls retrace_real_impls;
 
 int retrace_real_impls_init(void);
+
+#endif /* RETRACE_REAL_IMPLS_H_ */
 //void *retrace_real_impls_get(const char *func_name);

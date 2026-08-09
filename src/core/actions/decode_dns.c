@@ -62,6 +62,7 @@
 #include "actions.h"
 #include "logger.h"
 #include "real_impls.h"
+#include "action_utils.h"
 
 /* DNS header is 12 bytes. */
 #define DNS_HEADER_LEN 12
@@ -169,13 +170,8 @@ static int ia_decode_dns(struct ThreadContext *t_ctx,
 		return -1;
 	}
 
-	for (i = 0; i < t_ctx->params_cnt; i++) {
-		if (retrace_real_impls.strcmp(
-			    t_ctx->params[i].param_meta.name,
-			    param_name) == 0)
-			break;
-	}
-	if (i == t_ctx->params_cnt) {
+	i = retrace_action_find_param(t_ctx, param_name);
+	if (i < 0) {
 		log_dbg("decode_dns: param '%s' not found", param_name);
 		return 0;
 	}

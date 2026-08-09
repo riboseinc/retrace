@@ -66,18 +66,7 @@
 #include "actions.h"
 #include "logger.h"
 #include "real_impls.h"
-
-static int find_param_idx(struct ThreadContext *t_ctx, const char *name)
-{
-	int i;
-
-	for (i = 0; i < t_ctx->params_cnt; i++) {
-		if (retrace_real_impls.strcmp(
-			    t_ctx->params[i].param_meta.name, name) == 0)
-			return i;
-	}
-	return -1;
-}
+#include "action_utils.h"
 
 static int eval_op(long actual, const char *op, long expected)
 {
@@ -134,7 +123,7 @@ static int ia_filter(struct ThreadContext *t_ctx,
 	value = json_object_get_number(action_params, "value");
 	expected = (long)value;
 
-	param_idx = find_param_idx(t_ctx, param_name);
+	param_idx = retrace_action_find_param(t_ctx, param_name);
 	if (param_idx < 0) {
 		log_dbg("filter: param '%s' not in frame -- aborting",
 			param_name);
