@@ -86,9 +86,13 @@ struct LogEntry {
 
 struct LogRing {
 	uint32_t mask;
+
 	uint32_t dropped;
+
 	_Atomic uint32_t head;
+
 	_Atomic uint32_t tail;
+
 	struct LogEntry *entries;
 };
 
