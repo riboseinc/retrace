@@ -400,6 +400,9 @@ endif()
 # VS Code extension is pure TypeScript (no native build).
 add_subdirectory(vscode-extension)
 
+# Grafana plugin is also pure TypeScript.
+add_subdirectory(grafana-plugin)
+
 # ---------------------------------------------------------------
 # Package config
 # ---------------------------------------------------------------
