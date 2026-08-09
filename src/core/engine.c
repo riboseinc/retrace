@@ -41,6 +41,7 @@
 #include "thread_context.h"
 #include "reentrance_guard.h"
 #include "script_resolver.h"
+#include "call_hash.h"
 #include "action_runner.h"
 
 /*
@@ -114,6 +115,17 @@ void retrace_engine_wrapper(char *func_name,
 		arch_spec_ctx);
 
 	thread_ctx->prototype = retrace_func_get(func_name);
+
+	/* Coverage feedback for libFuzzer/AFL integration (TODO.complete/24).
+	 * Cheap (FNV-1a over the func name + arg count) and gated by env,
+	 * so zero overhead when disabled. Updates the per-thread rolling
+	 * hash; the destructor surfaces the final hash to stderr.
+	 */
+	if (retrace_call_hash_enabled())
+		retrace_call_hash_observe(func_name,
+			thread_ctx->prototype
+				? thread_ctx->prototype->params_cnt
+				: 0);
 
 	/* if func is not prototyped - do not intervene */
 	if (thread_ctx->prototype == NULL)

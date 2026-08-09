@@ -676,6 +676,42 @@ add_test(NAME unit-test-log-flusher
 set_tests_properties(unit-test-log-flusher PROPERTIES LABELS "unit")
 
 #
+# Per-thread call-sequence hash unit tests (TODO.complete/24).
+# Verifies FNV-1a rolling hash: env gating, determinism, uniqueness,
+# per-thread isolation, walk semantics, NULL safety, multi-thread.
+#
+add_executable(retrace_test_call_hash test_call_hash.c)
+set_target_properties(retrace_test_call_hash PROPERTIES
+    OUTPUT_NAME test_call_hash
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_call_hash PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_call_hash PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_call_hash PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_call_hash PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-call-hash
+    COMMAND retrace_test_call_hash)
+set_tests_properties(unit-test-call-hash PROPERTIES LABELS "unit")
+
+#
 # modify_in_param_arr action unit tests (TODO.complete/14).
 # Completes the 14-action sweep.
 #
