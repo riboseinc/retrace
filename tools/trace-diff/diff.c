@@ -49,20 +49,25 @@ static void usage(FILE *out)
 "retrace-diff -- differential trace analysis (TODO.complete/27 MVP)\n"
 "\n"
 "Usage:\n"
-"  retrace-diff BEFORE.json AFTER.json\n"
+"  retrace-diff [OPTIONS] BEFORE.json AFTER.json\n"
 "\n"
 "Reads two retrace trace logs (each a JSON array of entries with\n"
 "`message.func` and `message.call_duration_us`), groups calls by\n"
 "function, and prints a structured diff of call counts and total\n"
 "time.\n"
 "\n"
-"Exit codes:\n"
-"  0  no diff (call surface unchanged)\n"
-"  1  diff found (CI gating signal)\n"
-"  2  argument or IO error\n"
-"\n"
 "Options:\n"
-"  --help, -h   Show this message\n");
+"  --threshold pct=N  Suppress diffs at or below N%% change (CI\n"
+"                     gating). Counted diffs only if a function's\n"
+"                     call count OR total time changed by >N%%.\n"
+"                     New/removed functions always count.\n"
+"                     Default: 0 (report every change).\n"
+"  --help, -h         Show this message\n"
+"\n"
+"Exit codes:\n"
+"  0  no diff above the threshold (call surface within tolerance)\n"
+"  1  diff found above the threshold (CI gating signal)\n"
+"  2  argument or IO error\n");
 }
 
 /*
@@ -124,11 +129,48 @@ static void print_func_diff(const char *name,
 }
 
 /*
+ * Configuration for the diff walk. The threshold_pct field
+ * implements TODO.complete/27 P1 (CI gating): only count a
+ * function as "changed" if its count OR total time changed by
+ * more than N percent. Default 0 = report every change.
+ *
+ * New/removed functions always count (they're 100% changes by
+ * definition; you can't get more divergent than "absent").
+ */
+struct DiffConfig {
+	double threshold_pct;
+};
+
+/*
+ * Returns 1 if the change exceeds the configured threshold, 0
+ * otherwise. A function with zero before-count and nonzero after
+ * always exceeds (avoids divide-by-zero).
+ */
+static int exceeds_threshold(uint64_t before, uint64_t after,
+			     double threshold_pct)
+{
+	double delta;
+	double pct;
+
+	if (before == after)
+		return 0;
+	if (threshold_pct <= 0.0)
+		return 1;
+	if (before == 0)
+		return 1;  /* 0 -> N is unbounded; always report */
+
+	delta = (double)((long long)after - (long long)before);
+	pct = 100.0 * (delta < 0 ? -delta : delta) / (double)before;
+	return pct > threshold_pct;
+}
+
+/*
  * Walks both normalized logs and prints every function that differs.
  * Returns the number of differing functions (0 = no diff).
  */
 static int print_all_diffs(const struct NormalizedLog *before,
-			   const struct NormalizedLog *after)
+			   const struct NormalizedLog *after,
+			   const struct DiffConfig *cfg)
 {
 	int diffs = 0;
 	size_t i;
@@ -137,6 +179,8 @@ static int print_all_diffs(const struct NormalizedLog *before,
 	for (i = 0; i < before->count; i++) {
 		const struct FuncStat *b = &before->funcs[i];
 		const struct FuncStat *a = normalize_find(after, b->name);
+		int count_exceeds;
+		int time_exceeds;
 
 		/* Only print if there's a real diff. */
 		if (a != NULL &&
@@ -144,8 +188,19 @@ static int print_all_diffs(const struct NormalizedLog *before,
 		    a->total_duration_us == b->total_duration_us)
 			continue;
 
+		/* If threshold is set, count this diff only if it
+		 * exceeds the threshold on count or time.
+		 */
+		count_exceeds = a ?
+		    exceeds_threshold(b->call_count, a->call_count,
+			cfg->threshold_pct) : 1;
+		time_exceeds = a ?
+		    exceeds_threshold(b->total_duration_us,
+			a->total_duration_us, cfg->threshold_pct) : 1;
+
 		print_func_diff(b->name, b, a);
-		diffs++;
+		if (count_exceeds || time_exceeds)
+			diffs++;
 	}
 
 	/* Functions only in `after` (new). */
@@ -155,6 +210,7 @@ static int print_all_diffs(const struct NormalizedLog *before,
 		if (normalize_find(before, a->name) != NULL)
 			continue;
 		print_func_diff(a->name, NULL, a);
+		/* New functions always exceed the threshold. */
 		diffs++;
 	}
 
@@ -194,6 +250,7 @@ int main(int argc, char **argv)
 	const char *after_path = NULL;
 	struct NormalizedLog before = {0};
 	struct NormalizedLog after = {0};
+	struct DiffConfig cfg = {.threshold_pct = 0.0};
 	int argi;
 	int rc;
 	int diffs;
@@ -203,6 +260,34 @@ int main(int argc, char **argv)
 		    strcmp(argv[argi], "-h") == 0) {
 			usage(stdout);
 			return 0;
+		}
+		if (strncmp(argv[argi], "--threshold", 11) == 0) {
+			const char *val = NULL;
+
+			/* Accept either `--threshold N` or
+			 * `--threshold=pct=N` / `--threshold pct=N`.
+			 */
+			if (argv[argi][11] == '=') {
+				val = argv[argi] + 12;
+			} else if (argv[argi][11] == '\0' &&
+				   argi + 1 < argc) {
+				val = argv[++argi];
+			} else {
+				fprintf(stderr,
+					"retrace-diff: bad --threshold form\n");
+				usage(stderr);
+				return 2;
+			}
+			/* Skip optional `pct=` prefix. */
+			if (strncmp(val, "pct=", 4) == 0)
+				val += 4;
+			cfg.threshold_pct = atof(val);
+			if (cfg.threshold_pct < 0.0) {
+				fprintf(stderr,
+					"retrace-diff: --threshold must be >= 0\n");
+				return 2;
+			}
+			continue;
 		}
 		if (argv[argi][0] == '-') {
 			fprintf(stderr, "retrace-diff: unknown option '%s'\n",
@@ -235,12 +320,20 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	diffs = print_all_diffs(&before, &after);
+	diffs = print_all_diffs(&before, &after, &cfg);
 
-	if (diffs == 0)
-		printf("No call-surface differences found.\n");
-	else
-		printf("\n%d function(s) changed.\n", diffs);
+	if (diffs == 0) {
+		if (cfg.threshold_pct > 0.0)
+			printf("No call-surface differences above %.1f%% threshold.\n",
+				cfg.threshold_pct);
+		else
+			printf("No call-surface differences found.\n");
+	} else {
+		printf("\n%d function(s) changed", diffs);
+		if (cfg.threshold_pct > 0.0)
+			printf(" above %.1f%% threshold", cfg.threshold_pct);
+		printf(".\n");
+	}
 
 	normalize_free(&before);
 	normalize_free(&after);
