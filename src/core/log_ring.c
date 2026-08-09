@@ -103,6 +103,19 @@ static void ring_free(struct LogRing *r)
 {
 	if (r == NULL)
 		return;
+	/* Free any un-drained text copies so we don't leak on deinit. */
+	if (r->entries != NULL) {
+		uint32_t t = atomic_load_explicit(&r->tail,
+			memory_order_relaxed);
+		uint32_t h = atomic_load_explicit(&r->head,
+			memory_order_relaxed);
+
+		while (t != h) {
+			retrace_real_impls.free(r->entries[t].text);
+			r->entries[t].text = NULL;
+			t = (t + 1) & r->mask;
+		}
+	}
 	retrace_real_impls.free(r->entries);
 	retrace_real_impls.free(r);
 }
@@ -215,17 +228,36 @@ int retrace_log_ring_push(struct LogRing *r, uint8_t module,
 	uint32_t next;
 	uint32_t t;
 	size_t text_len;
+	char *text_copy;
 	struct LogEntry *e;
 
 	if (r == NULL || text == NULL)
 		return -1;
+
+	/* Heap-copy the text up front so the ring entry stays small
+	 * (16 bytes) and message length is unbounded. The copy is
+	 * freed by drain() after the consumer callback returns.
+	 *
+	 * We allocate BEFORE the ring-full check so that on full-ring
+	 * we can free immediately and the producer sees a clean -1.
+	 * Alternative (allocate after check) saves a malloc on drop
+	 * but creates a TOCTOU: between check and store, the consumer
+	 * could drain, making the push succeed with a stale text.
+	 */
+	text_len = retrace_real_impls.strlen(text);
+	text_copy = (char *)retrace_real_impls.malloc(text_len + 1);
+	if (text_copy == NULL)
+		return -1;
+	retrace_real_impls.memcpy(text_copy, text, text_len);
+	text_copy[text_len] = '\0';
 
 	h = atomic_load_explicit(&r->head, memory_order_relaxed);
 	next = (h + 1) & r->mask;
 	t = atomic_load_explicit(&r->tail, memory_order_acquire);
 
 	if (next == t) {
-		/* Ring full. Drop and count. */
+		/* Ring full. Drop the copy and count. */
+		retrace_real_impls.free(text_copy);
 		r->dropped++;
 		return -1;
 	}
@@ -235,12 +267,7 @@ int retrace_log_ring_push(struct LogRing *r, uint8_t module,
 	e->module = module;
 	e->sev = sev;
 	e->_reserved = 0;
-
-	text_len = retrace_real_impls.strlen(text);
-	if (text_len >= LOG_RING_TEXT_CAP)
-		text_len = LOG_RING_TEXT_CAP - 1;
-	retrace_real_impls.memcpy(e->text, text, text_len);
-	e->text[text_len] = '\0';
+	e->text = text_copy;
 
 	atomic_store_explicit(&r->head, next, memory_order_release);
 	return 0;
@@ -260,10 +287,17 @@ size_t retrace_log_ring_drain(struct LogRing *r,
 	h = atomic_load_explicit(&r->head, memory_order_acquire);
 
 	while (t != h) {
-		const struct LogEntry *e = &r->entries[t];
+		struct LogEntry *e = &r->entries[t];
 
 		if (cb(e, ctx) != 0)
 			break;
+
+		/* Free the heap-allocated text now that the consumer
+		 * has seen it. The next push to this slot will write
+		 * a fresh pointer.
+		 */
+		retrace_real_impls.free(e->text);
+		e->text = NULL;
 		t = (t + 1) & r->mask;
 		count++;
 	}

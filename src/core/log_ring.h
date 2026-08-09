@@ -57,29 +57,31 @@
 #include "logger.h"
 
 /*
- * One ring entry. Fixed-size so the ring is a flat array (cache
- * friendly, no per-entry allocation).
+ * One ring entry. Each entry holds a heap-allocated text buffer
+ * (producer-side malloc, consumer-side free) so the ring supports
+ * unbounded message lengths -- important for `log_params` which
+ * can emit multi-KB JSON blobs for calls like send(large_buffer).
+ *
+ * The producer pays one malloc per push; the consumer (flusher
+ * thread) frees after the drain callback returns. The ring itself
+ * is a flat array of these structs (16 bytes each), so capacity
+ * is cheap: 64 entries × 16 B = 1 KB per thread.
  *
  *   4 bytes : timestamp (ms since logger init, uint32 wraps at ~49d)
  *   1 byte  : module (enum Modules from logger.h)
  *   1 byte  : severity (enum Severity from logger.h)
  *   2 bytes : reserved (alignment)
- *   248 bytes: formatted text (NUL-terminated within this field)
- *
- * Total: 256 bytes. Messages longer than 247 chars are truncated
- * to fit; the trailing '\0' is always written.
+ *   8 bytes : pointer to NUL-terminated text (heap-allocated)
  */
-#define LOG_RING_TEXT_CAP 248
-
 struct LogEntry {
 	uint32_t ts_ms;
 	uint8_t  module;
 	uint8_t  sev;
 	uint16_t _reserved;
-	char     text[LOG_RING_TEXT_CAP];
+	char    *text;
 };
 
-/* Default capacity (power-of-2). 64 entries × 256 B = 16 KB per thread. */
+/* Default capacity (power-of-2). 64 entries × 16 B = 1 KB per thread. */
 #define LOG_RING_DEFAULT_CAP 64
 
 struct LogRing {
@@ -115,11 +117,11 @@ struct LogRing *retrace_log_ring_get(void);
  * Push an entry onto the ring. Returns:
  *   0  on success
  *   -1 if the ring was full (entry dropped, `ring->dropped` bumped)
+ *   -1 on OOM or invalid input (ring=NULL, text=NULL)
  *
- * The text is copied into the ring entry. Entries longer than
- * LOG_RING_TEXT_CAP - 1 are truncated; the truncation is silent
- * (the flusher can detect it by checking strlen(entry->text) but
- * in practice log messages fit comfortably).
+ * The text is heap-copied into a buffer owned by the ring; the
+ * caller may free or modify `text` immediately on success. The
+ * ring frees the copy after the drain callback returns.
  */
 int retrace_log_ring_push(struct LogRing *ring, uint8_t module,
 			  uint8_t sev, uint32_t ts_ms, const char *text);

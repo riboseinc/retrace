@@ -42,7 +42,10 @@ static int tests_fail;
 	printf("OK\n"); \
 } while (0)
 
-/* Drain callback that records up to N entries into a fixed array. */
+/* Drain callback that records up to N entries into a fixed array.
+ * Each entry's text is strdup'd because drain() frees the original
+ * after the callback returns.
+ */
 struct DrainCapture {
 	struct LogEntry entries[256];
 	size_t count;
@@ -55,8 +58,21 @@ static int capture_cb(const struct LogEntry *e, void *ctx)
 
 	if (c->stop_at > 0 && c->count >= (size_t)c->stop_at)
 		return 1;
-	if (c->count < sizeof(c->entries) / sizeof(c->entries[0]))
-		c->entries[c->count++] = *e;
+	if (c->count < sizeof(c->entries) / sizeof(c->entries[0])) {
+		struct LogEntry *dst = &c->entries[c->count++];
+		size_t len = strlen(e->text);
+
+		dst->ts_ms = e->ts_ms;
+		dst->module = e->module;
+		dst->sev = e->sev;
+		/* Allocate a copy that outlives drain()'s free. Tests
+		 * free these in their cleanup or rely on process exit.
+		 */
+		dst->text = (char *)malloc(len + 1);
+		if (dst->text == NULL)
+			return 1;
+		memcpy(dst->text, e->text, len + 1);
+	}
 	return 0;
 }
 
@@ -191,11 +207,11 @@ static void test_drop_when_full(void)
 	retrace_log_ring_deinit();
 }
 
-static void test_long_text_truncated(void)
+static void test_long_text_preserved(void)
 {
 	struct LogRing *r;
 	struct DrainCapture cap = {0};
-	char long_text[LOG_RING_TEXT_CAP + 64];
+	char long_text[4096];
 
 	memset(long_text, 'a', sizeof(long_text) - 1);
 	long_text[sizeof(long_text) - 1] = '\0';
@@ -208,9 +224,9 @@ static void test_long_text_truncated(void)
 		long_text) == 0);
 	retrace_log_ring_drain(r, capture_cb, &cap);
 	assert(cap.count == 1);
-	/* Text is NUL-terminated within the field. */
-	assert(cap.entries[0].text[LOG_RING_TEXT_CAP - 1] == '\0');
-	assert(strlen(cap.entries[0].text) == LOG_RING_TEXT_CAP - 1);
+	/* Long text is preserved exactly -- no truncation. */
+	assert(strcmp(cap.entries[0].text, long_text) == 0);
+	assert(strlen(cap.entries[0].text) == sizeof(long_text) - 1);
 
 	retrace_log_ring_deinit();
 }
@@ -355,7 +371,7 @@ int main(void)
 	printf("  -- capacity & wrap --\n");
 	TEST(wrap_around);
 	TEST(drop_when_full);
-	TEST(long_text_truncated);
+	TEST(long_text_preserved);
 
 	printf("  -- edge cases --\n");
 	TEST(null_inputs_safe);
