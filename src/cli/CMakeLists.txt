@@ -5,6 +5,7 @@
 
 add_executable(retrace_cli
 	retrace_cli.c
+	config_builder.c
 	${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 set_target_properties(retrace_cli PROPERTIES
 	OUTPUT_NAME retrace)
