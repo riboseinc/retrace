@@ -179,40 +179,50 @@ int retrace_real_impls_init(void)
 	if (retrace_real_impls.pthread_mutex_destroy == NULL)
 		return -29;
 
+	retrace_real_impls.pthread_create =
+		retrace_as_get_real_safe("pthread_create");
+	if (retrace_real_impls.pthread_create == NULL)
+		return -30;
+
+	retrace_real_impls.pthread_join =
+		retrace_as_get_real_safe("pthread_join");
+	if (retrace_real_impls.pthread_join == NULL)
+		return -31;
+
 	retrace_real_impls.real_vsnprintf =
 		retrace_as_get_real_safe("vsnprintf");
 	if (retrace_real_impls.real_vsnprintf == NULL)
-		return -30;
+		return -32;
 
 	retrace_real_impls.time =
 		retrace_as_get_real_safe("time");
 	if (retrace_real_impls.time == NULL)
-		return -31;
+		return -33;
 
 	retrace_real_impls.localtime_r =
 		retrace_as_get_real_safe("localtime_r");
 	if (retrace_real_impls.localtime_r == NULL)
-		return -32;
+		return -34;
 
 	retrace_real_impls.fprintf =
 		retrace_as_get_real_safe("fprintf");
 	if (retrace_real_impls.fprintf == NULL)
-		return -33;
+		return -35;
 
 	retrace_real_impls.fflush =
 		retrace_as_get_real_safe("fflush");
 	if (retrace_real_impls.fflush == NULL)
-		return -34;
+		return -36;
 
 	retrace_real_impls.vprintf =
 		retrace_as_get_real_safe("vprintf");
 	if (retrace_real_impls.vprintf == NULL)
-		return -35;
+		return -37;
 
 	retrace_real_impls.ctime_r =
 		retrace_as_get_real_safe("ctime_r");
 	if (retrace_real_impls.ctime_r == NULL)
-		return -36;
+		return -38;
 
 	return 0;
 }

@@ -15,7 +15,8 @@ set(_core_sources
 	sockaddr_inspect.c
 	caller_match.c
 	caller_cache.c
-	log_ring.c)
+	log_ring.c
+	log_flusher.c)
 
 # dlopen_guard.c is Linux-only: it exports dlopen/dlclose/dlsym/dlerror
 # as global symbols for LD_PRELOAD interposition. On macOS these symbols
