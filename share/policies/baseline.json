@@ -1,0 +1,65 @@
+{
+  "name": "baseline",
+  "rules": [
+    {
+      "id": "BASE-001",
+      "description": "Subprocess spawned via shell -- audit for injection",
+      "match": { "func_exact": "system" },
+      "severity": "high"
+    },
+    {
+      "id": "BASE-002",
+      "description": "exec-family call -- subprocess spawning",
+      "match": { "func_prefix": "exec" },
+      "severity": "medium"
+    },
+    {
+      "id": "BASE-003",
+      "description": "Reads /etc/shadow -- credential access",
+      "match": { "func_prefix": "open", "path_contains": "/etc/shadow" },
+      "severity": "critical"
+    },
+    {
+      "id": "BASE-004",
+      "description": "Reads /etc/passwd -- user enumeration",
+      "match": { "func_prefix": "open", "path_contains": "/etc/passwd" },
+      "severity": "medium"
+    },
+    {
+      "id": "BASE-005",
+      "description": "Reads SSH directory -- private key access",
+      "match": { "func_prefix": "open", "path_contains": ".ssh/" },
+      "severity": "critical"
+    },
+    {
+      "id": "BASE-006",
+      "description": "Reads a token env var -- credential exposure",
+      "match": { "func_exact": "getenv", "env_pattern": "*_TOKEN" },
+      "severity": "high"
+    },
+    {
+      "id": "BASE-007",
+      "description": "Reads a password env var -- credential exposure",
+      "match": { "func_exact": "getenv", "env_pattern": "*_PASSWORD" },
+      "severity": "high"
+    },
+    {
+      "id": "BASE-008",
+      "description": "Reads a key env var -- credential exposure",
+      "match": { "func_exact": "getenv", "env_pattern": "*_KEY" },
+      "severity": "high"
+    },
+    {
+      "id": "BASE-009",
+      "description": "Reads LD_PRELOAD -- runtime hijack risk",
+      "match": { "func_exact": "getenv", "env_pattern": "LD_*" },
+      "severity": "medium"
+    },
+    {
+      "id": "BASE-010",
+      "description": "Writes to /etc -- system config modification",
+      "match": { "func_prefix": "open", "path_contains": "/etc/" },
+      "severity": "high"
+    }
+  ]
+}
