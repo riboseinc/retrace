@@ -22,6 +22,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef RETRACE_CORE_LOGGER_H_
+#define RETRACE_CORE_LOGGER_H_
+
 #include "parson.h"
 
 enum Modules {
@@ -69,4 +72,6 @@ int retrace_logger_func_loggable(const char *func_name);
 
 #define log_dbg(fmt, ...) \
 	retrace_logger_log(FUNCS, SEVERITY_DEBUG, fmt, ##__VA_ARGS__)
+
+#endif /* RETRACE_CORE_LOGGER_H_ */
 
