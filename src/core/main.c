@@ -37,6 +37,7 @@
 #include "actions.h"
 #include "data_types.h"
 #include "config_cache.h"
+#include "call_hash.h"
 
 int retrace_inited;
 
@@ -58,6 +59,10 @@ static void retrace_main(void)
 	if (retrace_logger_init())
 		/* can't report error... */
 		return;
+
+	if (retrace_call_hash_init())
+		log_err("retrace_call_hash_init() failed; "
+			"call-hash feature disabled");
 
 	/* init parson code which is used by various modules */
 	json_set_allocation_functions(retrace_real_impls.malloc,
@@ -108,8 +113,27 @@ static void retrace_main(void)
 	retrace_inited = 1;
 }
 
+static void hash_print_cb(uint64_t hash, void *ctx)
+{
+	FILE *out = (FILE *)ctx;
+
+	retrace_real_impls.fprintf(out, "  thread hash: 0x%016llx\n",
+		(unsigned long long)hash);
+}
+
 __attribute__((destructor))
 static void retrace_destructor(void)
 {
+	if (retrace_call_hash_enabled()) {
+		/* Print the final per-thread hashes to stderr so users
+		 * (and future fuzz harnesses) can grab them. The
+		 * lock-free logger path is already in teardown, so we
+		 * write directly via real_impls.
+		 */
+		retrace_real_impls.fprintf(stderr,
+			"retrace: call-hash summary:\n");
+		retrace_call_hash_walk(hash_print_cb, stderr);
+	}
+	retrace_call_hash_deinit();
 	retrace_logger_deinit();
 }
