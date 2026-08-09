@@ -47,20 +47,26 @@ enum Severity {
 
 struct Rule {
 	char id[64];
+
 	char description[256];
 
 	/* Predicate fields (NULL/0 = wildcard) */
 	const char *func_prefix;
+
 	const char *func_exact;
+
 	const char *path_contains;
-	const char *env_pattern;  /* glob: supports trailing *, e.g. "*_TOKEN" */
+
+	const char *env_pattern;
 
 	enum Severity severity;
 };
 
 struct Policy {
 	char name[64];
+
 	struct Rule *rules;
+
 	size_t rules_count;
 };
 
