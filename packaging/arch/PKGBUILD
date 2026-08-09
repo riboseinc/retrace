@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Maintainer: Ribose Inc <opensource@ribose.com>
+# Contributor: Ribose Inc <opensource@ribose.com>
+
+pkgname=retrace
+pkgver=2.2.2
+pkgrel=1
+pkgdesc="Userspace libc interceptor for security discovery"
+arch=('x86_64' 'aarch64')
+url="https://github.com/riboseinc/retrace"
+license=('BSD-2-Clause')
+depends=('openssl')
+makedepends=('cmake' 'ninja')
+source=("$url/archive/v$pkgver/retrace-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$pkgname-$pkgver"
+    cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DBUILD_SHARED_LIBS=ON \
+        -DRETRACE_BUILD_TESTS=OFF \
+        -DRETRACE_BUILD_EXAMPLES=OFF
+    cmake --build build
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    DESTDIR="$pkgdir" cmake --install build
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

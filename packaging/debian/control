@@ -1,0 +1,45 @@
+Source: retrace
+Section: devel
+Priority: optional
+Maintainer: Ribose Inc <opensource@ribose.com>
+Build-Depends: debhelper-compat (= 13),
+               cmake (>= 3.20),
+               ninja-build,
+               libssl-dev
+Standards-Version: 4.6.0
+Homepage: https://github.com/riboseinc/retrace
+Vcs-Browser: https://github.com/riboseinc/retrace
+Vcs-Git: https://github.com/riboseinc/retrace.git
+
+Package: retrace
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Userspace libc interceptor for security discovery
+ retrace intercepts libc calls in dynamically-linked binaries by
+ preloading a shared library (LD_PRELOAD on ELF, DYLD_INSERT_LIBRARIES
+ on Darwin). It can log, modify, or fault every intercepted call.
+ .
+ This package contains the retrace shared library, the retrace CLI,
+ and the OTLP converter tool.
+ .
+ Features:
+  * 400+ intercepted libc functions (stdio, stdlib, unistd, string,
+    pthread, network sockets)
+  * 16 built-in actions (log_params, call_real, modify_return,
+    memory_fuzz, sandbox, addr_deny, filter, decode_http, decode_dns,
+    and more)
+  * JSON-driven configuration via RETRACE_JSON_CONFIG
+  * Per-return-address routing (caller_matches)
+  * Config cache (compile/execute separation)
+  * OTLP/JSON export via retrace-to-otlp
+  * Python config builder (python3-retrace)
+
+Package: python3-retrace
+Architecture: all
+Depends: ${misc:Depends}, python3
+Description: Python config builder for retrace
+ Pure Python 3 module that generates retrace JSON configs
+ programmatically with a fluent API. No C extension needed.
+ .
+ Provides presets for HTTP tracing, DNS tracing, network tracing,
+ malloc fuzzing, and path sandboxing.
