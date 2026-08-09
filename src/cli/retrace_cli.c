@@ -39,6 +39,7 @@
 #include <signal.h>
 
 #include "parson.h"
+#include "config_builder.h"
 
 #ifdef __linux__
 #define RETRACE_PRELOAD_ENV "LD_PRELOAD"
@@ -641,23 +642,20 @@ static int cmd_trace(int argc, char **argv)
 	}
 
 	if (nfuncs == 0) {
-		snprintf(json, sizeof(json),
-			"{\"intercept_scripts\":[{\"func_name\":\"*\","
-			"\"actions\":[{\"action_name\":\"log_params\"},"
-			"{\"action_name\":\"call_real\"}]}]}");
-	} else {
-		int pos = 0;
-
-		pos += snprintf(json + pos, sizeof(json) - pos,
-			"{\"intercept_scripts\":[");
-		for (i = 0; i < nfuncs; i++) {
-			pos += snprintf(json + pos, sizeof(json) - pos,
-				"%s{\"func_name\":\"%s\","
-				"\"actions\":[{\"action_name\":\"log_params\"},"
-				"{\"action_name\":\"call_real\"}]}",
-				i > 0 ? "," : "", argv[i]);
+		if (retrace_cli_build_trace_config(json, sizeof(json),
+						   NULL, 0) < 0) {
+			fprintf(stderr,
+				"retrace trace: config too large for buffer\n");
+			return 1;
 		}
-		pos += snprintf(json + pos, sizeof(json) - pos, "]}");
+	} else {
+		if (retrace_cli_build_trace_config(json, sizeof(json),
+						   (const char *const *)argv,
+						   (size_t)nfuncs) < 0) {
+			fprintf(stderr,
+				"retrace trace: config too large for buffer\n");
+			return 1;
+		}
 	}
 
 	config = write_temp_config(json);
@@ -786,12 +784,12 @@ static int cmd_mock(int argc, char **argv)
 		return 1;
 	}
 
-	snprintf(json, sizeof(json),
-		"{\"intercept_scripts\":[{\"func_name\":\"%s\","
-		"\"actions\":[{\"action_name\":\"call_real\"},"
-		"{\"action_name\":\"modify_return_value_int\","
-		"\"action_params\":{\"retval_int\":%ld}}]}]}",
-		func, retval);
+	if (retrace_cli_build_mock_config(json, sizeof(json),
+					  func, retval) < 0) {
+		fprintf(stderr,
+			"retrace mock: config too large for buffer\n");
+		return 1;
+	}
 
 	config = write_temp_config(json);
 	if (!config)
@@ -841,12 +839,12 @@ static int cmd_fuzz(int argc, char **argv)
 		return 1;
 	}
 
-	snprintf(json, sizeof(json),
-		"{\"intercept_scripts\":[{\"func_name\":\"%s\","
-		"\"actions\":[{\"action_name\":\"call_real\"},"
-		"{\"action_name\":\"memory_fuzz\","
-		"\"action_params\":{\"fail_rate\":%.4f}}]}]}",
-		func, rate);
+	if (retrace_cli_build_fuzz_config(json, sizeof(json),
+					  func, rate) < 0) {
+		fprintf(stderr,
+			"retrace fuzz: config too large for buffer\n");
+		return 1;
+	}
 
 	config = write_temp_config(json);
 	if (!config)
@@ -902,12 +900,12 @@ static int cmd_slow(int argc, char **argv)
 		return 1;
 	}
 
-	snprintf(json, sizeof(json),
-		"{\"intercept_scripts\":[{\"func_name\":\"%s\","
-		"\"actions\":[{\"action_name\":\"call_real\"},"
-		"{\"action_name\":\"delay\","
-		"\"action_params\":{\"ms\":%d}}]}]}",
-		func, ms);
+	if (retrace_cli_build_slow_config(json, sizeof(json),
+					  func, ms) < 0) {
+		fprintf(stderr,
+			"retrace slow: config too large for buffer\n");
+		return 1;
+	}
 
 	config = write_temp_config(json);
 	if (!config)

@@ -146,3 +146,25 @@ add_test(NAME fuzz-action-run-smoke
 set_tests_properties(fuzz-action-run-smoke PROPERTIES
     LABELS "fuzz"
     TIMEOUT 30)
+
+# fuzz_cli_parse -- exercises the CLI config builders (trace/mock/fuzz/slow).
+# Statically links the builders from src/cli/config_builder.c; no engine
+# dependency. Catches buffer-overflow + JSON-injection regressions.
+add_executable(fuzz_cli_parse fuzz_cli_parse.c
+    ${CMAKE_SOURCE_DIR}/src/cli/config_builder.c)
+set_target_properties(fuzz_cli_parse PROPERTIES
+    OUTPUT_NAME fuzz_cli_parse
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/fuzz")
+target_compile_options(fuzz_cli_parse PRIVATE ${_fuzz_compile_flags})
+target_link_options(fuzz_cli_parse PRIVATE ${_fuzz_link_flags})
+target_include_directories(fuzz_cli_parse PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/cli)
+
+add_test(NAME fuzz-cli-parse-smoke
+    COMMAND ${CMAKE_BINARY_DIR}/test/fuzz/fuzz_cli_parse
+        -max_total_time=5
+        ${CMAKE_CURRENT_SOURCE_DIR}/corpus/cli_parse
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(fuzz-cli-parse-smoke PROPERTIES
+    LABELS "fuzz"
+    TIMEOUT 30)
