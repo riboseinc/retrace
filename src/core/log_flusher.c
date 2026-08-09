@@ -47,10 +47,14 @@
 
 struct FlusherState {
 	retrace_log_flusher_emit_cb cb;
+
 	void *ctx;
+
 	pthread_t tid;
-	_Atomic int running;     /* 1 between init and stop, else 0 */
-	_Atomic int stop_signal; /* set by stop(), checked by thread */
+
+	_Atomic int running;
+
+	_Atomic int stop_signal;
 };
 
 static struct FlusherState g_flusher;
