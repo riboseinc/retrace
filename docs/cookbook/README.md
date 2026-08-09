@@ -85,6 +85,12 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 |---|--------|-----------------|
 | 22 | [Decode HTTP and DNS wire formats](22-decode-protocols.md) | Parse `send`/`recv` buffers as HTTP/DNS and log structured fields instead of raw bytes. |
 
+### Observability bridges
+
+| # | Recipe | What it teaches |
+|---|--------|-----------------|
+| 23 | [Bridge to OpenTelemetry (OTLP)](23-otlp-bridge.md) | Ship retrace's timing data to Jaeger / Tempo / Honeycomb via the `retrace-to-otlp` converter. |
+
 ## Action reference
 
 Compact form. For the full schema and parameter reference, see
