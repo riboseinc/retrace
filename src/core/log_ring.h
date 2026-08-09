@@ -85,11 +85,11 @@ struct LogEntry {
 #define LOG_RING_DEFAULT_CAP 64
 
 struct LogRing {
-	uint32_t mask;             /* capacity - 1 */
-	uint32_t dropped;          /* monotonic drop counter */
-	_Atomic uint32_t head;     /* writer position */
-	_Atomic uint32_t tail;     /* reader position */
-	struct LogEntry *entries;  /* capacity entries */
+	uint32_t mask;
+	uint32_t dropped;
+	_Atomic uint32_t head;
+	_Atomic uint32_t tail;
+	struct LogEntry *entries;
 };
 
 /*
