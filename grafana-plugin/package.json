@@ -1,0 +1,23 @@
+{
+  "name": "retrace-grafana",
+  "version": "0.1.0",
+  "description": "retrace data source plugin for Grafana",
+  "license": "BSD-2-Clause",
+  "scripts": {
+    "build": "webpack -c .config/webpack/webpack.config.ts --env production",
+    "dev": "webpack -w -c .config/webpack/webpack.config.ts --env development",
+    "test": "jest --passWithNoTests"
+  },
+  "dependencies": {
+    "@grafana/data": "^10.0.0",
+    "@grafana/runtime": "^10.0.0",
+    "rxjs": "^7.8.0"
+  },
+  "devDependencies": {
+    "@grafana/eslint-config": "^6.0.0",
+    "@types/jest": "^29.0.0",
+    "typescript": "^5.0.0",
+    "webpack": "^5.0.0",
+    "webpack-cli": "^5.0.0"
+  }
+}
