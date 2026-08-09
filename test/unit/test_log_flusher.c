@@ -43,7 +43,10 @@ static int tests_fail;
 	printf("OK\n"); \
 } while (0)
 
-/* Emit callback that records each entry into a fixed array. */
+/* Emit callback that records each entry into a fixed array.
+ * Each entry's text is strdup'd because the flusher's drain frees
+ * the original after the callback returns.
+ */
 struct EmitCapture {
 	struct LogEntry entries[512];
 	size_t count;
@@ -58,8 +61,18 @@ static int emit_capture(const struct LogEntry *e, void *p)
 {
 	struct EmitCapture *c = (struct EmitCapture *)p;
 
-	if (c->count < sizeof(c->entries) / sizeof(c->entries[0]))
-		c->entries[c->count++] = *e;
+	if (c->count < sizeof(c->entries) / sizeof(c->entries[0])) {
+		struct LogEntry *dst = &c->entries[c->count++];
+		size_t len = strlen(e->text);
+
+		dst->ts_ms = e->ts_ms;
+		dst->module = e->module;
+		dst->sev = e->sev;
+		dst->text = (char *)malloc(len + 1);
+		if (dst->text == NULL)
+			return 1;
+		memcpy(dst->text, e->text, len + 1);
+	}
 	return 0;
 }
 
