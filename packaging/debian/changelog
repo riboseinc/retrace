@@ -1,0 +1,13 @@
+retrace (2.2.2-1) unstable; urgency=medium
+
+  * Initial Debian packaging.
+  * Network function interception (27 BSD-sockets functions).
+  * Per-return-address routing (caller_matches array).
+  * HTTP/1.x and DNS protocol decoders.
+  * Filter action (conditional param-value guards).
+  * Config cache (compile/execute separation).
+  * OTLP/JSON converter tool.
+  * Python config builder binding.
+  * Engine MECE refactor (5 single-concern modules).
+
+ -- Ribose Inc <opensource@ribose.com>  Sat, 09 Aug 2026 00:00:00 +0000

@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+# SPDX-License-Identifier: BSD-2-Clause
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DBUILD_SHARED_LIBS=ON \
+		-DRETRACE_BUILD_TESTS=OFF \
+		-DRETRACE_BUILD_EXAMPLES=OFF \
+		-G Ninja
+
+override_dh_auto_install:
+	dh_auto_install
+
+override_dh_auto_test:
+	# Tests require LD_PRELOAD which doesn't work in pbuilder/sbuild.
+	# Users can run tests manually after install:
+	#   cmake -B build -DRETRACE_BUILD_TESTS=ON && ctest --test-dir build
