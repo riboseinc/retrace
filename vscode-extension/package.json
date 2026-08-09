@@ -1,0 +1,72 @@
+{
+  "name": "retrace-viewer",
+  "displayName": "retrace viewer",
+  "description": "View retrace JSON logs in VS Code with function-name highlighting and severity coloring.",
+  "version": "0.1.0",
+  "publisher": "riboseinc",
+  "license": "BSD-2-Clause",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Debuggers"
+  ],
+  "keywords": [
+    "retrace",
+    "tracing",
+    "debugging",
+    "libc",
+    "interception"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "retrace.showViewer",
+        "title": "retrace: Open Log Viewer",
+        "category": "retrace"
+      },
+      {
+        "command": "retrace.showStats",
+        "title": "retrace: Show Stats",
+        "category": "retrace"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "retrace.showViewer"
+        },
+        {
+          "command": "retrace.showStats"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "retrace.showViewer",
+          "when": "resourceExtname == '.json'",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.0.0"
+  },
+  "homepage": "https://github.com/riboseinc/retrace",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/riboseinc/retrace.git",
+    "directory": "vscode-extension"
+  }
+}
