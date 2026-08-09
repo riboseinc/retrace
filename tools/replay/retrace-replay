@@ -1,0 +1,233 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# retrace-replay: time-travel replay for retrace traces
+# (TODO.complete/25 MVP).
+#
+# Reads a retrace JSON log and lets you step through the calls
+# forward and backward, inspect arguments, and "rewind" to any
+# point. Standalone Python -- no engine change.
+#
+# Usage:
+#   retrace run --log /tmp/trace.json -- ./your-binary
+#   retrace-replay /tmp/trace.json
+#
+# Commands (interactive prompt):
+#   n / Enter  -- next event forward
+#   p          -- previous event (rewind)
+#   N          -- next 10 events
+#   <number>   -- jump to event index N
+#   l          -- list next 10 events
+#   f <regex>  -- forward to next event matching regex (in func or args)
+#   q          -- quit
+#
+# Each event display:
+#   #42  func=open  args={path: "/etc/passwd", flags: 0}
+#        retval=3   duration=12us
+#
+# Limitations (MVP):
+#   - Reads the full log into memory. Sufficient for typical
+#     retrace runs (<1M events). For larger, swap to mmap'd
+#     index in a follow-up.
+#   - Args are shown raw (no type-aware formatting).
+#   - No state reconstruction (e.g. "what was in this buffer
+#     at event N"). That requires TODO.complete/25 P1 to capture
+#     memory snapshots alongside the call log.
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+
+def load_trace(path):
+    """Load and parse a retrace JSON log.
+
+    Returns a list of dicts, one per log entry. Skips engine-noise
+    entries (those with message.text instead of message.func).
+    """
+    with open(path, "r") as f:
+        text = f.read()
+
+    # The log is a JSON array, possibly with newlines between entries.
+    # Parse the whole thing at once.
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as e:
+        sys.stderr.write(f"retrace-replay: cannot parse {path}: {e}\n")
+        sys.exit(2)
+
+    if not isinstance(data, list):
+        sys.stderr.write(
+            f"retrace-replay: {path} is not a JSON array\n"
+        )
+        sys.exit(2)
+
+    # Filter to entries with message.func (skip engine noise).
+    events = []
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        msg = entry.get("message")
+        if not isinstance(msg, dict):
+            continue
+        if "func" not in msg:
+            continue
+        events.append(entry)
+    return events
+
+
+def format_event(idx, entry, color=True):
+    """Format one event for display."""
+    msg = entry.get("message", {})
+    func = msg.get("func", "?")
+    sev = entry.get("severity", "INFO")
+    duration_us = msg.get("call_duration_us")
+
+    # Build the args dict (everything in message except the
+    # retrace-internal fields).
+    args = {
+        k: v
+        for k, v in msg.items()
+        if k not in ("func", "call_duration_us", "ret_val")
+    }
+    ret_val = msg.get("ret_val")
+
+    if color:
+        # ANSI color codes
+        FUNC_COLOR = "\033[36m"  # cyan
+        SEV_COLOR_WARN = "\033[33m"
+        SEV_COLOR_ERR = "\033[31m"
+        RESET = "\033[0m"
+        DIM = "\033[2m"
+
+        sev_color = ""
+        if sev == "WARN":
+            sev_color = SEV_COLOR_WARN
+        elif sev == "ERROR":
+            sev_color = SEV_COLOR_ERR
+    else:
+        FUNC_COLOR = SEV_COLOR_WARN = SEV_COLOR_ERR = RESET = DIM = ""
+        sev_color = ""
+
+    lines = []
+    args_str = json.dumps(args, separators=(",", ":")) if args else "{}"
+    lines.append(
+        f"#{idx:<5} {FUNC_COLOR}{func}{RESET} {sev_color}{sev}{RESET}"
+    )
+    lines.append(f"       args: {args_str}")
+    if ret_val is not None:
+        lines.append(
+            f"       ret:  {ret_val}"
+            + (
+                f"  {DIM}({duration_us}us){RESET}"
+                if duration_us is not None
+                else ""
+            )
+        )
+    return "\n".join(lines)
+
+
+def find_next_match(events, current_idx, pattern):
+    """Find the next event >= current_idx whose func or args
+    match the regex `pattern`. Returns the index, or None.
+    """
+    regex = re.compile(pattern)
+    for i in range(current_idx, len(events)):
+        msg = events[i].get("message", {})
+        text = json.dumps(msg)
+        if regex.search(text):
+            return i
+    return None
+
+
+def interactive_loop(events, start_idx=0):
+    """Main interactive loop. Returns when user quits."""
+    idx = start_idx
+    use_color = sys.stdout.isatty()
+
+    print(
+        f"retrace-replay: {len(events)} events loaded. "
+        f"Type 'h' for help."
+    )
+    while 0 <= idx < len(events):
+        print()
+        print(format_event(idx, events[idx], color=use_color))
+        try:
+            cmd = input(f"\n[{idx}/{len(events) - 1}]> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+
+        if cmd == "" or cmd == "n":
+            idx += 1
+        elif cmd == "p":
+            idx = max(0, idx - 1)
+        elif cmd == "N":
+            idx = min(len(events) - 1, idx + 10)
+        elif cmd == "l":
+            for j in range(idx, min(idx + 10, len(events))):
+                print(format_event(j, events[j], color=use_color))
+                print()
+        elif cmd == "q":
+            break
+        elif cmd == "h":
+            print(
+                "Commands: n/Enter=next, p=prev, N=+10, "
+                "<num>=jump, l=list 10, f <regex>=find, q=quit"
+            )
+        elif cmd.isdigit():
+            new_idx = int(cmd)
+            if 0 <= new_idx < len(events):
+                idx = new_idx
+            else:
+                print(f"index out of range (0..{len(events) - 1})")
+        elif cmd.startswith("f "):
+            pattern = cmd[2:].strip()
+            next_match = find_next_match(events, idx, pattern)
+            if next_match is None:
+                print("no match found")
+            else:
+                idx = next_match
+        else:
+            print(f"unknown command: {cmd!r} (type 'h' for help)")
+
+    if idx >= len(events):
+        print("reached end of trace")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="retrace-replay",
+        description=(
+            "Time-travel replay for retrace traces "
+            "(TODO.complete/25 MVP)"
+        ),
+    )
+    parser.add_argument("log", help="Path to the retrace JSON log file")
+    parser.add_argument(
+        "--start",
+        type=int,
+        default=0,
+        help="Event index to start at (default: 0)",
+    )
+    args = parser.parse_args()
+
+    if not Path(args.log).exists():
+        sys.stderr.write(f"retrace-replay: {args.log} not found\n")
+        sys.exit(2)
+
+    events = load_trace(args.log)
+    if not events:
+        sys.stderr.write(
+            f"retrace-replay: no replayable events in {args.log}\n"
+        )
+        sys.exit(1)
+
+    start = max(0, min(args.start, len(events) - 1))
+    interactive_loop(events, start_idx=start)
+
+
+if __name__ == "__main__":
+    main()
