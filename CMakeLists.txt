@@ -389,6 +389,7 @@ endif()
 # tools/ uses POSIX-only headers (sys/wait.h etc.) -- skip on Windows.
 if(NOT RETRACE_PLATFORM_WINDOWS)
 	add_subdirectory(tools)
+	add_subdirectory(frida-bridge)
 endif()
 
 # ---------------------------------------------------------------
