@@ -390,6 +390,11 @@ endif()
 if(NOT RETRACE_PLATFORM_WINDOWS)
 	add_subdirectory(tools)
 	add_subdirectory(frida-bridge)
+
+	# eBPF is Linux-only.
+	if(RETRACE_PLATFORM_LINUX)
+		add_subdirectory(ebpf-bridge)
+	endif()
 endif()
 
 # ---------------------------------------------------------------
