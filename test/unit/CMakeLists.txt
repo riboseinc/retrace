@@ -605,6 +605,42 @@ add_test(NAME unit-test-reentrance-guard
 set_tests_properties(unit-test-reentrance-guard PROPERTIES LABELS "unit")
 
 #
+# Lock-free log ring unit tests (TODO.complete/19 P0 PR A).
+# Verifies SPSC ring semantics: push/drain, wrap-around, drop-on-full,
+# text truncation, early-stop drain, NULL safety, multi-thread isolation.
+#
+add_executable(retrace_test_log_ring test_log_ring.c)
+set_target_properties(retrace_test_log_ring PROPERTIES
+    OUTPUT_NAME test_log_ring
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_log_ring PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_log_ring PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_log_ring PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_log_ring PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-log-ring
+    COMMAND retrace_test_log_ring)
+set_tests_properties(unit-test-log-ring PROPERTIES LABELS "unit")
+
+#
 # modify_in_param_arr action unit tests (TODO.complete/14).
 # Completes the 14-action sweep.
 #
