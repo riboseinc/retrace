@@ -397,6 +397,9 @@ if(NOT RETRACE_PLATFORM_WINDOWS)
 	endif()
 endif()
 
+# VS Code extension is pure TypeScript (no native build).
+add_subdirectory(vscode-extension)
+
 # ---------------------------------------------------------------
 # Package config
 # ---------------------------------------------------------------
