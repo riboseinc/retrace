@@ -26,6 +26,7 @@
 #include "actions.h"
 #include "logger.h"
 #include "real_impls.h"
+#include "action_utils.h"
 #include "data_types.h"
 
 #include <time.h>
@@ -164,18 +165,10 @@ static int ia_log_params
 
 			/* pointer to ARRAY */
 			if (param->param_meta.modifiers & CDM_ARRAY) {
-				for (cnt_param_idx = 0;
-						cnt_param_idx != t_ctx->params_cnt;
-						cnt_param_idx++) {
+				cnt_param_idx = retrace_action_find_param(t_ctx,
+					param->param_meta.array_cnt_param);
 
-					if (!retrace_real_impls.strcmp(
-						t_ctx->params[cnt_param_idx].param_meta.name,
-						param->param_meta.array_cnt_param))
-						break;
-
-				}
-
-				if (cnt_param_idx == t_ctx->params_cnt) {
+				if (cnt_param_idx < 0) {
 					log_err("wrong array_cnt_param for param '%s'",
 						param->param_meta.name);
 
@@ -285,14 +278,9 @@ static int ia_modify_in_param_str
 	}
 
 	/* check that param exists in parsed params */
-	for (param_idx = 0; param_idx != t_ctx->params_cnt; param_idx++) {
-		if (!retrace_real_impls.strcmp(
-			t_ctx->params[param_idx].param_meta.name,
-			param_name))
-			break;
-	}
+	param_idx = retrace_action_find_param(t_ctx, param_name);
 
-	if (param_idx == t_ctx->params_cnt) {
+	if (param_idx < 0) {
 		log_err("param '%s', is not defined for func '%s'",
 			param_name, t_ctx->prototype->name);
 
@@ -410,14 +398,9 @@ static int ia_modify_in_param_arr
 	}
 
 	/* check that param exists in prototype */
-	for (param_idx = 0; param_idx != t_ctx->params_cnt; param_idx++) {
-		if (!retrace_real_impls.strcmp(
-			t_ctx->params[param_idx].param_meta.name,
-			param_name))
-			break;
-	}
+	param_idx = retrace_action_find_param(t_ctx, param_name);
 
-	if (param_idx == t_ctx->params_cnt) {
+	if (param_idx < 0) {
 		log_err("param '%s', is not defined for func '%s'",
 			param_name, t_ctx->prototype->name);
 
@@ -506,18 +489,10 @@ static int ia_modify_in_param_arr
 
 	/* update the size param if exists */
 	if (retrace_real_impls.strlen(param->param_meta.array_cnt_param)) {
-		for (cnt_param_idx = 0;
-				cnt_param_idx != t_ctx->params_cnt;
-				cnt_param_idx++) {
+		cnt_param_idx = retrace_action_find_param(t_ctx,
+			param->param_meta.array_cnt_param);
 
-			if (!retrace_real_impls.strcmp(
-				t_ctx->params[cnt_param_idx].param_meta.name,
-				param->param_meta.array_cnt_param))
-				break;
-
-		}
-
-		if (cnt_param_idx == t_ctx->params_cnt) {
+		if (cnt_param_idx < 0) {
 			log_err("wrong array_cnt_param for param '%s'",
 				param->param_meta.name);
 
@@ -571,14 +546,9 @@ static int ia_modify_in_param_int
 	}
 
 	/* check that param exists in prototype */
-	for (param_idx = 0; param_idx != t_ctx->params_cnt; param_idx++) {
-		if (!retrace_real_impls.strcmp(
-			t_ctx->params[param_idx].param_meta.name,
-			param_name))
-			break;
-	}
+	param_idx = retrace_action_find_param(t_ctx, param_name);
 
-	if (param_idx == t_ctx->params_cnt) {
+	if (param_idx < 0) {
 		log_err("param '%s', is not defined for func '%s'",
 			param_name, t_ctx->prototype->name);
 
