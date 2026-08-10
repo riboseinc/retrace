@@ -66,6 +66,7 @@ static void usage(FILE *out)
 "  retrace list-functions\n"
 "  retrace list-actions\n"
 "  retrace validate <config.json>\n"
+"  retrace fuzz-replay <fuzzer-name> <crash-input>\n"
 "\n"
 "Quick subcommands (no JSON needed):\n"
 "  retrace trace malloc,free -- /bin/ls\n"
@@ -1052,6 +1053,72 @@ int main(int argc, char **argv)
 		}
 		printf("retrace validate: %s exists (full validation TBD)\n", argv[2]);
 		return 0;
+	}
+
+	if (strcmp(argv[1], "fuzz-replay") == 0) {
+		/*
+		 * retrace fuzz-replay <fuzzer-name> <crash-input>
+		 *
+		 * Replays a crashing input through the named libFuzzer
+		 * harness. The harness runs the input once (not fuzzing),
+		 * and if it crashes, the backtrace is visible in stderr.
+		 *
+		 * Pairs with the nightly fuzz workflow (TODO.complete/33):
+		 * download the crash artifact, then run:
+		 *
+		 *   retrace fuzz-replay fuzz_action_run crash-abc123
+		 */
+		const char *fuzzer_name;
+		const char *crash_path;
+		char fuzzer_bin[PATH_MAX];
+
+		if (argc < 4) {
+			fprintf(stderr,
+				"retrace fuzz-replay: usage: retrace fuzz-replay <fuzzer-name> <crash-input>\n"
+				"  <fuzzer-name>   e.g. fuzz_config_parse, fuzz_action_run\n"
+				"  <crash-input>   path to the crash reproducer file\n");
+			return 1;
+		}
+
+		fuzzer_name = argv[2];
+		crash_path = argv[3];
+
+		if (access(crash_path, R_OK) != 0) {
+			fprintf(stderr,
+				"retrace fuzz-replay: cannot read '%s'\n",
+				crash_path);
+			return 1;
+		}
+
+		/* Try to find the fuzzer binary:
+		 *   1. As-is via PATH (execvp handles lookup)
+		 *   2. Alongside the CLI binary
+		 */
+		snprintf(fuzzer_bin, sizeof(fuzzer_bin), "%s", fuzzer_name);
+		if (strchr(fuzzer_name, '/') == NULL) {
+			/* No slash in name -- might be on PATH.
+			 * execvp will search PATH; skip access() check.
+			 */
+		} else if (access(fuzzer_bin, X_OK) != 0) {
+			fprintf(stderr,
+				"retrace fuzz-replay: cannot execute '%s'\n",
+				fuzzer_name);
+			return 1;
+		}
+
+		fprintf(stderr,
+			"retrace fuzz-replay: running %s on %s ...\n",
+			fuzzer_name, crash_path);
+
+		/* libFuzzer in single-input mode: just pass the file
+		 * path. The harness runs LLVMFuzzerTestOneInput once
+		 * and exits. If the input triggers a crash, the
+		 * backtrace goes to stderr (ASAN).
+		 */
+		execlp(fuzzer_bin, fuzzer_name, crash_path, (char *)NULL);
+
+		perror("retrace fuzz-replay: exec failed");
+		return 127;
 	}
 
 	if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
