@@ -46,7 +46,7 @@
 static void usage(FILE *out)
 {
 	fprintf(out,
-"retrace-diff -- differential trace analysis (TODO.complete/27 MVP)\n"
+"retrace-diff -- differential trace analysis (TODO.complete/27)\n"
 "\n"
 "Usage:\n"
 "  retrace-diff [OPTIONS] BEFORE.json AFTER.json\n"
@@ -62,6 +62,9 @@ static void usage(FILE *out)
 "                     call count OR total time changed by >N%%.\n"
 "                     New/removed functions always count.\n"
 "                     Default: 0 (report every change).\n"
+"  --order            Also run a sequence-alignment (LCS) diff\n"
+"                     to detect call-ORDER changes even when\n"
+"                     per-function counts are identical.\n"
 "  --help, -h         Show this message\n"
 "\n"
 "Exit codes:\n"
@@ -139,6 +142,12 @@ static void print_func_diff(const char *name,
  */
 struct DiffConfig {
 	double threshold_pct;
+
+	/* When non-zero, also run an ordering diff (TODO.complete/27 P1)
+	 * via longest common subsequence. The output is appended to
+	 * the standard per-function diff.
+	 */
+	int order_diff;
 };
 
 /*
@@ -217,7 +226,99 @@ static int print_all_diffs(const struct NormalizedLog *before,
 	return diffs;
 }
 
-static int load_trace(const char *path, struct NormalizedLog *out)
+/*
+ * Order diff via longest common subsequence (TODO.complete/27 P1).
+ *
+ * Computes the LCS of two function-name sequences and prints
+ * the differences as unified-diff-style insertions / deletions.
+ * Each entry in the LCS appears as a context line ("  func");
+ * each before-only entry appears as a deletion ("- func"); each
+ * after-only entry appears as an insertion ("+ func").
+ *
+ * Returns the number of insertions + deletions (i.e. the
+ * "edit distance"). 0 means identical order.
+ *
+ * Standard DP. O(N*M) memory for the table; bounded by trace
+ * length. For typical retrace runs (< 10K calls) this is fine.
+ */
+static int print_order_diff(char **before_seq, size_t before_len,
+			    char **after_seq, size_t after_len)
+{
+	size_t i, j;
+	size_t *dp;
+	size_t dp_rows = before_len + 1;
+	size_t dp_cols = after_len + 1;
+	int edits = 0;
+
+	if (before_len == 0 && after_len == 0)
+		return 0;
+
+	/* Allocate the (before_len+1) x (after_len+1) table. */
+	dp = (size_t *)calloc(dp_rows * dp_cols, sizeof(size_t));
+	if (dp == NULL) {
+		fprintf(stderr,
+			"retrace-diff: OOM in LCS (sizes %zu x %zu)\n",
+			before_len, after_len);
+		return -1;
+	}
+
+	/* Fill the table. */
+	for (i = 1; i < dp_rows; i++) {
+		for (j = 1; j < dp_cols; j++) {
+			if (strcmp(before_seq[i - 1], after_seq[j - 1]) == 0)
+				dp[i * dp_cols + j] =
+					dp[(i - 1) * dp_cols + (j - 1)] + 1;
+			else
+				dp[i * dp_cols + j] =
+					(dp[(i - 1) * dp_cols + j] >
+					 dp[i * dp_cols + (j - 1)])
+					? dp[(i - 1) * dp_cols + j]
+					: dp[i * dp_cols + (j - 1)];
+		}
+	}
+
+	/* Walk back from [before_len][after_len] to reconstruct. */
+	printf("\n--- order diff (LCS) ---\n");
+	i = before_len;
+	j = after_len;
+	while (i > 0 && j > 0) {
+		if (strcmp(before_seq[i - 1], after_seq[j - 1]) == 0) {
+			printf("  %s\n", before_seq[i - 1]);
+			i--;
+			j--;
+		} else if (dp[(i - 1) * dp_cols + j] >=
+			   dp[i * dp_cols + (j - 1)]) {
+			printf("- %s\n", before_seq[i - 1]);
+			i--;
+			edits++;
+		} else {
+			printf("+ %s\n", after_seq[j - 1]);
+			j--;
+			edits++;
+		}
+	}
+	while (i > 0) {
+		printf("- %s\n", before_seq[i - 1]);
+		i--;
+		edits++;
+	}
+	while (j > 0) {
+		printf("+ %s\n", after_seq[j - 1]);
+		j--;
+		edits++;
+	}
+
+	free(dp);
+	return edits;
+}
+
+/*
+ * Load a trace file, returning the parsed JSON_Array and a
+ * NormalizedLog summary. Caller frees both via json_value_free
+ * and normalize_free.
+ */
+static int load_trace(const char *path, struct NormalizedLog *out,
+		      JSON_Value **root_out, JSON_Array **arr_out)
 {
 	JSON_Value *root;
 	JSON_Array *arr;
@@ -240,7 +341,8 @@ static int load_trace(const char *path, struct NormalizedLog *out)
 		json_value_free(root);
 		return -1;
 	}
-	json_value_free(root);
+	*root_out = root;
+	*arr_out = arr;
 	return 0;
 }
 
@@ -250,7 +352,11 @@ int main(int argc, char **argv)
 	const char *after_path = NULL;
 	struct NormalizedLog before = {0};
 	struct NormalizedLog after = {0};
-	struct DiffConfig cfg = {.threshold_pct = 0.0};
+	struct DiffConfig cfg = {.threshold_pct = 0.0, .order_diff = 0};
+	JSON_Value *trace_root_before = NULL;
+	JSON_Value *trace_root_after = NULL;
+	JSON_Array *trace_arr_before = NULL;
+	JSON_Array *trace_arr_after = NULL;
 	int argi;
 	int rc;
 	int diffs;
@@ -260,6 +366,10 @@ int main(int argc, char **argv)
 		    strcmp(argv[argi], "-h") == 0) {
 			usage(stdout);
 			return 0;
+		}
+		if (strcmp(argv[argi], "--order") == 0) {
+			cfg.order_diff = 1;
+			continue;
 		}
 		if (strncmp(argv[argi], "--threshold", 11) == 0) {
 			const char *val = NULL;
@@ -313,14 +423,49 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	if (load_trace(before_path, &before) != 0)
+	if (load_trace(before_path, &before, &trace_root_before,
+		&trace_arr_before) != 0)
 		return 2;
-	if (load_trace(after_path, &after) != 0) {
+	if (load_trace(after_path, &after, &trace_root_after,
+		&trace_arr_after) != 0) {
 		normalize_free(&before);
+		json_value_free(trace_root_before);
 		return 2;
 	}
 
 	diffs = print_all_diffs(&before, &after, &cfg);
+
+	if (cfg.order_diff) {
+		char **before_seq = NULL;
+		char **after_seq = NULL;
+		size_t before_len = 0;
+		size_t after_len = 0;
+		int order_edits;
+
+		if (normalize_call_sequence(trace_arr_before,
+			    &before_seq, &before_len) != 0 ||
+		    normalize_call_sequence(trace_arr_after,
+			    &after_seq, &after_len) != 0) {
+			fprintf(stderr,
+				"retrace-diff: OOM building call sequences\n");
+		} else {
+			order_edits = print_order_diff(before_seq,
+				before_len, after_seq, after_len);
+			if (order_edits > 0) {
+				printf("\n%d call-order edit(s) found.\n",
+					order_edits);
+				diffs++;
+			} else {
+				printf("\nCall order identical.\n");
+			}
+		}
+		for (size_t k = 0; k < before_len; k++)
+			free(before_seq[k]);
+		for (size_t k = 0; k < after_len; k++)
+			free(after_seq[k]);
+		free(before_seq);
+		free(after_seq);
+	}
 
 	if (diffs == 0) {
 		if (cfg.threshold_pct > 0.0)
@@ -337,6 +482,8 @@ int main(int argc, char **argv)
 
 	normalize_free(&before);
 	normalize_free(&after);
+	json_value_free(trace_root_before);
+	json_value_free(trace_root_after);
 
 	/* Exit 1 if there was a diff, 0 if not. */
 	rc = (diffs > 0) ? 1 : 0;

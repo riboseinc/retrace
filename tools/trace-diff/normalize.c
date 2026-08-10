@@ -121,6 +121,68 @@ const struct FuncStat *normalize_find(const struct NormalizedLog *log,
 	return NULL;
 }
 
+/*
+ * Build a flat sequence of function names in call order. Used by
+ * the ordering diff (TODO.complete/27 P1). Skips engine-noise
+ * entries (same convention as normalize_from_trace).
+ */
+int normalize_call_sequence(JSON_Array *trace, char ***out_seq,
+			    size_t *out_len)
+{
+	size_t i, n;
+	size_t cap = 0;
+	char **seq = NULL;
+	size_t len = 0;
+
+	if (trace == NULL || out_seq == NULL || out_len == NULL)
+		return -1;
+
+	n = json_array_get_count(trace);
+	for (i = 0; i < n; i++) {
+		JSON_Object *entry = json_array_get_object(trace, i);
+		JSON_Object *msg;
+		const char *func;
+		char *name_copy;
+
+		if (entry == NULL)
+			continue;
+		msg = json_object_get_object(entry, "message");
+		if (msg == NULL)
+			continue;
+		func = json_object_get_string(msg, "func");
+		if (func == NULL || !json_object_has_value(msg,
+			    "call_duration_us"))
+			continue;
+
+		if (len == cap) {
+			size_t newcap = (cap == 0) ? 32 : cap * 2;
+			char **newbuf = (char **)realloc(seq,
+				newcap * sizeof(*newbuf));
+
+			if (newbuf == NULL)
+				goto fail;
+			seq = newbuf;
+			cap = newcap;
+		}
+
+		name_copy = (char *)malloc(strlen(func) + 1);
+		if (name_copy == NULL)
+			goto fail;
+		memcpy(name_copy, func, strlen(func) + 1);
+		seq[len++] = name_copy;
+	}
+
+	*out_seq = seq;
+	*out_len = len;
+	return 0;
+
+fail:
+	for (i = 0; i < len; i++)
+		free(seq[i]);
+	free(seq);
+	return -1;
+}
+
 void normalize_free(struct NormalizedLog *log)
 {
 	if (log == NULL)
