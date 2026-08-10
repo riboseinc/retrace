@@ -116,6 +116,16 @@ static void *flusher_main(void *arg)
 	};
 	struct FlusherState *s = (struct FlusherState *)arg;
 
+	/*
+	 * Mark this thread as "logging disabled" so any libc call
+	 * it makes (which would otherwise trigger a retrace
+	 * intercept, create a ThreadContext, run log_params, push
+	 * to THIS thread's ring, drain, call emit, call printf,
+	 * intercept again... infinite recursion) short-circuits
+	 * at the log_json gate. See logger.c.
+	 */
+	retrace_logger_disable_for_this_thread();
+
 	while (atomic_load_explicit(&s->stop_signal,
 		memory_order_relaxed) == 0) {
 		retrace_log_flusher_drain_all(s->cb, s->ctx);
@@ -124,6 +134,13 @@ static void *flusher_main(void *arg)
 
 	/* Final drain after the stop signal to capture in-flight. */
 	retrace_log_flusher_drain_all(s->cb, s->ctx);
+
+	/* Mark thread as exited so flusher_stop's spin-wait can
+	 * observe exit without pthread_join. pthread_join from a
+	 * dyld destructor hangs on macOS; the spin-wait + this
+	 * release-store sidesteps that.
+	 */
+	atomic_store_explicit(&s->running, 0, memory_order_release);
 	return NULL;
 }
 
@@ -168,8 +185,31 @@ void retrace_log_flusher_stop(void)
 	atomic_store_explicit(&g_flusher.stop_signal, 1,
 		memory_order_relaxed);
 
-	retrace_real_impls.pthread_join(g_flusher.tid, NULL);
+#if defined(__APPLE__)
+	/* macOS: pthread_join from a dyld __attribute__((destructor))
+	 * hangs because the threading library is mid-teardown. Use
+	 * a bounded spin-wait instead, plus a grace period for the
+	 * thread to fully terminate before the destructor touches
+	 * stdout/file.
+	 */
+	{
+		struct timespec poll = {.tv_sec = 0, .tv_nsec = 100000};
+		struct timespec grace = {.tv_sec = 0, .tv_nsec = 10000000};
+		int waits = 0;
 
-	atomic_store_explicit(&g_flusher.running, 0,
-		memory_order_relaxed);
+		while (atomic_load_explicit(&g_flusher.running,
+			memory_order_acquire) == 1 && waits < 10000) {
+			nanosleep(&poll, NULL);
+			waits++;
+		}
+		if (waits < 10000)
+			nanosleep(&grace, NULL);
+	}
+#else
+	/* Linux / BSD: pthread_join in a destructor works correctly.
+	 * This is the safe path: the thread is fully terminated
+	 * before we return.
+	 */
+	retrace_real_impls.pthread_join(g_flusher.tid, NULL);
+#endif
 }

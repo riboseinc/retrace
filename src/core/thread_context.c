@@ -32,10 +32,21 @@
 
 static pthread_key_t thread_ctx_key;
 
+/*
+ * Per-thread destructor. Frees the thread's ThreadContext.
+ *
+ * Does NOT delete the global pthread_key -- that would race
+ * with other threads still using it (the flusher thread from
+ * TODO.complete/19 PR C is the case that exposed this: it
+ * exits before the producer threads, and deleting the global
+ * key from its destructor invalidated the key for every
+ * still-running producer, causing SIGBUS on the next
+ * pthread_getspecific call). The key is process-global and
+ * lives until exit; the OS reclaims it.
+ */
 static void thread_ctx_destructor(void *thread_ctx)
 {
 	retrace_real_impls.free(thread_ctx);
-	retrace_real_impls.pthread_key_delete(thread_ctx_key);
 }
 
 int retrace_thread_context_init(void)
