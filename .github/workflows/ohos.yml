@@ -173,6 +173,7 @@ jobs:
             sh -c '
               LD_LIBRARY_PATH=. LD_PRELOAD=./libretrace.so.2 \
               RETRACE_JSON_CONFIG=./retrace-config.json \
+              RETRACE_LOGGER_RING=0 \
               ./ohos-ldpreload-target 2>&1
             ' 2>&1)
           rc=$?
