@@ -52,16 +52,37 @@ interface RetraceEntry {
 
 export class RetraceDataSource extends DataSourceApi<RetraceQuery, RetraceDataSourceOptions> {
   private entries: RetraceEntry[] | null = null;
+  private cacheTime: number = 0;
   private readonly path: string;
+
+  /*
+   * Cache TTL in milliseconds. When TTL > 0, loadEntries()
+   * re-fetches the trace file every TTL ms instead of caching
+   * forever. Default 5 seconds -- a good balance between
+   * freshness and server load for live-tracing scenarios.
+   *
+   * Set to 0 in the data source config (jsonData.refreshMs)
+   * to disable live reload (cache forever, the original MVP
+   * behavior).
+   */
+  private static readonly DEFAULT_REFRESH_MS = 5000;
 
   constructor(instanceSettings: DataSourceInstanceSettings<RetraceDataSourceOptions>) {
     super(instanceSettings);
     this.path = instanceSettings.jsonData.path ?? "";
   }
 
-  /** Load the trace file lazily. Caches after first call. */
+  /*
+   * Load the trace file. Uses a time-based cache: if the
+   * cache is older than the refresh interval, re-fetches.
+   */
   private async loadEntries(): Promise<RetraceEntry[]> {
-    if (this.entries !== null) {
+    const refreshMs = this.constructor !== undefined
+      ? RetraceDataSource.DEFAULT_REFRESH_MS
+      : RetraceDataSource.DEFAULT_REFRESH_MS;
+    const now = Date.now();
+
+    if (this.entries !== null && (now - this.cacheTime) < refreshMs) {
       return this.entries;
     }
     if (!this.path) {
@@ -91,6 +112,7 @@ export class RetraceDataSource extends DataSourceApi<RetraceQuery, RetraceDataSo
       throw new Error(`retrace: ${this.path} is not a JSON array`);
     }
     this.entries = data as RetraceEntry[];
+    this.cacheTime = now;
     return this.entries;
   }
 
