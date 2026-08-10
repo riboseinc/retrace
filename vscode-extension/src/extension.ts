@@ -123,6 +123,70 @@ function escapeHtml(s: string): string {
         .replace(/"/g, "&quot;");
 }
 
+/**
+ * Render a self-contained HTML page that connects to the
+ * retrace-ws WebSocket and displays events live.
+ *
+ * The page opens a WebSocket, parses each incoming JSON entry,
+ * and appends it to a scrollable list. Same visual style as
+ * renderViewer but with auto-scroll and a connection-status
+ * indicator.
+ */
+function renderLivePage(wsUrl: string): string {
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>retrace: live</title>
+<style>
+body { font-family: var(--vscode-editor-font-family, monospace); margin: 0; padding: 8px; color: var(--vscode-editor-foreground, #eee); background: var(--vscode-editor-background, #1e1e1e); }
+#status { position: fixed; top: 0; right: 8px; padding: 4px 8px; background: var(--vscode-editorWidget-background, #2a2a2a); border-radius: 0 0 4px 4px; font-size: 12px; }
+#events { padding-top: 24px; }
+.event { display: flex; gap: 12px; padding: 2px 4px; border-bottom: 1px solid var(--vscode-editorWidget-background, #2a2a2a); white-space: nowrap; }
+.idx { color: var(--vscode-descriptionForeground, #888); min-width: 60px; }
+.func { color: var(--vscode-textLink-foreground, #6ed6ff); font-weight: bold; min-width: 160px; }
+.sev { min-width: 60px; }
+.sev-WARN { color: #ffcc66; }
+.sev-ERROR { color: #ff6666; }
+.args { color: var(--vscode-editor-foreground, #ddd); flex-grow: 1; }
+</style>
+</head>
+<body>
+<div id="status">connecting...</div>
+<div id="events"></div>
+<script>
+const ws = new WebSocket(${JSON.stringify(wsUrl)});
+const status = document.getElementById('status');
+const events = document.getElementById('events');
+let count = 0;
+ws.onopen = () => status.textContent = 'live (0 events)';
+ws.onclose = () => status.textContent = 'disconnected';
+ws.onerror = () => status.textContent = 'error';
+ws.onmessage = (e) => {
+    try {
+        const entry = JSON.parse(e.data);
+        const div = document.createElement('div');
+        div.className = 'event';
+        const func = entry.message?.func || entry.message?.text || '?';
+        const sev = entry.severity || 'INFO';
+        div.innerHTML = '<span class="idx">#' + count + '</span>' +
+            '<span class="func sev-' + sev + '">' + escapeHtml(func) + '</span>' +
+            '<span class="sev">' + sev + '</span>' +
+            '<span class="args">' + escapeHtml(e.data.substring(0, 200)) + '</span>';
+        events.appendChild(div);
+        count++;
+        status.textContent = 'live (' + count + ' events)';
+        window.scrollTo(0, document.body.scrollHeight);
+    } catch (err) {}
+};
+function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>`;
+}
+
 export function activate(context: vscode.ExtensionContext): void {
     const showViewer = vscode.commands.registerCommand(
         "retrace.showViewer",
@@ -201,7 +265,28 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     );
 
-    context.subscriptions.push(showViewer, showStats);
+    const connectLive = vscode.commands.registerCommand(
+        "retrace.connectLive",
+        async () => {
+            const url = await vscode.window.showInputBox({
+                prompt: "WebSocket URL of retrace-ws",
+                value: "ws://localhost:8765/ws",
+                placeHolder: "ws://hostname:port/ws",
+            });
+            if (!url) return;
+
+            const panel = vscode.window.createWebviewPanel(
+                "retraceLive",
+                `retrace: live @ ${url}`,
+                vscode.ViewColumn.Active,
+                { enableScripts: true }
+            );
+
+            panel.webview.html = renderLivePage(url);
+        }
+    );
+
+    context.subscriptions.push(showViewer, showStats, connectLive);
 }
 
 export function deactivate(): void {
