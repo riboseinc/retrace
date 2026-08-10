@@ -138,10 +138,10 @@ int main(void)
 
 	printf("--- call_real benchmark ---\n");
 
-	if (bench_run("call_real_zero_arg", bench_op, &cz, 100000, &r) == 0)
+	if (bench_run("call_real_zero_arg", bench_op, &cz, 10000, &r) == 0)
 		bench_print("call_real_zero_arg", &r);
 
-	if (bench_run("call_real_one_arg", bench_op, &co, 100000, &r) == 0)
+	if (bench_run("call_real_one_arg", bench_op, &co, 10000, &r) == 0)
 		bench_print("call_real_one_arg", &r);
 
 	return 0;
