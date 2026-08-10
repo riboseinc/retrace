@@ -1,0 +1,77 @@
+{
+  "name": "pci-dss",
+  "rules": [
+    {
+      "id": "PCI-1",
+      "description": "Access to potential cardholder data (PAN-shaped filenames)",
+      "match": { "func_prefix": "open", "path_contains": "card" },
+      "severity": "critical"
+    },
+    {
+      "id": "PCI-2",
+      "description": "Access to payment-related directories",
+      "match": { "func_prefix": "open", "path_contains": "payment" },
+      "severity": "critical"
+    },
+    {
+      "id": "PCI-3",
+      "description": "Reads PCI-DSS scope env vars (merchant IDs, keys)",
+      "match": { "func_exact": "getenv", "env_pattern": "*_MERCHANT_ID" },
+      "severity": "high"
+    },
+    {
+      "id": "PCI-4",
+      "description": "Reads payment-gateway API key env vars",
+      "match": { "func_exact": "getenv", "env_pattern": "*_API_KEY" },
+      "severity": "high"
+    },
+    {
+      "id": "PCI-5",
+      "description": "Reads payment-gateway secret env vars",
+      "match": { "func_exact": "getenv", "env_pattern": "*_SECRET" },
+      "severity": "high"
+    },
+    {
+      "id": "PCI-6",
+      "description": "Outbound connects to non-standard payment ports (audit manually)",
+      "match": { "func_exact": "connect" },
+      "severity": "medium"
+    },
+    {
+      "id": "PCI-7",
+      "description": "Subprocess spawned (potential CDE boundary crossing)",
+      "match": { "func_exact": "system" },
+      "severity": "high"
+    },
+    {
+      "id": "PCI-8",
+      "description": "exec-family call (subprocess spawning)",
+      "match": { "func_prefix": "exec" },
+      "severity": "medium"
+    },
+    {
+      "id": "PCI-9",
+      "description": "Reads PCI-DSS config directory",
+      "match": { "func_prefix": "open", "path_contains": "/etc/pci/" },
+      "severity": "medium"
+    },
+    {
+      "id": "PCI-10",
+      "description": "Reads standard credential file (/etc/shadow)",
+      "match": { "func_prefix": "open", "path_contains": "/etc/shadow" },
+      "severity": "critical"
+    },
+    {
+      "id": "PCI-11",
+      "description": "Reads SSH credentials",
+      "match": { "func_prefix": "open", "path_contains": ".ssh/" },
+      "severity": "critical"
+    },
+    {
+      "id": "PCI-12",
+      "description": "Reads token env vars (any framework -- catch-all)",
+      "match": { "func_exact": "getenv", "env_pattern": "*_TOKEN" },
+      "severity": "medium"
+    }
+  ]
+}

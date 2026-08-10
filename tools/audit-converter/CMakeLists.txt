@@ -19,5 +19,9 @@ target_include_directories(retrace_audit PRIVATE
 install(TARGETS retrace_audit
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-install(FILES ${CMAKE_SOURCE_DIR}/share/policies/baseline.json
+install(FILES
+    ${CMAKE_SOURCE_DIR}/share/policies/baseline.json
+    ${CMAKE_SOURCE_DIR}/share/policies/pci-dss.json
+    ${CMAKE_SOURCE_DIR}/share/policies/hipaa.json
+    ${CMAKE_SOURCE_DIR}/share/policies/iso27001.json
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/retrace/policies)
