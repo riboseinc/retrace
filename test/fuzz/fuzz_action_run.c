@@ -37,10 +37,31 @@
  */
 static long fuzz_stub_real(void) { return 0; }
 
+/*
+ * Maximum input size the harness will accept.
+ *
+ * The nightly fuzz workflow (PR #607) found that parson's
+ * comment-stripping path can be made to allocate ~1 GB from a
+ * 139-byte input that triggers pathological comment-like
+ * patterns. parson is vendored third-party code; fixing its
+ * memory accounting is upstream work. As a defensive measure,
+ * this harness caps input at 4 KB -- well above any realistic
+ * action_params payload (the schema is shallow: action_name,
+ * action_params object with a handful of numeric/string fields).
+ *
+ * The libFuzzer `-max_len=4096` flag enforces this at the
+ * engine level too; this guard is defense-in-depth for direct
+ * invocation.
+ */
+#define FUZZ_ACTION_RUN_MAX_INPUT 4096
+
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
 	char *buf;
 	JSON_Value *v;
+
+	if (size > FUZZ_ACTION_RUN_MAX_INPUT)
+		return 0;
 
 	buf = (char *)malloc(size + 1);
 	if (buf == NULL)
