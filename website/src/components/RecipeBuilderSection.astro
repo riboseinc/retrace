@@ -1,0 +1,43 @@
+---
+/*
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Wrapper section that hosts the RecipeBuilder.vue island.
+ * Sits between Recipes and ConfigValidator in the page flow
+ * (TODO.complete/36 P1).
+ */
+import RecipeBuilder from "../components/RecipeBuilder.vue";
+---
+
+<section id="recipe-builder" class="section">
+  <div class="container">
+    <h2>Recipe Builder</h2>
+    <p class="lede">
+      Visually compose a config: pick a function, drag actions from the palette,
+      tune params inline, copy the generated JSON into the validator.
+    </p>
+    <RecipeBuilder client:visible />
+  </div>
+</section>
+
+<style>
+.section {
+  padding: 64px 0;
+  background: var(--surface, #f8f9fa);
+  border-top: 1px solid var(--border, #ecf0f1);
+}
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+h2 {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+.lede {
+  font-size: 16px;
+  color: var(--muted, #6c7a89);
+  margin-bottom: 32px;
+}
+</style>
