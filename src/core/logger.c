@@ -41,6 +41,13 @@ static int logger_emit_entry(const struct LogEntry *entry, void *ctx);
 extern int retrace_inited;
 
 /*
+ * Ring enabled flag. Defaults to 1 (use the lock-free ring + flusher
+ * post-init). Set to 0 by RETRACE_LOGGER_RING=0 env var, for platforms
+ * where the background thread is unstable (OHOS Docker/QEMU).
+ */
+static int g_logger_ring_enabled;
+
+/*
  * Lazy flusher spawn: on the first log push, atomically try to
  * spawn the flusher thread. Only one thread wins the race; the
  * others skip. This avoids spawning the thread during the dyld
@@ -393,13 +400,30 @@ int retrace_logger_init(void)
 		 * Thread creation during a dyld __attribute__((constructor))
 		 * can crash on some platforms (OHOS/musl under QEMU);
 		 * deferring to first use avoids that.
+		 *
+		 * RETRACE_LOGGER_RING=0 disables the ring entirely;
+		 * log_json falls back to synchronous writes for every
+		 * call. Default: enabled. Use 0 on platforms where the
+		 * background flusher thread is unstable (OHOS Docker/QEMU).
 		 */
-		if (retrace_log_ring_init() != 0) {
-			log_err("logger: log_ring_init failed; "
-				"falling back to no-op log path");
-			return 0;
+		{
+			char *ring_env = retrace_real_impls.getenv(
+				"RETRACE_LOGGER_RING");
+
+			if (ring_env != NULL && ring_env[0] == '0')
+				g_logger_ring_enabled = 0;
+			else
+				g_logger_ring_enabled = 1;
 		}
-		g_logger_ring_ready = 1;
+		if (g_logger_ring_enabled) {
+			if (retrace_log_ring_init() != 0) {
+				log_err("logger: log_ring_init failed; "
+					"falling back to sync log path");
+				g_logger_ring_enabled = 0;
+			} else {
+				g_logger_ring_ready = 1;
+			}
+		}
 	}
 
 	return 0;
@@ -489,7 +513,8 @@ void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 	 * This avoids spawning the flusher thread inside the
 	 * constructor (which crashes on OHOS/musl under QEMU).
 	 */
-	if (g_logger_ring_ready && retrace_inited) {
+	if (g_logger_ring_ready && g_logger_ring_enabled &&
+	    retrace_inited) {
 		ensure_flusher_running();
 		ring = retrace_log_ring_get();
 		if (ring != NULL) {
