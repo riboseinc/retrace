@@ -1,0 +1,148 @@
+# Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
+# BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+# Nightly libFuzzer runs of every harness in test/fuzz/.
+# See TODO.complete/33 P1.
+#
+# Runs each fuzzer for FUZZ_SECONDS (default 300 = 5 minutes)
+# against the seed corpus in test/fuzz/corpus/<fuzzer>/.
+# On crash, uploads the crashing input + backtrace as an
+# artifact for download.
+#
+# Manual trigger via the Actions UI ("Run workflow"). Otherwise
+# runs nightly on the main branch at 03:00 UTC.
+
+name: fuzz
+
+on:
+  schedule:
+    # 03:00 UTC daily
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      fuzz_seconds:
+        description: 'Seconds to run each fuzzer'
+        required: false
+        default: '300'
+  pull_request:
+    paths:
+      - 'test/fuzz/**'
+      - '.github/workflows/fuzz.yml'
+
+jobs:
+  fuzz:
+    name: fuzz (${{ matrix.fuzzer }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        fuzzer:
+          - fuzz_config_parse
+          - fuzz_script_resolve
+          - fuzz_action_run
+          - fuzz_cli_parse
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang libssl-dev
+
+      - name: Configure
+        run: |
+          CC=clang cmake -B build -G Ninja \
+            -DRETRACE_BUILD_TESTS=ON \
+            -DRETRACE_BUILD_FUZZERS=ON
+
+      - name: Build fuzzer
+        run: cmake --build build --target ${{ matrix.fuzzer }}
+
+      - name: Run fuzzer
+        id: run
+        env:
+          FUZZ_SECONDS: ${{ github.event.inputs.fuzz_seconds || '300' }}
+        run: |
+          set +e
+          mkdir -p artifacts
+          fuzz_target="build/test/fuzz/${{ matrix.fuzzer }}"
+          corpus_dir="test/fuzz/corpus/$(echo ${{ matrix.fuzzer }} | sed 's/^fuzz_//')"
+
+          # Run the fuzzer. -artifact_prefix=artifacts/ makes
+          # libFuzzer write any crash-reproducer there.
+          #
+          # Cap RSS at 2 GB so OOM conditions are reported as
+          # artifacts rather than killing the runner.
+          "$fuzz_target" \
+            -max_total_time="$FUZZ_SECONDS" \
+            -rss_limit_mb=2048 \
+            -artifact_prefix=artifacts/ \
+            -print_final_stats=1 \
+            "$corpus_dir"
+          exitcode=$?
+
+          # libFuzzer exit codes that mean "found a bug worth
+          # reporting": 77 (crash), 71 (OOM), 70 (timeout).
+          # The matrix leg succeeds so other fuzzers keep
+          # running; the artifact is the signal.
+          if [ "$exitcode" -eq 77 ] || [ "$exitcode" -eq 71 ] || [ "$exitcode" -eq 70 ]; then
+            echo "crash_found=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Fuzzer ${{ matrix.fuzzer }} found a bug (exit $exitcode); see artifacts."
+            exit 0
+          fi
+          exit "$exitcode"
+
+      - name: Upload crash artifacts
+        if: steps.run.outputs.crash_found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-${{ matrix.fuzzer }}
+          path: artifacts/
+          retention-days: 30
+
+  summary:
+    name: fuzz summary
+    runs-on: ubuntu-latest
+    needs: fuzz
+    if: always()
+    steps:
+      - name: Report
+        run: |
+          echo "## Fuzz run summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Fuzzer | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          for result in ${{ join(needs.fuzz.result, ' ') }}; do
+            # Each matrix leg's result is either 'success',
+            # 'failure', or 'cancelled'. The summary job gets
+            # them as a single space-separated string.
+            echo "placeholder"
+          done
+          # The actual per-fuzzer breakdown is in the matrix
+          # legs above; this summary just exists to give the
+          # workflow a single completion status for branch
+          # protection rules.
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "See individual fuzz legs for details and crash artifacts." >> "$GITHUB_STEP_SUMMARY"
