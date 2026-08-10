@@ -53,6 +53,19 @@ void retrace_logger_log(int module, int sev, const char *fmt, ...);
 void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value);
 
 /*
+ * Set the calling thread's "logging disabled" flag. Used by
+ * the background log flusher (TODO.complete/19 PR C) so its
+ * own libc calls don't generate log entries that would feed
+ * back into the ring it's trying to drain.
+ *
+ * Once called from a thread, that thread's log_info/log_dbg/
+ * log_err/log_warn calls become no-ops for the rest of its
+ * lifetime. Cannot be reversed (intentionally -- the flag is
+ * for thread-lifetime markers like "I'm an internal thread").
+ */
+void retrace_logger_disable_for_this_thread(void);
+
+/*
  * Per-function log filter. Returns 1 if log_params should emit a JSON
  * entry for `func_name`, 0 if the caller asked to suppress it via the
  * RETRACE_LOGGER_ALLOWED_FUNCS / RETRACE_LOGGER_EXCLUDED_FUNCS env

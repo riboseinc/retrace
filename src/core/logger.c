@@ -30,6 +30,8 @@
 
 #include "logger.h"
 #include "real_impls.h"
+#include "log_ring.h"
+#include "log_flusher.h"
 
 /*
  * MAXLEN_FUNC_NAME from funcs.h is 64. Don't include funcs.h here -- it
@@ -116,7 +118,27 @@ static char *g_retrace_severities[SEVERITY_CNT] = {"DEBUG",
 };
 
 static int g_first_json;
-static pthread_mutex_t g_logger_mtx;
+
+/*
+ * Thread-local "logging disabled" flag (TODO.complete/19 PR C).
+ *
+ * Set in the flusher thread (and any future internal thread)
+ * so its libc calls don't generate log entries that would
+ * feed back into its own ring. Without this, the flusher's
+ * first printf via real_impls triggers a retrace intercept
+ * (printf IS wrapped), the engine creates a ThreadContext for
+ * the flusher, log_params pushes to the flusher's ring, the
+ * flusher drains and emits via printf, which gets intercepted
+ * again -- infinite recursion.
+ *
+ * The flag short-circuits log_json before any ring push.
+ */
+static _Thread_local int g_this_thread_logging_disabled;
+
+void retrace_logger_disable_for_this_thread(void)
+{
+	g_this_thread_logging_disabled = 1;
+}
 
 /* Per-function log filter, populated from env at logger_init. */
 static struct LoggerFuncFilter g_logger_allowed_funcs;
@@ -198,8 +220,56 @@ int retrace_logger_func_loggable(const char *func_name)
 	return 1;
 }
 
+/*
+ * Emit callback for the background flusher. Runs on the flusher
+ * thread, so no synchronization needed on g_first_json or the
+ * underlying FILE* -- only this thread writes to them.
+ *
+ * Receives a serialized JSON entry as entry->text and writes it
+ * with the leading-comma logic that produces a valid JSON array.
+ */
+static int logger_emit_entry(const struct LogEntry *entry, void *ctx)
+{
+	(void)ctx;
+
+	if (entry == NULL || entry->text == NULL)
+		return 0;
+
+	if (g_logger_config.stdout_ena &&
+	    retrace_real_impls.printf &&
+	    retrace_real_impls.fflush) {
+		if (g_first_json)
+			retrace_real_impls.printf(",\n%s\n", entry->text);
+		else
+			retrace_real_impls.printf("%s\n", entry->text);
+		retrace_real_impls.fflush(stdout);
+	}
+
+	if (g_logger_config.logfile != NULL &&
+	    retrace_real_impls.fprintf &&
+	    retrace_real_impls.fflush) {
+		if (g_first_json) {
+			retrace_real_impls.fprintf(g_logger_config.logfile,
+				",\n%s\n", entry->text);
+		} else {
+			retrace_real_impls.fprintf(g_logger_config.logfile,
+				"%s\n", entry->text);
+		}
+		retrace_real_impls.fflush(g_logger_config.logfile);
+	}
+
+	g_first_json = 1;
+	return 0;
+}
+
 void retrace_logger_deinit(void)
 {
+	/* Stop the flusher first so it drains every pending entry
+	 * before we write the closing "]" and tear down the rings.
+	 */
+	retrace_log_flusher_stop();
+	retrace_log_ring_deinit();
+
 	/* experimental JSON, make array of log messages */
 	if (g_logger_config.ena &&
 		(g_logger_config.stdout_ena || g_logger_config.logfile)) {
@@ -231,11 +301,6 @@ void retrace_logger_deinit(void)
 int retrace_logger_init(void)
 {
 	char *env_val;
-
-	if (retrace_real_impls.pthread_mutex_init(&g_logger_mtx, NULL)) {
-		/* can't report error...or use stderr? */
-		return 1;
-	}
 
 	/* override def config with env parameters */
 	env_val =
@@ -281,6 +346,23 @@ int retrace_logger_init(void)
 			retrace_real_impls.fprintf(g_logger_config.logfile, "[\n");
 			retrace_real_impls.fflush(g_logger_config.logfile);
 		}
+
+		/* Spawn the lock-free ring + background flusher that
+		 * replaces the prior global-mutex write path. The
+		 * flusher is the single consumer; producer threads
+		 * push to per-thread rings without contending.
+		 */
+		if (retrace_log_ring_init() != 0) {
+			log_err("logger: log_ring_init failed; "
+				"falling back to no-op log path");
+			return 0;
+		}
+		if (retrace_log_flusher_init(logger_emit_entry, NULL) != 0) {
+			log_err("logger: log_flusher_init failed; "
+				"falling back to no-op log path");
+			retrace_log_ring_deinit();
+			return 0;
+		}
 	}
 
 	return 0;
@@ -290,71 +372,6 @@ void retrace_loger_update_config(void)
 {
 	//const JSON_Object *logger_conf;
 	//logger_conf = json_object_get_object(retrace_conf, "logger");
-}
-
-void retrace_logger_log_old(int module, int sev, const char *fmt, ...)
-{
-	va_list args;
-	va_list args2;
-	size_t pref_size, log_size;
-	char *logBuff;
-	time_t rawtime;
-	struct tm timeinfo;
-
-	if (!(g_logger_config.ena &&
-		(g_logger_config.stdout_ena || g_logger_config.logfile)))
-		return;
-
-	if (!(g_logger_config.modules_ena[module]
-		&& g_logger_config.severities_ena[sev]))
-		return;
-
-	if (g_logger_config.decoration_ena) {
-		retrace_real_impls.time(&rawtime);
-		retrace_real_impls.localtime_r(&rawtime, &timeinfo);
-
-		pref_size = retrace_real_impls.real_snprintf(NULL, 0, "[RT][%02d:%02d:%02d][%s][%s] ",
-			timeinfo.tm_hour,
-			timeinfo.tm_min,
-			timeinfo.tm_sec,
-			g_retrace_module_pref[module],
-			g_retrace_severities[sev]);
-	} else
-		pref_size = 0;
-
-	va_start(args, fmt);
-	va_copy(args2, args);
-
-	log_size = retrace_real_impls.real_vsnprintf(NULL, 0, fmt, args);
-	logBuff = (char *) retrace_real_impls.malloc(pref_size + log_size + 1);
-
-	if (g_logger_config.decoration_ena) {
-		retrace_real_impls.real_snprintf(logBuff,
-			pref_size + 1,
-			"[RT][%02d:%02d:%02d][%s][%s] ",
-			timeinfo.tm_hour,
-			timeinfo.tm_min,
-			timeinfo.tm_sec,
-			g_retrace_module_pref[module],
-			g_retrace_severities[sev]);
-	}
-
-	retrace_real_impls.real_vsnprintf(logBuff + pref_size, log_size + 1, fmt, args2);
-
-	if (g_logger_config.stdout_ena) {
-		retrace_real_impls.printf("%s\n", logBuff);
-		retrace_real_impls.fflush(stdout);
-	}
-
-	if (g_logger_config.logfile != NULL) {
-		retrace_real_impls.fprintf(g_logger_config.logfile,
-			"%s\n", logBuff);
-		retrace_real_impls.fflush(g_logger_config.logfile);
-	}
-	retrace_real_impls.free(logBuff);
-
-	va_end(args2);
-	va_end(args);
 }
 
 
@@ -385,8 +402,10 @@ void retrace_logger_log(int module, int sev, const char *fmt, ...)
 	va_end(args2);
 	va_end(args);
 
-	//freed by retrace_logger_log_json
-	//json_value_free(root_value);
+	/* retrace_logger_log_json frees msg_value via
+	 * json_object_set_value(... msg_value) -- it becomes a child
+	 * of root_value which we then free.
+	 */
 }
 
 void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
@@ -395,6 +414,10 @@ void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 	JSON_Value *root_value;
 	JSON_Object *root_object;
 	char *serialized_string;
+	struct LogRing *ring;
+
+	if (g_this_thread_logging_disabled)
+		return;
 
 	if (!(g_logger_config.ena &&
 		(g_logger_config.stdout_ena || g_logger_config.logfile)))
@@ -418,31 +441,22 @@ void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 
 	serialized_string = json_serialize_to_string_pretty(root_value);
 
-	retrace_real_impls.pthread_mutex_lock(&g_logger_mtx);
-
-	if (g_logger_config.stdout_ena) {
-		if (g_first_json)
-			retrace_real_impls.printf(",\n%s\n", serialized_string);
-		else
-			retrace_real_impls.printf("%s\n", serialized_string);
-
-		retrace_real_impls.fflush(stdout);
+	/*
+	 * Lock-free hot path: push the serialized JSON to this thread's
+	 * ring. The background flusher drains the ring and writes to
+	 * stdout/file from a single thread, eliminating the global
+	 * mutex contention that capped throughput at ~10K events/sec.
+	 *
+	 * If the ring is full (rare -- target outpaces flusher for
+	 * >64 events), we drop the entry and increment the ring's
+	 * dropped counter; total surfaced at deinit via
+	 * log_ring_total_dropped().
+	 */
+	ring = retrace_log_ring_get();
+	if (ring != NULL) {
+		(void)retrace_log_ring_push(ring, (uint8_t)module,
+			(uint8_t)sev, (uint32_t)rawtime, serialized_string);
 	}
-
-	if (g_logger_config.logfile != NULL) {
-		if (g_first_json) {
-			retrace_real_impls.fprintf(g_logger_config.logfile,
-					",\n%s\n", serialized_string);
-		} else {
-			retrace_real_impls.fprintf(g_logger_config.logfile,
-					"%s\n", serialized_string);
-		}
-
-		retrace_real_impls.fflush(g_logger_config.logfile);
-	}
-
-	g_first_json = 1;
-	retrace_real_impls.pthread_mutex_unlock(&g_logger_mtx);
 
 	json_free_serialized_string(serialized_string);
 	json_value_free(root_value);
