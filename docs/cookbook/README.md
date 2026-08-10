@@ -114,6 +114,7 @@ Compact form. For the full schema and parameter reference, see
 | `filter` | Run the next actions only if a param matches an operator/value. |
 | `decode_http` | Parse a buffer as HTTP/1.x and log method/path/status. |
 | `decode_dns` | Parse a buffer as DNS wire format and log id/qname/qtype/answers. |
+| `capture_buffer` | Read memory at a pointer param (post-call) and log as hex or string. |
 
 ## Environment variables
 
