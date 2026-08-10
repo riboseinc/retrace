@@ -1,0 +1,89 @@
+{
+  "name": "iso27001",
+  "rules": [
+    {
+      "id": "ISO-1",
+      "description": "Subprocess spawned via shell -- audit for injection (A.8.7)",
+      "match": { "func_exact": "system" },
+      "severity": "high"
+    },
+    {
+      "id": "ISO-2",
+      "description": "exec-family call -- subprocess spawning (A.8.7)",
+      "match": { "func_prefix": "exec" },
+      "severity": "medium"
+    },
+    {
+      "id": "ISO-3",
+      "description": "Reads /etc/shadow -- credential access (A.5.17)",
+      "match": { "func_prefix": "open", "path_contains": "/etc/shadow" },
+      "severity": "critical"
+    },
+    {
+      "id": "ISO-4",
+      "description": "Reads /etc/passwd -- user enumeration (A.5.16)",
+      "match": { "func_prefix": "open", "path_contains": "/etc/passwd" },
+      "severity": "medium"
+    },
+    {
+      "id": "ISO-5",
+      "description": "Reads SSH directory -- private key access (A.5.17)",
+      "match": { "func_prefix": "open", "path_contains": ".ssh/" },
+      "severity": "critical"
+    },
+    {
+      "id": "ISO-6",
+      "description": "Writes to system paths (A.8.13)",
+      "match": { "func_prefix": "open", "path_contains": "/etc/" },
+      "severity": "high"
+    },
+    {
+      "id": "ISO-7",
+      "description": "Reads authentication token env vars (A.5.17)",
+      "match": { "func_exact": "getenv", "env_pattern": "*_TOKEN" },
+      "severity": "high"
+    },
+    {
+      "id": "ISO-8",
+      "description": "Reads password env vars (A.5.17)",
+      "match": { "func_exact": "getenv", "env_pattern": "*_PASSWORD" },
+      "severity": "high"
+    },
+    {
+      "id": "ISO-9",
+      "description": "Reads cryptographic key env vars (A.8.24)",
+      "match": { "func_exact": "getenv", "env_pattern": "*_KEY" },
+      "severity": "high"
+    },
+    {
+      "id": "ISO-10",
+      "description": "Reads LD_PRELOAD and related (runtime hijack risk, A.8.7)",
+      "match": { "func_exact": "getenv", "env_pattern": "LD_*" },
+      "severity": "medium"
+    },
+    {
+      "id": "ISO-11",
+      "description": "Outbound network connection (A.8.20 network services)",
+      "match": { "func_exact": "connect" },
+      "severity": "medium"
+    },
+    {
+      "id": "ISO-12",
+      "description": "Reads system log paths (A.8.15 logging)",
+      "match": { "func_prefix": "open", "path_contains": "/var/log/" },
+      "severity": "medium"
+    },
+    {
+      "id": "ISO-13",
+      "description": "Reads root's home directory (A.5.15 access control)",
+      "match": { "func_prefix": "open", "path_contains": "/root/" },
+      "severity": "high"
+    },
+    {
+      "id": "ISO-14",
+      "description": "Reads system crontabs (A.5.15)",
+      "match": { "func_prefix": "open", "path_contains": "/etc/cron" },
+      "severity": "high"
+    }
+  ]
+}
