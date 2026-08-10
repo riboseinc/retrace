@@ -58,6 +58,20 @@ struct NormalizedLog {
 int normalize_from_trace(JSON_Array *trace, struct NormalizedLog *out);
 
 /*
+ * Build a flat sequence of function names from a trace, in the
+ * order they were called. Used for ordering diff (TODO.complete/27 P1).
+ *
+ * Engine-noise entries (those with `message.text` instead of
+ * `message.func`) are skipped -- they don't represent real
+ * intercepted calls.
+ *
+ * Returns 0 on success, -1 on OOM. The caller owns *out_seq and
+ * must free() it.
+ */
+int normalize_call_sequence(JSON_Array *trace, char ***out_seq,
+			    size_t *out_len);
+
+/*
  * Lookup a function's stats by name. Returns NULL if not present.
  */
 const struct FuncStat *normalize_find(const struct NormalizedLog *log,
