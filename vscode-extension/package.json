@@ -32,6 +32,11 @@
         "command": "retrace.showStats",
         "title": "retrace: Show Stats",
         "category": "retrace"
+      },
+      {
+        "command": "retrace.connectLive",
+        "title": "retrace: Connect to Live Stream",
+        "category": "retrace"
       }
     ],
     "menus": {
