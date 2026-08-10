@@ -33,6 +33,29 @@
 #include "log_ring.h"
 #include "log_flusher.h"
 
+/* Forward declarations for the lazy-spawn function. */
+static int g_flusher_spawned;  /* guarded by __sync CAS */
+static int logger_emit_entry(const struct LogEntry *entry, void *ctx);
+
+/* Set in main.c's constructor when all init is complete. */
+extern int retrace_inited;
+
+/*
+ * Lazy flusher spawn: on the first log push, atomically try to
+ * spawn the flusher thread. Only one thread wins the race; the
+ * others skip. This avoids spawning the thread during the dyld
+ * constructor (which crashes on OHOS/musl under QEMU).
+ */
+static void ensure_flusher_running(void)
+{
+	int expected = 0;
+
+	if (__sync_bool_compare_and_swap(&g_flusher_spawned, expected, 1)) {
+		if (retrace_log_flusher_init(logger_emit_entry, NULL) != 0)
+			log_err("logger: log_flusher_init failed");
+	}
+}
+
 /*
  * MAXLEN_FUNC_NAME from funcs.h is 64. Don't include funcs.h here -- it
  * pulls in section macros that conflict with real_impls.h on Darwin.
@@ -135,6 +158,19 @@ static int g_first_json;
  */
 static _Thread_local int g_this_thread_logging_disabled;
 
+/*
+ * Tracks whether the ring subsystem has been initialized. The
+ * flusher thread is spawned lazily on the first push -- see
+ * ensure_flusher_running(). Split from g_logger_config.ena
+ * because the ring may be inited even when logging is disabled
+ * by env at a later stage.
+ */
+static int g_logger_ring_ready;
+
+/*
+ * One-time guard for lazy flusher spawn. Set atomically; only
+ * one thread wins the race to spawn.
+ */
 void retrace_logger_disable_for_this_thread(void)
 {
 	g_this_thread_logging_disabled = 1;
@@ -266,9 +302,13 @@ void retrace_logger_deinit(void)
 {
 	/* Stop the flusher first so it drains every pending entry
 	 * before we write the closing "]" and tear down the rings.
+	 * Only stop if it was actually spawned (lazy init: the
+	 * flusher starts on first push, not in logger_init).
 	 */
-	retrace_log_flusher_stop();
-	retrace_log_ring_deinit();
+	if (g_logger_ring_ready && g_flusher_spawned)
+		retrace_log_flusher_stop();
+	if (g_logger_ring_ready)
+		retrace_log_ring_deinit();
 
 	/* experimental JSON, make array of log messages */
 	if (g_logger_config.ena &&
@@ -347,22 +387,19 @@ int retrace_logger_init(void)
 			retrace_real_impls.fflush(g_logger_config.logfile);
 		}
 
-		/* Spawn the lock-free ring + background flusher that
-		 * replaces the prior global-mutex write path. The
-		 * flusher is the single consumer; producer threads
-		 * push to per-thread rings without contending.
+		/* Init the lock-free ring subsystem. The background
+		 * flusher thread is NOT spawned here -- it's spawned
+		 * lazily on the first log push (see retrace_logger_log_json).
+		 * Thread creation during a dyld __attribute__((constructor))
+		 * can crash on some platforms (OHOS/musl under QEMU);
+		 * deferring to first use avoids that.
 		 */
 		if (retrace_log_ring_init() != 0) {
 			log_err("logger: log_ring_init failed; "
 				"falling back to no-op log path");
 			return 0;
 		}
-		if (retrace_log_flusher_init(logger_emit_entry, NULL) != 0) {
-			log_err("logger: log_flusher_init failed; "
-				"falling back to no-op log path");
-			retrace_log_ring_deinit();
-			return 0;
-		}
+		g_logger_ring_ready = 1;
 	}
 
 	return 0;
@@ -442,20 +479,51 @@ void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 	serialized_string = json_serialize_to_string_pretty(root_value);
 
 	/*
-	 * Lock-free hot path: push the serialized JSON to this thread's
-	 * ring. The background flusher drains the ring and writes to
-	 * stdout/file from a single thread, eliminating the global
-	 * mutex contention that capped throughput at ~10K events/sec.
+	 * Lock-free hot path (post-init): push the serialized JSON
+	 * to this thread's ring. The background flusher drains the
+	 * ring and writes to stdout/file from a single thread,
+	 * eliminating the global mutex contention.
 	 *
-	 * If the ring is full (rare -- target outpaces flusher for
-	 * >64 events), we drop the entry and increment the ring's
-	 * dropped counter; total surfaced at deinit via
-	 * log_ring_total_dropped().
+	 * During init (before retrace_inited), write DIRECTLY.
+	 * The constructor is single-threaded, so no mutex needed.
+	 * This avoids spawning the flusher thread inside the
+	 * constructor (which crashes on OHOS/musl under QEMU).
 	 */
-	ring = retrace_log_ring_get();
-	if (ring != NULL) {
-		(void)retrace_log_ring_push(ring, (uint8_t)module,
-			(uint8_t)sev, (uint32_t)rawtime, serialized_string);
+	if (g_logger_ring_ready && retrace_inited) {
+		ensure_flusher_running();
+		ring = retrace_log_ring_get();
+		if (ring != NULL) {
+			(void)retrace_log_ring_push(ring, (uint8_t)module,
+				(uint8_t)sev, (uint32_t)rawtime,
+				serialized_string);
+		}
+	} else if (g_logger_config.stdout_ena ||
+		   g_logger_config.logfile != NULL) {
+		/* Synchronous write during init -- single-threaded,
+		 * no lock needed.
+		 */
+		if (g_logger_config.stdout_ena) {
+			if (g_first_json)
+				retrace_real_impls.printf(",\n%s\n",
+					serialized_string);
+			else
+				retrace_real_impls.printf("%s\n",
+					serialized_string);
+			retrace_real_impls.fflush(stdout);
+		}
+		if (g_logger_config.logfile != NULL) {
+			if (g_first_json)
+				retrace_real_impls.fprintf(
+					g_logger_config.logfile,
+					",\n%s\n", serialized_string);
+			else
+				retrace_real_impls.fprintf(
+					g_logger_config.logfile,
+					"%s\n", serialized_string);
+			retrace_real_impls.fflush(
+				g_logger_config.logfile);
+		}
+		g_first_json = 1;
 	}
 
 	json_free_serialized_string(serialized_string);
