@@ -11,6 +11,9 @@ set_target_properties(retrace_diff PROPERTIES
     OUTPUT_NAME retrace-diff
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools")
 
+# sqrt() from <math.h> needs -lm on Linux (part of libSystem on macOS).
+target_link_libraries(retrace_diff PRIVATE m)
+
 target_include_directories(retrace_diff PRIVATE
     ${CMAKE_SOURCE_DIR}/src/config/json
     ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
