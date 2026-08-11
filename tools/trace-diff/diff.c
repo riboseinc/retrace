@@ -56,20 +56,26 @@ static void usage(FILE *out)
 "function, and prints a structured diff of call counts and total\n"
 "time.\n"
 "\n"
+"Statistical significance mode (TODO.complete/27 P2):\n"
+"  retrace-diff --stats BASE1.json,BASE2.json,... TEST.json\n"
+"                [--zscore N]\n"
+"\n"
+"Loads multiple baseline traces, computes per-function mean +\n"
+"stddev, and flags functions whose test count deviates by more\n"
+"than N standard deviations (default N=2, ~95%% confidence).\n"
+"\n"
 "Options:\n"
 "  --threshold pct=N  Suppress diffs at or below N%% change (CI\n"
-"                     gating). Counted diffs only if a function's\n"
-"                     call count OR total time changed by >N%%.\n"
-"                     New/removed functions always count.\n"
-"                     Default: 0 (report every change).\n"
-"  --order            Also run a sequence-alignment (LCS) diff\n"
-"                     to detect call-ORDER changes even when\n"
-"                     per-function counts are identical.\n"
+"                     gating). Default: 0 (report every change).\n"
+"  --order            Also run a sequence-alignment (LCS) diff.\n"
+"  --stats BASES      Statistical significance mode. BASES is a\n"
+"                     comma-separated list of baseline files.\n"
+"  --zscore N         Z-score threshold for --stats (default 2.0).\n"
 "  --help, -h         Show this message\n"
 "\n"
 "Exit codes:\n"
-"  0  no diff above the threshold (call surface within tolerance)\n"
-"  1  diff found above the threshold (CI gating signal)\n"
+"  0  no diff above the threshold\n"
+"  1  diff found above the threshold\n"
 "  2  argument or IO error\n");
 }
 
@@ -341,9 +347,186 @@ static int load_trace(const char *path, struct NormalizedLog *out,
 		json_value_free(root);
 		return -1;
 	}
-	*root_out = root;
-	*arr_out = arr;
+	if (root_out != NULL)
+		*root_out = root;
+	else
+		json_value_free(root);
+	if (arr_out != NULL)
+		*arr_out = arr;
 	return 0;
+}
+
+/*
+ * Statistical significance mode (TODO.complete/27 P2).
+ *
+ * Loads N baseline traces, computes per-function mean + stddev
+ * of call counts, then compares the test trace. A function is
+ * "significant" if its test count deviates from the mean by
+ * more than `zscore` standard deviations.
+ *
+ * Returns the number of significant functions (0 = none).
+ */
+#include <math.h>
+
+static int run_stats_mode(const char *baseline_list,
+			  const char *test_path, double zscore)
+{
+	char *list_copy = strdup(baseline_list);
+	char *tok;
+	struct NormalizedLog *baselines = NULL;
+	int n_baselines = 0;
+	int cap = 0;
+	struct NormalizedLog test = {0};
+	JSON_Value *test_root = NULL;
+	JSON_Array *test_arr = NULL;
+	int significant = 0;
+	size_t i;
+	int j;
+
+	if (list_copy == NULL) {
+		fprintf(stderr, "retrace-diff: OOM\n");
+		return -1;
+	}
+
+	/* Parse the comma-separated baseline list and load each. */
+	tok = strtok(list_copy, ",");
+	while (tok != NULL) {
+		struct NormalizedLog log = {0};
+
+		if (n_baselines == cap) {
+			int newcap = (cap == 0) ? 4 : cap * 2;
+
+			baselines = realloc(baselines,
+				newcap * sizeof(*baselines));
+			if (baselines == NULL) {
+				free(list_copy);
+				return -1;
+			}
+			cap = newcap;
+		}
+		if (load_trace(tok, &log, NULL, NULL) != 0) {
+			free(list_copy);
+			for (i = 0; i < (size_t)n_baselines; i++)
+				normalize_free(&baselines[i]);
+			free(baselines);
+			return -1;
+		}
+		baselines[n_baselines++] = log;
+		tok = strtok(NULL, ",");
+	}
+	free(list_copy);
+
+	if (n_baselines < 2) {
+		fprintf(stderr,
+			"retrace-diff: --stats needs at least 2 baselines (got %d)\n",
+			n_baselines);
+		for (i = 0; i < (size_t)n_baselines; i++)
+			normalize_free(&baselines[i]);
+		free(baselines);
+		return -1;
+	}
+
+	/* Load the test trace. */
+	if (load_trace(test_path, &test, &test_root, &test_arr) != 0) {
+		for (i = 0; i < (size_t)n_baselines; i++)
+			normalize_free(&baselines[i]);
+		free(baselines);
+		return -1;
+	}
+
+	printf("--- statistical significance (z > %.1f) ---\n", zscore);
+	printf("baselines: %d\n", n_baselines);
+
+	/* For each function in the test trace, compute z-score. */
+	for (i = 0; i < test.count; i++) {
+		const char *name = test.funcs[i].name;
+		uint64_t test_count = test.funcs[i].call_count;
+		double sum = 0, sum_sq = 0;
+		double mean, variance, stddev;
+		int j;
+
+		for (j = 0; j < n_baselines; j++) {
+			const struct FuncStat *s = normalize_find(
+				&baselines[j], name);
+			double c = s ? (double)s->call_count : 0;
+
+			sum += c;
+			sum_sq += c * c;
+		}
+
+		mean = sum / n_baselines;
+		variance = (sum_sq / n_baselines) - (mean * mean);
+		stddev = sqrt(variance > 0 ? variance : 0);
+
+		if (stddev == 0) {
+			/* No variance in baselines. Flag if test
+			 * differs from the constant value at all.
+			 */
+			if ((double)test_count != mean) {
+				printf("  %s: test=%llu baseline=%.1f+0.0"
+				       " (NO VARIANCE -- manual review)\n",
+					name,
+					(unsigned long long)test_count,
+					mean);
+				significant++;
+			}
+		} else {
+			double z = ((double)test_count - mean) / stddev;
+
+			if (fabs(z) > zscore) {
+				printf("  %s: test=%llu baseline=%.1f+%.1f"
+				       " (z=%.2f ***)\n",
+					name,
+					(unsigned long long)test_count,
+					mean, stddev, z);
+				significant++;
+			}
+		}
+	}
+
+	/* Check for functions that existed in baselines but not
+	 * in the test (regression: feature removed).
+	 */
+	for (j = 0; j < n_baselines; j++) {
+		size_t k;
+
+		for (k = 0; k < baselines[j].count; k++) {
+			const char *name = baselines[j].funcs[k].name;
+
+			if (normalize_find(&test, name) == NULL) {
+				/* Only report once. */
+				int already = 0;
+				int m;
+
+				for (m = 0; m < j; m++) {
+					if (normalize_find(&baselines[m],
+						    name) != NULL) {
+						already = 1;
+						break;
+					}
+				}
+				if (!already && j == 0) {
+					printf("  %s: ABSENT in test (was in baseline)\n",
+						name);
+					significant++;
+				}
+			}
+		}
+	}
+
+	if (significant == 0)
+		printf("All functions within %.1f sigma of baseline.\n",
+			zscore);
+	else
+		printf("\n%d function(s) significant.\n", significant);
+
+	/* Cleanup. */
+	for (i = 0; i < (size_t)n_baselines; i++)
+		normalize_free(&baselines[i]);
+	free(baselines);
+	normalize_free(&test);
+	json_value_free(test_root);
+	return significant;
 }
 
 int main(int argc, char **argv)
@@ -357,6 +540,8 @@ int main(int argc, char **argv)
 	JSON_Value *trace_root_after = NULL;
 	JSON_Array *trace_arr_before = NULL;
 	JSON_Array *trace_arr_after = NULL;
+	const char *stats_baselines = NULL;
+	double stats_zscore = 2.0;
 	int argi;
 	int rc;
 	int diffs;
@@ -369,6 +554,16 @@ int main(int argc, char **argv)
 		}
 		if (strcmp(argv[argi], "--order") == 0) {
 			cfg.order_diff = 1;
+			continue;
+		}
+		if (strcmp(argv[argi], "--stats") == 0 &&
+		    argi + 1 < argc) {
+			stats_baselines = argv[++argi];
+			continue;
+		}
+		if (strcmp(argv[argi], "--zscore") == 0 &&
+		    argi + 1 < argc) {
+			stats_zscore = atof(argv[++argi]);
 			continue;
 		}
 		if (strncmp(argv[argi], "--threshold", 11) == 0) {
@@ -415,6 +610,22 @@ int main(int argc, char **argv)
 			usage(stderr);
 			return 2;
 		}
+	}
+
+	/* Stats mode takes precedence over two-file mode. */
+	if (stats_baselines != NULL) {
+		const char *test_file = before_path ?
+			before_path : after_path;
+
+		if (test_file == NULL) {
+			fprintf(stderr,
+				"retrace-diff: --stats needs a test file\n");
+			usage(stderr);
+			return 2;
+		}
+		diffs = run_stats_mode(stats_baselines, test_file,
+			stats_zscore);
+		return (diffs > 0) ? 1 : 0;
 	}
 
 	if (before_path == NULL || after_path == NULL) {
