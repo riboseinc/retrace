@@ -48,6 +48,23 @@
  */
 
 /*
+ * Exported global: the most recent call-hash value from ANY
+ * thread. Updated atomically by retrace_call_hash_observe().
+ *
+ * A libFuzzer custom mutator (TODO.complete/24 P1) reads this
+ * to bias mutations toward inputs that produce new call
+ * sequences. The mutator compares the current value against
+ * the value from the previous iteration -- if different, the
+ * input exercised a new libc-call path, and similar mutations
+ * should be favored.
+ *
+ * Access: read is atomic on all supported architectures
+ * (aligned 64-bit load). Write uses __sync_lock_test_and_set
+ * for portability.
+ */
+extern uint64_t retrace_call_hash_last;
+
+/*
  * Initialize the module. Parses RETRACE_CALL_HASH env var. Safe
  * to call regardless of whether the feature is enabled.
  *

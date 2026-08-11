@@ -62,6 +62,7 @@ jobs:
           - fuzz_script_resolve
           - fuzz_action_run
           - fuzz_cli_parse
+          - fuzz_call_hash
 
     steps:
       - uses: actions/checkout@v4

@@ -147,6 +147,23 @@ set_tests_properties(fuzz-action-run-smoke PROPERTIES
     LABELS "fuzz"
     TIMEOUT 30)
 
+#
+# fuzz_call_hash: libFuzzer custom mutator using retrace's
+# call_hash as coverage feedback (TODO.complete/24 P1).
+# Links standalone (no engine dependency). The custom mutator
+# reads retrace_call_hash_last via weak symbol.
+#
+add_retrace_fuzzer(fuzz_call_hash fuzz_call_hash.c)
+
+add_test(NAME fuzz-call-hash-smoke
+    COMMAND ${CMAKE_BINARY_DIR}/test/fuzz/fuzz_call_hash
+        -max_total_time=5
+        ${CMAKE_CURRENT_SOURCE_DIR}/corpus/call_hash
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(fuzz-call-hash-smoke PROPERTIES
+    LABELS "fuzz"
+    TIMEOUT 30)
+
 # fuzz_cli_parse -- exercises the CLI config builders (trace/mock/fuzz/slow).
 # Statically links the builders from src/cli/config_builder.c; no engine
 # dependency. Catches buffer-overflow + JSON-injection regressions.

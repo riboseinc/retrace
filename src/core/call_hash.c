@@ -41,6 +41,12 @@
 #define FNV_OFFSET ((uint64_t)0xcbf29ce484222325ULL)
 #define FNV_PRIME  ((uint64_t)0x100000001b3ULL)
 
+/*
+ * Exported global updated on every call_hash_observe. Read by
+ * the libFuzzer custom mutator (TODO.complete/24 P1).
+ */
+uint64_t retrace_call_hash_last;
+
 struct ThreadHash {
 	uint64_t hash;
 
@@ -159,6 +165,14 @@ void retrace_call_hash_observe(const char *func_name, int arg_count)
 
 	th->hash = h;
 	th->observed = 1;
+
+	/*
+	 * Publish the latest hash to the exported global so a
+	 * libFuzzer custom mutator can read it between iterations
+	 * (TODO.complete/24 P1). __sync_lock_test_and_set provides
+	 * a full memory barrier.
+	 */
+	__sync_lock_test_and_set(&retrace_call_hash_last, h);
 }
 
 uint64_t retrace_call_hash_get(void)
