@@ -24,10 +24,7 @@
  *   sarif    -- SARIF 2.1.0 (industry-standard static-analysis
  *               format). Consumed natively by GitHub Code Scanning,
  *               Azure DevOps, and other CI tools.
- *
- * PDF rendering is out of scope here (TODO.complete/26 P2 -- the
- * "tiny PDF writer" sub-task). This module owns the data model
- * + JSON/SARIF serialization.
+ *   pdf      -- printable PDF report (cover + summary + findings).
  */
 
 #include "parson.h"
@@ -36,6 +33,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "pdf_writer.h"
 
 /*
  * Predicate evaluation. The entry is the log entry's "message"
@@ -399,7 +398,8 @@ static JSON_Value *format_sarif(const struct Policy *policy,
 
 enum OutputFormat {
 	OUT_DEFAULT,
-	OUT_SARIF
+	OUT_SARIF,
+	OUT_PDF
 };
 
 static void usage(FILE *out)
@@ -455,6 +455,8 @@ int main(int argc, char **argv)
 				fmt = OUT_DEFAULT;
 			else if (strcmp(f, "sarif") == 0)
 				fmt = OUT_SARIF;
+			else if (strcmp(f, "pdf") == 0)
+				fmt = OUT_PDF;
 			else {
 				fprintf(stderr,
 					"retrace-audit: unknown format '%s'\n",
@@ -502,6 +504,70 @@ int main(int argc, char **argv)
 
 	findings_init(&findings);
 	scan_trace(trace, &policy, &findings);
+
+	if (fmt == OUT_PDF) {
+		int nc = 0, nh = 0, nm = 0, ni = 0;
+		size_t fi;
+		const char **sevs = NULL;
+		const char **ids = NULL;
+		const char **descs = NULL;
+
+		for (fi = 0; fi < findings.count; fi++) {
+			switch (findings.items[fi].rule->severity) {
+			case SEV_CRITICAL:
+				nc++;
+				break;
+			case SEV_HIGH:
+				nh++;
+				break;
+			case SEV_MEDIUM:
+				nm++;
+				break;
+			default:
+				ni++;
+				break;
+			}
+		}
+		if (findings.count > 0) {
+			sevs = malloc(findings.count * sizeof(char *));
+			ids = malloc(findings.count * sizeof(char *));
+			descs = malloc(findings.count * sizeof(char *));
+			for (fi = 0; fi < findings.count; fi++) {
+				sevs[fi] = severity_str(
+					findings.items[fi].rule->severity);
+				ids[fi] = findings.items[fi].rule->id;
+				descs[fi] =
+					findings.items[fi].rule->description;
+			}
+		}
+		if (out_path != NULL) {
+			out = fopen(out_path, "wb");
+			if (out == NULL) {
+				fprintf(stderr,
+					"retrace-audit: cannot open %s\n",
+					out_path);
+				free(sevs);
+				free(ids);
+				free(descs);
+				json_value_free(trace_root);
+				findings_free(&findings);
+				policy_free(&policy);
+				return 1;
+			}
+		}
+		pdf_write_audit_report(out, policy.name, trace_path,
+			sevs, ids, descs, (int)findings.count,
+			nc, nh, nm, ni);
+		free(sevs);
+		free(ids);
+		free(descs);
+		if (out != stdout)
+			fclose(out);
+		json_value_free(trace_root);
+		findings_free(&findings);
+		policy_free(&policy);
+		return 0;
+	}
 
 	switch (fmt) {
 	case OUT_SARIF:
