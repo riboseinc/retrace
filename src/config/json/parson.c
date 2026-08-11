@@ -45,6 +45,20 @@
 #define MAX_NESTING       2048
 #define FLOAT_FORMAT      "%1.17g"
 
+/*
+ * Allocation budget: if total parson_malloc/parson_realloc bytes
+ * exceed this, all subsequent allocations fail (return NULL).
+ *
+ * Set by json_parse_string_with_comments to input_size *
+ * PARSON_ALLOC_BUDGET_MULTIPLIER. Prevents adversarial inputs
+ * from causing OOM via pathological parser behavior (found by
+ * nightly fuzz workflow; see TODO.complete/33).
+ */
+#define PARSON_ALLOC_BUDGET_MULTIPLIER 1000
+
+static size_t parson_alloc_total;
+static size_t parson_alloc_budget;
+
 #define SIZEOF_TOKEN(a)       (sizeof(a) - 1)
 #define SKIP_CHAR(str)        ((*str)++)
 #define SKIP_WHITESPACES(str) while (isspace((unsigned char)(**str))) { SKIP_CHAR(str); }
@@ -55,6 +69,29 @@
 
 static JSON_Malloc_Function parson_malloc = malloc;
 static JSON_Free_Function parson_free = free;
+
+/*
+ * Saved originals during budget enforcement. parson_budgeted_malloc
+ * calls these (not the parson_malloc pointer, which gets swapped).
+ */
+static JSON_Malloc_Function parson_real_malloc = malloc;
+static JSON_Free_Function parson_real_free = free;
+
+static size_t parson_alloc_total;
+static size_t parson_alloc_budget;
+
+static void *parson_budgeted_malloc(size_t sz) {
+    if (parson_alloc_budget > 0 &&
+        parson_alloc_total + sz > parson_alloc_budget)
+        return NULL;
+    void *p = parson_real_malloc(sz);
+    if (p) parson_alloc_total += sz;
+    return p;
+}
+
+static void parson_budgeted_free(void *ptr) {
+    parson_real_free(ptr);
+}
 
 #define IS_CONT(b) (((unsigned char)(b) & 0xC0) == 0x80) /* is utf-8 continuation byte */
 
@@ -1058,15 +1095,44 @@ JSON_Value * json_parse_string(const char *string) {
 JSON_Value * json_parse_string_with_comments(const char *string) {
     JSON_Value *result = NULL;
     char *string_mutable_copy = NULL, *string_mutable_copy_ptr = NULL;
+    size_t input_len = strlen(string);
+    JSON_Malloc_Function orig_malloc;
+    JSON_Free_Function orig_free;
+
+    orig_malloc = parson_malloc;
+    orig_free = parson_free;
+
+    /* Save the real allocator before swapping in the budgeted one. */
+    parson_real_malloc = orig_malloc;
+    parson_real_free = orig_free;
+
+    parson_malloc = parson_budgeted_malloc;
+    parson_free = parson_budgeted_free;
+
+    parson_alloc_total = 0;
+    parson_alloc_budget = input_len * PARSON_ALLOC_BUDGET_MULTIPLIER;
+
     string_mutable_copy = parson_strdup(string);
     if (string_mutable_copy == NULL) {
+        parson_malloc = orig_malloc;
+        parson_free = orig_free;
+        parson_alloc_budget = 0;
         return NULL;
     }
     remove_comments(string_mutable_copy, "/*", "*/");
     remove_comments(string_mutable_copy, "//", "\n");
     string_mutable_copy_ptr = string_mutable_copy;
     result = parse_value((const char**)&string_mutable_copy_ptr, 0);
+
+    /*
+     * parson_free here uses the budgeted wrapper, which just
+     * delegates to the original free. Safe.
+     */
     parson_free(string_mutable_copy);
+
+    parson_malloc = orig_malloc;
+    parson_free = orig_free;
+    parson_alloc_budget = 0;
     return result;
 }
 
