@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.3.2] - 2026-08-13
+
+### Changed
+- `test/helpers/test_utils.h`: new `CHECK()` macro for always-on
+  post-condition checks. `assert()` compiles to `((void)0)` under
+  `-DNDEBUG` (CMake Release default), eliding both the check and
+  any side effects in the tested expression. `CHECK()` always
+  evaluates; on miss it prints a FAIL line, increments
+  `tests_fail`, and returns from the test function.
+
+### Fixed
+- 8 unit test files (`test_call_count_limit`, `test_decode_http`,
+  `test_decode_dns`, `test_filter`, `test_fuzzing_seed`,
+  `test_log_flusher`, `test_log_ring`, `test_modify_return_value_int`)
+  had side-effecting function calls wrapped inside `assert()`.
+  Under CMake Release builds these calls were silently elided,
+  leaving state uninitialized and assertions unverified. Every
+  `assert(action(ctx, p) == X)` is now `rc = action(ctx, p);
+  CHECK(rc == X);`. The bug class previously caused v2.3.1 RC
+  tests to segfault on Alpine/musl + gcc -O3 while passing on
+  glibc/macOS by luck.
+
+### Added
+- Migrated 7 of the 8 affected test files to `test_utils.h`
+  (DRY: shared TEST macro, action_fn_t typedef, JSON builders,
+  `init_minimal_real_impls()`, `finish_tests()`). Each file now
+  has ~30 fewer lines of duplicated boilerplate.
+
 ## [2.3.1] - 2026-08-12
 
 ### Changed

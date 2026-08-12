@@ -13,35 +13,10 @@
  * non-HTTP passthrough.
  */
 
-#include <assert.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-
-#include "engine.h"
-#include "actions.h"
-#include "funcs.h"
-#include "data_types.h"
-#include "real_impls.h"
-#include "parson.h"
-
-typedef int (*action_fn_t)(struct ThreadContext *t_ctx,
-			    const JSON_Object *action_params);
-
-static int tests_run;
-static int tests_pass;
-static int tests_fail;
-
-#define TEST(name) do { \
-	tests_run++; \
-	printf("  TEST %s ... ", #name); \
-	test_##name(); \
-	tests_pass++; \
-	printf("OK\n"); \
-} while (0)
+#include "test_utils.h"
 
 static struct ThreadContext *build_ctx_with_buf(const char *name,
-						const char *data)
+						 const char *data)
 {
 	static struct ThreadContext ctx;
 	static struct FuncPrototype proto;
@@ -82,19 +57,23 @@ static JSON_Object *build_params(const char *param_name)
 	return root;
 }
 
+DECLARE_TEST_STATE();
+
 static void test_action_lookup(void)
 {
 	retrace_actions_init();
-	assert(retrace_actions_get("decode_http") != NULL);
+	CHECK(retrace_actions_get("decode_http") != NULL);
 }
 
 static void test_params_null(void)
 {
 	action_fn_t action = retrace_actions_get("decode_http");
 	struct ThreadContext ctx;
+	int rc;
 
 	memset(&ctx, 0, sizeof(ctx));
-	assert(action(&ctx, NULL) == -1);
+	rc = action(&ctx, NULL);
+	CHECK(rc == -1);
 }
 
 static void test_missing_param_name(void)
@@ -103,9 +82,11 @@ static void test_missing_param_name(void)
 	struct ThreadContext ctx;
 	JSON_Value *root_val = json_value_init_object();
 	JSON_Object *root = json_value_get_object(root_val);
+	int rc;
 
 	memset(&ctx, 0, sizeof(ctx));
-	assert(action(&ctx, root) == -1);
+	rc = action(&ctx, root);
+	CHECK(rc == -1);
 	json_value_free(root_val);
 }
 
@@ -118,7 +99,7 @@ static void test_get_request(void)
 	int rc;
 
 	rc = action(ctx, p);
-	assert(rc == 0);
+	CHECK(rc == 0);
 
 	json_value_free(json_object_get_wrapping_value(p));
 }
@@ -129,8 +110,10 @@ static void test_post_request(void)
 	struct ThreadContext *ctx = build_ctx_with_buf("buf",
 		"POST /submit HTTP/1.1\r\nContent-Length: 10\r\n\r\nname=value");
 	JSON_Object *p = build_params("buf");
+	int rc;
 
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -140,8 +123,10 @@ static void test_http_response(void)
 	struct ThreadContext *ctx = build_ctx_with_buf("buf",
 		"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html>");
 	JSON_Object *p = build_params("buf");
+	int rc;
 
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -151,8 +136,10 @@ static void test_http_404_response(void)
 	struct ThreadContext *ctx = build_ctx_with_buf("buf",
 		"HTTP/1.1 404 Not Found\r\n\r\n");
 	JSON_Object *p = build_params("buf");
+	int rc;
 
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -162,9 +149,10 @@ static void test_non_http_data(void)
 	struct ThreadContext *ctx = build_ctx_with_buf("buf",
 		"\x00\x01\x02\x03 not http at all");
 	JSON_Object *p = build_params("buf");
+	int rc;
 
-	/* Non-HTTP data returns 0 (no-op, no abort). */
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -173,8 +161,10 @@ static void test_empty_buffer(void)
 	action_fn_t action = retrace_actions_get("decode_http");
 	struct ThreadContext *ctx = build_ctx_with_buf("buf", "");
 	JSON_Object *p = build_params("buf");
+	int rc;
 
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -185,6 +175,7 @@ static void test_null_buffer(void)
 	static struct FuncPrototype proto;
 	struct FuncParam params[8];
 	JSON_Object *p = build_params("buf");
+	int rc;
 
 	memset(&ctx, 0, sizeof(ctx));
 	memset(params, 0, sizeof(params));
@@ -197,8 +188,8 @@ static void test_null_buffer(void)
 	ctx.params_cnt = 1;
 	memcpy(ctx.params, params, sizeof(params));
 
-	/* NULL buffer val returns 0 (no-op). */
-	assert(action(&ctx, p) == 0);
+	rc = action(&ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -208,9 +199,10 @@ static void test_unknown_param(void)
 	struct ThreadContext *ctx = build_ctx_with_buf("buf",
 		"GET / HTTP/1.1\r\n\r\n");
 	JSON_Object *p = build_params("nonexistent");
+	int rc;
 
-	/* Unknown param returns 0 (no-op, not -1). */
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -220,24 +212,17 @@ static void test_delete_request(void)
 	struct ThreadContext *ctx = build_ctx_with_buf("buf",
 		"DELETE /api/items/42 HTTP/1.1\r\n\r\n");
 	JSON_Object *p = build_params("buf");
+	int rc;
 
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
 int main(void)
 {
-	retrace_real_impls.strcmp = strcmp;
-	retrace_real_impls.strlen = strlen;
-	retrace_real_impls.strcpy = strcpy;
-	retrace_real_impls.strncmp = strncmp;
-	retrace_real_impls.memset = memset;
-	retrace_real_impls.memcpy = memcpy;
-	retrace_real_impls.malloc = malloc;
-	retrace_real_impls.free = free;
-	retrace_real_impls.real_snprintf = snprintf;
-	retrace_real_impls.real_sprintf = sprintf;
-	retrace_real_impls.real_vsnprintf = vsnprintf;
+	init_minimal_real_impls();
+	INIT_TESTS();
 
 	printf("decode_http action tests:\n");
 
@@ -261,7 +246,5 @@ int main(void)
 	TEST(empty_buffer);
 	TEST(null_buffer);
 
-	printf("\nPass: %d, Fail: %d (of %d)\n",
-		tests_pass, tests_fail, tests_run);
-	return tests_fail == 0 ? 0 : 1;
+	return finish_tests(tests_run, tests_pass, tests_fail);
 }

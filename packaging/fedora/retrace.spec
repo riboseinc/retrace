@@ -2,10 +2,10 @@
 #
 # Fedora RPM spec for retrace (TODO.complete/38).
 # Build: rpmbuild -ba retrace.spec
-# Install: dnf install retrace-2.3.1-1.*.rpm
+# Install: dnf install retrace-2.3.2-1.*.rpm
 
 Name:           retrace
-Version:        2.3.1
+Version:        2.3.2
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,9 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Wed Aug 13 2026 Ribose Inc <opensource@ribose.com> - 2.3.2-1
+- Unit tests hardened: CHECK macro replaces side-effecting asserts
+
 * Tue Aug 12 2026 Ribose Inc <opensource@ribose.com> - 2.3.1-1
 - Audit policy MECE refactor + unit tests for policy/normalize
 

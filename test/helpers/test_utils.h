@@ -76,6 +76,26 @@ typedef int (*action_fn_t)(struct ThreadContext *t_ctx,
 	printf("OK\n"); \
 } while (0)
 
+/* Always-on post-condition check. Use in place of assert() whenever
+ * the tested expression involves a function call whose side effects
+ * are needed by later code in the same test. assert() compiles to
+ * ((void)0) under -DNDEBUG (CMake Release default), eliding both
+ * the check AND the call. That class of bug previously caused
+ * tests to silently pass on Alpine/musl + gcc -O3 while segfaulting
+ * on uninitialized state.
+ *
+ * On failure: prints a FAIL line with file:line + expression,
+ * increments tests_fail, and returns from the enclosing test_*
+ * function (which must therefore be void).
+ */
+#define CHECK(cond) do { \
+	if (!(cond)) { \
+		printf("FAIL [%s:%d] %s\n", __FILE__, __LINE__, #cond); \
+		tests_fail++; \
+		return; \
+	} \
+} while (0)
+
 /* Print summary and return exit code. Pass the counters from
  * DECLARE_TEST_STATE(). Usage: return finish_tests(tests_run,
  * tests_pass, tests_fail);
