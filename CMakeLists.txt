@@ -403,6 +403,9 @@ add_subdirectory(vscode-extension)
 # Grafana plugin is also pure TypeScript.
 add_subdirectory(grafana-plugin)
 
+# Wasm playground (pure C source + HTML, compiled separately).
+add_subdirectory(wasm-playground)
+
 # ---------------------------------------------------------------
 # Package config
 # ---------------------------------------------------------------
