@@ -98,4 +98,23 @@ int policy_load_from_file(const char *path, struct Policy *out);
  */
 const char *severity_str(enum Severity s);
 
+/*
+ * Predicate evaluation. The entry is the log entry's "message"
+ * object (the part that varies by action). For log_params
+ * entries, "func" is the intercepted function name and other
+ * fields are the parsed arguments (path, buf, etc.).
+ *
+ * Predicate semantics: a rule matches if ALL of its non-NULL
+ * constraints match (AND). NULL constraints are wildcards.
+ *
+ * env_pattern glob shapes:
+ *   *_TOKEN, *_KEY, *_PASSWORD  (suffix)
+ *   LD_*, IFS                   (prefix)
+ *   (anything else is exact)
+ *
+ * Returns 1 if the rule matches, 0 otherwise (including when
+ * either argument is NULL).
+ */
+int policy_rule_matches(const struct Rule *rule, JSON_Object *msg);
+
 #endif /* RETRACE_AUDIT_POLICY_H_ */

@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.3.1] - 2026-08-12
+
+### Changed
+- `audit-converter`: moved `rule_matches` from `audit.c` to `policy.c`
+  as the public `policy_rule_matches`. Rule-matching semantics now
+  live with the rule data model (MECE split); `audit.c` is purely
+  trace-scanning + output formatting.
+
+### Added
+- `test/unit/test_policy.c` — 25 unit tests for the audit policy
+  module (severity_str round-trip, policy_load_from_json variants,
+  policy_rule_matches across all 4 predicate types including
+  suffix/prefix/exact env_pattern, AND semantics, NULL safety).
+- `test/unit/test_normalize.c` — 12 unit tests for the trace-diff
+  normalizer (call-count aggregation, duration sum, engine-noise
+  skip, ordering preservation, NULL safety, free idempotency).
+
 ## [2.3.0] - 2026-08-12
 
 ### Added
