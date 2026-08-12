@@ -43,10 +43,17 @@ static int tests_fail;
 	printf("OK\n"); \
 } while (0)
 
-/* Emit callback that records each entry into a fixed array.
- * Each entry's text is strdup'd because the flusher's drain frees
- * the original after the callback returns.
+/* Always-on check. assert() alone is compiled out by NDEBUG.
+ * See feedback_assert_with_side_effects.md.
  */
+#define CHECK(cond) do { \
+	if (!(cond)) { \
+		printf("FAIL [%s:%d] %s\n", __FILE__, __LINE__, #cond); \
+		tests_fail++; \
+		return; \
+	} \
+} while (0)
+
 struct EmitCapture {
 	struct LogEntry entries[512];
 	size_t count;
@@ -80,20 +87,25 @@ static void test_drain_all_oneshot(void)
 {
 	struct LogRing *r;
 	struct EmitCapture cap;
+	int rc;
 
 	retrace_log_ring_init();
 	r = retrace_log_ring_get();
-	assert(r != NULL);
+	CHECK(r != NULL);
 
-	retrace_log_ring_push(r, FUNCS, SEVERITY_INFO, 1, "a");
-	retrace_log_ring_push(r, FUNCS, SEVERITY_INFO, 2, "b");
-	retrace_log_ring_push(r, FUNCS, SEVERITY_INFO, 3, "c");
+	rc = retrace_log_ring_push(r, FUNCS, SEVERITY_INFO, 1, "a");
+	CHECK(rc == 0);
+	rc = retrace_log_ring_push(r, FUNCS, SEVERITY_INFO, 2, "b");
+	CHECK(rc == 0);
+	rc = retrace_log_ring_push(r, FUNCS, SEVERITY_INFO, 3, "c");
+	CHECK(rc == 0);
 
 	emit_capture_reset(&cap);
-	assert(retrace_log_flusher_drain_all(emit_capture, &cap) == 3);
-	assert(cap.count == 3);
-	assert(strcmp(cap.entries[0].text, "a") == 0);
-	assert(strcmp(cap.entries[2].text, "c") == 0);
+	rc = retrace_log_flusher_drain_all(emit_capture, &cap);
+	CHECK(rc == 3);
+	CHECK(cap.count == 3);
+	CHECK(strcmp(cap.entries[0].text, "a") == 0);
+	CHECK(strcmp(cap.entries[2].text, "c") == 0);
 
 	retrace_log_ring_deinit();
 }
@@ -101,20 +113,18 @@ static void test_drain_all_oneshot(void)
 static void test_init_stop_lifecycle(void)
 {
 	struct EmitCapture cap;
+	int rc;
 
 	retrace_log_ring_init();
 	emit_capture_reset(&cap);
 
-	/* Flusher starts with no entries -- should idle harmlessly. */
-	assert(retrace_log_flusher_init(emit_capture, &cap) == 0);
+	rc = retrace_log_flusher_init(emit_capture, &cap);
+	CHECK(rc == 0);
 
-	/* Double-init is rejected. */
-	assert(retrace_log_flusher_init(emit_capture, &cap) == -1);
+	rc = retrace_log_flusher_init(emit_capture, &cap);
+	CHECK(rc == -1);
 
-	/* Stop without entry pushes is just a clean shutdown. */
 	retrace_log_flusher_stop();
-
-	/* Stop again is a no-op (no crash). */
 	retrace_log_flusher_stop();
 
 	retrace_log_ring_deinit();
@@ -124,20 +134,19 @@ static void test_flusher_drains_pushed_entries(void)
 {
 	struct LogRing *r;
 	struct EmitCapture cap;
+	int rc;
 
 	retrace_log_ring_init();
 	emit_capture_reset(&cap);
 
-	assert(retrace_log_flusher_init(emit_capture, &cap) == 0);
+	rc = retrace_log_flusher_init(emit_capture, &cap);
+	CHECK(rc == 0);
 
-	/* Push from this thread; flusher should pick it up within
-	 * a few intervals (1ms each).
-	 */
 	r = retrace_log_ring_get();
-	assert(r != NULL);
-	retrace_log_ring_push(r, FUNCS, SEVERITY_INFO, 100, "alpha");
+	CHECK(r != NULL);
+	rc = retrace_log_ring_push(r, FUNCS, SEVERITY_INFO, 100, "alpha");
+	CHECK(rc == 0);
 
-	/* Wait up to 50ms for the flusher to drain. */
 	{
 		struct timespec ts = {.tv_sec = 0, .tv_nsec = 1000000};
 		int tries = 50;
@@ -148,58 +157,53 @@ static void test_flusher_drains_pushed_entries(void)
 
 	retrace_log_flusher_stop();
 
-	assert(cap.count >= 1);
-	assert(strcmp(cap.entries[0].text, "alpha") == 0);
+	CHECK(cap.count >= 1);
+	CHECK(strcmp(cap.entries[0].text, "alpha") == 0);
 
 	retrace_log_ring_deinit();
 }
 
 static void test_stop_does_final_drain(void)
 {
-	/* The contract: stop() does one final drain after the loop
-	 * exits. So an entry pushed just before stop() must be
-	 * captured even if the loop never woke.
-	 */
 	struct LogRing *r;
 	struct EmitCapture cap;
+	int rc;
 
 	retrace_log_ring_init();
 	emit_capture_reset(&cap);
 
-	assert(retrace_log_flusher_init(emit_capture, &cap) == 0);
+	rc = retrace_log_flusher_init(emit_capture, &cap);
+	CHECK(rc == 0);
 
 	r = retrace_log_ring_get();
-	retrace_log_ring_push(r, FUNCS, SEVERITY_INFO, 1, "final-drain");
+	rc = retrace_log_ring_push(r, FUNCS, SEVERITY_INFO, 1, "final-drain");
+	CHECK(rc == 0);
 
 	retrace_log_flusher_stop();
 
-	assert(cap.count >= 1);
-	assert(strcmp(cap.entries[cap.count - 1].text, "final-drain") == 0);
+	CHECK(cap.count >= 1);
+	CHECK(strcmp(cap.entries[cap.count - 1].text, "final-drain") == 0);
 
 	retrace_log_ring_deinit();
 }
 
 static void test_null_cb_rejected(void)
 {
+	int rc;
+
 	retrace_log_ring_init();
-	assert(retrace_log_flusher_init(NULL, NULL) == -1);
+	rc = retrace_log_flusher_init(NULL, NULL);
+	CHECK(rc == -1);
 	retrace_log_ring_deinit();
 }
 
 static void test_stop_without_init_noop(void)
 {
 	retrace_log_ring_init();
-	/* No init -- stop should not crash. */
 	retrace_log_flusher_stop();
 	retrace_log_ring_deinit();
 }
 
-/*
- * Multi-thread stress: 4 threads each push N entries, then we
- * stop the flusher and verify all 4N entries were emitted
- * (modulo drops if the rings filled -- we keep N under capacity
- * to avoid drops here).
- */
 struct StressArg {
 	int n;
 };
@@ -215,7 +219,7 @@ static void *stress_pusher(void *p)
 		return NULL;
 	for (i = 0; i < a->n; i++) {
 		snprintf(buf, sizeof(buf), "s%d", i);
-		retrace_log_ring_push(r, FUNCS, SEVERITY_INFO,
+		(void)retrace_log_ring_push(r, FUNCS, SEVERITY_INFO,
 			(uint32_t)i, buf);
 	}
 	return NULL;
@@ -228,11 +232,13 @@ static void test_multi_thread_all_drained(void)
 	struct StressArg args[NTHREADS];
 	struct EmitCapture cap;
 	int i;
+	int rc;
 
 	retrace_log_ring_init();
 	emit_capture_reset(&cap);
 
-	assert(retrace_log_flusher_init(emit_capture, &cap) == 0);
+	rc = retrace_log_flusher_init(emit_capture, &cap);
+	CHECK(rc == 0);
 
 	for (i = 0; i < NTHREADS; i++) {
 		args[i].n = PER_THREAD;
@@ -243,18 +249,14 @@ static void test_multi_thread_all_drained(void)
 
 	retrace_log_flusher_stop();
 
-	/* All entries should be drained (no drops expected since
-	 * PER_THREAD < LOG_RING_DEFAULT_CAP - 1 = 63).
-	 */
-	assert(cap.count == (size_t)(NTHREADS * PER_THREAD));
-	assert(retrace_log_ring_total_dropped() == 0);
+	CHECK(cap.count == (size_t)(NTHREADS * PER_THREAD));
+	CHECK(retrace_log_ring_total_dropped() == 0);
 
 	retrace_log_ring_deinit();
 }
 
 int main(void)
 {
-	/* Init real_impls. */
 	retrace_real_impls.strcmp = strcmp;
 	retrace_real_impls.strlen = strlen;
 	retrace_real_impls.strcpy = strcpy;

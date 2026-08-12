@@ -209,6 +209,7 @@ target_link_libraries(retrace_test_modify_return_value_int PRIVATE
     Threads::Threads)
 
 target_include_directories(retrace_test_modify_return_value_int PRIVATE
+    ${CMAKE_SOURCE_DIR}/test/helpers
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/backends
     ${CMAKE_SOURCE_DIR}/src/config/json
@@ -246,6 +247,7 @@ target_link_libraries(retrace_test_call_count_limit PRIVATE
     Threads::Threads)
 
 target_include_directories(retrace_test_call_count_limit PRIVATE
+    ${CMAKE_SOURCE_DIR}/test/helpers
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/backends
     ${CMAKE_SOURCE_DIR}/src/config/json
@@ -351,6 +353,7 @@ target_link_libraries(retrace_test_fuzzing_seed PRIVATE
     Threads::Threads)
 
 target_include_directories(retrace_test_fuzzing_seed PRIVATE
+    ${CMAKE_SOURCE_DIR}/test/helpers
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/backends
     ${CMAKE_SOURCE_DIR}/src/config/json
@@ -903,6 +906,7 @@ target_link_libraries(retrace_test_decode_http PRIVATE
     Threads::Threads)
 
 target_include_directories(retrace_test_decode_http PRIVATE
+    ${CMAKE_SOURCE_DIR}/test/helpers
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/backends
     ${CMAKE_SOURCE_DIR}/src/config/json

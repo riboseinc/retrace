@@ -128,16 +128,18 @@ static void build_dns_response(unsigned char *buf, int *out_len)
 static void test_action_lookup(void)
 {
 	retrace_actions_init();
-	assert(retrace_actions_get("decode_dns") != NULL);
+	CHECK(retrace_actions_get("decode_dns") != NULL);
 }
 
 static void test_params_null(void)
 {
 	action_fn_t action = retrace_actions_get("decode_dns");
 	struct ThreadContext ctx;
+	int rc;
 
 	memset(&ctx, 0, sizeof(ctx));
-	assert(action(&ctx, NULL) == -1);
+	rc = action(&ctx, NULL);
+	CHECK(rc == -1);
 }
 
 static void test_missing_param_name(void)
@@ -145,9 +147,11 @@ static void test_missing_param_name(void)
 	action_fn_t action = retrace_actions_get("decode_dns");
 	struct ThreadContext ctx;
 	JSON_Value *v = json_value_init_object();
+	int rc;
 
 	memset(&ctx, 0, sizeof(ctx));
-	assert(action(&ctx, json_value_get_object(v)) == -1);
+	rc = action(&ctx, json_value_get_object(v));
+	CHECK(rc == -1);
 	json_value_free(v);
 }
 
@@ -158,12 +162,14 @@ static void test_dns_a_query(void)
 	int dns_len;
 	struct ThreadContext *ctx;
 	JSON_Object *p;
+	int rc;
 
 	build_dns_query(dns_buf, &dns_len);
 	ctx = build_ctx_with_buf("buf", dns_buf, dns_len);
 	p = build_params("buf");
 
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 
 	json_value_free(json_object_get_wrapping_value(p));
 }
@@ -175,12 +181,14 @@ static void test_dns_aaaa_query(void)
 	int dns_len;
 	struct ThreadContext *ctx;
 	JSON_Object *p;
+	int rc;
 
 	build_dns_aaaa_query(dns_buf, &dns_len);
 	ctx = build_ctx_with_buf("buf", dns_buf, dns_len);
 	p = build_params("buf");
 
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 
 	json_value_free(json_object_get_wrapping_value(p));
 }
@@ -192,12 +200,14 @@ static void test_dns_response(void)
 	int dns_len;
 	struct ThreadContext *ctx;
 	JSON_Object *p;
+	int rc;
 
 	build_dns_response(dns_buf, &dns_len);
 	ctx = build_ctx_with_buf("buf", dns_buf, dns_len);
 	p = build_params("buf");
 
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 
 	json_value_free(json_object_get_wrapping_value(p));
 }
@@ -209,9 +219,10 @@ static void test_non_dns_data(void)
 			       0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	struct ThreadContext *ctx = build_ctx_with_buf("buf", raw, sizeof(raw));
 	JSON_Object *p = build_params("buf");
+	int rc;
 
-	/* Non-DNS: no questions, no answers -> no-op. */
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 
 	json_value_free(json_object_get_wrapping_value(p));
 }
@@ -222,9 +233,10 @@ static void test_short_buffer(void)
 	unsigned char short_buf[] = {0x01, 0x02, 0x03};
 	struct ThreadContext *ctx = build_ctx_with_buf("buf", short_buf, 3);
 	JSON_Object *p = build_params("buf");
+	int rc;
 
-	/* Buffer too short (< 12 bytes) -> no-op. */
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 
 	json_value_free(json_object_get_wrapping_value(p));
 }
@@ -236,6 +248,7 @@ static void test_null_buffer(void)
 	static struct FuncPrototype proto;
 	struct FuncParam params[8];
 	JSON_Object *p = build_params("buf");
+	int rc;
 
 	memset(&ctx, 0, sizeof(ctx));
 	memset(params, 0, sizeof(params));
@@ -248,7 +261,8 @@ static void test_null_buffer(void)
 	ctx.params_cnt = 1;
 	memcpy(ctx.params, params, sizeof(params));
 
-	assert(action(&ctx, p) == 0);
+	rc = action(&ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -259,12 +273,14 @@ static void test_unknown_param(void)
 	int dns_len;
 	struct ThreadContext *ctx;
 	JSON_Object *p;
+	int rc;
 
 	build_dns_query(dns_buf, &dns_len);
 	ctx = build_ctx_with_buf("buf", dns_buf, dns_len);
 	p = build_params("nonexistent");
 
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 

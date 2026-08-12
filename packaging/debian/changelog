@@ -1,3 +1,10 @@
+retrace (2.3.2-1) unstable; urgency=medium
+
+  * test: CHECK macro + assert(side-effect) sweep across 8 unit tests.
+  * DRY: migrated 7 tests to shared test_utils.h boilerplate.
+
+ -- Ribose Inc <opensource@ribose.com>  Wed, 13 Aug 2026 00:00:00 +0000
+
 retrace (2.3.1-1) unstable; urgency=medium
 
   * Audit policy MECE refactor: rule matcher moved to policy module.

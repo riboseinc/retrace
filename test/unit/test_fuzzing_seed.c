@@ -22,40 +22,11 @@
  * Part of TODO.complete/14.
  */
 
-#include <assert.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-
-#include "engine.h"
-#include "actions.h"
-#include "funcs.h"
-#include "data_types.h"
-#include "real_impls.h"
-#include "parson.h"
-
-typedef int (*action_fn_t)(struct ThreadContext *t_ctx,
-			    const JSON_Object *action_params);
-
-static int tests_run;
-static int tests_pass;
-static int tests_fail;
-
-#define TEST(name) do { \
-	tests_run++; \
-	printf("  TEST %s ... ", #name); \
-	test_##name(); \
-	tests_pass++; \
-	printf("OK\n"); \
-} while (0)
+#include "test_utils.h"
 
 static JSON_Object *build_params_with_seed(double seed)
 {
-	JSON_Value *root_val = json_value_init_object();
-	JSON_Object *root = json_value_get_object(root_val);
-
-	json_object_set_number(root, "seed", seed);
-	return root;
+	return build_json_number("seed", seed);
 }
 
 static JSON_Object *build_empty_params(void)
@@ -67,7 +38,6 @@ static JSON_Object *build_empty_params(void)
 	return root;
 }
 
-/* Sample 5 rand() values into out. */
 static void sample_rand_sequence(int *out, int n)
 {
 	int i;
@@ -86,10 +56,12 @@ static int sequences_equal(const int *a, const int *b, int n)
 	return 1;
 }
 
+DECLARE_TEST_STATE();
+
 static void test_action_lookup(void)
 {
 	retrace_actions_init();
-	assert(retrace_actions_get("fuzzing_seed") != NULL);
+	CHECK(retrace_actions_get("fuzzing_seed") != NULL);
 }
 
 static void test_params_null(void)
@@ -100,7 +72,7 @@ static void test_params_null(void)
 
 	memset(&ctx, 0, sizeof(ctx));
 	rc = action(&ctx, NULL);
-	assert(rc == -1);
+	CHECK(rc == -1);
 }
 
 static void test_missing_seed(void)
@@ -112,7 +84,7 @@ static void test_missing_seed(void)
 
 	memset(&ctx, 0, sizeof(ctx));
 	rc = action(&ctx, params);
-	assert(rc == -1);
+	CHECK(rc == -1);
 
 	json_value_free(json_object_get_wrapping_value(params));
 }
@@ -125,20 +97,19 @@ static void test_seed_makes_rand_deterministic(void)
 	int seq_b[5];
 	JSON_Object *p1 = build_params_with_seed(42.0);
 	JSON_Object *p2 = build_params_with_seed(42.0);
-	int rc1, rc2;
+	int rc;
 
 	memset(&ctx, 0, sizeof(ctx));
 
-	rc1 = action(&ctx, p1);
-	assert(rc1 == 0);
+	rc = action(&ctx, p1);
+	CHECK(rc == 0);
 	sample_rand_sequence(seq_a, 5);
 
-	rc2 = action(&ctx, p2);
-	assert(rc2 == 0);
+	rc = action(&ctx, p2);
+	CHECK(rc == 0);
 	sample_rand_sequence(seq_b, 5);
 
-	/* Same seed -> same sequence. */
-	assert(sequences_equal(seq_a, seq_b, 5));
+	CHECK(sequences_equal(seq_a, seq_b, 5));
 
 	json_value_free(json_object_get_wrapping_value(p1));
 	json_value_free(json_object_get_wrapping_value(p2));
@@ -152,19 +123,19 @@ static void test_different_seeds_produce_different_sequences(void)
 	int seq_b[5];
 	JSON_Object *p1 = build_params_with_seed(1.0);
 	JSON_Object *p2 = build_params_with_seed(2.0);
+	int rc;
 
 	memset(&ctx, 0, sizeof(ctx));
 
-	action(&ctx, p1);
+	rc = action(&ctx, p1);
+	CHECK(rc == 0);
 	sample_rand_sequence(seq_a, 5);
 
-	action(&ctx, p2);
+	rc = action(&ctx, p2);
+	CHECK(rc == 0);
 	sample_rand_sequence(seq_b, 5);
 
-	/* Vanishingly unlikely for two seeds to produce identical
-	 * 5-element sequences.
-	 */
-	assert(!sequences_equal(seq_a, seq_b, 5));
+	CHECK(!sequences_equal(seq_a, seq_b, 5));
 
 	json_value_free(json_object_get_wrapping_value(p1));
 	json_value_free(json_object_get_wrapping_value(p2));
@@ -178,16 +149,19 @@ static void test_seed_zero(void)
 	int seq_b[5];
 	JSON_Object *p1 = build_params_with_seed(0.0);
 	JSON_Object *p2 = build_params_with_seed(0.0);
+	int rc;
 
 	memset(&ctx, 0, sizeof(ctx));
 
-	assert(action(&ctx, p1) == 0);
+	rc = action(&ctx, p1);
+	CHECK(rc == 0);
 	sample_rand_sequence(seq_a, 5);
 
-	assert(action(&ctx, p2) == 0);
+	rc = action(&ctx, p2);
+	CHECK(rc == 0);
 	sample_rand_sequence(seq_b, 5);
 
-	assert(sequences_equal(seq_a, seq_b, 5));
+	CHECK(sequences_equal(seq_a, seq_b, 5));
 
 	json_value_free(json_object_get_wrapping_value(p1));
 	json_value_free(json_object_get_wrapping_value(p2));
@@ -195,14 +169,8 @@ static void test_seed_zero(void)
 
 int main(void)
 {
-	retrace_real_impls.strcmp = strcmp;
-	retrace_real_impls.strlen = strlen;
-	retrace_real_impls.strcpy = strcpy;
-	retrace_real_impls.memset = memset;
-	retrace_real_impls.memcpy = memcpy;
-	retrace_real_impls.malloc = malloc;
-	retrace_real_impls.free = free;
-	retrace_real_impls.real_snprintf = snprintf;
+	init_minimal_real_impls();
+	INIT_TESTS();
 
 	printf("fuzzing_seed tests:\n");
 
@@ -216,7 +184,5 @@ int main(void)
 	TEST(different_seeds_produce_different_sequences);
 	TEST(seed_zero);
 
-	printf("\nPass: %d, Fail: %d (of %d)\n",
-		tests_pass, tests_fail, tests_run);
-	return tests_fail == 0 ? 0 : 1;
+	return finish_tests(tests_run, tests_pass, tests_fail);
 }

@@ -18,42 +18,9 @@
  * Part of TODO.complete/14.
  */
 
-#include <assert.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include "test_utils.h"
+
 #include <limits.h>
-
-#include "engine.h"
-#include "actions.h"
-#include "funcs.h"
-#include "data_types.h"
-#include "real_impls.h"
-#include "parson.h"
-
-typedef int (*action_fn_t)(struct ThreadContext *t_ctx,
-			    const JSON_Object *action_params);
-
-static int tests_run;
-static int tests_pass;
-static int tests_fail;
-
-#define TEST(name) do { \
-	tests_run++; \
-	printf("  TEST %s ... ", #name); \
-	test_##name(); \
-	tests_pass++; \
-	printf("OK\n"); \
-} while (0)
-
-static JSON_Object *build_params_with_number(const char *key, double val)
-{
-	JSON_Value *root_val = json_value_init_object();
-	JSON_Object *root = json_value_get_object(root_val);
-
-	json_object_set_number(root, key, val);
-	return root;
-}
 
 static struct ThreadContext *build_empty_ctx(void)
 {
@@ -64,10 +31,12 @@ static struct ThreadContext *build_empty_ctx(void)
 	return &ctx;
 }
 
+DECLARE_TEST_STATE();
+
 static void test_action_lookup(void)
 {
 	retrace_actions_init();
-	assert(retrace_actions_get("modify_return_value_int") != NULL);
+	CHECK(retrace_actions_get("modify_return_value_int") != NULL);
 }
 
 static void test_params_null(void)
@@ -77,7 +46,7 @@ static void test_params_null(void)
 	int rc;
 
 	rc = action(ctx, NULL);
-	assert(rc == -1);
+	CHECK(rc == -1);
 }
 
 static void test_missing_retval_int(void)
@@ -88,11 +57,10 @@ static void test_missing_retval_int(void)
 	JSON_Object *root = json_value_get_object(root_val);
 	int rc;
 
-	/* Object with unrelated key, no retval_int. */
 	json_object_set_string(root, "unrelated", "foo");
 
 	rc = action(ctx, root);
-	assert(rc == -1);
+	CHECK(rc == -1);
 
 	json_value_free(root_val);
 }
@@ -101,12 +69,12 @@ static void test_set_zero(void)
 {
 	action_fn_t action = retrace_actions_get("modify_return_value_int");
 	struct ThreadContext *ctx = build_empty_ctx();
-	JSON_Object *params = build_params_with_number("retval_int", 0.0);
+	JSON_Object *params = build_json_number("retval_int", 0.0);
 	int rc;
 
 	rc = action(ctx, params);
-	assert(rc == 0);
-	assert(ctx->ret_val == 0);
+	CHECK(rc == 0);
+	CHECK(ctx->ret_val == 0);
 
 	json_value_free(json_object_get_wrapping_value(params));
 }
@@ -115,12 +83,12 @@ static void test_set_positive(void)
 {
 	action_fn_t action = retrace_actions_get("modify_return_value_int");
 	struct ThreadContext *ctx = build_empty_ctx();
-	JSON_Object *params = build_params_with_number("retval_int", 42.0);
+	JSON_Object *params = build_json_number("retval_int", 42.0);
 	int rc;
 
 	rc = action(ctx, params);
-	assert(rc == 0);
-	assert(ctx->ret_val == 42);
+	CHECK(rc == 0);
+	CHECK(ctx->ret_val == 42);
 
 	json_value_free(json_object_get_wrapping_value(params));
 }
@@ -129,12 +97,12 @@ static void test_set_negative(void)
 {
 	action_fn_t action = retrace_actions_get("modify_return_value_int");
 	struct ThreadContext *ctx = build_empty_ctx();
-	JSON_Object *params = build_params_with_number("retval_int", -13.0);
+	JSON_Object *params = build_json_number("retval_int", -13.0);
 	int rc;
 
 	rc = action(ctx, params);
-	assert(rc == 0);
-	assert(ctx->ret_val == -13);
+	CHECK(rc == 0);
+	CHECK(ctx->ret_val == -13);
 
 	json_value_free(json_object_get_wrapping_value(params));
 }
@@ -146,14 +114,11 @@ static void test_set_large(void)
 	JSON_Object *params;
 	int rc;
 
-	/* Near long max. parson stores as double; for values < 2^53
-	 * this is exact.
-	 */
-	params = build_params_with_number("retval_int", 9007199254740992.0);
+	params = build_json_number("retval_int", 9007199254740992.0);
 
 	rc = action(ctx, params);
-	assert(rc == 0);
-	assert(ctx->ret_val == 9007199254740992L);
+	CHECK(rc == 0);
+	CHECK(ctx->ret_val == 9007199254740992L);
 
 	json_value_free(json_object_get_wrapping_value(params));
 }
@@ -162,14 +127,17 @@ static void test_overwrites_each_call(void)
 {
 	action_fn_t action = retrace_actions_get("modify_return_value_int");
 	struct ThreadContext *ctx = build_empty_ctx();
-	JSON_Object *p1 = build_params_with_number("retval_int", 100.0);
-	JSON_Object *p2 = build_params_with_number("retval_int", 200.0);
+	JSON_Object *p1 = build_json_number("retval_int", 100.0);
+	JSON_Object *p2 = build_json_number("retval_int", 200.0);
+	int rc;
 
-	assert(action(ctx, p1) == 0);
-	assert(ctx->ret_val == 100);
+	rc = action(ctx, p1);
+	CHECK(rc == 0);
+	CHECK(ctx->ret_val == 100);
 
-	assert(action(ctx, p2) == 0);
-	assert(ctx->ret_val == 200);
+	rc = action(ctx, p2);
+	CHECK(rc == 0);
+	CHECK(ctx->ret_val == 200);
 
 	json_value_free(json_object_get_wrapping_value(p1));
 	json_value_free(json_object_get_wrapping_value(p2));
@@ -177,14 +145,8 @@ static void test_overwrites_each_call(void)
 
 int main(void)
 {
-	retrace_real_impls.strcmp = strcmp;
-	retrace_real_impls.strlen = strlen;
-	retrace_real_impls.strcpy = strcpy;
-	retrace_real_impls.memset = memset;
-	retrace_real_impls.memcpy = memcpy;
-	retrace_real_impls.malloc = malloc;
-	retrace_real_impls.free = free;
-	retrace_real_impls.real_snprintf = snprintf;
+	init_minimal_real_impls();
+	INIT_TESTS();
 
 	printf("modify_return_value_int tests:\n");
 
@@ -200,7 +162,5 @@ int main(void)
 	TEST(set_large);
 	TEST(overwrites_each_call);
 
-	printf("\nPass: %d, Fail: %d (of %d)\n",
-		tests_pass, tests_fail, tests_run);
-	return tests_fail == 0 ? 0 : 1;
+	return finish_tests(tests_run, tests_pass, tests_fail);
 }

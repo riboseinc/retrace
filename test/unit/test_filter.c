@@ -14,32 +14,7 @@
  * Tests cover all six operators, param lookup, and edge cases.
  */
 
-#include <assert.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-
-#include "engine.h"
-#include "actions.h"
-#include "funcs.h"
-#include "data_types.h"
-#include "real_impls.h"
-#include "parson.h"
-
-typedef int (*action_fn_t)(struct ThreadContext *t_ctx,
-			    const JSON_Object *action_params);
-
-static int tests_run;
-static int tests_pass;
-static int tests_fail;
-
-#define TEST(name) do { \
-	tests_run++; \
-	printf("  TEST %s ... ", #name); \
-	test_##name(); \
-	tests_pass++; \
-	printf("OK\n"); \
-} while (0)
+#include "test_utils.h"
 
 static JSON_Object *build_filter_params(const char *param_name,
 					const char *op, double value)
@@ -89,10 +64,12 @@ static struct ThreadContext *build_empty_ctx(void)
 	return &ctx;
 }
 
+DECLARE_TEST_STATE();
+
 static void test_action_lookup(void)
 {
 	retrace_actions_init();
-	assert(retrace_actions_get("filter") != NULL);
+	CHECK(retrace_actions_get("filter") != NULL);
 }
 
 static void test_eq_pass(void)
@@ -100,8 +77,10 @@ static void test_eq_pass(void)
 	action_fn_t action = retrace_actions_get("filter");
 	struct ThreadContext *ctx = build_ctx_with_int_param("x", 42);
 	JSON_Object *p = build_filter_params("x", "==", 42);
+	int rc;
 
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -110,8 +89,10 @@ static void test_eq_fail(void)
 	action_fn_t action = retrace_actions_get("filter");
 	struct ThreadContext *ctx = build_ctx_with_int_param("x", 42);
 	JSON_Object *p = build_filter_params("x", "==", 99);
+	int rc;
 
-	assert(action(ctx, p) == -1);
+	rc = action(ctx, p);
+	CHECK(rc == -1);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -123,7 +104,7 @@ static void test_##testname(void) \
 	struct ThreadContext *ctx = build_ctx_with_int_param("x", actual); \
 	JSON_Object *p = build_filter_params("x", op, expected); \
 	int rc = action(ctx, p); \
-	assert(should_pass ? rc == 0 : rc == -1); \
+	CHECK(should_pass ? rc == 0 : rc == -1); \
 	json_value_free(json_object_get_wrapping_value(p)); \
 }
 
@@ -140,8 +121,10 @@ static void test_params_null(void)
 {
 	action_fn_t action = retrace_actions_get("filter");
 	struct ThreadContext *ctx = build_empty_ctx();
+	int rc;
 
-	assert(action(ctx, NULL) == -1);
+	rc = action(ctx, NULL);
+	CHECK(rc == -1);
 }
 
 static void test_missing_param_name(void)
@@ -150,10 +133,12 @@ static void test_missing_param_name(void)
 	struct ThreadContext *ctx = build_empty_ctx();
 	JSON_Value *root_val = json_value_init_object();
 	JSON_Object *root = json_value_get_object(root_val);
+	int rc;
 
 	json_object_set_string(root, "op", "==");
 	json_object_set_number(root, "value", 0);
-	assert(action(ctx, root) == -1);
+	rc = action(ctx, root);
+	CHECK(rc == -1);
 	json_value_free(root_val);
 }
 
@@ -163,10 +148,12 @@ static void test_missing_op(void)
 	struct ThreadContext *ctx = build_empty_ctx();
 	JSON_Value *root_val = json_value_init_object();
 	JSON_Object *root = json_value_get_object(root_val);
+	int rc;
 
 	json_object_set_string(root, "param_name", "x");
 	json_object_set_number(root, "value", 0);
-	assert(action(ctx, root) == -1);
+	rc = action(ctx, root);
+	CHECK(rc == -1);
 	json_value_free(root_val);
 }
 
@@ -175,8 +162,10 @@ static void test_unknown_param(void)
 	action_fn_t action = retrace_actions_get("filter");
 	struct ThreadContext *ctx = build_ctx_with_int_param("real", 42);
 	JSON_Object *p = build_filter_params("nonexistent", "==", 42);
+	int rc;
 
-	assert(action(ctx, p) == -1);
+	rc = action(ctx, p);
+	CHECK(rc == -1);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -185,8 +174,10 @@ static void test_unknown_op(void)
 	action_fn_t action = retrace_actions_get("filter");
 	struct ThreadContext *ctx = build_ctx_with_int_param("x", 42);
 	JSON_Object *p = build_filter_params("x", "invalid_op", 42);
+	int rc;
 
-	assert(action(ctx, p) == -1);
+	rc = action(ctx, p);
+	CHECK(rc == -1);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
@@ -195,21 +186,17 @@ static void test_negative_value(void)
 	action_fn_t action = retrace_actions_get("filter");
 	struct ThreadContext *ctx = build_ctx_with_int_param("x", -5);
 	JSON_Object *p = build_filter_params("x", "<", 0);
+	int rc;
 
-	assert(action(ctx, p) == 0);
+	rc = action(ctx, p);
+	CHECK(rc == 0);
 	json_value_free(json_object_get_wrapping_value(p));
 }
 
 int main(void)
 {
-	retrace_real_impls.strcmp = strcmp;
-	retrace_real_impls.strlen = strlen;
-	retrace_real_impls.strcpy = strcpy;
-	retrace_real_impls.memset = memset;
-	retrace_real_impls.memcpy = memcpy;
-	retrace_real_impls.malloc = malloc;
-	retrace_real_impls.free = free;
-	retrace_real_impls.real_snprintf = snprintf;
+	init_minimal_real_impls();
+	INIT_TESTS();
 
 	printf("filter action tests:\n");
 
@@ -236,7 +223,5 @@ int main(void)
 	printf("  -- edge cases --\n");
 	TEST(negative_value);
 
-	printf("\nPass: %d, Fail: %d (of %d)\n",
-		tests_pass, tests_fail, tests_run);
-	return tests_fail == 0 ? 0 : 1;
+	return finish_tests(tests_run, tests_pass, tests_fail);
 }
