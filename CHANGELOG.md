@@ -6,6 +6,130 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.3.0] - 2026-08-12
+
+### Added
+
+#### Lock-free logger (TODO 19)
+
+- Per-thread SPSC ring buffer replaces the global-mutex logger
+  hot path. Background flusher thread drains rings at 1ms cadence.
+  Eliminates contention; sustains 100K+ events/sec on multi-core.
+  `RETRACE_LOGGER_RING=0` env gate for platforms where background
+  threads are unstable (OHOS Docker/QEMU).
+
+#### capture_buffer action (new — 17th built-in)
+
+- Post-call memory observation. Reads N bytes from a pointer param
+  (after `call_real`) and logs as hex or string. Critical for
+  security auditing: see WHAT was read/received, not just that
+  read()/recv() was called.
+
+#### Call-hash coverage feedback for libFuzzer (TODO 24)
+
+- Per-thread FNV-1a rolling hash of intercepted libc calls.
+  Exported as `retrace_call_hash_last` global for a libFuzzer
+  custom mutator (`fuzz_call_hash`) that biases mutations toward
+  inputs exercising new call sequences.
+
+#### Compliance audit tool (TODO 26)
+
+- `retrace-audit` reads a retrace JSON log, applies policy rules,
+  and emits findings as JSON, SARIF 2.1.0, or printable PDF.
+  Ships with 4 policies: baseline, PCI-DSS, HIPAA, ISO 27001.
+
+#### Differential trace analysis (TODO 27)
+
+- `retrace-diff` compares two traces per function call-count and
+  total-time. Supports `--threshold` (CI gating), `--order` (LCS
+  sequence alignment), and `--stats` (statistical significance
+  via z-score against N baseline traces).
+
+#### Time-travel replay (TODO 25)
+
+- `retrace-replay` interactive tool: step forward/backward
+  through trace events, jump to indices, search by regex.
+  Surfaces `capture_buffer` entries alongside parent calls.
+
+#### WebSocket live streaming (TODO 22)
+
+- `retrace-ws` tails the JSON log and broadcasts to WebSocket
+  clients. Built-in browser viewer with function-name highlighting
+  and severity coloring.
+
+#### Frida bridge (TODO 28)
+
+- `retrace-frida.js`: hooks 30 libc functions via Frida's
+  Interceptor, dereferences string args (path, name, command),
+  emits retrace-compatible JSON to stdout.
+
+#### eBPF backend (TODO 29)
+
+- BPF program + Python loader skeleton for kernel-level syscall
+  observation on Linux. Observation-only (eBPF cannot mutate).
+
+#### VS Code extension (TODO 31)
+
+- `retrace: Open Log Viewer` — webview with function-name
+  highlighting and severity coloring. `retrace: Show Stats` —
+  per-function call count quick-pick. `retrace: Connect to Live
+  Stream` — WebSocket client consuming retrace-ws output.
+
+#### Grafana data source (TODO 32)
+
+- Loads retrace JSON log (via HTTP) as a Grafana time series.
+  5-second cache TTL for live-reload dashboards.
+
+#### CLI fuzz-replay (TODO 33)
+
+- `retrace fuzz-replay <fuzzer-name> <crash-input>` replays a
+  crash reproducer through the named libFuzzer harness.
+
+#### Nightly fuzz workflow (TODO 33)
+
+- `.github/workflows/fuzz.yml` runs all 5 fuzzers for 5 minutes
+  each, uploads crash artifacts (exit 77/71/70) on failure.
+
+#### Website interactive features (TODO 36)
+
+- Decision Wizard: 4-step wizard (goal → sub-goal → target →
+  config + command + recipe link).
+- Recipe Builder: drag-and-drop action chain composer with live
+  JSON output.
+- Wasm playground: browser-based trace demo running entirely in
+  WebAssembly.
+
+#### Cookbook recipes 22-23
+
+- Recipe 22: Decode HTTP and DNS wire formats.
+- Recipe 23: Bridge to OpenTelemetry (OTLP) via retrace-to-otlp.
+
+### Fixed
+
+- macOS dyld destructor crash: `thread_context.c` destructor was
+  deleting the global pthread_key from a per-thread context.
+- OHOS Docker/QEMU crash: background flusher thread spawned during
+  constructor. Fixed via lazy spawn + `RETRACE_LOGGER_RING=0`.
+- Alpine arm64 perf-bench timeout: reduced iterations from 100K
+  to 10K for QEMU-compatible runtime.
+- Parson OOM: 129-byte adversarial input caused ~2GB allocation.
+  Added allocation budget (`input_size * 1000`) to
+  `json_parse_string_with_comments`.
+- CLI `cmd_trace` stack overflow: snprintf return accumulation
+  without bounds checking. Fixed via extracted config builders.
+
+### Changed
+
+- Logger hot path: global mutex → per-thread SPSC ring + background
+  flusher (3 PRs: ring, flusher, integration).
+- Audit tool: MECE refactor — scan/present/format layers are
+  separate (OCP: adding a format = new function, no engine change).
+- Action param lookup: DRY extraction into `retrace_action_find_param`
+  shared across 8 sites in 5 files.
+- Flusher stop: `pthread_join` (hangs on macOS dyld destructor) →
+  spin-wait + grace period.
+- Removed `retrace_logger_log_old` (dead code, pre-JSON legacy).
+
 ## [2.2.2] - 2026-08-08
 
 ### Added

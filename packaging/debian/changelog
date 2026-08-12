@@ -1,4 +1,4 @@
-retrace (2.2.2-1) unstable; urgency=medium
+retrace (2.3.0-1) unstable; urgency=medium
 
   * Initial Debian packaging.
   * Network function interception (27 BSD-sockets functions).
