@@ -987,3 +987,51 @@ endif()
 add_test(NAME unit-test-decode-dns
     COMMAND retrace_test_decode_dns)
 set_tests_properties(unit-test-decode-dns PROPERTIES LABELS "unit")
+
+#
+# Audit policy unit tests (TODO.complete/26). policy_rule_matches
+# is the audit-converter's predicate engine -- exercises every
+# predicate type (func_exact, func_prefix, path_contains,
+# env_pattern suffix/prefix/exact), AND semantics, and NULL safety.
+# Compiles policy.c directly from tools/audit-converter/.
+#
+set(_audit_policy_source
+    ${CMAKE_SOURCE_DIR}/tools/audit-converter/policy.c)
+set(_parson_for_tools ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
+
+add_executable(retrace_test_policy test_policy.c
+    ${_audit_policy_source} ${_parson_for_tools})
+set_target_properties(retrace_test_policy PROPERTIES
+    OUTPUT_NAME test_policy
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_policy PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/audit-converter
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-policy
+    COMMAND retrace_test_policy)
+set_tests_properties(unit-test-policy PROPERTIES LABELS "unit")
+
+#
+# Trace-diff normalize unit tests (TODO.complete/27). Verifies
+# call-count aggregation, duration sum, engine-noise filtering,
+# ordering preservation, and NULL safety. Compiles normalize.c
+# directly from tools/trace-diff/.
+#
+add_executable(retrace_test_normalize test_normalize.c
+    ${CMAKE_SOURCE_DIR}/tools/trace-diff/normalize.c
+    ${_parson_for_tools})
+set_target_properties(retrace_test_normalize PROPERTIES
+    OUTPUT_NAME test_normalize
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_normalize PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/trace-diff
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-normalize
+    COMMAND retrace_test_normalize)
+set_tests_properties(unit-test-normalize PROPERTIES LABELS "unit")

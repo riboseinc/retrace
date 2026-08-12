@@ -163,3 +163,75 @@ int policy_load_from_file(const char *path, struct Policy *out)
 	json_value_free(v);
 	return rc;
 }
+
+int policy_rule_matches(const struct Rule *rule, JSON_Object *msg)
+{
+	const char *func;
+	size_t nkeys, k;
+
+	if (rule == NULL || msg == NULL)
+		return 0;
+
+	func = json_object_get_string(msg, "func");
+
+	if (rule->func_exact != NULL) {
+		if (func == NULL || strcmp(func, rule->func_exact) != 0)
+			return 0;
+	}
+
+	if (rule->func_prefix != NULL) {
+		size_t plen = strlen(rule->func_prefix);
+
+		if (func == NULL || strncmp(func, rule->func_prefix, plen) != 0)
+			return 0;
+	}
+
+	if (rule->path_contains != NULL) {
+		int found = 0;
+
+		nkeys = json_object_get_count(msg);
+		for (k = 0; k < nkeys; k++) {
+			JSON_Value *v = json_object_get_value_at(msg, k);
+			const char *s;
+
+			if (json_value_get_type(v) != JSONString)
+				continue;
+			s = json_value_get_string(v);
+			if (s != NULL && strstr(s, rule->path_contains) != NULL) {
+				found = 1;
+				break;
+			}
+		}
+		if (!found)
+			return 0;
+	}
+
+	if (rule->env_pattern != NULL) {
+		const char *var = json_object_get_string(msg, "name");
+		size_t plen;
+		int match = 0;
+
+		if (var == NULL)
+			return 0;
+		plen = strlen(rule->env_pattern);
+		if (rule->env_pattern[0] == '*' && plen > 1) {
+			size_t vlen = strlen(var);
+			size_t suffix_len = plen - 1;
+
+			if (vlen >= suffix_len &&
+			    strcmp(var + vlen - suffix_len,
+				   rule->env_pattern + 1) == 0)
+				match = 1;
+		} else if (plen > 0 && rule->env_pattern[plen - 1] == '*') {
+			if (strncmp(var, rule->env_pattern, plen - 1) == 0)
+				match = 1;
+		} else {
+			if (strcmp(var, rule->env_pattern) == 0)
+				match = 1;
+		}
+		if (!match)
+			return 0;
+	}
+
+	return 1;
+}
