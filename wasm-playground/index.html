@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>retrace wasm playground</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; padding: 20px; }
+h1 { font-size: 1.4rem; margin-bottom: 4px; }
+.sub { color: #888; font-size: 0.85rem; margin-bottom: 20px; }
+.controls { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; }
+input[type=number] { width: 80px; padding: 6px 10px; font-size: 14px; background: #16213e; color: #e0e0e0; border: 1px solid #334; border-radius: 4px; }
+button { padding: 8px 18px; font-size: 14px; background: #0f3460; color: #e0e0e0; border: none; border-radius: 4px; cursor: pointer; }
+button:hover { background: #1a4a7a; }
+.result { margin-bottom: 16px; font-size: 0.9rem; color: #8cc; }
+pre { background: #0f0f23; border: 1px solid #223; border-radius: 6px; padding: 12px; font-size: 13px; line-height: 1.5; overflow-x: auto; white-space: pre; }
+.func { color: #6ed6ff; font-weight: bold; }
+.error { color: #f88; }
+</style>
+</head>
+<body>
+<h1>retrace wasm playground</h1>
+<p class="sub">
+  A minimal demo of retrace's intercept-log-trace pattern, running entirely in your browser via WebAssembly.
+  Pick a number, click Run, and see the libc-call trace for computing its factorial.
+</p>
+
+<div class="controls">
+  <label>factorial of:</label>
+  <input type="number" id="n" value="5" min="0" max="12">
+  <button id="btn" disabled>Run</button>
+</div>
+
+<div class="result" id="result"></div>
+<pre id="trace">Loading wasm...</pre>
+
+<script>
+(async () => {
+  let instance = null;
+  let memory = null;
+
+  try {
+    const resp = await fetch('playground.wasm');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const bytes = await resp.arrayBuffer();
+    const result = await WebAssembly.instantiate(bytes, {});
+    instance = result.instance;
+    memory = instance.exports.memory;
+    document.getElementById('btn').disabled = false;
+    document.getElementById('trace').textContent = 'Ready. Click Run.';
+  } catch (err) {
+    document.getElementById('trace').innerHTML =
+      '<span class="error">Cannot load playground.wasm.\n' +
+      'Build with:\n' +
+      '  clang --target=wasm32 -O2 -nostdlib \\\n' +
+      '    -Wl,--no-entry -Wl,--export=run \\\n' +
+      '    -Wl,--export=get_trace \\\n' +
+      '    -o wasm-playground/playground.wasm \\\n' +
+      '    wasm-playground/playground.c\n\n' +
+      'Error: ' + err.message + '</span>';
+    return;
+  }
+
+  function readCString(ptr) {
+    const view = new Uint8Array(memory.buffer);
+    let end = ptr;
+    while (view[end] !== 0) end++;
+    return new TextDecoder().decode(view.slice(ptr, end));
+  }
+
+  function colorize(trace) {
+    return trace.split('\n').map(line => {
+      if (!line) return '';
+      const paren = line.indexOf('(');
+      if (paren > 0) {
+        const func = line.substring(0, paren);
+        const args = line.substring(paren);
+        return '<span class="func">' + func + '</span>' + args;
+      }
+      return line;
+    }).join('\n');
+  }
+
+  document.getElementById('btn').onclick = () => {
+    const n = parseInt(document.getElementById('n').value, 10);
+    const result = instance.exports.run(n);
+    const tracePtr = instance.exports.get_trace();
+    const trace = readCString(tracePtr);
+
+    document.getElementById('result').textContent =
+      n + '! = ' + result;
+    document.getElementById('trace').innerHTML = colorize(trace);
+  };
+})();
+</script>
+</body>
+</html>
