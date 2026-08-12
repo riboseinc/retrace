@@ -19,6 +19,10 @@
  *   - policy_rule_matches AND semantics (all non-NULL constraints
  *     must match)
  *   - policy_rule_matches NULL safety
+ *
+ * Note: function calls live OUTSIDE assert() so the side-effecting
+ * call still happens under -DNDEBUG. Otherwise the test would
+ * operate on uninitialized memory.
  */
 
 #include "parson.h"
@@ -38,6 +42,15 @@ static int tests_fail;
 	test_##name(); \
 	tests_pass++; \
 	printf("OK\n"); \
+} while (0)
+
+/* Always-on check. assert() alone is compiled out by NDEBUG. */
+#define CHECK(cond) do { \
+	if (!(cond)) { \
+		printf("FAIL [%s:%d] %s\n", __FILE__, __LINE__, #cond); \
+		tests_fail++; \
+		return; \
+	} \
 } while (0)
 
 /* ----- Helpers ----- */
@@ -70,15 +83,15 @@ static void msg_free(JSON_Object *o)
 
 static void test_severity_str_round_trip(void)
 {
-	assert(strcmp(severity_str(SEV_INFO), "info") == 0);
-	assert(strcmp(severity_str(SEV_MEDIUM), "medium") == 0);
-	assert(strcmp(severity_str(SEV_HIGH), "high") == 0);
-	assert(strcmp(severity_str(SEV_CRITICAL), "critical") == 0);
+	CHECK(strcmp(severity_str(SEV_INFO), "info") == 0);
+	CHECK(strcmp(severity_str(SEV_MEDIUM), "medium") == 0);
+	CHECK(strcmp(severity_str(SEV_HIGH), "high") == 0);
+	CHECK(strcmp(severity_str(SEV_CRITICAL), "critical") == 0);
 }
 
 static void test_severity_str_default_is_info(void)
 {
-	assert(strcmp(severity_str((enum Severity)99), "info") == 0);
+	CHECK(strcmp(severity_str((enum Severity)99), "info") == 0);
 }
 
 /* ----- policy_load_from_json ----- */
@@ -101,30 +114,32 @@ static void test_load_all_predicate_types(void)
 	JSON_Value *v = json_parse_string(src);
 	JSON_Object *root = json_value_get_object(v);
 	struct Policy p;
+	int rc;
 
-	assert(policy_load_from_json(root, &p) == 0);
-	assert(strcmp(p.name, "test") == 0);
-	assert(p.rules_count == 4);
+	rc = policy_load_from_json(root, &p);
+	CHECK(rc == 0);
+	CHECK(strcmp(p.name, "test") == 0);
+	CHECK(p.rules_count == 4);
 
-	assert(strcmp(p.rules[0].id, "R1") == 0);
-	assert(p.rules[0].severity == SEV_HIGH);
-	assert(p.rules[0].func_exact != NULL);
-	assert(strcmp(p.rules[0].func_exact, "system") == 0);
+	CHECK(strcmp(p.rules[0].id, "R1") == 0);
+	CHECK(p.rules[0].severity == SEV_HIGH);
+	CHECK(p.rules[0].func_exact != NULL);
+	CHECK(strcmp(p.rules[0].func_exact, "system") == 0);
 
-	assert(strcmp(p.rules[1].id, "R2") == 0);
-	assert(p.rules[1].severity == SEV_MEDIUM);
-	assert(p.rules[1].func_prefix != NULL);
-	assert(strcmp(p.rules[1].func_prefix, "get") == 0);
+	CHECK(strcmp(p.rules[1].id, "R2") == 0);
+	CHECK(p.rules[1].severity == SEV_MEDIUM);
+	CHECK(p.rules[1].func_prefix != NULL);
+	CHECK(strcmp(p.rules[1].func_prefix, "get") == 0);
 
-	assert(strcmp(p.rules[2].id, "R3") == 0);
-	assert(p.rules[2].severity == SEV_CRITICAL);
-	assert(p.rules[2].path_contains != NULL);
-	assert(strcmp(p.rules[2].path_contains, "/etc/passwd") == 0);
+	CHECK(strcmp(p.rules[2].id, "R3") == 0);
+	CHECK(p.rules[2].severity == SEV_CRITICAL);
+	CHECK(p.rules[2].path_contains != NULL);
+	CHECK(strcmp(p.rules[2].path_contains, "/etc/passwd") == 0);
 
-	assert(strcmp(p.rules[3].id, "R4") == 0);
-	assert(p.rules[3].severity == SEV_INFO);
-	assert(p.rules[3].env_pattern != NULL);
-	assert(strcmp(p.rules[3].env_pattern, "*_TOKEN") == 0);
+	CHECK(strcmp(p.rules[3].id, "R4") == 0);
+	CHECK(p.rules[3].severity == SEV_INFO);
+	CHECK(p.rules[3].env_pattern != NULL);
+	CHECK(strcmp(p.rules[3].env_pattern, "*_TOKEN") == 0);
 
 	policy_free(&p);
 	json_value_free(v);
@@ -136,11 +151,13 @@ static void test_load_missing_rules_array(void)
 	JSON_Value *v = json_parse_string(src);
 	JSON_Object *root = json_value_get_object(v);
 	struct Policy p;
+	int rc;
 
-	assert(policy_load_from_json(root, &p) == 0);
-	assert(strcmp(p.name, "empty") == 0);
-	assert(p.rules == NULL);
-	assert(p.rules_count == 0);
+	rc = policy_load_from_json(root, &p);
+	CHECK(rc == 0);
+	CHECK(strcmp(p.name, "empty") == 0);
+	CHECK(p.rules == NULL);
+	CHECK(p.rules_count == 0);
 	policy_free(&p);
 	json_value_free(v);
 }
@@ -151,9 +168,11 @@ static void test_load_unnamed_policy_uses_default(void)
 	JSON_Value *v = json_parse_string(src);
 	JSON_Object *root = json_value_get_object(v);
 	struct Policy p;
+	int rc;
 
-	assert(policy_load_from_json(root, &p) == 0);
-	assert(strcmp(p.name, "(unnamed)") == 0);
+	rc = policy_load_from_json(root, &p);
+	CHECK(rc == 0);
+	CHECK(strcmp(p.name, "(unnamed)") == 0);
 	policy_free(&p);
 	json_value_free(v);
 }
@@ -162,8 +181,8 @@ static void test_load_null_safety(void)
 {
 	struct Policy p;
 
-	assert(policy_load_from_json(NULL, &p) == -1);
-	assert(policy_load_from_json(NULL, NULL) == -1);
+	CHECK(policy_load_from_json(NULL, &p) == -1);
+	CHECK(policy_load_from_json(NULL, NULL) == -1);
 }
 
 static void test_free_null_is_safe(void)
@@ -178,7 +197,7 @@ static void test_func_exact_match(void)
 	struct Rule r = {"R", "", .func_exact = "system"};
 	JSON_Object *m = msg_from_func("system");
 
-	assert(policy_rule_matches(&r, m) == 1);
+	CHECK(policy_rule_matches(&r, m) == 1);
 	msg_free(m);
 }
 
@@ -187,7 +206,7 @@ static void test_func_exact_no_match(void)
 	struct Rule r = {"R", "", .func_exact = "system"};
 	JSON_Object *m = msg_from_func("execve");
 
-	assert(policy_rule_matches(&r, m) == 0);
+	CHECK(policy_rule_matches(&r, m) == 0);
 	msg_free(m);
 }
 
@@ -196,7 +215,7 @@ static void test_func_exact_no_func_in_msg(void)
 	struct Rule r = {"R", "", .func_exact = "system"};
 	JSON_Object *m = msg_with_string("text", "no func here");
 
-	assert(policy_rule_matches(&r, m) == 0);
+	CHECK(policy_rule_matches(&r, m) == 0);
 	msg_free(m);
 }
 
@@ -207,7 +226,7 @@ static void test_func_prefix_match(void)
 	struct Rule r = {"R", "", .func_prefix = "get"};
 	JSON_Object *m = msg_from_func("getenv");
 
-	assert(policy_rule_matches(&r, m) == 1);
+	CHECK(policy_rule_matches(&r, m) == 1);
 	msg_free(m);
 }
 
@@ -216,7 +235,7 @@ static void test_func_prefix_no_match(void)
 	struct Rule r = {"R", "", .func_prefix = "get"};
 	JSON_Object *m = msg_from_func("setenv");
 
-	assert(policy_rule_matches(&r, m) == 0);
+	CHECK(policy_rule_matches(&r, m) == 0);
 	msg_free(m);
 }
 
@@ -227,7 +246,7 @@ static void test_path_contains_match_in_path(void)
 	struct Rule r = {"R", "", .path_contains = "/etc/passwd"};
 	JSON_Object *m = msg_with_string("path", "/etc/passwd");
 
-	assert(policy_rule_matches(&r, m) == 1);
+	CHECK(policy_rule_matches(&r, m) == 1);
 	msg_free(m);
 }
 
@@ -236,7 +255,7 @@ static void test_path_contains_match_in_any_string_field(void)
 	struct Rule r = {"R", "", .path_contains = "secret"};
 	JSON_Object *m = msg_with_string("buf", "load the secret sauce");
 
-	assert(policy_rule_matches(&r, m) == 1);
+	CHECK(policy_rule_matches(&r, m) == 1);
 	msg_free(m);
 }
 
@@ -245,7 +264,7 @@ static void test_path_contains_no_match(void)
 	struct Rule r = {"R", "", .path_contains = "/etc/shadow"};
 	JSON_Object *m = msg_with_string("path", "/etc/passwd");
 
-	assert(policy_rule_matches(&r, m) == 0);
+	CHECK(policy_rule_matches(&r, m) == 0);
 	msg_free(m);
 }
 
@@ -256,7 +275,7 @@ static void test_env_pattern_suffix_match(void)
 	struct Rule r = {"R", "", .env_pattern = "*_TOKEN"};
 	JSON_Object *m = msg_with_string("name", "API_TOKEN");
 
-	assert(policy_rule_matches(&r, m) == 1);
+	CHECK(policy_rule_matches(&r, m) == 1);
 	msg_free(m);
 }
 
@@ -265,7 +284,7 @@ static void test_env_pattern_suffix_no_match(void)
 	struct Rule r = {"R", "", .env_pattern = "*_TOKEN"};
 	JSON_Object *m = msg_with_string("name", "API_KEY");
 
-	assert(policy_rule_matches(&r, m) == 0);
+	CHECK(policy_rule_matches(&r, m) == 0);
 	msg_free(m);
 }
 
@@ -274,7 +293,7 @@ static void test_env_pattern_prefix_match(void)
 	struct Rule r = {"R", "", .env_pattern = "LD_*"};
 	JSON_Object *m = msg_with_string("name", "LD_PRELOAD");
 
-	assert(policy_rule_matches(&r, m) == 1);
+	CHECK(policy_rule_matches(&r, m) == 1);
 	msg_free(m);
 }
 
@@ -283,7 +302,7 @@ static void test_env_pattern_prefix_no_match(void)
 	struct Rule r = {"R", "", .env_pattern = "LD_*"};
 	JSON_Object *m = msg_with_string("name", "PATH");
 
-	assert(policy_rule_matches(&r, m) == 0);
+	CHECK(policy_rule_matches(&r, m) == 0);
 	msg_free(m);
 }
 
@@ -292,7 +311,7 @@ static void test_env_pattern_exact_match(void)
 	struct Rule r = {"R", "", .env_pattern = "IFS"};
 	JSON_Object *m = msg_with_string("name", "IFS");
 
-	assert(policy_rule_matches(&r, m) == 1);
+	CHECK(policy_rule_matches(&r, m) == 1);
 	msg_free(m);
 }
 
@@ -301,7 +320,7 @@ static void test_env_pattern_null_name_in_msg(void)
 	struct Rule r = {"R", "", .env_pattern = "*_TOKEN"};
 	JSON_Object *m = msg_from_func("getenv");  /* no "name" field */
 
-	assert(policy_rule_matches(&r, m) == 0);
+	CHECK(policy_rule_matches(&r, m) == 0);
 	msg_free(m);
 }
 
@@ -314,7 +333,7 @@ static void test_and_both_match(void)
 	JSON_Object *m = msg_from_func("open");
 
 	json_object_set_string(m, "path", "/etc/passwd");
-	assert(policy_rule_matches(&r, m) == 1);
+	CHECK(policy_rule_matches(&r, m) == 1);
 	msg_free(m);
 }
 
@@ -325,7 +344,7 @@ static void test_and_one_fails(void)
 	JSON_Object *m = msg_from_func("open");
 
 	json_object_set_string(m, "path", "/var/log/foo");
-	assert(policy_rule_matches(&r, m) == 0);
+	CHECK(policy_rule_matches(&r, m) == 0);
 	msg_free(m);
 }
 
@@ -336,7 +355,7 @@ static void test_empty_rule_matches_anything(void)
 	struct Rule r = {"R", ""};  /* all predicates NULL */
 	JSON_Object *m = msg_from_func("anything");
 
-	assert(policy_rule_matches(&r, m) == 1);
+	CHECK(policy_rule_matches(&r, m) == 1);
 	msg_free(m);
 }
 
@@ -345,8 +364,8 @@ static void test_null_inputs_safe(void)
 	struct Rule r = {"R", ""};
 	JSON_Object *m = msg_from_func("x");
 
-	assert(policy_rule_matches(NULL, m) == 0);
-	assert(policy_rule_matches(&r, NULL) == 0);
+	CHECK(policy_rule_matches(NULL, m) == 0);
+	CHECK(policy_rule_matches(&r, NULL) == 0);
 	msg_free(m);
 }
 
