@@ -202,6 +202,27 @@ $ retrace validate bad-config.json
 error: unknown action 'modify_return_value' (did you mean modify_return_value_int?)
 ```
 
+### `fuzz-replay` — replay a libFuzzer crash
+
+```sh
+retrace fuzz-replay <fuzzer-name> <crash-input>
+```
+
+Replays a crash input through the matching libFuzzer harness for
+quick triage. Looks up the harness under `build/test/fuzz/` (built
+with `-DRETRACE_BUILD_FUZZERS=ON`). Useful when the nightly fuzz
+workflow reports a crash and you want to reproduce it locally with
+ASAN / gdb attached.
+
+```sh
+$ retrace fuzz-replay fuzz_action_run crash-abc123
+retrace fuzz-replay: running fuzz_action_run on crash-abc123 ...
+... (ASAN backtrace if the crash reproduces)
+```
+
+The fuzzer name must match a binary under `build/test/fuzz/`. To
+list available fuzzers, run `ls build/test/fuzz/`.
+
 ## Common options
 
 These apply to `run`, `trace`, `mock`, `fuzz`, and `slow`:

@@ -22,7 +22,7 @@ incomplete I/O), redirecting network `connect()` calls, redirecting
 file `open()` paths, faking OpenSSL verify results, and more.
 
 
-== Supported platforms (v2.2.0)
+== Supported platforms (v2.3.3)
 
 [cols="1,1,1,1", frame=all, grid=all]
 |===
@@ -77,6 +77,70 @@ See the link:https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README
 for 20+ recipes covering tracing, fuzzing, mocking, redirection,
 security auditing, and CI integration.
 
+
+== What's new in v2.3.x
+
+The v2.3.x series turns retrace from a single CLI into a tools
+ecosystem: one shared-library backend, plus standalone tools that
+all consume the same JSON log format.
+
+* **Lock-free SPSC ring logger** &mdash; per-thread ring with atomic
+  head/tail; a single background flusher thread drains at 1ms
+  cadence. Hot path is now a non-blocking push instead of a
+  mutexed `fwrite`. Env-gated via `RETRACE_LOGGER_RING` (default
+  on; disable for OHOS/QEMU).
+* **`capture_buffer` action** &mdash; post-call memory observation:
+  reads N bytes from a pointer param and logs as hex or string.
+* **`call_hash`** &mdash; per-thread FNV-1a rolling hash of
+  intercepted libc calls; surfaces as coverage feedback for
+  libFuzzer via a custom mutator.
+* **`retrace-audit`** &mdash; compliance audit tool. Apply a policy
+  file (baseline / PCI-DSS / HIPAA / ISO 27001 / custom) and emit
+  findings as JSON, SARIF 2.1.0 (GitHub Code Scanning / Azure
+  DevOps), or printable PDF. See
+  link:docs/cookbook/24-audit-compliance.md[cookbook 24].
+* **`retrace-diff`** &mdash; differential trace analysis. Per-function
+  count + duration diff with `--threshold pct=N` for CI gating,
+  LCS-based call-order diff (`--order`), and statistical
+  significance (`--stats` z-score against N baselines). See
+  link:docs/cookbook/25-diff-regression.md[cookbook 25] and
+  link:docs/cookbook/26-diff-call-order.md[cookbook 26].
+* **`retrace-replay`** &mdash; interactive TUI for traces. Step
+  forward/backward, jump to any index, regex search. See
+  link:docs/cookbook/27-replay-debug.md[cookbook 27].
+* **`retrace-ws`** &mdash; WebSocket streamer for live traces with a
+  built-in browser viewer at `http://localhost:8765/`. See
+  link:docs/cookbook/28-live-stream.md[cookbook 28].
+* **Frida bridge** (`frida-bridge/retrace-frida.js`) &mdash; emits
+  retrace-compatible JSON from inside Frida. The escape hatch when
+  `LD_PRELOAD` can't reach the target: iOS apps, static binaries,
+  attach to a running PID. See
+  link:docs/cookbook/29-frida-bridge.md[cookbook 29].
+* **eBPF bridge** (`ebpf-bridge/retrace-ebpf.bpf.c`) &mdash;
+  kernel-level observation of every `openat` / `close` syscall on
+  the system. Observation only (eBPF cannot modify calls). See
+  link:docs/cookbook/30-ebpf-system.md[cookbook 30].
+* **VS Code extension** &mdash; renders a retrace JSON log in a
+  webview pane inside the editor; doubles as a `retrace-ws`
+  client for live streams. See
+  link:docs/cookbook/31-vscode-viewer.md[cookbook 31].
+* **Grafana data source plugin** &mdash; loads a retrace JSON log
+  (over HTTP) and exposes events as a Grafana frame. Cache TTL
+  enables self-updating dashboards. See
+  link:docs/cookbook/32-grafana-dashboard.md[cookbook 32].
+* **`fuzz-replay` CLI subcommand** &mdash; replay a libFuzzer crash
+  input through the matching harness for quick triage.
+* **Nightly fuzz workflow** &mdash; matrix of 5 fuzzers, 5 minutes
+  each, against the seed corpus. Crash artifacts uploaded for
+  download.
+* **Parson OOM hardening** &mdash; allocation budget
+  (`input_len * 1000`) on the comment-stripping path; eliminates
+  the OOM vector found by the nightly fuzz workflow.
+* **Website features** &mdash; Decision Wizard, Recipe Builder,
+  Cmd-K search palette, Glossary, Community section, Back-to-top.
+
+See link:CHANGELOG.md[CHANGELOG.md] for the full diff per release
+(v2.3.0 / v2.3.1 / v2.3.2 / v2.3.3).
 
 == What's new in v2.2.0
 
@@ -474,6 +538,60 @@ $ RETRACE_LOGGER_DEF_ENA=0 \
 | `examples/stringinject/` | File/string injection helper (paired with `tools/stringinjector`)
 | `examples/unsafe-system/` | Trace `system()` invocation paths
 |===
+
+
+== Tooling ecosystem
+
+retrace ships one shared-library backend plus standalone tools
+that consume the same JSON log format. Each owns one job; mix and
+match freely.
+
+[cols="1,4", frame=all, grid=all]
+|===
+| Tool | Job
+
+| `retrace-audit`
+| Apply a policy file (baseline / PCI-DSS / HIPAA / ISO 27001 /
+  custom) and emit findings as JSON, SARIF 2.1.0, or PDF.
+
+| `retrace-diff`
+| Per-function count + duration diff between two traces, with
+  `--threshold` for CI gating, `--order` for LCS call-sequence
+  diff, and `--stats` for z-score significance.
+
+| `retrace-replay`
+| Interactive TUI: step / rewind / jump / regex-search through
+  events.
+
+| `retrace-ws`
+| Tail a running trace and broadcast over WebSocket; built-in
+  browser viewer at `http://localhost:8765/`.
+
+| `retrace-to-otlp`
+| Convert a retrace JSON log to OTLP/JSON for Jaeger / Tempo /
+  Honeycomb / Datadog.
+
+| `frida-bridge/retrace-frida.js`
+| Frida script emitting retrace-compatible JSON. Use when
+  `LD_PRELOAD` can't reach the target (iOS, static binaries,
+  attach to running PID).
+
+| `ebpf-bridge/retrace-ebpf.bpf.c`
+| Linux kernel-level BPF program observing every `openat` /
+  `close` syscall on the system. Observation only.
+
+| `vscode-extension/`
+| VS Code extension: renders a trace in a webview pane, doubles
+  as a `retrace-ws` client for live streams.
+
+| `grafana-plugin/`
+| Grafana data source: load a trace over HTTP, expose events as
+  a frame for time series / bar gauge / state timeline panels.
+|===
+
+For task-driven recipes covering every tool, see
+link:docs/tools.md[the tools overview] and the
+link:docs/cookbook/README.html[cookbook] (32 recipes and counting).
 
 
 == Architecture
