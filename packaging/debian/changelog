@@ -1,3 +1,9 @@
+retrace (2.3.3-1) unstable; urgency=medium
+
+  * docs: cookbook recipes for every v2.3.0 tool + tools.md overview.
+
+ -- Ribose Inc <opensource@ribose.com>  Wed, 13 Aug 2026 00:00:00 +0000
+
 retrace (2.3.2-1) unstable; urgency=medium
 
   * test: CHECK macro + assert(side-effect) sweep across 8 unit tests.

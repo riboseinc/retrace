@@ -91,6 +91,27 @@ $ retrace run --config cookbook/<recipe>.json -- <your-program>
 |---|--------|-----------------|
 | 23 | [Bridge to OpenTelemetry (OTLP)](23-otlp-bridge.md) | Ship retrace's timing data to Jaeger / Tempo / Honeycomb via the `retrace-to-otlp` converter. |
 
+### Tooling ecosystem
+
+The standalone tools ship as separate binaries alongside `retrace`.
+Each one consumes the standard retrace JSON log format and owns one
+job.
+
+| # | Recipe | Tool | What it teaches |
+|---|--------|------|-----------------|
+| 24 | [Audit a trace for compliance violations](24-audit-compliance.md) | `retrace-audit` | Apply a policy file (baseline, PCI-DSS, HIPAA, ISO 27001, custom) and emit findings as JSON, SARIF, or PDF. |
+| 25 | [Detect performance regressions between two builds](25-diff-regression.md) | `retrace-diff` | Per-function count + duration diff with `--threshold` and `--stats` for CI gating. |
+| 26 | [Diff the call-order between two runs](26-diff-call-order.md) | `retrace-diff --order` | LCS-based call-sequence diff for behavior-regression detection. |
+| 27 | [Time-travel replay for a trace](27-replay-debug.md) | `retrace-replay` | Interactive TUI: step/rewind/jump/search through events. |
+| 28 | [Live-stream a trace over WebSocket](28-live-stream.md) | `retrace-ws` | Tail a running trace and broadcast to browser + programmatic clients. |
+| 29 | [Trace an iOS / static / running process via Frida](29-frida-bridge.md) | `frida-bridge/retrace-frida.js` | When `LD_PRELOAD` can't reach the target (iOS, static binaries, attach to running PID). |
+| 30 | [System-wide file-access tracing with eBPF](30-ebpf-system.md) | `ebpf-bridge/retrace-ebpf.bpf.c` | Kernel-level observation across every process on the system. |
+| 31 | [Browse a trace in VS Code](31-vscode-viewer.md) | `vscode-extension/` | Webview with severity coloring + live-stream client. |
+| 32 | [Visualize a trace in Grafana](32-grafana-dashboard.md) | `grafana-plugin/` | Data source plugin for ops dashboards (time series, bar gauge, state timeline). |
+
+For an overview of when to reach for each tool, see
+[docs/tools.md](../tools.md).
+
 ## Action reference
 
 Compact form. For the full schema and parameter reference, see
