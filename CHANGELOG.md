@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.3.4] - 2026-08-13
+
+### Changed
+- `README.adoc`: new "What's new in v2.3.x" section consolidating
+  highlights from v2.3.0–v2.3.3 (lock-free logger, capture_buffer,
+  call_hash, parson OOM hardening, the entire tools ecosystem,
+  fuzz-replay CLI, nightly fuzz workflow, website features). New
+  "Tooling ecosystem" section with one row per standalone tool.
+  "Supported platforms" header bumped from v2.2.0 to v2.3.3.
+
+### Added
+- `docs/cli.md`: `fuzz-replay` subcommand section. The subcommand
+  shipped in v2.3.0 but was undocumented in the CLI reference until
+  now.
+
 ## [2.3.3] - 2026-08-13
 
 ### Added
