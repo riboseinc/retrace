@@ -285,6 +285,8 @@ Environment variables:
 | `RETRACE_LOGGER_DEF_ENA` | `0` disables the logger entirely.
 | `RETRACE_LOGGER_DEF_STDOUT_ENA` | `0` keeps retrace's log off stdout so it doesn't mix with the target's own output.
 | `RETRACE_LOGGER_DEF_FN` | Path to a log file (alternative to stderr).
+| `RETRACE_LOGGER_RING` | `1` (default): lock-free SPSC ring + background flusher. `0`: synchronous writes (OHOS/QEMU/debug).
+| `RETRACE_CALL_HASH` | `1` enables per-thread FNV-1a rolling hash surfaced to libFuzzer via `retrace_call_hash_last`. Default `0` (zero overhead).
 |===
 
 [NOTE]

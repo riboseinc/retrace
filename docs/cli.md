@@ -241,6 +241,8 @@ Additional environment variables:
 | `RETRACE_LOGGER_DEF_STDOUT_ENA` | `0` to suppress stdout mirroring of the log.          |
 | `RETRACE_LOGGER_ALLOWED_FUNCS`  | Comma-separated allowlist of function names to log.  |
 | `RETRACE_LOGGER_EXCLUDED_FUNCS` | Comma-separated denylist of function names to skip.  |
+| `RETRACE_LOGGER_RING`           | `1` (default): use lock-free SPSC ring + background flusher. `0`: synchronous writes (for OHOS / QEMU / debug builds where thread creation during init is fragile). |
+| `RETRACE_CALL_HASH`             | `1` enables per-thread FNV-1a rolling hash of intercepted calls; exposed via `retrace_call_hash_last` for libFuzzer custom mutators (recipe 24). Default: `0` (off, zero overhead). |
 
 ## Library resolution
 

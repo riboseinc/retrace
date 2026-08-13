@@ -1,3 +1,10 @@
+retrace (2.3.5-1) unstable; urgency=medium
+
+  * docs: capture_buffer action reference + RETRACE_CALL_HASH and
+    RETRACE_LOGGER_RING env var reference.
+
+ -- Ribose Inc <opensource@ribose.com>  Wed, 13 Aug 2026 00:00:00 +0000
+
 retrace (2.3.4-1) unstable; urgency=medium
 
   * docs: README.adoc + cli.md updated to mention v2.3.x tools and fuzz-replay.
