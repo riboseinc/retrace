@@ -1039,3 +1039,22 @@ target_include_directories(retrace_test_normalize PRIVATE
 add_test(NAME unit-test-normalize
     COMMAND retrace_test_normalize)
 set_tests_properties(unit-test-normalize PROPERTIES LABELS "unit")
+
+#
+# Threshold math unit tests for retrace-diff (TODO.complete/27).
+# diff_exceeds_threshold gates CI regression reports; wrong answers
+# here mean either false alarms in clean PRs or missed regressions
+# in dirty PRs. Pure function, no parson/normalize deps.
+#
+add_executable(retrace_test_threshold test_threshold.c
+    ${CMAKE_SOURCE_DIR}/tools/trace-diff/threshold.c)
+set_target_properties(retrace_test_threshold PROPERTIES
+    OUTPUT_NAME test_threshold
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_threshold PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/trace-diff)
+
+add_test(NAME unit-test-threshold
+    COMMAND retrace_test_threshold)
+set_tests_properties(unit-test-threshold PROPERTIES LABELS "unit")

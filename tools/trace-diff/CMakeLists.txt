@@ -6,7 +6,7 @@
 
 set(_parson_source ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 
-add_executable(retrace_diff diff.c normalize.c ${_parson_source})
+add_executable(retrace_diff diff.c normalize.c threshold.c ${_parson_source})
 set_target_properties(retrace_diff PROPERTIES
     OUTPUT_NAME retrace-diff
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools")

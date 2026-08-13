@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.3.6] - 2026-08-14
+
+### Changed
+- `tools/trace-diff`: extracted `exceeds_threshold` from `diff.c`
+  to a new `threshold.{c,h}` as the public `diff_exceeds_threshold`.
+  MECE split mirrors the existing `normalize.c` extraction:
+  threshold math, trace aggregation, and orchestration/printing now
+  live in three separate files. The function is now unit-testable
+  in isolation.
+
+### Added
+- `test/unit/test_threshold.c` — 15 unit tests covering
+  `diff_exceeds_threshold` across every edge case: identical
+  values, zero/negative threshold (report-any mode), 0→N unbounded
+  growth, N→0 at/below 100% threshold, positive and negative
+  direction at/above/below threshold, large-threshold suppression,
+  and the strict-`>` boundary (at-threshold does not report).
+
 ## [2.3.5] - 2026-08-13
 
 ### Added
