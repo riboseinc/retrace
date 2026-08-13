@@ -38,6 +38,7 @@
 
 #include "parson.h"
 #include "normalize.h"
+#include "threshold.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -157,29 +158,6 @@ struct DiffConfig {
 };
 
 /*
- * Returns 1 if the change exceeds the configured threshold, 0
- * otherwise. A function with zero before-count and nonzero after
- * always exceeds (avoids divide-by-zero).
- */
-static int exceeds_threshold(uint64_t before, uint64_t after,
-			     double threshold_pct)
-{
-	double delta;
-	double pct;
-
-	if (before == after)
-		return 0;
-	if (threshold_pct <= 0.0)
-		return 1;
-	if (before == 0)
-		return 1;  /* 0 -> N is unbounded; always report */
-
-	delta = (double)((long long)after - (long long)before);
-	pct = 100.0 * (delta < 0 ? -delta : delta) / (double)before;
-	return pct > threshold_pct;
-}
-
-/*
  * Walks both normalized logs and prints every function that differs.
  * Returns the number of differing functions (0 = no diff).
  */
@@ -207,10 +185,10 @@ static int print_all_diffs(const struct NormalizedLog *before,
 		 * exceeds the threshold on count or time.
 		 */
 		count_exceeds = a ?
-		    exceeds_threshold(b->call_count, a->call_count,
+		    diff_exceeds_threshold(b->call_count, a->call_count,
 			cfg->threshold_pct) : 1;
 		time_exceeds = a ?
-		    exceeds_threshold(b->total_duration_us,
+		    diff_exceeds_threshold(b->total_duration_us,
 			a->total_duration_us, cfg->threshold_pct) : 1;
 
 		print_func_diff(b->name, b, a);
