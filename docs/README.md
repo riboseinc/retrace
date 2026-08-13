@@ -12,7 +12,8 @@ install, quick start, and platform support.
 | Get an answer to a common question | [FAQ](faq.md) — language support, overhead, production use, more |
 | Look up a CLI subcommand or env var | [CLI reference](cli.md) |
 | Look up an action or write a JSON config | [Configuration reference](configuration.md) |
-| Run a specific scenario (trace, fuzz, mock, sandbox) | [Cookbook](cookbook/README.md) — 21 recipes with copy-paste JSON |
+| Run a specific scenario (trace, fuzz, mock, sandbox) | [Cookbook](cookbook/README.md) — 32 recipes with copy-paste JSON |
+| Pick the right standalone tool for a job | [Tools overview](tools.md) — `retrace-audit`, `retrace-diff`, `retrace-replay`, `retrace-ws`, Frida/eBPF bridges, VS Code + Grafana plugins |
 | Contribute, build, test, or debug retrace | [Development guide](development.md) |
 | Understand the engine, backends, and actions | [Architecture](architecture.md) |
 | Add retrace to a Dockerfile or compose stack | [Docker guide](docker.md) |
@@ -29,10 +30,11 @@ docs/
 ├── faq.md                 ← common questions: language support, overhead, etc.
 ├── cli.md                 ← CLI subcommand + env var reference
 ├── configuration.md       ← JSON config schema + action parameter reference
+├── tools.md               ← standalone tooling ecosystem (audit, diff, replay, ws, frida, ebpf, ide plugins)
 ├── development.md         ← building, testing, contributing, debugging retrace
 ├── architecture.md        ← how engine, backends, and actions fit together
 ├── engine-state-machine.md ← per-call lifecycle (engine_wrapper flow)
-├── cookbook/              ← 21 recipe-driven walkthroughs
+├── cookbook/              ← 32 recipe-driven walkthroughs
 │   ├── README.md          ← index + compact action reference
 │   ├── 01-trace-all-calls.md
 │   ├── …

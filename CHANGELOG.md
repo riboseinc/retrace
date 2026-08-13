@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.3.3] - 2026-08-13
+
+### Added
+- Nine cookbook recipes for the v2.3.0 tool ecosystem:
+  - [24 — Audit a trace for compliance violations](docs/cookbook/24-audit-compliance.md) (`retrace-audit`).
+  - [25 — Detect performance regressions between two builds](docs/cookbook/25-diff-regression.md) (`retrace-diff` with `--threshold` and `--stats`).
+  - [26 — Diff the call-order between two runs](docs/cookbook/26-diff-call-order.md) (`retrace-diff --order` LCS).
+  - [27 — Time-travel replay for a trace](docs/cookbook/27-replay-debug.md) (`retrace-replay`).
+  - [28 — Live-stream a trace over WebSocket](docs/cookbook/28-live-stream.md) (`retrace-ws`).
+  - [29 — Trace an iOS / static / running process via Frida](docs/cookbook/29-frida-bridge.md).
+  - [30 — System-wide file-access tracing with eBPF](docs/cookbook/30-ebpf-system.md).
+  - [31 — Browse a trace in VS Code](docs/cookbook/31-vscode-viewer.md).
+  - [32 — Visualize a trace in Grafana](docs/cookbook/32-grafana-dashboard.md).
+- [`docs/tools.md`](docs/tools.md) — top-level overview of the
+  tools ecosystem with a "when to reach for what" table and per-tool
+  reference linking back to the cookbook.
+- `docs/README.md` updated: new row in the routing table for the
+  tools overview; doc-map reflects the larger cookbook count.
+
+### Changed
+- `docs/cookbook/README.md` — new "Tooling ecosystem" section
+  indexes recipes 24–32 with one-line summaries and direct tool
+  references.
+
 ## [2.3.2] - 2026-08-13
 
 ### Changed
