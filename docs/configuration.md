@@ -112,6 +112,38 @@ the top of the first script you want to seed.
 Without this action, the seed defaults to `getpid()`, so each run
 gets different failures.
 
+#### `capture_buffer`
+
+Reads N bytes from a pointer parameter **after** the real call
+returns and logs the contents (post-call memory observation). Use
+this to capture what `recv` filled, what `read` loaded, what
+`snprintf` wrote &mdash; not just the return value.
+
+```json
+{ "action_name": "capture_buffer",
+  "action_params": {
+    "param_name": "buf",
+    "size_param": "len",
+    "format": "hex"
+  } }
+```
+
+| Param           | Type   | Required | Notes                                                          |
+|-----------------|--------|----------|----------------------------------------------------------------|
+| `param_name`    | string | yes      | Name of the pointer parameter to read.                         |
+| `size_param`    | string | no       | Name of the integer parameter holding the buffer length.       |
+| `max_bytes`     | number | no       | Cap on bytes to read. Default 4096; hard cap 4096.             |
+| `format`        | string | no       | `hex` (default) or `string`. String replaces non-printable    |
+|                 |        |          | bytes with `.` (preserves `\n`/`\r`/`\t`).                     |
+
+If `size_param` is omitted, captures `max_bytes` bytes. If
+`size_param` exceeds `max_bytes`, truncates to `max_bytes`. The
+action never aborts the script (always returns 0); it logs the
+captured bytes as a `capture_buffer: <param>[N]=<value>` entry.
+
+Pair with `decode_http` / `decode_dns` (recipe 22) when you want
+structured fields instead of raw bytes.
+
 ### Modify
 
 Actions that rewrite the call's arguments or return value.

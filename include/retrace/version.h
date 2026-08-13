@@ -38,9 +38,9 @@
 
 #define RETRACE_VERSION_MAJOR 2
 #define RETRACE_VERSION_MINOR 3
-#define RETRACE_VERSION_PATCH 4
+#define RETRACE_VERSION_PATCH 5
 
-#define RETRACE_VERSION_STRING "2.3.4"
+#define RETRACE_VERSION_STRING "2.3.5"
 
 #define RETRACE_VERSION_ATLEAST(maj, min, pat)                  \
 	(RETRACE_VERSION_MAJOR > (maj) ||                       \

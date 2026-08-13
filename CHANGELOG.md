@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.3.5] - 2026-08-13
+
+### Added
+- `docs/configuration.md`: `capture_buffer` action reference.
+  Covers `param_name` (required), `size_param`, `max_bytes`
+  (default 4096, hard cap 4096), `format` (`hex` default vs
+  `string`), and the non-printable byte replacement behavior.
+  Cross-references recipe 22 (`decode_http` / `decode_dns`) for
+  the structured-fields alternative.
+- `docs/cli.md` + `README.adoc` env var tables: `RETRACE_LOGGER_RING`
+  (lock-free ring + background flusher vs synchronous writes) and
+  `RETRACE_CALL_HASH` (per-thread FNV-1a coverage hash for
+  libFuzzer custom mutators). Both shipped in v2.3.0 but were
+  absent from the env var reference until now.
+
 ## [2.3.4] - 2026-08-13
 
 ### Changed
