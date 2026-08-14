@@ -77,9 +77,6 @@ static JSON_Free_Function parson_free = free;
 static JSON_Malloc_Function parson_real_malloc = malloc;
 static JSON_Free_Function parson_real_free = free;
 
-static size_t parson_alloc_total;
-static size_t parson_alloc_budget;
-
 static void *parson_budgeted_malloc(size_t sz) {
     if (parson_alloc_budget > 0 &&
         parson_alloc_total + sz > parson_alloc_budget)
@@ -1095,9 +1092,14 @@ JSON_Value * json_parse_string(const char *string) {
 JSON_Value * json_parse_string_with_comments(const char *string) {
     JSON_Value *result = NULL;
     char *string_mutable_copy = NULL, *string_mutable_copy_ptr = NULL;
-    size_t input_len = strlen(string);
+    size_t input_len;
     JSON_Malloc_Function orig_malloc;
     JSON_Free_Function orig_free;
+
+    if (string == NULL)
+	return NULL;
+
+    input_len = strlen(string);
 
     orig_malloc = parson_malloc;
     orig_free = parson_free;
