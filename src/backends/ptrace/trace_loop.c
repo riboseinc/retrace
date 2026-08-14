@@ -139,8 +139,12 @@ retrace_ptrace_trace_loop(struct retrace_engine *eng, pid_t child_pid)
 	int in_syscall = 0; /* next stop is entry (0) or exit (1) */
 	int status;
 
-	if (eng == NULL)
-		return -1;
+	/* `eng` is not dereferenced here: syscall dispatch goes through
+	 * the process-global retrace_engine_wrapper (constructor-
+	 * initialized). The handle survives in the signature for the
+	 * backend API contract (spawn/attach both forward one).
+	 */
+	(void) eng;
 
 	/* Wait for the initial execve stop (Linux delivers SIGTRAP at that
 	 * point for a PTRACE_TRACEME child).

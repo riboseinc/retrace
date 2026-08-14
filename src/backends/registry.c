@@ -33,6 +33,7 @@
  */
 
 #include <retrace/backend.h>
+#include <retrace/retrace.h>
 
 #include <stddef.h>
 #include <string.h>
@@ -41,6 +42,11 @@
 
 static const retrace_backend_t *registered[RETRACE_BACKEND_MAX];
 static size_t registered_count;
+
+/* Projection of registered[] into a name-only array for the public
+ * retrace_list_backends(). Rebuilt on each call; valid until next call.
+ */
+static const char *backend_names[RETRACE_BACKEND_MAX];
 
 RETRACE_BACKEND_API int
 retrace_backend_register(const retrace_backend_t *backend)
@@ -116,4 +122,54 @@ retrace_backend_select(struct retrace_engine *eng,
 	}
 
 	return best;
+}
+
+RETRACE_API retrace_status_t
+retrace_list_backends(const char *const **out_names, size_t *out_count)
+{
+	size_t i;
+
+	if (out_names == NULL || out_count == NULL)
+		return RETRACE_ERR_INVAL;
+
+	for (i = 0; i < registered_count; i++)
+		backend_names[i] = registered[i]->name;
+
+	*out_names = backend_names;
+	*out_count = registered_count;
+	return RETRACE_OK;
+}
+
+RETRACE_API retrace_status_t
+retrace_attach_process(int pid)
+{
+	const retrace_backend_t *ptrace;
+	retrace_pid_t rc;
+
+	if (pid <= 0)
+		return RETRACE_ERR_INVAL;
+
+	/* Explicit lookup, not select(): attach semantics differ from
+	 * spawn. The ptrace probe checks whether a target path is a
+	 * static ELF — meaningless for an already-running pid. For a
+	 * process we cannot exec (the only kind attach targets),
+	 * ptrace is the sole native mechanism regardless of how the
+	 * binary was linked.
+	 */
+	ptrace = retrace_backend_find("ptrace");
+	if (ptrace == NULL || ptrace->attach == NULL)
+		return RETRACE_ERR_NOENT;
+
+	/* ptrace_attach ignores the engine handle: the process-global
+	 * engine (constructor-initialized) serves the trace loop.
+	 */
+	rc = ptrace->attach(NULL, (retrace_pid_t)pid);
+
+	if (rc == (retrace_pid_t)pid)
+		return RETRACE_OK;
+	if (rc == (retrace_pid_t)RETRACE_BACKEND_PERMISSION)
+		return RETRACE_ERR_PERMISSION;
+	if (rc == (retrace_pid_t)RETRACE_BACKEND_UNSUPPORTED)
+		return RETRACE_ERR_UNSUPPORTED;
+	return RETRACE_ERR_INTERNAL;
 }

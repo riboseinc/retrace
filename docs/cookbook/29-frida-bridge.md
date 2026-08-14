@@ -136,6 +136,17 @@ $ frida -l retrace-frida.js -p 12345 > /tmp/trace.json
 Use this for incident response — no restart, no deployment, just
 attach and gather.
 
+**On Linux, retrace can attach natively** since v2.4.0:
+
+```sh
+$ retrace attach --log /tmp/trace.json 12345
+```
+
+Same JSON output, no Frida dependency, no JS runtime overhead.
+The Frida path remains the answer when the target is not a direct
+child and ptrace permissions are locked down, or on iOS/macOS
+where retrace's ptrace backend does not build.
+
 ### Custom function list for a specific investigation
 
 Edit `FUNC_LIST` to focus on what matters. For a crypto audit,

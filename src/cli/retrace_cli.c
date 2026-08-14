@@ -37,6 +37,7 @@
 #include <errno.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <dlfcn.h>
 
 #include "parson.h"
 #include "config_builder.h"
@@ -52,10 +53,17 @@
 #define RETRACE_LIB_NAME "libretrace.so"
 #endif
 
+/* Mirror of retrace_status_t (include/retrace/retrace.h). The CLI
+ * stays a standalone binary: it dlsyms library functions but cannot
+ * include the full public header without dragging in the build's
+ * include paths. Values must stay in sync with the public header.
+ */
+typedef int retrace_status_t;
+
 static void usage(FILE *out)
 {
 	fprintf(out,
-"retrace v2.3.8 -- userspace libc interceptor\n"
+"retrace v2.4.0 -- userspace libc interceptor\n"
 "\n"
 "Usage:\n"
 "  retrace run [OPTIONS] -- <command> [args...]\n"
@@ -67,6 +75,8 @@ static void usage(FILE *out)
 "  retrace list-actions\n"
 "  retrace validate <config.json>\n"
 "  retrace fuzz-replay <fuzzer-name> <crash-input>\n"
+"  retrace attach [OPTIONS] <pid>\n"
+"  retrace backends\n"
 "\n"
 "Quick subcommands (no JSON needed):\n"
 "  retrace trace malloc,free -- /bin/ls\n"
@@ -957,6 +967,204 @@ static int cmd_run(int argc, char **argv)
 	return 0;
 }
 
+/*
+ * retrace attach [OPTIONS] <pid>
+ *
+ * Attach to an already-running process and trace its syscalls until
+ * it exits. Uses the ptrace backend — no LD_PRELOAD, no restart.
+ * The trace output follows the same JSON format as `retrace run`
+ * and feeds the same downstream tools.
+ */
+static int cmd_attach(int argc, char **argv)
+{
+	const char *config = NULL;
+	const char *logfile = NULL;
+	const char *lib_override = NULL;
+	int quiet = 0;
+	int pid = -1;
+	int i;
+	char lib_path[PATH_MAX];
+	char *found;
+	void *lib;
+	retrace_status_t (*attach_fn)(int pid);
+	retrace_status_t rc;
+
+	for (i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "--config") == 0 && i + 1 < argc) {
+			config = argv[++i];
+		} else if (strcmp(argv[i], "--log") == 0 && i + 1 < argc) {
+			logfile = argv[++i];
+		} else if (strcmp(argv[i], "--lib") == 0 && i + 1 < argc) {
+			lib_override = argv[++i];
+		} else if (strcmp(argv[i], "--quiet") == 0) {
+			quiet = 1;
+		} else if (strcmp(argv[i], "--help") == 0 ||
+			   strcmp(argv[i], "-h") == 0) {
+			usage(stdout);
+			return 0;
+		} else if (pid < 0) {
+			char *end = NULL;
+			long v = strtol(argv[i], &end, 10);
+
+			if (end == argv[i] || *end != '\0' || v <= 0) {
+				fprintf(stderr,
+					"retrace attach: invalid pid '%s'\n",
+					argv[i]);
+				return 1;
+			}
+			pid = (int)v;
+		} else {
+			fprintf(stderr, "retrace attach: unknown option '%s'\n",
+				argv[i]);
+			return 1;
+		}
+	}
+
+	if (pid < 0) {
+		fprintf(stderr,
+			"retrace attach: usage: retrace attach [--config FILE] "
+			"[--log FILE] <pid>\n");
+		return 1;
+	}
+
+	if (lib_override)
+		setenv("RETRACE_LIB", lib_override, 1);
+
+	found = find_library(lib_path, sizeof(lib_path));
+	if (!found) {
+		fprintf(stderr,
+			"retrace attach: cannot find %s. Set RETRACE_LIB.\n",
+			RETRACE_LIB_NAME);
+		return 1;
+	}
+
+	/* The library constructor reads these at dlopen time. */
+	if (config)
+		setenv("RETRACE_JSON_CONFIG", config, 1);
+	if (logfile) {
+		setenv("RETRACE_LOGGER_DEF_FN", logfile, 1);
+		setenv("RETRACE_LOGGER_DEF_STDOUT_ENA", "0", 1);
+	}
+	if (quiet)
+		setenv("RETRACE_LOGGER_DEF_ENA", "0", 1);
+
+	lib = dlopen(lib_path, RTLD_NOW);
+	if (lib == NULL) {
+		fprintf(stderr, "retrace attach: dlopen(%s): %s\n",
+			lib_path, dlerror());
+		return 1;
+	}
+
+	attach_fn = (retrace_status_t (*)(int pid))dlsym(lib,
+		"retrace_attach_process");
+	if (attach_fn == NULL) {
+		fprintf(stderr,
+			"retrace attach: library lacks retrace_attach_process "
+			"(pre-v2.4.0 build?)\n");
+		dlclose(lib);
+		return 1;
+	}
+
+	fprintf(stderr, "retrace attach: tracing pid %d (ctrl-c to stop "
+		"tracing, target exits when it exits)\n", pid);
+
+	rc = attach_fn(pid);
+
+	switch (rc) {
+	case 0:
+		fprintf(stderr, "retrace attach: target exited\n");
+		break;
+	case -7: /* RETRACE_ERR_PERMISSION */
+		fprintf(stderr,
+			"retrace attach: permission denied (ptrace).\n"
+			"  - run as root, or\n"
+			"  - attach to a child process, or\n"
+			"  - set /proc/sys/kernel/yama/ptrace_scope to 0 "
+			"(security tradeoff)\n");
+		break;
+	case -6: /* RETRACE_ERR_UNSUPPORTED */
+		fprintf(stderr,
+			"retrace attach: unsupported on this platform "
+			"(Linux only)\n");
+		break;
+	case -3: /* RETRACE_ERR_NOENT */
+		fprintf(stderr,
+			"retrace attach: ptrace backend not available in "
+			"this build\n");
+		break;
+	default:
+		fprintf(stderr, "retrace attach: failed (status %d)\n",
+			(int)rc);
+		break;
+	}
+
+	dlclose(lib);
+	return rc == 0 ? 0 : 1;
+}
+
+/*
+ * retrace backends
+ *
+ * List the backends compiled into this build (preload_elf, preload_macho,
+ * ptrace, ...). Discoverability for the interposition mechanisms
+ * available on this platform.
+ */
+static int cmd_backends(void)
+{
+	char lib_path[PATH_MAX];
+	char *found;
+	void *lib;
+	retrace_status_t (*list_fn)(const char *const **names,
+				    size_t *count);
+	const char *const *names;
+	size_t count;
+	size_t i;
+
+	/* Pure listing: keep the library's constructor log out of the
+	 * way (it would otherwise emit a JSON banner to stdout).
+	 */
+	setenv("RETRACE_LOGGER_DEF_STDOUT_ENA", "0", 1);
+
+	found = find_library(lib_path, sizeof(lib_path));
+	if (!found) {
+		fprintf(stderr,
+			"retrace backends: cannot find %s. Set RETRACE_LIB.\n",
+			RETRACE_LIB_NAME);
+		return 1;
+	}
+
+	lib = dlopen(lib_path, RTLD_NOW);
+	if (lib == NULL) {
+		fprintf(stderr, "retrace backends: dlopen(%s): %s\n",
+			lib_path, dlerror());
+		return 1;
+	}
+
+	list_fn = (retrace_status_t(*)(const char *const **names,
+				       size_t *count))
+		dlsym(lib, "retrace_list_backends");
+	if (list_fn == NULL) {
+		fprintf(stderr,
+			"retrace backends: library lacks "
+			"retrace_list_backends (pre-v2.4.0 build?)\n");
+		dlclose(lib);
+		return 1;
+	}
+
+	if (list_fn(&names, &count) != 0 || count == 0) {
+		fprintf(stderr, "retrace backends: none registered\n");
+		dlclose(lib);
+		return 1;
+	}
+
+	printf("%zu backend%s registered:\n", count, count == 1 ? "" : "s");
+	for (i = 0; i < count; i++)
+		printf("  %s\n", names[i]);
+
+	dlclose(lib);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	if (argc < 2) {
@@ -966,6 +1174,14 @@ int main(int argc, char **argv)
 
 	if (strcmp(argv[1], "run") == 0) {
 		return cmd_run(argc - 2, &argv[2]);
+	}
+
+	if (strcmp(argv[1], "attach") == 0) {
+		return cmd_attach(argc - 2, &argv[2]);
+	}
+
+	if (strcmp(argv[1], "backends") == 0) {
+		return cmd_backends();
 	}
 
 	if (strcmp(argv[1], "trace") == 0) {
