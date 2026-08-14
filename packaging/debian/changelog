@@ -1,3 +1,12 @@
+retrace (2.3.7-1) unstable; urgency=medium
+
+  * parson: defend against NULL input in json_parse_string_with_comments
+    (would segfault on strlen(NULL)).
+  * parson: remove duplicate static declarations.
+  * test: parson allocation-budget regression tests (10 cases).
+
+ -- Ribose Inc <opensource@ribose.com>  Thu, 14 Aug 2026 00:00:00 +0000
+
 retrace (2.3.6-1) unstable; urgency=medium
 
   * trace-diff: extract threshold.c (MECE) + 15 unit tests for

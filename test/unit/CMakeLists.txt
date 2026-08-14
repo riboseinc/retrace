@@ -1058,3 +1058,24 @@ target_include_directories(retrace_test_threshold PRIVATE
 add_test(NAME unit-test-threshold
     COMMAND retrace_test_threshold)
 set_tests_properties(unit-test-threshold PROPERTIES LABELS "unit")
+
+#
+# Parson allocation-budget regression tests (TODO.complete/33 P0).
+# Guards against regressions where someone tightens the budget
+# (breaking real configs) or fails to reset it between calls
+# (breaking repeated parses). Compiles parson.c via the parson_stub
+# real_impls.h (same pattern as the property tests).
+#
+add_executable(retrace_test_parson_budget test_parson_budget.c
+    ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
+set_target_properties(retrace_test_parson_budget PROPERTIES
+    OUTPUT_NAME test_parson_budget
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_parson_budget PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-parson-budget
+    COMMAND retrace_test_parson_budget)
+set_tests_properties(unit-test-parson-budget PROPERTIES LABELS "unit")

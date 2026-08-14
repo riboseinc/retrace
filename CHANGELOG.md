@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.3.7] - 2026-08-14
+
+### Fixed
+- `src/config/json/parson.c`: `json_parse_string_with_comments(NULL)`
+  no longer segfaults. The public API function called `strlen(NULL)`
+  before any NULL check, which would crash any caller that passed
+  NULL by accident. Now returns NULL gracefully. Bug found while
+  writing the budget regression test.
+
+### Changed
+- `src/config/json/parson.c`: removed duplicate `static size_t
+  parson_alloc_total;` and `parson_alloc_budget;` declarations.
+  Both pairs initialized to 0 (C tentative definition semantics),
+  so behavior was unchanged, but the duplication was a clear bad-
+  merge artifact.
+
+### Added
+- `test/unit/test_parson_budget.c` — 10 unit tests guarding the
+  v2.3.0 allocation-budget mechanism against regressions: realistic
+  configs parse, comments parse, repeated parses don't accumulate,
+  edge cases (NULL, empty, whitespace-only, malformed) return NULL
+  gracefully, large configs stay within budget. Includes the
+  NULL-input test that caught the segfault bug above.
+
 ## [2.3.6] - 2026-08-14
 
 ### Changed
