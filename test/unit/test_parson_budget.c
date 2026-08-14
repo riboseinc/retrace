@@ -29,6 +29,7 @@
 
 #include "parson.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -186,6 +187,31 @@ static void test_malformed_returns_null(void)
 
 /* ----- Budget is generous enough for legitimate configs ----- */
 
+/* Append helper that clamps `pos` before every snprintf, so
+ * `sizeof(buf) - pos` can never underflow. CodeQL flags the
+ * unguarded accumulation pattern as a size-argument overflow.
+ */
+static size_t append_chk(char *buf, size_t bufsz, size_t pos,
+			 const char *fmt, ...)
+{
+	va_list ap;
+	int n;
+
+	if (pos >= bufsz - 1)
+		return pos;
+	va_start(ap, fmt);
+	n = vsnprintf(buf + pos, bufsz - pos, fmt, ap);
+	va_end(ap);
+	if (n < 0)
+		return pos;
+	/* Clamp: snprintf returns the would-be length, which can
+	 * exceed the remaining space. Cap at what fits.
+	 */
+	if ((size_t)n > bufsz - pos - 1)
+		return bufsz - 1;
+	return pos + (size_t)n;
+}
+
 static void test_large_realistic_config_parses(void)
 {
 	/* A config 10x the typical size -- simulates a heavy multi-
@@ -196,16 +222,16 @@ static void test_large_realistic_config_parses(void)
 	size_t pos = 0;
 	int i;
 
-	pos += snprintf(big_config + pos, sizeof(big_config) - pos,
+	pos = append_chk(big_config, sizeof(big_config), pos,
 		"{\"intercept_scripts\":[");
 	for (i = 0; i < 50; i++) {
-		pos += snprintf(big_config + pos, sizeof(big_config) - pos,
+		pos = append_chk(big_config, sizeof(big_config), pos,
 			"%s{\"func_name\":\"func_%d\",\"actions\":["
 			"{\"action_name\":\"log_params\"},"
 			"{\"action_name\":\"call_real\"}]}",
 			i > 0 ? "," : "", i);
 	}
-	pos += snprintf(big_config + pos, sizeof(big_config) - pos, "]}");
+	pos = append_chk(big_config, sizeof(big_config), pos, "]}");
 
 	{
 		JSON_Value *v = json_parse_string_with_comments(big_config);
