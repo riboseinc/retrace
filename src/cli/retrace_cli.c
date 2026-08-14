@@ -55,7 +55,7 @@
 static void usage(FILE *out)
 {
 	fprintf(out,
-"retrace v2.3.7 -- userspace libc interceptor\n"
+"retrace v2.3.8 -- userspace libc interceptor\n"
 "\n"
 "Usage:\n"
 "  retrace run [OPTIONS] -- <command> [args...]\n"
