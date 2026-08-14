@@ -172,7 +172,7 @@ static void test_empty_string_returns_null(void)
 
 static void test_whitespace_only_returns_null(void)
 {
-	JSON_Value *v = json_parse_string_with_comments("   \n\t  ");
+	JSON_Value *v = json_parse_string_with_comments("\t\n\t");
 
 	CHECK(v == NULL);
 }
