@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.4.0] - 2026-08-14
+
+MINOR bump per ADR-0006: new capability, backwards-compatible API.
+
+### Added
+- **Native process attach — `retrace attach <pid>`**. Attach to an
+  already-running process via ptrace and trace its syscalls until
+  it exits. No `LD_PRELOAD`, no restart, no control of the launch
+  required — reaches the targets the preload backends structurally
+  cannot (any running PID; static binaries after they started).
+  Output is the same JSON format as `retrace run` and feeds the
+  same downstream tools (audit, diff, replay). Linux only; reports
+  a clean error elsewhere.
+- **`retrace backends`** — lists the interposition backends
+  compiled into the library (preload-elf, preload-macho,
+  preload-msvc, ptrace, ...).
+- **New public API** (`include/retrace/retrace.h`):
+  `retrace_attach_process(pid)` — explicit ptrace lookup (bypasses
+  the static-binary probe: attach semantics differ from spawn; for
+  a process you cannot exec, ptrace is the sole native mechanism
+  regardless of how the binary was linked) — and
+  `retrace_list_backends(&names, &count)`.
+- **`test/unit/test_attach.c`** — 3 tests: backend enumeration,
+  invalid-pid rejection, and (on Linux) a real fork + PTRACE_ATTACH
+  + timeout-kill round trip verifying the trace loop runs to
+  completion. Non-Linux legs verify the clean-failure contract.
+
+### Changed
+- `src/backends/ptrace/trace_loop.c`: removed a NULL-engine early
+  return that defended an unsatisfiable contract —
+  `struct retrace_engine` is never instantiated; syscall dispatch
+  goes through the process-global `retrace_engine_wrapper`. The
+  handle survives in the signature for the backend API contract.
+
 ## [2.3.8] - 2026-08-14
 
 ### Added

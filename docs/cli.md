@@ -223,6 +223,53 @@ retrace fuzz-replay: running fuzz_action_run on crash-abc123 ...
 The fuzzer name must match a binary under `build/test/fuzz/`. To
 list available fuzzers, run `ls build/test/fuzz/`.
 
+### `attach` — trace a running process (Linux)
+
+```sh
+retrace attach [--config FILE] [--log FILE] <pid>
+```
+
+Attaches to an already-running process via `ptrace` and traces its
+syscalls until it exits — no `LD_PRELOAD`, no restart, no control of
+the launch required. This reaches the targets the preload backends
+structurally cannot: any running PID, and static binaries after they
+started. Output is the same JSON format as `retrace run` and feeds
+the same downstream tools (`retrace-audit`, `retrace-diff`,
+`retrace-replay`).
+
+```sh
+$ retrace attach --log /tmp/trace.json $(pidof my-server)
+retrace attach: tracing pid 4242 (ctrl-c to stop tracing, ...)
+... (JSON entries stream to /tmp/trace.json as syscalls happen)
+retrace attach: target exited
+```
+
+Permission errors mean one of:
+
+- not root, and the target is not your child process — run as root,
+  or relax `/proc/sys/kernel/kernel/yama/ptrace_scope` to `0`;
+- container hardening — attach to a process you spawned.
+
+On macOS and Windows the command reports
+`ptrace backend not available in this build` and exits 1.
+
+### `backends` — list interposition backends
+
+```sh
+retrace backends
+```
+
+Prints the backends compiled into the library
+(`preload-elf`, `preload-macho`, `preload-msvc`, `ptrace`, ...).
+Discoverability for which interposition mechanisms this build
+supports on this platform.
+
+```sh
+$ retrace backends
+1 backend registered:
+  preload-macho
+```
+
 ## Common options
 
 These apply to `run`, `trace`, `mock`, `fuzz`, and `slow`:

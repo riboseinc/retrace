@@ -1,3 +1,12 @@
+retrace (2.4.0-1) unstable; urgency=medium
+
+  * New: native process attach via ptrace (`retrace attach <pid>`).
+  * New: `retrace backends` lists compiled interposition backends.
+  * New public API: retrace_attach_process() + retrace_list_backends().
+  * Tutorial 27 + cookbook 29 note native attach for running PIDs.
+
+ -- Ribose Inc <opensource@ribose.com>  Fri, 14 Aug 2026 00:00:00 +0000
+
 retrace (2.3.8-1) unstable; urgency=medium
 
   * docs: tutorials 23-27 covering the v2.3.0 tool ecosystem.
