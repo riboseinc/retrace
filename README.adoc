@@ -78,6 +78,21 @@ for 20+ recipes covering tracing, fuzzing, mocking, redirection,
 security auditing, and CI integration.
 
 
+== What's new in v2.4.0
+
+* **Native process attach &mdash; `retrace attach <pid>`** &mdash;
+  attach to an already-running process via ptrace and trace its
+  syscalls until it exits. No `LD_PRELOAD`, no restart, no control
+  of the launch required. This reaches the targets the preload
+  backends structurally cannot: any running PID (and static
+  binaries after they started). Output is the same JSON format and
+  feeds the same downstream tools. New public API:
+  `retrace_attach_process(pid)` and `retrace_list_backends()`.
+  See link:docs/cli.md[the CLI reference].
+* **`retrace backends`** &mdash; lists the interposition backends
+  compiled into the library (preload-elf, preload-macho,
+  preload-msvc, ptrace, ...).
+
 == What's new in v2.3.x
 
 The v2.3.x series turns retrace from a single CLI into a tools
@@ -569,6 +584,9 @@ match freely.
 | Tail a running trace and broadcast over WebSocket; built-in
   browser viewer at `http://localhost:8765/`.
 
+| `retrace attach <pid>`
+| Attach to a running process via ptrace and trace its syscalls
+  until it exits — no preload, no restart (Linux).
 | `retrace-to-otlp`
 | Convert a retrace JSON log to OTLP/JSON for Jaeger / Tempo /
   Honeycomb / Datadog.

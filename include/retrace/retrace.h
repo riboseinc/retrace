@@ -133,6 +133,38 @@ RETRACE_API retrace_status_t retrace_engine_select_backend(
 		retrace_engine_t *eng, const char *name);
 
 /* ----------------------------------------------------------------- *
+ * Process attach
+ *
+ * Attach to an already-running process and trace its syscalls until
+ * it exits. This is the ptrace path: unlike the preload backends it
+ * needs no control of the process at exec time, so it works for
+ * targets LD_PRELOAD cannot reach (any running PID; also the only
+ * native option for static binaries after they started).
+ *
+ * Observation-oriented: the trace loop forwards each syscall to the
+ * engine, applying the JSON config like any other trace source.
+ *
+ * Requires the process-global engine (initialized by the library
+ * constructor on dlopen/load); no engine handle is needed.
+ *
+ * Linux only. Returns:
+ *   RETRACE_OK              trace loop ran to completion (target exited)
+ *   RETRACE_ERR_NOENT       ptrace backend not registered
+ *   RETRACE_ERR_PERMISSION  PTRACE_ATTACH denied (ptrace_scope / creds)
+ *   RETRACE_ERR_INVAL       pid <= 0
+ *   RETRACE_ERR_UNSUPPORTED non-Linux platform
+ */
+RETRACE_API retrace_status_t retrace_attach_process(int pid);
+
+/*
+ * Enumerate registered backend names (e.g. "preload_elf", "ptrace").
+ * The array and its strings are owned by the library and remain valid
+ * until the next call; callers must not free them.
+ */
+RETRACE_API retrace_status_t retrace_list_backends(
+		const char *const **out_names, size_t *out_count);
+
+/* ----------------------------------------------------------------- *
  * Programmatic script builder
  *
  * Build a script in C without parsing a file. Equivalent to the JSON path
