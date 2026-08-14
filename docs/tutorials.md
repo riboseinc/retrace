@@ -32,6 +32,11 @@ Pick the one that matches your situation.
 20. [Debug a production issue (safely)](#20-debug-a-production-issue-safely)
 21. [Integrate retrace into your build](#21-integrate-retrace-into-your-build)
 22. [Build retrace from source](#22-build-retrace-from-source)
+23. [Audit a binary for compliance violations](#23-audit-a-binary-for-compliance-violations)
+24. [Catch performance regressions in CI](#24-catch-performance-regressions-in-ci)
+25. [Debug a captured trace interactively](#25-debug-a-captured-trace-interactively)
+26. [Watch a long-running server's calls live](#26-watch-a-long-running-servers-calls-live)
+27. [Trace a binary `LD_PRELOAD` can't reach](#27-trace-a-binary-ld_preload-cant-reach)
 
 ---
 
@@ -990,8 +995,367 @@ and the platform-specific toolchain files under `cmake/`.
 
 ---
 
+## 23. Audit a binary for compliance violations
+
+**Time:** 10 minutes.
+**Goal:** produce a defensible compliance report from a trace, suitable for a PCI-DSS / HIPAA / ISO 27001 audit trail.
+
+You have a binary that handles card data, PHI, or PII. Before it
+ships, you need evidence of what it actually does at the libc-call
+level — not what the docs claim it does.
+
+### Step 1 — capture a full trace
+
+```sh
+retrace run --log /tmp/trace.json -- ./payment-processor --dry-run
+```
+
+### Step 2 — apply the baseline policy
+
+```sh
+retrace-audit \
+  --policy share/policies/baseline.json \
+  --trace /tmp/trace.json \
+  --format default
+```
+
+The report groups findings by severity:
+
+```
+"summary": {
+  "total_entries": 4823,
+  "findings": 7,
+  "by_severity": {"critical": 1, "high": 3, "medium": 2, "info": 1}
+}
+```
+
+### Step 3 — check the critical finding
+
+The one `critical` is `BL-007`: the binary called `system()` with
+a command that includes user-controlled input — a shell-injection
+risk. The finding includes the full log entry as evidence (entry
+index 1247), so you can jump straight to it.
+
+### Step 4 — run the standard for your domain
+
+```sh
+retrace-audit \
+  --policy share/policies/pci-dss.json \
+  --trace /tmp/trace.json \
+  --format sarif \
+  -o pci-findings.sarif
+```
+
+SARIF 2.1.0 uploads natively to GitHub Code Scanning
+(**Security → Code scanning alerts**) and Azure DevOps. Each
+finding appears with its rule ID, severity, and evidence.
+
+### Step 5 — generate a PDF for the audit trail
+
+```sh
+retrace-audit \
+  --policy share/policies/pci-dss.json \
+  --trace /tmp/trace.json \
+  --format pdf \
+  -o pci-audit.pdf
+```
+
+The PDF has a cover page, executive summary, and one page per
+finding. Attach it to the compliance ticket.
+
+**What you learned:** `retrace-audit` turns a trace into a
+policy-driven report with evidence per finding. The four built-in
+policies cover the common compliance questions; write your own by
+copying the six-field rule schema.
+
+**See also:** [cookbook 24](cookbook/24-audit-compliance.md) for
+custom policies and multi-policy chaining.
+
+---
+
+## 24. Catch performance regressions in CI
+
+**Time:** 15 minutes.
+**Goal:** fail the PR build when a change makes the binary meaningfully slower.
+
+Your PR passed tests, but users notice it's 30% slower. Reading
+two 100K-line traces side-by-side doesn't scale. You want CI to
+compare the traces and fail on a real regression — not on noise.
+
+### Step 1 — capture a baseline on the release branch
+
+```sh
+git checkout v1.4.2
+cmake --build build
+retrace run --log /tmp/before.json -- ./your-program input.bin
+```
+
+### Step 2 — capture the candidate
+
+```sh
+git checkout my-feature-branch
+cmake --build build
+retrace run --log /tmp/after.json -- ./your-program input.bin
+```
+
+### Step 3 — diff them
+
+```sh
+retrace-diff /tmp/before.json /tmp/after.json
+```
+
+```
+function: malloc
+  count:      before=1247, after=1532  (+22.8%)
+  total time: before=8.3ms, after=11.9ms (+43.4%)
+```
+
+The regression is right there: `malloc` calls are up 22.8% and
+time is up 43.4%.
+
+### Step 4 — add a threshold so noise doesn't fail the build
+
+Mutex-lock counts jitter by 0.2% between runs. Suppress anything
+below 10%:
+
+```sh
+retrace-diff --threshold pct=10 /tmp/before.json /tmp/after.json
+echo $?
+1
+```
+
+Exit code 1 = "diff above threshold found". Exit 0 = clean. Exit
+2 = setup error.
+
+### Step 5 — wire it into CI
+
+```yaml
+# .github/workflows/perf.yml
+- name: Check for perf regression
+  run: |
+    retrace-diff --threshold pct=10 \
+      test/golden-trace.json /tmp/candidate.json || {
+      echo "::error::Performance regression detected (see diff above)"
+      exit 1
+    }
+```
+
+**What you learned:** `retrace-diff --threshold pct=N` turns two
+traces into a CI gate. Exit code 1 fails the build on a real
+regression; 0 passes. Tune N to sit above your run-to-run noise.
+
+**See also:** [cookbook 25](cookbook/25-diff-regression.md) for
+z-score statistical gating, and
+[cookbook 26](cookbook/26-diff-call-order.md) for the LCS
+call-order diff that catches behavior changes stats miss.
+
+---
+
+## 25. Debug a captured trace interactively
+
+**Time:** 5 minutes.
+**Goal:** walk through a 10K-event trace forward and backward, like gdb for libc calls.
+
+You captured a trace from a flaky bug. `grep` on the JSON works
+but you lose the narrative — you can't rewind to just before the
+failure and step forward again. You want a debugger for the trace.
+
+### Step 1 — capture the trace
+
+```sh
+retrace run --log /tmp/trace.json -- ./flaky-app --seed 1234
+```
+
+### Step 2 — open it in replay
+
+```sh
+retrace-replay /tmp/trace.json
+[retrace-replay] loaded 8421 events from /tmp/trace.json
+> l
+  #0    func=opendir     args={ name: "." }
+  #1    func=readdir     args={ dirp: 0x7f... }
+  ...
+```
+
+### Step 3 — search forward for the failure
+
+```
+> f connect
+#342  func=connect   args={ addr: "10.0.0.5:8080" }
+     retval=-1   duration=21000us
+```
+
+`f <regex>` jumps to the next event whose func or args match.
+
+### Step 4 — step backward to see what led here
+
+```
+> p
+#341  func=getaddrinfo   args={ host: "prod.internal" }
+     retval=0   duration=1200us
+> p
+#340  func=getenv   args={ name: "SERVICE_HOST" }
+     retval="10.0.0.5"
+```
+
+There it is: the env var pointed at the wrong host.
+
+### Step 5 — jump to a specific event
+
+```
+> 342
+#342  func=connect   args={ addr: "10.0.0.5:8080" }
+```
+
+**What you learned:** `retrace-replay` gives you `n`/`p`/`<N>`/
+`l`/`f`/`q` — the gdb keys, for traces. Search forward by regex,
+rewind to see what preceded a failure, jump straight to an entry
+index that `retrace-audit` flagged.
+
+**See also:** [cookbook 27](cookbook/27-replay-debug.md) for the
+full command reference and the audit-findings integration.
+
+---
+
+## 26. Watch a long-running server's calls live
+
+**Time:** 5 minutes.
+**Goal:** stream a running trace to any browser — live dashboard with zero client setup.
+
+The server runs for hours. `tail -f | jq` works for you alone, but
+you want the on-call engineer to see the same stream without
+installing anything.
+
+### Step 1 — start the streamer against the log file
+
+```sh
+retrace-ws /tmp/trace.json
+[retrace-ws] listening on ws://localhost:8765
+[retrace-ws] viewer: http://localhost:8765/
+[retrace-ws] tailing /tmp/trace.json...
+```
+
+### Step 2 — run the server under retrace
+
+```sh
+retrace run --log /tmp/trace.json -- ./your-server --config prod.yaml
+```
+
+### Step 3 — open the viewer
+
+Open `http://localhost:8765/` in any browser. Events stream in
+as they're written — no refresh needed. Open it on a second
+machine over SSH port-forward and your teammate sees the same
+stream.
+
+### Step 4 — build a programmatic alert
+
+Any WebSocket client works. Python example — alert when `connect`
+fires:
+
+```python
+import asyncio, json, websockets
+
+async def main():
+    async with websockets.connect("ws://localhost:8765/stream") as ws:
+        async for msg in ws:
+            entry = json.loads(msg)
+            if entry["message"]["func"] == "connect":
+                print("[ALERT] outbound connect:",
+                      entry["message"]["args"])
+
+asyncio.run(main())
+```
+
+**What you learned:** `retrace-ws` decouples the observer from
+the trace file. One process writes the log; any number of
+browser or programmatic clients consume it live. The VS Code
+extension (tutorial 31 in the cookbook) is itself a
+`retrace-ws` client.
+
+**See also:** [cookbook 28](cookbook/28-live-stream.md) for
+cross-machine streaming and live-audit alerting.
+
+---
+
+## 27. Trace a binary `LD_PRELOAD` can't reach
+
+**Time:** 10 minutes.
+**Goal:** get a retrace-style call log from an iOS app, a static binary, or a process that's already running.
+
+`LD_PRELOAD` needs a dynamic loader you control at exec time. When
+the target is an iOS app, a statically-linked Go/C binary, or a
+production process you can't restart, you need a different way in.
+
+`retrace-frida.js` is a Frida script that hooks libc functions and
+emits the same JSON format as `retrace run` — so every retrace
+tool (audit, diff, replay) works unchanged on the output.
+
+### Step 1 — install Frida
+
+```sh
+pip install frida-tools
+```
+
+### Step 2 — trace a static binary
+
+```sh
+file ./your-static-binary
+# ELF 64-bit LSB executable, x86-64, statically linked
+
+frida -l frida-bridge/retrace-frida.js -f ./your-static-binary \
+  > /tmp/trace.json
+```
+
+### Step 3 — attach to an already-running process
+
+The case `LD_PRELOAD` can never handle — no restart:
+
+```sh
+# The PID has been running in prod for hours
+frida -l frida-bridge/retrace-frida.js -p 12345 > /tmp/trace.json
+^C   # detach when done; the process keeps running
+```
+
+### Step 4 — run any retrace tool on the output
+
+```sh
+retrace-audit --policy share/policies/baseline.json \
+  --trace /tmp/trace.json
+```
+
+Same JSON format, same downstream tools.
+
+### Step 5 — focus the function list
+
+Edit `FUNC_LIST` at the top of `retrace-frida.js` to hook only
+what you care about. For a TLS audit:
+
+```javascript
+const FUNC_LIST = [
+    { name: "SSL_read",             argc: 3 },
+    { name: "SSL_write",            argc: 3 },
+    { name: "SSL_get_verify_result", argc: 1 },
+];
+```
+
+**What you learned:** when the dynamic loader isn't yours to
+control (iOS, static, running PID), the Frida bridge gets you the
+same JSON stream. Higher per-call overhead than `LD_PRELOAD` —
+use it for behavioral tracing and security review, not perf
+measurement.
+
+**See also:** [cookbook 29](cookbook/29-frida-bridge.md) for iOS
+setup via `frida-server`/`frida-gadget` and child-process
+following, and
+[cookbook 30](cookbook/30-ebpf-system.md) for the eBPF
+alternative when you need system-wide kernel-level observation.
+
+---
+
 ## See also
 
-- [Cookbook](cookbook/README.md) — 21 recipe-style walkthroughs.
+- [Cookbook](cookbook/README.md) — 32 recipe-style walkthroughs.
+- [Tools overview](tools.md) — which standalone tool for which job.
 - [CLI reference](cli.md) — every subcommand.
 - [Configuration reference](configuration.md) — full JSON schema.

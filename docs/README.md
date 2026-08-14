@@ -8,7 +8,7 @@ install, quick start, and platform support.
 
 | You want to… | Go to |
 |--------------|-------|
-| Solve a specific problem step-by-step | [Tutorials](tutorials.md) — 22 scenario-driven walkthroughs |
+| Solve a specific problem step-by-step | [Tutorials](tutorials.md) — 27 scenario-driven walkthroughs |
 | Get an answer to a common question | [FAQ](faq.md) — language support, overhead, production use, more |
 | Look up a CLI subcommand or env var | [CLI reference](cli.md) |
 | Look up an action or write a JSON config | [Configuration reference](configuration.md) |
@@ -26,7 +26,7 @@ install, quick start, and platform support.
 ```
 docs/
 ├── README.md              ← you are here
-├── tutorials.md           ← 22 scenario-driven step-by-step walkthroughs
+├── tutorials.md           ← 27 scenario-driven step-by-step walkthroughs
 ├── faq.md                 ← common questions: language support, overhead, etc.
 ├── cli.md                 ← CLI subcommand + env var reference
 ├── configuration.md       ← JSON config schema + action parameter reference

@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.3.8] - 2026-08-14
+
+### Added
+- Five new tutorials (23–27) covering the v2.3.0 tool ecosystem,
+  each following the established Time/Goal/Steps format:
+  - [23 — Audit a binary for compliance violations](docs/tutorials.md)
+    (`retrace-audit`: baseline policy, SARIF upload, PDF for the
+    audit trail).
+  - [24 — Catch performance regressions in CI](docs/tutorials.md)
+    (`retrace-diff --threshold pct=N` as a GitHub Actions gate).
+  - [25 — Debug a captured trace interactively](docs/tutorials.md)
+    (`retrace-replay`: forward regex search, backward stepping,
+    index jump).
+  - [26 — Watch a long-running server's calls live](docs/tutorials.md)
+    (`retrace-ws`: browser viewer + programmatic Python client).
+  - [27 — Trace a binary `LD_PRELOAD` can't reach](docs/tutorials.md)
+    (Frida bridge: static binaries, attach-to-running-PID, focused
+    function lists).
+
+### Changed
+- `docs/README.md` routing table and doc-map updated: tutorials
+  count 22 → 27; "See also" in tutorials links the cookbook
+  (32 recipes) and `tools.md`.
+
 ## [2.3.7] - 2026-08-14
 
 ### Fixed
