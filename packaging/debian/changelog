@@ -1,3 +1,9 @@
+retrace (2.4.1-1) unstable; urgency=medium
+
+  * audit: extract scan.c (MECE) + 11 unit tests for the scan engine.
+
+ -- Ribose Inc <opensource@ribose.com>  Fri, 14 Aug 2026 00:00:00 +0000
+
 retrace (2.4.0-1) unstable; urgency=medium
 
   * New: native process attach via ptrace (`retrace attach <pid>`).

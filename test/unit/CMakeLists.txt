@@ -1124,3 +1124,26 @@ endif()
 add_test(NAME unit-test-attach
     COMMAND retrace_test_attach)
 set_tests_properties(unit-test-attach PROPERTIES LABELS "unit")
+
+#
+# Audit scan-engine unit tests (TODO.complete/26). audit_scan_trace
+# drives the policy matcher across a trace and collects findings --
+# false negatives here mean missed violations in compliance reports.
+# Compiles scan.c + policy.c directly from tools/audit-converter/.
+#
+add_executable(retrace_test_scan test_scan.c
+    ${CMAKE_SOURCE_DIR}/tools/audit-converter/scan.c
+    ${_audit_policy_source}
+    ${_parson_for_tools})
+set_target_properties(retrace_test_scan PROPERTIES
+    OUTPUT_NAME test_scan
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_scan PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/audit-converter
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-scan
+    COMMAND retrace_test_scan)
+set_tests_properties(unit-test-scan PROPERTIES LABELS "unit")
