@@ -29,98 +29,13 @@
 
 #include "parson.h"
 #include "policy.h"
+#include "scan.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "pdf_writer.h"
-
-/*
- * Internal finding representation. Decoupled from the on-disk
- * format so we can add formatters (default, SARIF, future PDF
- * text) without touching the matcher.
- */
-struct Finding {
-	const struct Rule *rule;
-
-	size_t entry_index;
-
-	JSON_Object *entry;  /* borrowed from trace_root; do not free */
-};
-
-struct Findings {
-	struct Finding *items;
-
-	size_t count;
-
-	size_t cap;
-};
-
-static void findings_init(struct Findings *f)
-{
-	f->items = NULL;
-	f->count = 0;
-	f->cap = 0;
-}
-
-static void findings_free(struct Findings *f)
-{
-	free(f->items);
-	f->items = NULL;
-	f->count = 0;
-	f->cap = 0;
-}
-
-static int findings_append(struct Findings *f, const struct Rule *rule,
-			   size_t entry_index, JSON_Object *entry)
-{
-	struct Finding *newbuf;
-
-	if (f->count == f->cap) {
-		size_t newcap = (f->cap == 0) ? 16 : f->cap * 2;
-
-		newbuf = (struct Finding *)realloc(f->items,
-			newcap * sizeof(*newbuf));
-		if (newbuf == NULL)
-			return -1;
-		f->items = newbuf;
-		f->cap = newcap;
-	}
-	f->items[f->count].rule = rule;
-	f->items[f->count].entry_index = entry_index;
-	f->items[f->count].entry = entry;
-	f->count++;
-	return 0;
-}
-
-/*
- * Walks every (entry, rule) pair, appends matches to findings.
- */
-static void scan_trace(JSON_Array *trace, const struct Policy *policy,
-		       struct Findings *out)
-{
-	size_t i, n = json_array_get_count(trace);
-
-	for (i = 0; i < n; i++) {
-		JSON_Object *entry = json_array_get_object(trace, i);
-		JSON_Object *msg;
-		size_t r;
-
-		if (entry == NULL)
-			continue;
-		msg = json_object_get_object(entry, "message");
-		if (msg == NULL)
-			continue;
-
-		for (r = 0; r < policy->rules_count; r++) {
-			const struct Rule *rule = &policy->rules[r];
-
-			if (policy_rule_matches(rule, msg))
-				findings_append(out, rule, i, msg);
-		}
-	}
-}
 
 /* ----- Severity mappings for SARIF ----- */
 
@@ -410,8 +325,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	findings_init(&findings);
-	scan_trace(trace, &policy, &findings);
+	audit_findings_init(&findings);
+	audit_scan_trace(trace, &policy, &findings);
 
 	if (fmt == OUT_PDF) {
 		int nc = 0, nh = 0, nm = 0, ni = 0;
@@ -458,7 +373,7 @@ int main(int argc, char **argv)
 				free(ids);
 				free(descs);
 				json_value_free(trace_root);
-				findings_free(&findings);
+				audit_findings_free(&findings);
 				policy_free(&policy);
 				return 1;
 			}
@@ -472,7 +387,7 @@ int main(int argc, char **argv)
 		if (out != stdout)
 			fclose(out);
 		json_value_free(trace_root);
-		findings_free(&findings);
+		audit_findings_free(&findings);
 		policy_free(&policy);
 		return 0;
 	}
@@ -494,7 +409,7 @@ int main(int argc, char **argv)
 				out_path);
 			json_value_free(out_root);
 			json_value_free(trace_root);
-			findings_free(&findings);
+			audit_findings_free(&findings);
 			policy_free(&policy);
 			return 1;
 		}
@@ -513,7 +428,7 @@ int main(int argc, char **argv)
 
 	json_value_free(out_root);
 	json_value_free(trace_root);
-	findings_free(&findings);
+	audit_findings_free(&findings);
 	policy_free(&policy);
 	return 0;
 }

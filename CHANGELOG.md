@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.4.1] - 2026-08-14
+
+### Changed
+- `tools/audit-converter`: extracted the scan engine from `audit.c`
+  to a new `scan.{c,h}` — `struct Finding`/`Findings` +
+  `audit_findings_init/free/append` + `audit_scan_trace`. MECE
+  split completes the module chain: `policy.c` owns rules +
+  matching, `scan.c` owns apply-policy-to-trace, `audit.c` owns
+  CLI + formatters. The scan engine is now unit-testable in
+  isolation (same pattern as the `policy_rule_matches` and
+  `diff_exceeds_threshold` extractions).
+
+### Added
+- `test/unit/test_scan.c` — 11 unit tests: single rule/entry
+  matching, severity preserved through `finding->rule`, findings
+  in trace order, policy-rule order within one entry, multiple
+  rules per entry, one rule across entries, entries without a
+  message skipped, empty trace / zero-rule policy / no-match all
+  yield zero findings, `audit_findings_append` growth past the
+  initial 16-entry capacity, and the init→free→init lifecycle.
+  False negatives here mean missed violations in compliance
+  reports; wrong ordering corrupts the evidence chain.
+
 ## [2.4.0] - 2026-08-14
 
 MINOR bump per ADR-0006: new capability, backwards-compatible API.
