@@ -1079,3 +1079,48 @@ target_include_directories(retrace_test_parson_budget PRIVATE
 add_test(NAME unit-test-parson-budget
     COMMAND retrace_test_parson_budget)
 set_tests_properties(unit-test-parson-budget PROPERTIES LABELS "unit")
+
+#
+# Native process attach tests (v2.4.0). Exercises the public
+# retrace_attach_process / retrace_list_backends APIs. On Linux the
+# attach leg forks a child and PTRACE_ATTACHes to it (permitted for
+# a direct child under default yama); elsewhere it verifies the
+# clean-failure contract. Needs the full engine + backends because
+# the ptrace trace loop dispatches through retrace_engine_wrapper.
+#
+add_executable(retrace_test_attach test_attach.c)
+set_target_properties(retrace_test_attach PROPERTIES
+    OUTPUT_NAME test_attach
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_attach PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_attach PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_attach PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_attach PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+# The ptrace backend only exists on Linux; link it in so the real
+# attach path (not just the failure path) is exercised there.
+if(RETRACE_PLATFORM_LINUX)
+    target_link_libraries(retrace_test_attach PRIVATE retrace_backend_ptrace)
+endif()
+
+add_test(NAME unit-test-attach
+    COMMAND retrace_test_attach)
+set_tests_properties(unit-test-attach PROPERTIES LABELS "unit")
