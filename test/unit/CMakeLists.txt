@@ -1147,3 +1147,28 @@ target_include_directories(retrace_test_scan PRIVATE
 add_test(NAME unit-test-scan
     COMMAND retrace_test_scan)
 set_tests_properties(unit-test-scan PROPERTIES LABELS "unit")
+
+#
+# Audit formatter unit tests (TODO.complete/26). audit_format_sarif
+# is what GitHub Code Scanning ingests -- a structural regression
+# breaks alert ingestion silently. Pins the SARIF 2.1.0 skeleton
+# and every field Code Scanning keys off, plus the default report.
+# Compiles format.c + scan.c + policy.c from tools/audit-converter/.
+#
+add_executable(retrace_test_format test_format.c
+    ${CMAKE_SOURCE_DIR}/tools/audit-converter/format.c
+    ${CMAKE_SOURCE_DIR}/tools/audit-converter/scan.c
+    ${_audit_policy_source}
+    ${_parson_for_tools})
+set_target_properties(retrace_test_format PROPERTIES
+    OUTPUT_NAME test_format
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_format PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/audit-converter
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-format
+    COMMAND retrace_test_format)
+set_tests_properties(unit-test-format PROPERTIES LABELS "unit")

@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.4.2] - 2026-08-14
+
+### Changed
+- `tools/audit-converter`: extracted the output formatters from
+  `audit.c` to a new `format.{c,h}` -- `audit_sarif_level`,
+  `audit_format_default`, `audit_format_sarif`. Completes the
+  tool's MECE chain: `policy.c` (rules + matching) -> `scan.c`
+  (apply-to-trace) -> `format.c` (render) -> `audit.c` (CLI).
+
+### Added
+- `test/unit/test_format.c` -- 11 unit tests. SARIF coverage pins
+  everything GitHub Code Scanning keys off: the 2.1.0 skeleton
+  (version, $schema, single run, driver name), per-result
+  ruleId/level/message.text, severity->level mapping
+  (critical/high -> error, medium -> warning, info -> note),
+  1-based region.startLine, artifactLocation.uri, and the
+  zero-findings empty-results contract. Default-format coverage
+  pins policy/trace fields, per-finding evidence (deep-copied
+  entry), summary counts per severity, and the zeroed summary.
+
 ## [2.4.1] - 2026-08-14
 
 ### Changed
