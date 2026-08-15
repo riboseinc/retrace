@@ -7,7 +7,7 @@
 
 set(_parson_source ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 
-add_executable(retrace_audit audit.c policy.c scan.c pdf_writer.c ${_parson_source})
+add_executable(retrace_audit audit.c policy.c scan.c format.c pdf_writer.c ${_parson_source})
 set_target_properties(retrace_audit PROPERTIES
     OUTPUT_NAME retrace-audit
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools")
