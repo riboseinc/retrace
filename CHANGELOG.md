@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.4.4] - 2026-08-16
+
+### Fixed
+- `tools/trace-diff` stats mode: switched the variance from the
+  one-pass `E[x^2] - mean^2` form to the numerically stable
+  two-pass sum-of-squared-deviations. The one-pass form suffers
+  catastrophic cancellation for large call counts (values beyond
+  2^53 are not exactly representable in a double), producing
+  wrong stddevs and therefore wrong z-scores -- found by the new
+  large-counts unit test.
+
+### Changed
+- `tools/trace-diff`: extracted the z-score math from
+  `run_stats_mode` to a new `stats.{c,h}` -- `diff_stats_compute`
+  fills mean/stddev/z/no-variance/significance in one call. The
+  tool chain is now: `normalize.c` -> `threshold.c` -> `lcs.c` ->
+  `stats.c` -> `diff.c` (CLI + printing).
+
+### Added
+- `test/unit/test_stats.c` -- 10 unit tests: known distributions
+  ([10,12,14] -> 12 +- sqrt(8/3)), significant/not classification,
+  negative-direction |z|, zero-variance cases (constant baselines,
+  all-zero, single baseline), strict threshold semantics (exact
+  z == threshold is NOT significant), custom thresholds, invalid
+  inputs, and billion-scale counts.
+
 ## [2.4.3] - 2026-08-15
 
 ### Changed

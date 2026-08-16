@@ -63,7 +63,7 @@ typedef int retrace_status_t;
 static void usage(FILE *out)
 {
 	fprintf(out,
-"retrace v2.4.3 -- userspace libc interceptor\n"
+"retrace v2.4.4 -- userspace libc interceptor\n"
 "\n"
 "Usage:\n"
 "  retrace run [OPTIONS] -- <command> [args...]\n"
