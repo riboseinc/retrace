@@ -1060,6 +1060,25 @@ add_test(NAME unit-test-threshold
 set_tests_properties(unit-test-threshold PROPERTIES LABELS "unit")
 
 #
+# LCS alignment unit tests (TODO.complete/27 P1). diff_lcs_walk
+# drives the call-order diff (cookbook 26): the edit count is what
+# CI gates on and the alignment is what users read. Pure algorithm,
+# no parson/normalize deps.
+#
+add_executable(retrace_test_lcs test_lcs.c
+    ${CMAKE_SOURCE_DIR}/tools/trace-diff/lcs.c)
+set_target_properties(retrace_test_lcs PROPERTIES
+    OUTPUT_NAME test_lcs
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_lcs PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/trace-diff)
+
+add_test(NAME unit-test-lcs
+    COMMAND retrace_test_lcs)
+set_tests_properties(unit-test-lcs PROPERTIES LABELS "unit")
+
+#
 # Parson allocation-budget regression tests (TODO.complete/33 P0).
 # Guards against regressions where someone tightens the budget
 # (breaking real configs) or fails to reset it between calls

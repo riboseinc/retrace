@@ -39,6 +39,7 @@
 #include "parson.h"
 #include "normalize.h"
 #include "threshold.h"
+#include "lcs.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -213,87 +214,55 @@ static int print_all_diffs(const struct NormalizedLog *before,
 /*
  * Order diff via longest common subsequence (TODO.complete/27 P1).
  *
- * Computes the LCS of two function-name sequences and prints
- * the differences as unified-diff-style insertions / deletions.
- * Each entry in the LCS appears as a context line ("  func");
- * each before-only entry appears as a deletion ("- func"); each
- * after-only entry appears as an insertion ("+ func").
- *
- * Returns the number of insertions + deletions (i.e. the
- * "edit distance"). 0 means identical order.
- *
- * Standard DP. O(N*M) memory for the table; bounded by trace
- * length. For typical retrace runs (< 10K calls) this is fine.
+ * Prints the alignment computed by lcs.c as unified-diff-style
+ * lines: "  func" for entries in both, "- func" for before-only,
+ * "+ func" for after-only. Returns the number of insertions +
+ * deletions (the "edit distance"); 0 means identical order.
  */
+struct print_ctx {
+	int edits;
+};
+
+static int print_item(const struct diff_lcs_item *item, void *p)
+{
+	struct print_ctx *ctx = (struct print_ctx *)p;
+
+	switch (item->type) {
+	case DIFF_LCS_MATCH:
+		printf("  %s\n", item->name);
+		break;
+	case DIFF_LCS_DELETE:
+		printf("- %s\n", item->name);
+		ctx->edits++;
+		break;
+	case DIFF_LCS_INSERT:
+		printf("+ %s\n", item->name);
+		ctx->edits++;
+		break;
+	}
+	return 0;
+}
+
 static int print_order_diff(char **before_seq, size_t before_len,
 			    char **after_seq, size_t after_len)
 {
-	size_t i, j;
-	size_t *dp;
-	size_t dp_rows = before_len + 1;
-	size_t dp_cols = after_len + 1;
-	int edits = 0;
+	struct print_ctx ctx = {0};
+	int rc;
 
 	if (before_len == 0 && after_len == 0)
 		return 0;
 
-	/* Allocate the (before_len+1) x (after_len+1) table. */
-	dp = (size_t *)calloc(dp_rows * dp_cols, sizeof(size_t));
-	if (dp == NULL) {
+	printf("\n--- order diff (LCS) ---\n");
+	rc = diff_lcs_walk((const char *const *)before_seq, before_len,
+			   (const char *const *)after_seq, after_len,
+			   print_item, &ctx);
+	if (rc < 0) {
 		fprintf(stderr,
 			"retrace-diff: OOM in LCS (sizes %zu x %zu)\n",
 			before_len, after_len);
 		return -1;
 	}
-
-	/* Fill the table. */
-	for (i = 1; i < dp_rows; i++) {
-		for (j = 1; j < dp_cols; j++) {
-			if (strcmp(before_seq[i - 1], after_seq[j - 1]) == 0)
-				dp[i * dp_cols + j] =
-					dp[(i - 1) * dp_cols + (j - 1)] + 1;
-			else
-				dp[i * dp_cols + j] =
-					(dp[(i - 1) * dp_cols + j] >
-					 dp[i * dp_cols + (j - 1)])
-					? dp[(i - 1) * dp_cols + j]
-					: dp[i * dp_cols + (j - 1)];
-		}
-	}
-
-	/* Walk back from [before_len][after_len] to reconstruct. */
-	printf("\n--- order diff (LCS) ---\n");
-	i = before_len;
-	j = after_len;
-	while (i > 0 && j > 0) {
-		if (strcmp(before_seq[i - 1], after_seq[j - 1]) == 0) {
-			printf("  %s\n", before_seq[i - 1]);
-			i--;
-			j--;
-		} else if (dp[(i - 1) * dp_cols + j] >=
-			   dp[i * dp_cols + (j - 1)]) {
-			printf("- %s\n", before_seq[i - 1]);
-			i--;
-			edits++;
-		} else {
-			printf("+ %s\n", after_seq[j - 1]);
-			j--;
-			edits++;
-		}
-	}
-	while (i > 0) {
-		printf("- %s\n", before_seq[i - 1]);
-		i--;
-		edits++;
-	}
-	while (j > 0) {
-		printf("+ %s\n", after_seq[j - 1]);
-		j--;
-		edits++;
-	}
-
-	free(dp);
-	return edits;
+	return ctx.edits;
 }
 
 /*
