@@ -1212,3 +1212,22 @@ target_link_libraries(retrace_test_stats PRIVATE m)
 add_test(NAME unit-test-stats
     COMMAND retrace_test_stats)
 set_tests_properties(unit-test-stats PROPERTIES LABELS "unit")
+
+#
+# PDF writer unit tests (TODO.complete/26 P2). The PDF is a
+# compliance deliverable -- malformed structure fails viewers and
+# auditors' tooling. pdf_writer.c is decoupled from parson and
+# the Findings model (takes string arrays), so this links alone.
+#
+add_executable(retrace_test_pdf test_pdf.c
+    ${CMAKE_SOURCE_DIR}/tools/audit-converter/pdf_writer.c)
+set_target_properties(retrace_test_pdf PROPERTIES
+    OUTPUT_NAME test_pdf
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_pdf PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/audit-converter)
+
+add_test(NAME unit-test-pdf
+    COMMAND retrace_test_pdf)
+set_tests_properties(unit-test-pdf PROPERTIES LABELS "unit")
