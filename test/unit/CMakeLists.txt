@@ -1191,3 +1191,24 @@ target_include_directories(retrace_test_format PRIVATE
 add_test(NAME unit-test-format
     COMMAND retrace_test_format)
 set_tests_properties(unit-test-format PROPERTIES LABELS "unit")
+
+#
+# Z-score stats unit tests (TODO.complete/27 P2). diff_stats_compute
+# drives the --stats CI gate (cookbook 25) -- wrong mean/stddev/z
+# means missed regressions or false alarms on every PR. Needs -lm
+# for sqrt/fabs (part of libSystem on macOS).
+#
+add_executable(retrace_test_stats test_stats.c
+    ${CMAKE_SOURCE_DIR}/tools/trace-diff/stats.c)
+set_target_properties(retrace_test_stats PROPERTIES
+    OUTPUT_NAME test_stats
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_stats PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/trace-diff)
+
+target_link_libraries(retrace_test_stats PRIVATE m)
+
+add_test(NAME unit-test-stats
+    COMMAND retrace_test_stats)
+set_tests_properties(unit-test-stats PROPERTIES LABELS "unit")

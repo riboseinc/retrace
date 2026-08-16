@@ -40,6 +40,7 @@
 #include "normalize.h"
 #include "threshold.h"
 #include "lcs.h"
+#include "stats.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -315,6 +316,8 @@ static int load_trace(const char *path, struct NormalizedLog *out,
  */
 #include <math.h>
 
+#define MAX_BASELINES 64
+
 static int run_stats_mode(const char *baseline_list,
 			  const char *test_path, double zscore)
 {
@@ -387,47 +390,40 @@ static int run_stats_mode(const char *baseline_list,
 	/* For each function in the test trace, compute z-score. */
 	for (i = 0; i < test.count; i++) {
 		const char *name = test.funcs[i].name;
-		uint64_t test_count = test.funcs[i].call_count;
-		double sum = 0, sum_sq = 0;
-		double mean, variance, stddev;
+		uint64_t counts[MAX_BASELINES];
+		struct diff_stats st;
 		int j;
 
 		for (j = 0; j < n_baselines; j++) {
 			const struct FuncStat *s = normalize_find(
 				&baselines[j], name);
-			double c = s ? (double)s->call_count : 0;
 
-			sum += c;
-			sum_sq += c * c;
+			counts[j] = s ? s->call_count : 0;
 		}
 
-		mean = sum / n_baselines;
-		variance = (sum_sq / n_baselines) - (mean * mean);
-		stddev = sqrt(variance > 0 ? variance : 0);
+		if (diff_stats_compute(counts, (size_t)n_baselines,
+			    test.funcs[i].call_count, zscore, &st) != 0)
+			continue;
 
-		if (stddev == 0) {
+		if (st.no_variance) {
 			/* No variance in baselines. Flag if test
 			 * differs from the constant value at all.
 			 */
-			if ((double)test_count != mean) {
+			if (st.significant) {
 				printf("  %s: test=%llu baseline=%.1f+0.0"
 				       " (NO VARIANCE -- manual review)\n",
 					name,
-					(unsigned long long)test_count,
-					mean);
+					(unsigned long long)test.funcs[i].call_count,
+					st.mean);
 				significant++;
 			}
-		} else {
-			double z = ((double)test_count - mean) / stddev;
-
-			if (fabs(z) > zscore) {
-				printf("  %s: test=%llu baseline=%.1f+%.1f"
-				       " (z=%.2f ***)\n",
-					name,
-					(unsigned long long)test_count,
-					mean, stddev, z);
-				significant++;
-			}
+		} else if (st.significant) {
+			printf("  %s: test=%llu baseline=%.1f+%.1f"
+			       " (z=%.2f ***)\n",
+				name,
+				(unsigned long long)test.funcs[i].call_count,
+				st.mean, st.stddev, st.z);
+			significant++;
 		}
 	}
 
