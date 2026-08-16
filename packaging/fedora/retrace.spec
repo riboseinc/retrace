@@ -2,10 +2,10 @@
 #
 # Fedora RPM spec for retrace (TODO.complete/38).
 # Build: rpmbuild -ba retrace.spec
-# Install: dnf install retrace-2.4.2-1.*.rpm
+# Install: dnf install retrace-2.4.3-1.*.rpm
 
 Name:           retrace
-Version:        2.4.2
+Version:        2.4.3
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,9 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Sat Aug 15 2026 Ribose Inc <opensource@ribose.com> - 2.4.3-1
+- trace-diff lcs.c extraction (MECE) + 17 LCS alignment tests
+
 * Fri Aug 14 2026 Ribose Inc <opensource@ribose.com> - 2.4.2-1
 - audit format.c extraction (MECE) + 11 formatter tests
 

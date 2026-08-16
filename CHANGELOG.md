@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.4.3] - 2026-08-15
+
+### Changed
+- `tools/trace-diff`: extracted the LCS alignment from `diff.c` to
+  a new `lcs.{c,h}` -- `diff_lcs_len` (pure length) and
+  `diff_lcs_walk` (alignment emitted as typed MATCH/DELETE/INSERT
+  items via callback). The tool chain is now: `normalize.c`
+  (aggregation) -> `threshold.c` (gating) -> `lcs.c` (order
+  alignment) -> `diff.c` (CLI + printing). Behavior-preserving,
+  including the both-empty early return before the header.
+
+### Added
+- `test/unit/test_lcs.c` -- 17 unit tests: classic LCS lengths
+  (identical/disjoint/interleaved/textbook ABCBDAB vs BDCABA),
+  empty inputs, prefix cases; walk semantics (all-MATCH for
+  identical, only-edits for disjoint, one-side-empty);
+  the identities `edits = alen + blen - 2*lcs` and `items =
+  alen + blen - lcs`; pointer provenance (MATCH/DELETE names from
+  the before sequence, INSERT from after); alignment shape for
+  reorderings; early-stop via callback; NULL-callback safety.
+
 ## [2.4.2] - 2026-08-14
 
 ### Changed
