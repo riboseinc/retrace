@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.4.5] - 2026-08-16
+
+### Fixed
+- `tools/audit-converter/pdf_writer.c` -- two real bugs, both
+  present since the PDF output shipped in v2.3.0 and both found
+  by the new tests:
+  1. **Missing findings page**: the findings-page loop's bound
+     (`obj_id < total_objects - 1`) was off by one, so whenever
+     the findings content fit exactly (1-40 findings) the page
+     was skipped entirely -- the PDF declared `/Count 3` with
+     only 2 page objects, and every finding was invisible.
+     Beyond 40 findings the last page was dropped. Now the page
+     count matches the objects for every case.
+  2. **Double-escaped cover text**: the cover pre-escaped the
+     policy name and trace path, then `build_page_content`
+     escaped them again -- parentheses rendered as literal
+     backslash-parens in viewers. The cover now passes raw
+     strings and is escaped exactly once (matching the findings
+     path).
+
+### Added
+- `test/unit/test_pdf.c` -- 13 unit tests: `pdf_escape_string`
+  rules (plain/parens/backslash/empty), document structure
+  (PDF 1.4 header, %%EOF trailer, xref + startxref,
+  Catalog/Pages/Font), page counts for 0/1/40/41 findings,
+  cover content, padded summary labels, findings rule ids,
+  special-character round trip, and the writer's return value.
+
 ## [2.4.4] - 2026-08-16
 
 ### Fixed

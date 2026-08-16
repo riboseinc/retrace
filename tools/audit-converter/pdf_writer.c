@@ -173,18 +173,20 @@ int pdf_write_audit_report(FILE *out, const char *policy_name,
 
 	/* Page 1: Cover */
 	{
-		char *esc_policy = pdf_escape_string(policy_name);
-		char *esc_trace = pdf_escape_string(trace_path);
+		/* build_page_content escapes each line exactly once;
+		 * pass the raw strings (pre-escaping here would
+		 * double-escape and render literal backslashes).
+		 */
 		const char *lines[] = {
 			"retrace Compliance Audit Report",
 			"",
 			"Policy:",
 			"",
-			esc_policy,
+			policy_name,
 			"",
 			"Trace:",
 			"",
-			esc_trace,
+			trace_path,
 			"",
 			"Date:",
 			"",
@@ -204,8 +206,6 @@ int pdf_write_audit_report(FILE *out, const char *policy_name,
 			obj_id, strlen(content), content);
 		obj_id++;
 		free(content);
-		free(esc_policy);
-		free(esc_trace);
 	}
 
 	/* Page 2: Summary */
@@ -267,7 +267,15 @@ int pdf_write_audit_report(FILE *out, const char *policy_name,
 	{
 		int finding_idx = 0;
 
-		while (finding_idx < n_findings && obj_id < total_objects - 1) {
+		/* Object numbering: 3 core + 2 per page. After cover
+		 * and summary the next findings page starts at obj_id
+		 * and consumes exactly the remaining budget, so the
+		 * guard is obj_id < total_objects (the historical
+		 * "- 1" skipped the findings page whenever it fit
+		 * exactly -- 1..40 findings produced a /Count of 3
+		 * with only 2 page objects).
+		 */
+		while (finding_idx < n_findings && obj_id < total_objects) {
 			const char *lines[42];
 			int n_lines = 0;
 

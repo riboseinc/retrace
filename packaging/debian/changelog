@@ -1,3 +1,10 @@
+retrace (2.4.5-1) unstable; urgency=medium
+
+  * audit PDF: fix missing findings page (1-40 findings) and
+    double-escaped cover text; + 13 pdf_writer unit tests.
+
+ -- Ribose Inc <opensource@ribose.com>  Sat, 15 Aug 2026 00:00:00 +0000
+
 retrace (2.4.4-1) unstable; urgency=medium
 
   * trace-diff: extract stats.c (MECE) + 10 z-score tests; fix
