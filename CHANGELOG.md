@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.4.6] - 2026-08-17
+
+### Changed
+- `docs/architecture.md`: Logs section now documents the lock-free
+  SPSC ring + background flusher (v2.3.0) and
+  `RETRACE_LOGGER_RING`. New "The tooling ecosystem" section maps
+  the audit and diff module chains (policy→scan→format→pdf_writer;
+  normalize→threshold→lcs→stats) and the shared-JSON producer/
+  consumer contract. The backends section documents the ptrace
+  attach path (`retrace attach` / `retrace_attach_process`) and
+  why it bypasses the probe.
+- `docs/development.md`: new "Test conventions" (the CHECK-not-
+  assert rule with its Alpine war story, standalone tool-module
+  tests, per-commit checkpatch) and "Adding a new tool module"
+  (the pure-module → thin-CLI → standalone-test pattern).
+- `docs/faq.md`: four new answers — attach to a running process,
+  CI gating via `retrace-diff` exit codes, SARIF → GitHub Code
+  Scanning, logger overhead. Fixed stale counts (18→27 tutorials,
+  21→32 recipes) and the academic-citation version (2.1.0→2.4.5).
+
 ## [2.4.5] - 2026-08-16
 
 ### Fixed

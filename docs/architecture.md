@@ -320,8 +320,51 @@ The log goes to:
 Log entries include: timestamp, function name, parsed args, return
 value, `call_duration_us`.
 
+Since v2.3.0 the hot path is a **lock-free SPSC ring** per
+thread: the intercepting thread pushes an entry with two relaxed
+loads and one release store (no mutex on the write side), and a
+single background flusher thread drains all rings at a 1ms
+cadence and performs the actual I/O. The flusher disables
+interception for its own thread to avoid a feedback loop. Set
+`RETRACE_LOGGER_RING=0` for synchronous writes (OHOS/QEMU/debug
+builds where thread creation during init is fragile).
+
 `retrace pp <log.json>` pretty-prints a log as text.
 `retrace html <log.json>` converts it to an interactive HTML page.
+
+## The tooling ecosystem
+
+The standalone tools (`retrace-audit`, `retrace-diff`, ...) are
+consumers of the same JSON log the library produces. Each is
+decomposed into pure modules with the CLI as a thin driver —
+which is what makes them unit-testable without I/O:
+
+```
+tools/audit-converter/
+  policy.c     rules + matching        (policy_rule_matches)
+  scan.c       apply policy to trace   (audit_scan_trace)
+  format.c     render findings         (default JSON / SARIF 2.1.0)
+  pdf_writer.c PDF 1.4 deliverable    (cover + summary + findings)
+  audit.c      CLI: parse args, load, scan, format
+
+tools/trace-diff/
+  normalize.c  trace aggregation       (per-func counts + durations)
+  threshold.c  gating math             (diff_exceeds_threshold)
+  lcs.c        order alignment         (diff_lcs_len / diff_lcs_walk)
+  stats.c      z-score math            (diff_stats_compute)
+  diff.c       CLI: parse args, load, diff, print
+```
+
+Every module has a matching `test/unit/test_*.c` that links it
+standalone. The module chains are the reason that's possible:
+pure logic in small files, side effects (files, stdout)
+concentrated in the CLI driver.
+
+The output of every producer is byte-compatible with the input of
+every consumer — `retrace run`, `retrace attach`, the Frida
+bridge, and the eBPF bridge all emit the same JSON shape, and
+audit/diff/replay/ws/to-otlp all read it. Pipelines compose
+without format conversion.
 
 ## Per-platform backends
 
@@ -335,12 +378,24 @@ design.
 | `preload_macho` | macOS | x86_64, arm64 | `DYLD_INSERT_LIBRARIES` |
 | `preload_msvc` | Windows | x86_64, arm64 | Inline hook |
 | `preload_mingw` | Windows | x86_64 | Inline hook |
-| `ptrace` | Linux | x86_64, aarch64 | `ptrace(2)` (for static binaries) |
+| `ptrace` | Linux | x86_64, aarch64 | `ptrace(2)` |
 
 Each backend implements `retrace_backend_t` from
 `include/retrace/backend.h` and self-registers via the constructor
 section. `retrace_backend_select` walks the registry and picks the
 highest-rank backend whose `probe()` succeeds.
+
+The `ptrace` backend owns two niches the preload backends
+structurally cannot: statically-linked binaries (their probe
+checks for a missing `PT_INTERP`) and, since v2.4.0, **attaching
+to an already-running process** — `retrace attach <pid>` calls the
+public `retrace_attach_process()`, which selects the ptrace
+backend explicitly (attach semantics bypass the probe: for a
+process you cannot exec, ptrace is the sole native mechanism
+regardless of how the binary was linked). Its trace loop
+synthesizes a frame per syscall stop and forwards it to the same
+process-global `retrace_engine_wrapper` the preload trampolines
+use, so the JSON config applies unchanged.
 
 Adding a new backend (e.g., `frida`, `ebpf`) = adding a new
 directory under `src/backends/<name>/` and implementing the
