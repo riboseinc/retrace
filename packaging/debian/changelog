@@ -1,3 +1,11 @@
+retrace (2.4.6-1) unstable; urgency=medium
+
+  * docs: architecture/development/faq refreshed for v2.3.x-v2.4.x
+    (tool ecosystem module chains, ptrace attach, CHECK convention,
+    new FAQ entries).
+
+ -- Ribose Inc <opensource@ribose.com>  Sun, 16 Aug 2026 00:00:00 +0000
+
 retrace (2.4.5-1) unstable; urgency=medium
 
   * audit PDF: fix missing findings page (1-40 findings) and

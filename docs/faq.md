@@ -120,16 +120,72 @@ defensively); existing fields are not renamed or removed. See the
 [configuration reference](configuration.md) for the schema. The
 interactive HTML viewer handles whatever fields are present.
 
+## Can I attach to an already-running process?
+
+On Linux, yes — since v2.4.0:
+
+```sh
+retrace attach --log /tmp/trace.json $(pidof my-server)
+```
+
+This uses ptrace: no `LD_PRELOAD`, no restart, no control of the
+launch required. Output is the same JSON log as `retrace run` and
+feeds the same tools. Permission errors usually mean ptrace_scope
+restrictions — attach to your own child, run as root, or see the
+troubleshooting notes in the [CLI reference](cli.md#attach--trace-a-running-process-linux).
+
+Elsewhere (macOS, Windows, iOS), use the
+[Frida bridge](cookbook/29-frida-bridge.md) — same JSON output,
+different injection point.
+
+## How do I fail CI when a change makes my program slower?
+
+`retrace-diff` compares two traces and its exit code doubles as a
+gate: 0 = no diff above threshold, 1 = regression found, 2 = setup
+error. Suppress noise with a percentage threshold:
+
+```sh
+retrace-diff --threshold pct=10 before.json after.json
+```
+
+For statistical gating across flaky runs, feed it multiple
+baselines: `--stats base1.json,base2.json,base3.json test.json`
+flags functions deviating by more than N standard deviations.
+See [tutorial 24](tutorials.md) for the full workflow.
+
+## Can retrace findings appear in GitHub Code Scanning?
+
+Yes. `retrace-audit` emits SARIF 2.1.0 — upload the file as a
+SARIF artifact and each finding (rule ID, severity, evidence)
+becomes an alert in **Security → Code scanning**, with Azure
+DevOps support as well:
+
+```sh
+retrace-audit --policy share/policies/pci-dss.json \
+  --trace trace.json --format sarif -o findings.sarif
+```
+
+## Does the logger add much overhead to the target?
+
+Since v2.3.0 the hot path is a lock-free per-thread ring: the
+intercepting thread does two relaxed loads and one release store
+per entry — no mutex — and a single background thread performs
+the actual I/O at 1ms cadence. The throughput-critical part of
+your program never blocks on the log writer. For targets where
+even the flusher thread is unwanted (QEMU, OHOS), set
+`RETRACE_LOGGER_RING=0` for synchronous writes.
+
 ## How do I cite retrace in academic work?
 
-Cite the repository: `riboseinc/retrace`, version 2.1.0,
+Cite the repository: `riboseinc/retrace`, version 2.4.5,
 BSD-2-Clause license, available at
 <https://github.com/riboseinc/retrace>. There is no formal paper
 yet; if you'd like one, open an issue.
 
 ## See also
 
-- [Tutorials](tutorials.md) — 18 scenario-driven walkthroughs.
-- [Cookbook](cookbook/README.md) — 21 recipe-style recipes.
+- [Tutorials](tutorials.md) — 27 scenario-driven walkthroughs.
+- [Cookbook](cookbook/README.md) — 32 recipe-style recipes.
+- [Tools overview](tools.md) — which tool for which job.
 - [CLI reference](cli.md) — every subcommand.
 - [Configuration reference](configuration.md) — full JSON schema.

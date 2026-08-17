@@ -75,6 +75,25 @@ Examples under `examples/*/` (dns-fuzz, getenv-fuzzing,
 http-server-overflow, id-redirection, net-fuzzing, stringinject,
 unsafe-system) are self-contained demos.
 
+### Test conventions
+
+- **Use `CHECK(cond)`, not `assert(cond)`, whenever the
+  expression contains a function call whose side effects later
+  code needs.** `assert()` compiles to `((void)0)` under
+  `-DNDEBUG` (the CMake Release default), eliding both the check
+  and the call — this class of bug once segfaulted the test
+  suite on Alpine/musl + gcc -O3 while passing on glibc/macOS.
+  `CHECK()` lives in `test/helpers/test_utils.h` (or a per-file
+  copy); it always evaluates, prints `FAIL [file:line]`, bumps
+  `tests_fail`, and returns from the test function.
+- Every tool module under `tools/` has a standalone
+  `test/unit/test_<module>.c` that links just that module — no
+  engine, no LD_PRELOAD. Keep new modules linkable that way
+  (pure logic in the module, I/O in the CLI driver).
+- Fix style issues in the commit that introduces them:
+  checkpatch runs per-commit over the whole PR range, so a
+  fixup commit does not clear the original warning.
+
 ## Code style
 
 `.clang-format` is Mozilla-based. Format manually if you want
@@ -222,6 +241,28 @@ Backends live in `src/backends/<name>/`. Each backend:
 See `src/backends/preload_elf/` for the canonical example. The
 registry walks the constructor section at startup and picks the
 highest-rank backend whose `probe()` succeeds.
+
+## Adding a new tool module
+
+The standalone tools follow one decomposition pattern (see
+[architecture.md](architecture.md#the-tooling-ecosystem) for the
+current module chains):
+
+1. **Pure module first.** Put the algorithm in its own
+   `<module>.c` with a small header — no `printf`, no file I/O,
+   no global CLI state. Think `threshold.c` (one predicate) or
+   `lcs.c` (compute + callback).
+2. **Thin CLI driver.** The tool's `main()` file owns argument
+   parsing, loading, and printing. It calls the modules.
+3. **Standalone test.** Add `test/unit/test_<module>.c` linking
+   only the module (+ parson via the `parson_stub` include if it
+   parses JSON), following the `TEST`/`CHECK` conventions above.
+   Copy the CMake block from an existing tool test.
+
+This pattern is why the audit and diff tools could be tested (and
+why testing them found seven real bugs): small pure files make
+wrong answers visible; monolithic CLI drivers make them
+invisible.
 
 ## Adding a new action
 
