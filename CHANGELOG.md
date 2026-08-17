@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.5.2] - 2026-08-17
+
+### Added
+- `test/property/test_property_policy.c` — 6 property-based
+  tests for `policy_rule_matches` (the audit matcher), 2000
+  generated iterations each with a fixed seed (reproducible;
+  override via RETRACE_PROPERTY_SEED):
+  - **determinism**: same (rule, message) answers identically.
+  - **AND-loosening**: a matching rule still matches after any
+    single predicate is removed — fewer constraints cannot
+    un-match.
+  - **empty-matches-all**: a predicate-free rule matches every
+    generated message.
+  - **func_exact soundness**: a match implies the func equals
+    the pattern.
+  - **path_contains soundness**: a match implies some string
+    value contains the substring (non-matches vacuously sound).
+  - **env-glob iff**: suffix/prefix/exact shapes match exactly
+    the names that end with/start with/ equal the word.
+
 ## [2.5.1] - 2026-08-17
 
 ### Added

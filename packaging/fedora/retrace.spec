@@ -2,10 +2,10 @@
 #
 # Fedora RPM spec for retrace (TODO.complete/38).
 # Build: rpmbuild -ba retrace.spec
-# Install: dnf install retrace-2.5.1-1.*.rpm
+# Install: dnf install retrace-2.5.2-1.*.rpm
 
 Name:           retrace
-Version:        2.5.1
+Version:        2.5.2
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,9 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Mon Aug 17 2026 Ribose Inc <opensource@ribose.com> - 2.5.2-1
+- Property tests for the audit policy matcher
+
 * Mon Aug 17 2026 Ribose Inc <opensource@ribose.com> - 2.5.1-1
 - ring-logger contention benchmark (1/2/4/8 producer threads)
 

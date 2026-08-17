@@ -274,3 +274,31 @@ add_test(NAME property-caller-match
 set_tests_properties(property-caller-match PROPERTIES
     LABELS "property;unit"
     TIMEOUT 60)
+
+#
+# Property-based tests for the audit policy matcher (TODO.complete/26).
+# policy_rule_matches drives every compliance finding; these
+# properties (determinism, AND-loosening, empty-matches-all,
+# per-predicate soundness, env-glob iff-semantics) hold for any
+# generated rule + message. Links policy.c from tools/audit-converter/
+# plus parson via the stub.
+#
+add_executable(retrace_property_policy
+	test_property_policy.c
+	${CMAKE_SOURCE_DIR}/tools/audit-converter/policy.c
+	${_parson_sources})
+set_target_properties(retrace_property_policy PROPERTIES
+	OUTPUT_NAME property_policy
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/property")
+
+target_include_directories(retrace_property_policy PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}
+	${CMAKE_CURRENT_SOURCE_DIR}/parson_stub
+	${CMAKE_SOURCE_DIR}/tools/audit-converter
+	${CMAKE_SOURCE_DIR}/src/config/json)
+
+add_test(NAME property-policy
+	COMMAND retrace_property_policy)
+set_tests_properties(property-policy PROPERTIES
+	LABELS "property;unit"
+	TIMEOUT 60)
