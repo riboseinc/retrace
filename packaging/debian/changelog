@@ -1,3 +1,10 @@
+retrace (2.5.1-1) unstable; urgency=medium
+
+  * perf: ring-logger contention benchmark (1/2/4/8 producers);
+    documents the drop-on-full accounting invariant.
+
+ -- Ribose Inc <opensource@ribose.com>  Mon, 17 Aug 2026 00:00:00 +0000
+
 retrace (2.5.0-1) unstable; urgency=medium
 
   * Public API now matches the implementation (ADR-0014): removed

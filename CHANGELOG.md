@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.5.1] - 2026-08-17
+
+### Added
+- `test/perf/bench_log_ring_contention.c` — the lock-free ring
+  logger's contention benchmark. N producer threads (1/2/4/8)
+  push 20K entries each through the real hot path
+  (`log_info` -> ring push) while the flusher drains to a
+  counting sink; reports aggregate entries/sec, ns/entry,
+  delivered and dropped counts per configuration.
+  The correctness invariant it enforces: **delivered + dropped
+  == pushed** — drop-on-full is the ring's designed backpressure
+  (64 slots + 1ms flusher cadence ≈ 64K entries/s/thread
+  ceiling), and every drop must be accounted. First run on this
+  machine: push-side cost 0.8-1.9µs/entry; sustained synthetic
+  producers at 500K-1M entries/s engage drop-on-full heavily
+  with zero unaccounted entries. A portable mutex+cond start
+  gate stands in for pthread_barrier (absent on macOS).
+
 ## [2.5.0] - 2026-08-17
 
 MINOR bump per ADR-0006: the public header surface changed.
