@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.5.0] - 2026-08-17
+
+MINOR bump per ADR-0006: the public header surface changed.
+
+### Changed
+- **The public API now matches the implementation** (ADR-0014).
+  An audit (`nm -g` on the built library) showed that of ~28
+  functions declared in `<retrace/retrace.h>`, only the two added
+  in v2.4.0 actually existed — even `retrace_version()` had no
+  definition. Consumers compiled against the header and failed at
+  link time. The never-implemented declarations (engine
+  lifecycle, script builder, action params, config parsing,
+  introspection, error reporting) are removed; the re-
+  introduction path is documented in the ADR and gated on real
+  implementations. No working program can regress: the removed
+  symbols never existed in any linkable build.
+
+### Added
+- `retrace_version()` and `retrace_version_info()` — implemented
+  for real in a new `src/core/public_api.c` (previously declared,
+  never defined).
+- `test/unit/test_public_api.c` — the surface guard: dlsyms every
+  function the header declares from the running image and fails
+  the build if any is missing. A declared-but-unlinked symbol can
+  never ship again. Also pins the version contracts and the
+  attach/list-backends behavior smoke.
+- `docs/adr/0014-public-api-matches-implementation.md`.
+
 ## [2.4.6] - 2026-08-17
 
 ### Changed
