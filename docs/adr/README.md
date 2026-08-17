@@ -19,3 +19,5 @@ via a new ADR that references the old.
 | [0009](0009-from-scratch-windows-trampoline.md) | From-scratch Windows trampoline (no MinHook, no Detours) | accepted |
 | [0010](0010-aarch64-float-params-from-day-one.md) | AArch64 port supports float parameters from day one | accepted |
 | [0011](0011-v1-removal-at-v2.1.0.md) | Remove v1 source at v2.1.0 | accepted |
+| [0013](0013-engine-mece-split.md) | Engine MECE split | accepted |
+| [0014](0014-public-api-matches-implementation.md) | Public API matches the implementation | accepted |
