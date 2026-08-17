@@ -17,7 +17,8 @@ set(_core_sources
 	caller_cache.c
 	log_ring.c
 	log_flusher.c
-	call_hash.c)
+	call_hash.c
+	public_api.c)
 
 # dlopen_guard.c is Linux-only: it exports dlopen/dlclose/dlsym/dlerror
 # as global symbols for LD_PRELOAD interposition. On macOS these symbols
@@ -82,6 +83,7 @@ target_include_directories(retrace_core
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/backends>            # arch_spec.h
 		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/config/json>         # conf.h, parson.h (the v2 plan/04 decouples)
+		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>                 # retrace/retrace.h (public_api.c)
 	PRIVATE
 		${_retrace_arch_include}                                       # macros.h per-platform
 		${CMAKE_CURRENT_SOURCE_DIR}/prototypes
