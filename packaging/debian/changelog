@@ -1,3 +1,10 @@
+retrace (2.5.4-1) unstable; urgency=medium
+
+  * ci: timeout-minutes on every workflow job (bounded runner
+    hangs instead of GitHub's 6h default).
+
+ -- Ribose Inc <opensource@ribose.com>  Mon, 18 Aug 2026 00:00:00 +0000
+
 retrace (2.5.3-1) unstable; urgency=medium
 
   * ring logger: default capacity 64 -> 1024 (37x fewer drops at

@@ -49,6 +49,7 @@ env:
 
 jobs:
   build-x86_64:
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     container:
       image: alpine:3.21
@@ -96,6 +97,7 @@ jobs:
           LD_PRELOAD="$(pwd)/build/src/v2/libretrace.so" id
 
   build-aarch64:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
