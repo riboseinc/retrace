@@ -63,7 +63,7 @@ typedef int retrace_status_t;
 static void usage(FILE *out)
 {
 	fprintf(out,
-"retrace v2.5.4 -- userspace libc interceptor\n"
+"retrace v2.6.0 -- userspace libc interceptor\n"
 "\n"
 "Usage:\n"
 "  retrace run [OPTIONS] -- <command> [args...]\n"
@@ -1165,6 +1165,64 @@ static int cmd_backends(void)
 	return 0;
 }
 
+/*
+ * retrace list-functions / list-actions
+ *
+ * Prints the registry the library actually carries (dlopen +
+ * dlsym of the public introspection API -- the names come from
+ * whatever library this build installed, not a hardcoded list).
+ */
+static int cmd_list_registry(const char *api_symbol)
+{
+	char lib_path[PATH_MAX];
+	char *found;
+	void *lib;
+	retrace_status_t (*list_fn)(const char *const **names,
+				    size_t *count);
+	const char *const *names = NULL;
+	size_t count = 0;
+	size_t i;
+
+	setenv("RETRACE_LOGGER_DEF_STDOUT_ENA", "0", 1);
+	found = find_library(lib_path, sizeof(lib_path));
+	if (!found) {
+		fprintf(stderr,
+			"retrace: cannot find %s. Set RETRACE_LIB.\n",
+			RETRACE_LIB_NAME);
+		return 1;
+	}
+
+	lib = dlopen(lib_path, RTLD_NOW);
+	if (lib == NULL) {
+		fprintf(stderr, "retrace: dlopen(%s): %s\n",
+			lib_path, dlerror());
+		return 1;
+	}
+
+	list_fn = (retrace_status_t(*)(const char *const **names,
+				       size_t *count))dlsym(lib, api_symbol);
+	if (list_fn == NULL) {
+		fprintf(stderr,
+			"retrace: library lacks %s (pre-v2.6.0 build?)\n",
+			api_symbol);
+		dlclose(lib);
+		return 1;
+	}
+
+	if (list_fn(&names, &count) != 0 || count == 0) {
+		fprintf(stderr, "retrace: registry empty\n");
+		dlclose(lib);
+		return 1;
+	}
+
+	printf("%zu entr%s:\n", count, count == 1 ? "y" : "ies");
+	for (i = 0; i < count; i++)
+		printf("  %s\n", names[i]);
+
+	dlclose(lib);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	if (argc < 2) {
@@ -1230,29 +1288,11 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	if (strcmp(argv[1], "list-functions") == 0) {
-		/*
-		 * TODO: link against retrace_core and walk the registry.
-		 * For now, print a helpful message.
-		 */
-		printf("retrace list-functions requires the retrace_core library.\n");
-		printf("For now, see src/core/prototypes/ for the full list.\n");
-		return 0;
-	}
+	if (strcmp(argv[1], "list-functions") == 0)
+		return cmd_list_registry("retrace_list_functions");
 
-	if (strcmp(argv[1], "list-actions") == 0) {
-		printf("Built-in actions:\n");
-		printf("  log_params              Log call args to JSON\n");
-		printf("  call_real               Invoke real libc implementation\n");
-		printf("  modify_in_param_str     Rewrite a string argument\n");
-		printf("  modify_in_param_int     Rewrite an integer argument\n");
-		printf("  modify_in_param_arr     Rewrite a byte array argument\n");
-		printf("  modify_return_value_int Override the return value\n");
-		printf("  memory_fuzz             Randomly fail malloc/calloc/realloc\n");
-		printf("  incomplete_io           Partially fail I/O calls\n");
-		printf("  fuzzing_seed            Set deterministic seed for memory_fuzz\n");
-		return 0;
-	}
+	if (strcmp(argv[1], "list-actions") == 0)
+		return cmd_list_registry("retrace_list_actions");
 
 	if (strcmp(argv[1], "validate") == 0) {
 		if (argc < 3) {

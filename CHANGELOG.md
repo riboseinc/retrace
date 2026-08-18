@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.6.0] - 2026-08-18
+
+MINOR bump per ADR-0006: public surface grows (ADR-0014's
+implementation-first path).
+
+### Added
+- **`retrace_list_functions()` / `retrace_list_actions()`** —
+  public registry introspection: enumerate every interceptable
+  libc function (the prototype registry) and every built-in
+  action. Same ownership contract as `retrace_list_backends`.
+  Implementation walks the `__retrace_funcs` / `__retrace_acts`
+  linker-section arrays; no init required. The section-walk
+  macro's block-scope externs are hoisted by clang, so each
+  listing lives in its own translation unit (mirroring
+  funcs.c/actions.c) with a shared inline builder in
+  `public_api_internal.h`.
+- Surface-guard test extended: the two new symbols join the
+  dlsym list, plus contract tests (counts, non-empty names,
+  well-known members: malloc/open/write among 322 functions;
+  log_params/call_real/memory_fuzz/capture_buffer among 17
+  actions).
+
+### Fixed
+- **`retrace list-functions` / `list-actions` actually work
+  now.** Both were stubs since the CLI landed ("TODO: link
+  against retrace_core"; list-actions printed a hardcoded list
+  of 9 actions that had drifted from the real 17). Both now
+  dlopen the installed library and print the live registry.
+
 ## [2.5.4] - 2026-08-18
 
 ### Changed
