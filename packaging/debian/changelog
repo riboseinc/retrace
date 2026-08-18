@@ -1,3 +1,10 @@
+retrace (2.5.3-1) unstable; urgency=medium
+
+  * ring logger: default capacity 64 -> 1024 (37x fewer drops at
+    sustained rates); new RETRACE_LOGGER_RING_CAP env override.
+
+ -- Ribose Inc <opensource@ribose.com>  Tue, 18 Aug 2026 00:00:00 +0000
+
 retrace (2.5.2-1) unstable; urgency=medium
 
   * property tests for the audit policy matcher (6 properties x

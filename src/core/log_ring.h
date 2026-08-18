@@ -82,7 +82,19 @@ struct LogEntry {
 };
 
 /* Default capacity (power-of-2). 64 entries × 16 B = 1 KB per thread. */
-#define LOG_RING_DEFAULT_CAP 64
+/*
+ * Per-thread ring capacity (must be a power of two; the ring
+ * indexes with cap-1 masking). The default was raised from 64 to
+ * 1024 in v2.5.3: the contention benchmark showed the 64-slot
+ * ring engaging drop-on-full at sustained rates above the
+ * flusher's drain cadence (~64K entries/s/thread). 1024 slots
+ * (~1M entries/s/thread ceiling at the 1ms cadence) costs ~32KB
+ * per logging thread. Override via RETRACE_LOGGER_RING_CAP
+ * (power of two in [64, 65536]).
+ */
+#define LOG_RING_DEFAULT_CAP 1024
+#define LOG_RING_CAP_MIN 64
+#define LOG_RING_CAP_MAX 65536
 
 struct LogRing {
 	uint32_t mask;

@@ -289,6 +289,7 @@ Additional environment variables:
 | `RETRACE_LOGGER_ALLOWED_FUNCS`  | Comma-separated allowlist of function names to log.  |
 | `RETRACE_LOGGER_EXCLUDED_FUNCS` | Comma-separated denylist of function names to skip.  |
 | `RETRACE_LOGGER_RING`           | `1` (default): use lock-free SPSC ring + background flusher. `0`: synchronous writes (for OHOS / QEMU / debug builds where thread creation during init is fragile). |
+| `RETRACE_LOGGER_RING_CAP`        | Per-thread ring capacity in entries: power of two in `[64, 65536]`. Default `1024` (~1M entries/s/thread ceiling at the 1ms flusher cadence, ~32KB per logging thread). Larger = more headroom before drop-on-full engages. |
 | `RETRACE_CALL_HASH`             | `1` enables per-thread FNV-1a rolling hash of intercepted calls; exposed via `retrace_call_hash_last` for libFuzzer custom mutators (recipe 24). Default: `0` (off, zero overhead). |
 
 ## Library resolution

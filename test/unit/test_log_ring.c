@@ -310,6 +310,40 @@ static void *thread_push_then_drain(void *p)
 	return NULL;
 }
 
+static void test_env_cap_override(void)
+{
+	struct LogRing *r;
+
+	/* Valid power-of-two override: 256 slots -> mask 255. */
+	setenv("RETRACE_LOGGER_RING_CAP", "256", 1);
+	retrace_log_ring_deinit();
+	retrace_log_ring_init();
+	r = retrace_log_ring_get();
+	CHECK(r != NULL);
+	CHECK(r->mask == 255);
+
+	/* Non-power-of-two: falls back to the default. */
+	setenv("RETRACE_LOGGER_RING_CAP", "100", 1);
+	retrace_log_ring_deinit();
+	retrace_log_ring_init();
+	r = retrace_log_ring_get();
+	CHECK(r != NULL);
+	CHECK(r->mask == LOG_RING_DEFAULT_CAP - 1);
+
+	/* Out-of-range: falls back to the default. */
+	setenv("RETRACE_LOGGER_RING_CAP", "999999", 1);
+	retrace_log_ring_deinit();
+	retrace_log_ring_init();
+	r = retrace_log_ring_get();
+	CHECK(r != NULL);
+	CHECK(r->mask == LOG_RING_DEFAULT_CAP - 1);
+
+	/* Restore the suite pin for subsequent tests. */
+	setenv("RETRACE_LOGGER_RING_CAP", "64", 1);
+	retrace_log_ring_deinit();
+	retrace_log_ring_init();
+}
+
 static void test_multi_thread_each_thread_drains_own(void)
 {
 	enum { NTHREADS = 4, PER_THREAD = 32 };
@@ -338,6 +372,13 @@ static void test_multi_thread_each_thread_drains_own(void)
 
 int main(void)
 {
+	/* The wrap/drop tests below assume the historical 64-slot
+	 * ring (63 usable + 1 sentinel). Pin RETRACE_LOGGER_RING_CAP
+	 * before the first module init so the suite is deterministic
+	 * regardless of the production default (1024 since v2.5.3).
+	 */
+	setenv("RETRACE_LOGGER_RING_CAP", "64", 1);
+
 	retrace_real_impls.strcmp = strcmp;
 	retrace_real_impls.strlen = strlen;
 	retrace_real_impls.strcpy = strcpy;
@@ -346,6 +387,8 @@ int main(void)
 	retrace_real_impls.malloc = malloc;
 	retrace_real_impls.free = free;
 	retrace_real_impls.real_snprintf = snprintf;
+	retrace_real_impls.atoi = atoi;
+	retrace_real_impls.getenv = getenv;
 	retrace_real_impls.pthread_mutex_lock = pthread_mutex_lock;
 	retrace_real_impls.pthread_mutex_unlock = pthread_mutex_unlock;
 	retrace_real_impls.pthread_mutex_init = pthread_mutex_init;
@@ -369,6 +412,9 @@ int main(void)
 
 	printf("  -- edge cases --\n");
 	TEST(null_inputs_safe);
+
+	printf("  -- capacity configuration --\n");
+	TEST(env_cap_override);
 
 	printf("  -- concurrency --\n");
 	TEST(multi_thread_each_thread_drains_own);
