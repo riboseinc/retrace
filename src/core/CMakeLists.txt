@@ -19,7 +19,8 @@ set(_core_sources
 	log_flusher.c
 	call_hash.c
 	public_api.c
-	public_api_actions.c)
+	public_api_actions.c
+	public_api_validate.c)
 
 # dlopen_guard.c is Linux-only: it exports dlopen/dlclose/dlsym/dlerror
 # as global symbols for LD_PRELOAD interposition. On macOS these symbols

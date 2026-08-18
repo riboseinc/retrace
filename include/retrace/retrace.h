@@ -134,6 +134,24 @@ RETRACE_API retrace_status_t retrace_list_functions(
 RETRACE_API retrace_status_t retrace_list_actions(
 		const char *const **out_names, size_t *out_count);
 
+/*
+ * Validate a JSON intercept config (same comment-tolerant parse
+ * as the loader) and check every func_name against the prototype
+ * registry (the literal "*" wildcard is allowed) and every
+ * action_name against the action registry. Catches the typo
+ * classes that otherwise surface at runtime as silently-missing
+ * interceptions.
+ *
+ * buf must be NUL-terminated within len. err_buf (optional)
+ * receives a human-readable message on failure; on success it is
+ * set to an empty string.
+ *
+ * Returns RETRACE_OK, RETRACE_ERR_FORMAT (with err_buf message),
+ * or RETRACE_ERR_INVAL for NULL/empty/unterminated input.
+ */
+RETRACE_API retrace_status_t retrace_config_validate_buffer(
+		const char *buf, size_t len, char *err_buf, size_t err_len);
+
 #ifdef __cplusplus
 }
 #endif

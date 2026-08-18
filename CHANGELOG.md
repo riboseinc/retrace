@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.6.1] - 2026-08-19
+
+### Added
+- **`retrace_config_validate_buffer()`** — public config
+  validation (second ADR-0014 slice). Parses a JSON intercept
+  config (comment-tolerant, same as the loader) and checks every
+  `func_name` against the prototype registry (the literal `*`
+  wildcard allowed) and every `action_name` against the action
+  registry, catching the typo classes that otherwise surface at
+  runtime as silently-missing interceptions. Optional err_buf
+  carries a human-readable message ("unknown action 'log_paramz'
+  in func 'malloc'"). 8 new contract tests in the surface-guard
+  binary (ok/wildcard+comments/unknown action/unknown
+  function/malformed JSON/missing arrays/invalid inputs); the
+  guard now enforces 9 symbols.
+
+### Fixed
+- **`retrace validate <config.json>` actually validates now.**
+  It was a stub since the CLI landed ("TODO: parse JSON and
+  check action/func names") that only checked the file existed.
+  It now reads the file, dlopens the installed library, and
+  reports real errors with the offending names. Exit codes: 0
+  valid / 1 invalid config / 2 usage-or-IO.
+
 ## [2.6.0] - 2026-08-18
 
 MINOR bump per ADR-0006: public surface grows (ADR-0014's

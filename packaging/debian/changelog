@@ -1,3 +1,11 @@
+retrace (2.6.1-1) unstable; urgency=medium
+
+  * New: retrace_config_validate_buffer() public API; CLI
+    validate now parses + checks names against the registries
+    (was a file-existence stub).
+
+ -- Ribose Inc <opensource@ribose.com>  Tue, 19 Aug 2026 00:00:00 +0000
+
 retrace (2.6.0-1) unstable; urgency=medium
 
   * New: retrace_list_functions() / retrace_list_actions() public

@@ -63,7 +63,7 @@ typedef int retrace_status_t;
 static void usage(FILE *out)
 {
 	fprintf(out,
-"retrace v2.6.0 -- userspace libc interceptor\n"
+"retrace v2.6.1 -- userspace libc interceptor\n"
 "\n"
 "Usage:\n"
 "  retrace run [OPTIONS] -- <command> [args...]\n"
@@ -1223,6 +1223,100 @@ static int cmd_list_registry(const char *api_symbol)
 	return 0;
 }
 
+/*
+ * retrace validate <config.json>
+ *
+ * Parses the config (comment-tolerant) and checks every
+ * func_name/action_name against the library's registries via
+ * the public retrace_config_validate_buffer -- real error
+ * messages, not just file-existence.
+ */
+static int cmd_validate(int argc, char **argv)
+{
+	char lib_path[PATH_MAX];
+	char *found;
+	void *lib;
+	retrace_status_t (*validate_fn)(const char *buf, size_t len,
+					char *err_buf, size_t err_len);
+	FILE *f;
+	long fz;
+	char *buf;
+	char err[256];
+	int rc;
+
+	if (argc < 3) {
+		fprintf(stderr, "retrace validate: missing config file\n");
+		return 2;
+	}
+	f = fopen(argv[2], "r");
+	if (f == NULL) {
+		fprintf(stderr, "retrace validate: cannot read '%s'\n",
+			argv[2]);
+		return 2;
+	}
+	fseek(f, 0, SEEK_END);
+	fz = ftell(f);
+	rewind(f);
+	if (fz < 0) {
+		fclose(f);
+		return 2;
+	}
+	buf = (char *)malloc((size_t)fz + 1);
+	if (buf == NULL || fread(buf, 1, (size_t)fz, f) != (size_t)fz) {
+		fprintf(stderr, "retrace validate: read failed\n");
+		free(buf);
+		fclose(f);
+		return 2;
+	}
+	buf[fz] = '\0';
+	fclose(f);
+
+	setenv("RETRACE_LOGGER_DEF_STDOUT_ENA", "0", 1);
+	found = find_library(lib_path, sizeof(lib_path));
+	if (!found) {
+		fprintf(stderr,
+			"retrace validate: cannot find %s. Set RETRACE_LIB.\n",
+			RETRACE_LIB_NAME);
+		free(buf);
+		return 2;
+	}
+	lib = dlopen(lib_path, RTLD_NOW);
+	if (lib == NULL) {
+		fprintf(stderr, "retrace validate: dlopen(%s): %s\n",
+			lib_path, dlerror());
+		free(buf);
+		return 2;
+	}
+	validate_fn = (retrace_status_t (*)(const char *, size_t,
+					    char *, size_t))dlsym(lib,
+		"retrace_config_validate_buffer");
+	if (validate_fn == NULL) {
+		fprintf(stderr,
+			"retrace validate: library lacks "
+			"retrace_config_validate_buffer "
+			"(pre-v2.6.1 build?)\n");
+		dlclose(lib);
+		free(buf);
+		return 2;
+	}
+
+	rc = validate_fn(buf, (size_t)fz, err, sizeof(err));
+	free(buf);
+	dlclose(lib);
+
+	if (rc == 0) {
+		printf("ok: config is valid\n");
+		return 0;
+	}
+	if (rc == (retrace_status_t)-2) {
+		fprintf(stderr, "retrace validate: invalid input\n");
+		return 2;
+	}
+	fprintf(stderr, "retrace validate: %s\n",
+		err[0] ? err : "invalid config");
+	return 1;
+}
+
 int main(int argc, char **argv)
 {
 	if (argc < 2) {
@@ -1295,20 +1389,7 @@ int main(int argc, char **argv)
 		return cmd_list_registry("retrace_list_actions");
 
 	if (strcmp(argv[1], "validate") == 0) {
-		if (argc < 3) {
-			fprintf(stderr, "retrace validate: missing config file\n");
-			return 1;
-		}
-		/*
-		 * TODO: parse JSON and check action/func names.
-		 * For now, just check the file exists.
-		 */
-		if (access(argv[2], R_OK) != 0) {
-			fprintf(stderr, "retrace validate: cannot read '%s'\n", argv[2]);
-			return 1;
-		}
-		printf("retrace validate: %s exists (full validation TBD)\n", argv[2]);
-		return 0;
+		return cmd_validate(argc, argv);
 	}
 
 	if (strcmp(argv[1], "fuzz-replay") == 0) {

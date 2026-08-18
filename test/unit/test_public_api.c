@@ -58,6 +58,7 @@ static const char *const public_symbols[] = {
 	"retrace_list_backends",
 	"retrace_list_functions",
 	"retrace_list_actions",
+	"retrace_config_validate_buffer",
 };
 
 static void *g_lib;
@@ -168,6 +169,109 @@ static void test_list_actions_contract(void)
 	CHECK(contains(names, count, "capture_buffer"));
 }
 
+/* ----- config validation contract ----- */
+
+static void test_validate_ok_config(void)
+{
+	const char *cfg = "{\"intercept_scripts\":[{\"func_name\":\"malloc\","
+			  "\"actions\":[{\"action_name\":\"log_params\"},"
+			  "{\"action_name\":\"call_real\"}]}]}";
+	char err[128];
+	size_t len = strlen(cfg);
+
+	err[0] = 'x';
+	CHECK(retrace_config_validate_buffer(cfg, len, err,
+		sizeof(err)) == RETRACE_OK);
+	CHECK(err[0] == '\0');
+	/* len beyond the terminator is accepted. */
+	CHECK(retrace_config_validate_buffer(cfg, len + 64, err,
+		sizeof(err)) == RETRACE_OK);
+	/* err_buf optional. */
+	CHECK(retrace_config_validate_buffer(cfg, len, NULL, 0) ==
+		RETRACE_OK);
+}
+
+static void test_validate_wildcard_and_comments(void)
+{
+	const char *cfg = "/* comment */ {\"intercept_scripts\":[{"
+			  "// line note\n"
+			  "\"func_name\":\"*\",\"actions\":["
+			  "{\"action_name\":\"log_params\"}]}]}";
+	char err[128];
+
+	CHECK(retrace_config_validate_buffer(cfg, strlen(cfg), err,
+		sizeof(err)) == RETRACE_OK);
+}
+
+static void test_validate_unknown_action(void)
+{
+	const char *cfg = "{\"intercept_scripts\":[{\"func_name\":\"malloc\","
+			  "\"actions\":[{\"action_name\":\"log_paramz\"}]}]}";
+	char err[128];
+	size_t len = strlen(cfg);
+
+	CHECK(retrace_config_validate_buffer(cfg, len, err,
+		sizeof(err)) == RETRACE_ERR_FORMAT);
+	CHECK(strstr(err, "log_paramz") != NULL);
+	CHECK(strstr(err, "malloc") != NULL);
+}
+
+static void test_validate_unknown_function(void)
+{
+	const char *cfg = "{\"intercept_scripts\":[{\"func_name\":\"mallloc\","
+			  "\"actions\":[{\"action_name\":\"log_params\"}]}]}";
+	char err[128];
+
+	CHECK(retrace_config_validate_buffer(cfg, strlen(cfg), err,
+		sizeof(err)) == RETRACE_ERR_FORMAT);
+	CHECK(strstr(err, "mallloc") != NULL);
+}
+
+static void test_validate_malformed_json(void)
+{
+	char err[128];
+
+	CHECK(retrace_config_validate_buffer("{not json", 9, err,
+		sizeof(err)) == RETRACE_ERR_FORMAT);
+	CHECK(strstr(err, "malformed") != NULL);
+}
+
+static void test_validate_missing_scripts_array(void)
+{
+	const char *cfg = "{\"foo\":1}";
+	char err[128];
+
+	CHECK(retrace_config_validate_buffer(cfg, strlen(cfg), err,
+		sizeof(err)) == RETRACE_ERR_FORMAT);
+	CHECK(strstr(err, "intercept_scripts") != NULL);
+}
+
+static void test_validate_missing_actions_array(void)
+{
+	const char *cfg = "{\"intercept_scripts\":[{\"func_name\":\"malloc\"}]}";
+	char err[128];
+
+	CHECK(retrace_config_validate_buffer(cfg, strlen(cfg), err,
+		sizeof(err)) == RETRACE_ERR_FORMAT);
+	CHECK(strstr(err, "actions") != NULL);
+}
+
+static void test_validate_invalid_inputs(void)
+{
+	char err[8];
+
+	CHECK(retrace_config_validate_buffer(NULL, 10, err,
+		sizeof(err)) == RETRACE_ERR_INVAL);
+	CHECK(retrace_config_validate_buffer("", 0, err,
+		sizeof(err)) == RETRACE_ERR_INVAL);
+	/* Not NUL-terminated within len nor at buf[len]. */
+	CHECK(retrace_config_validate_buffer("abcabc", 3, err,
+		sizeof(err)) == RETRACE_ERR_INVAL);
+	/* NUL exactly at buf[len] (the strlen spelling) is fine --
+	 * covered by the ok-config test passing len == strlen.
+	 */
+}
+
 int main(void)
 {
 	printf("-- surface guard --\n");
@@ -182,6 +286,16 @@ int main(void)
 	TEST(list_backends_contract);
 	TEST(list_functions_contract);
 	TEST(list_actions_contract);
+
+	printf("-- config validation --\n");
+	TEST(validate_ok_config);
+	TEST(validate_wildcard_and_comments);
+	TEST(validate_unknown_action);
+	TEST(validate_unknown_function);
+	TEST(validate_malformed_json);
+	TEST(validate_missing_scripts_array);
+	TEST(validate_missing_actions_array);
+	TEST(validate_invalid_inputs);
 
 	printf("\nPass: %d, Fail: %d (of %d)\n",
 		tests_pass, tests_fail, tests_run);
