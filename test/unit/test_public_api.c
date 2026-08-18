@@ -56,6 +56,8 @@ static const char *const public_symbols[] = {
 	"retrace_version_info",
 	"retrace_attach_process",
 	"retrace_list_backends",
+	"retrace_list_functions",
+	"retrace_list_actions",
 };
 
 static void *g_lib;
@@ -120,6 +122,52 @@ static void test_list_backends_contract(void)
 	CHECK(names[0] != NULL && names[0][0] != '\0');
 }
 
+static int contains(const char *const *names, size_t count,
+		    const char *want)
+{
+	size_t i;
+
+	for (i = 0; i < count; i++)
+		if (names[i] != NULL && strcmp(names[i], want) == 0)
+			return 1;
+	return 0;
+}
+
+static void test_list_functions_contract(void)
+{
+	const char *const *names = NULL;
+	size_t count = 0;
+	size_t i;
+
+	CHECK(retrace_list_functions(NULL, NULL) == RETRACE_ERR_INVAL);
+	CHECK(retrace_list_functions(&names, &count) == RETRACE_OK);
+	CHECK(count > 100);  /* the prototype registry is large */
+	for (i = 0; i < count; i++)
+		CHECK(names[i] != NULL && names[i][0] != '\0');
+	/* Well-known interceptable functions must be present. */
+	CHECK(contains(names, count, "malloc"));
+	CHECK(contains(names, count, "open"));
+	CHECK(contains(names, count, "write"));
+}
+
+static void test_list_actions_contract(void)
+{
+	const char *const *names = NULL;
+	size_t count = 0;
+	size_t i;
+
+	CHECK(retrace_list_actions(NULL, NULL) == RETRACE_ERR_INVAL);
+	CHECK(retrace_list_actions(&names, &count) == RETRACE_OK);
+	CHECK(count >= 17);  /* built-in actions */
+	for (i = 0; i < count; i++)
+		CHECK(names[i] != NULL && names[i][0] != '\0');
+	/* Built-ins from every category. */
+	CHECK(contains(names, count, "log_params"));
+	CHECK(contains(names, count, "call_real"));
+	CHECK(contains(names, count, "memory_fuzz"));
+	CHECK(contains(names, count, "capture_buffer"));
+}
+
 int main(void)
 {
 	printf("-- surface guard --\n");
@@ -132,6 +180,8 @@ int main(void)
 	printf("-- behavior smoke --\n");
 	TEST(attach_invalid_pid);
 	TEST(list_backends_contract);
+	TEST(list_functions_contract);
+	TEST(list_actions_contract);
 
 	printf("\nPass: %d, Fail: %d (of %d)\n",
 		tests_pass, tests_fail, tests_run);
