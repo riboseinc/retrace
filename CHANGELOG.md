@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.5.3] - 2026-08-18
+
+### Changed
+- **Ring logger default capacity 64 -> 1024** per thread. The
+  v2.5.1 contention benchmark showed the 64-slot ring engaging
+  drop-on-full at sustained rates above the flusher's drain
+  cadence (~64K entries/s/thread): a synthetic 1-thread producer
+  at ~500K entries/s delivered under 10% of entries. With 1024
+  slots (~1M entries/s/thread ceiling at the 1ms cadence, ~32KB
+  per logging thread) the same benchmark delivers **97.6%**
+  single-threaded (37x fewer drops) and 68% at 8 threads (was
+  17%). Accounting remains exact at every thread count
+  (delivered + dropped == pushed).
+
+### Added
+- `RETRACE_LOGGER_RING_CAP` env var: per-thread ring capacity,
+  power of two in [64, 65536]; anything else falls back to the
+  default. Documented in `docs/cli.md` and the README env table.
+- `test_env_cap_override` in the ring unit tests: valid override
+  (mask == cap-1), non-power-of-two and out-of-range fallbacks,
+  suite re-pinned to 64 via the env var so the wrap/drop tests
+  stay deterministic against any production default.
+
 ## [2.5.2] - 2026-08-17
 
 ### Added

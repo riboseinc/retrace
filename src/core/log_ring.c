@@ -156,9 +156,39 @@ static void ring_key_destructor(void *p)
 	retrace_real_impls.pthread_setspecific(g_ring_key, NULL);
 }
 
+static uint32_t g_ring_cap;
+
+/*
+ * Parse RETRACE_LOGGER_RING_CAP once at module init. Accepted:
+ * power-of-two values in [LOG_RING_CAP_MIN, LOG_RING_CAP_MAX].
+ * Anything else (unset, malformed, out of range) falls back to
+ * LOG_RING_DEFAULT_CAP. Returns the effective capacity.
+ */
+static uint32_t ring_configured_cap(void)
+{
+	const char *env = retrace_real_impls.getenv
+		? retrace_real_impls.getenv("RETRACE_LOGGER_RING_CAP")
+		: NULL;
+	long v;
+
+	if (env == NULL || *env == '\0')
+		return LOG_RING_DEFAULT_CAP;
+
+	if (retrace_real_impls.atoi == NULL)
+		return LOG_RING_DEFAULT_CAP;
+	v = (long)retrace_real_impls.atoi(env);
+	if (v < (long)LOG_RING_CAP_MIN || v > (long)LOG_RING_CAP_MAX)
+		return LOG_RING_DEFAULT_CAP;
+	if ((v & (v - 1)) != 0)
+		return LOG_RING_DEFAULT_CAP;
+	return (uint32_t)v;
+}
+
 int retrace_log_ring_init(void)
 {
 	int rc;
+
+	g_ring_cap = ring_configured_cap();
 
 	rc = retrace_real_impls.pthread_mutex_init(&g_registry.mtx, NULL);
 	if (rc != 0) {
@@ -205,7 +235,7 @@ struct LogRing *retrace_log_ring_get(void)
 	if (r != NULL)
 		return r;
 
-	r = ring_alloc(LOG_RING_DEFAULT_CAP);
+	r = ring_alloc(g_ring_cap ? g_ring_cap : LOG_RING_DEFAULT_CAP);
 	if (r == NULL)
 		return NULL;
 
