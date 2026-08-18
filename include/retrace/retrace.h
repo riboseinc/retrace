@@ -122,6 +122,18 @@ RETRACE_API retrace_status_t retrace_attach_process(int pid);
 RETRACE_API retrace_status_t retrace_list_backends(
 		const char *const **out_names, size_t *out_count);
 
+/*
+ * Registry introspection: enumerate every interceptable libc
+ * function (the prototype registry) and every built-in action.
+ * Same ownership contract as retrace_list_backends: the array
+ * and strings are library-owned, valid until the next call to
+ * the same function.
+ */
+RETRACE_API retrace_status_t retrace_list_functions(
+		const char *const **out_names, size_t *out_count);
+RETRACE_API retrace_status_t retrace_list_actions(
+		const char *const **out_names, size_t *out_count);
+
 #ifdef __cplusplus
 }
 #endif
