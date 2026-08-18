@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.5.4] - 2026-08-18
+
+### Changed
+- CI hardening: `timeout-minutes` on every workflow job that
+  lacked one (build.yml 60/30, alpine 45/60, msys 30, nix 30,
+  checkpatch 15, website 20/15, docker 30 — fuzz, ohos, coverity,
+  release already had them). Previously a hung runner (observed
+  during the v2.5.3 cycle: two Linux legs stuck on `apt install`)
+  waited out GitHub's 6-hour default before anyone could intervene.
+
 ## [2.5.3] - 2026-08-18
 
 ### Changed

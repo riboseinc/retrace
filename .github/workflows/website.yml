@@ -19,6 +19,7 @@ concurrency:
 
 jobs:
   build:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,6 +38,7 @@ jobs:
           path: website/dist
 
   deploy:
+    timeout-minutes: 15
     needs: build
     runs-on: ubuntu-latest
     environment:
