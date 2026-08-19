@@ -42,6 +42,7 @@ CHECKPATCH_FLAGS=(
 
 # checkpatch.pl will ignore the following paths
 CHECKPATCH_IGNORE=(
+	'*.csv'
 	'*.json'
 	'*.nix'
 	'.gitattributes'

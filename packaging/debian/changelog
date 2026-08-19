@@ -1,3 +1,14 @@
+retrace (2.9.0-1) unstable; urgency=medium
+
+  * New: retrace-procmon2retrace (procmon CSV -> retrace JSON,
+    the Windows outer-layer producer, --pid scoping); correlation
+    coverage criteria -- pid-aware coverage, --window for lazy
+    materialization, probe/read/write classification with
+    --exclude-probes; golden cases 06-10 incl. the libsass
+    importer fixture.
+
+ -- Ribose Inc <opensource@ribose.com>  Wed, 19 Aug 2026 18:00:00 +0000
+
 retrace (2.7.0-1) unstable; urgency=medium
 
   * New: pid + tid on every log entry (correlatable streams);

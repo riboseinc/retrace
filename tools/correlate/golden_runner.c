@@ -86,7 +86,8 @@ main(int argc, char **argv)
 {
 	char   path[RUNNER_MAX];
 	char   cmd[RUNNER_MAX * 3];
-	char *prefix, *expected, *want_exit_s, *actual;
+	char *prefix, *options = NULL, *expected, *want_exit_s,
+	      *actual;
 	size_t expected_len = 0, actual_len = 0;
 	int    rc, got_exit, want_exit;
 
@@ -112,16 +113,36 @@ main(int argc, char **argv)
 	}
 	want_exit = atoi(want_exit_s);
 
-	snprintf(cmd,
-		 sizeof(cmd),
-		 "\"%s\" --inside \"%s/inside.json\" "
-		 "--outside \"%s/outside.json\" "
-		 "--prefix \"%s\" > \"%s\"",
-		 argv[2],
-		 argv[1],
-		 argv[1],
-		 prefix,
-		 argv[3]);
+	/*
+	 * Optional per-case extra flags (options.txt), verbatim:
+	 * --pid N, --window S, --exclude-probes.
+	 */
+	snprintf(path, sizeof(path), "%s/options.txt", argv[1]);
+	options = read_line_file(path);
+
+	if (options != NULL && options[0] != '\0')
+		snprintf(cmd,
+			 sizeof(cmd),
+			 "\"%s\" --inside \"%s/inside.json\" "
+			 "--outside \"%s/outside.json\" "
+			 "--prefix \"%s\" %s > \"%s\"",
+			 argv[2],
+			 argv[1],
+			 argv[1],
+			 prefix,
+			 options,
+			 argv[3]);
+	else
+		snprintf(cmd,
+			 sizeof(cmd),
+			 "\"%s\" --inside \"%s/inside.json\" "
+			 "--outside \"%s/outside.json\" "
+			 "--prefix \"%s\" > \"%s\"",
+			 argv[2],
+			 argv[1],
+			 argv[1],
+			 prefix,
+			 argv[3]);
 	rc = system(cmd);
 #ifdef _WIN32
 	got_exit = rc;

@@ -31,9 +31,9 @@ absence of raw-syscall escapes — a static binary or a hand-rolled
 `syscall()` call goes straight to the kernel layer. For
 sub-libc-certified reports on Linux use the ptrace backend
 (recipe 29/30 cover the adjacent bridges); on Windows the kernel
-layer (ETW/procmon, recipe below when the converter ships) is
-currently the honest capture — the ntdll hook set is in progress. `retrace-correlate` reports what the
-captures cover — no more.
+layer (ETW/procmon via `retrace-procmon2retrace`, below) is
+currently the honest capture — the ntdll hook set is in progress.
+`retrace-correlate` reports what the captures cover — no more.
 
 ## Capturing the outside stream
 
@@ -88,6 +88,18 @@ $ echo $?
 
 - `--prefix` is the mount root of the virtual filesystem; matching
   is on path components (`/mnt/tfs2/x` is NOT under `/mnt/tfs`).
+- `--pid N` scopes the correlation to one process — REQUIRED for
+  system-wide captures (procmon records every process on the
+  box); an inside record from another pid never covers a touch.
+- `--window SECS` makes coverage time-honest: an inside record
+  only covers a touch within ±SECONDS. Without it, a materialize
+  logged after an open covers it — which hides exactly the
+  touches the VFS cleaned up after instead of serving in time.
+- `--exclude-probes` drops existence-probe escapes (QueryOpen /
+  stat / access) from the report — for jail-grant policies that
+  grant read-attributes wholesale.
+- Every report line carries a class: `probe` (existence leak),
+  `read`, `write`.
 - Exit codes: `0` no escapes, `1` escapes found, `2` usage or I/O
   error — CI-friendly for gating packaged builds.
 - `--json` emits the report as a JSON array for machine consumers.
@@ -114,6 +126,22 @@ the parity contract for any correlator — retrace's and
 third-party implementations (tebako's Rust correlator runs the
 same cases in its CI). Add a case by adding a directory; the
 CTest loop picks it up at configure time.
+
+## Windows outer layer: procmon CSV
+
+The kernel layer on Windows is procmon/ETW. Convert its CSV export
+to the retrace shape and feed the correlation exactly as above:
+
+```sh
+$ retrace-procmon2retrace --pid 4212 ProcmonCSV.csv outside.json
+$ retrace-correlate --inside tfs.json --outside outside.json \
+                    --prefix "C:/pkg" --pid 4212
+```
+
+The converter handles procmon's quoting (commas and doubled quotes
+inside fields, CRLF, BOM) and passes NT path forms through — the
+correlator's normalizer maps `\Device\HarddiskVolume3\pkg\x`
+and `\??\C:\pkg\x` onto `C:/pkg/x` before the join.
 
 ## Variations
 
