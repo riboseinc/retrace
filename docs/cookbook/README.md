@@ -108,6 +108,7 @@ job.
 | 30 | [System-wide file-access tracing with eBPF](30-ebpf-system.md) | `ebpf-bridge/retrace-ebpf.bpf.c` | Kernel-level observation across every process on the system. |
 | 31 | [Browse a trace in VS Code](31-vscode-viewer.md) | `vscode-extension/` | Webview with severity coloring + live-stream client. |
 | 32 | [Visualize a trace in Grafana](32-grafana-dashboard.md) | `grafana-plugin/` | Data source plugin for ops dashboards (time series, bar gauge, state timeline). |
+| 33 | [Detect filesystem escapes from a virtualized environment](33-detect-vfs-escapes.md) | `retrace-correlate` | Join an inside (VFS) stream against an outside (retrace) stream; report host-filesystem touches the VFS never saw. |
 
 For an overview of when to reach for each tool, see
 [docs/tools.md](../tools.md).

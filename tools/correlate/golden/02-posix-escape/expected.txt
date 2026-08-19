@@ -1,0 +1,2 @@
+escape /mnt/tfs/secret/keys.pem func=open tid=603
+escape /mnt/tfs/tmp/.lock func=openat tid=604

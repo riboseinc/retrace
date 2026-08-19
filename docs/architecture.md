@@ -317,8 +317,10 @@ The log goes to:
 - a file (if `RETRACE_LOGGER_DEF_FN` is set, or `--log FILE`)
 - both (default)
 
-Log entries include: timestamp, function name, parsed args, return
-value, `call_duration_us`.
+Log entries include: timestamp (`time`), process id (`pid`),
+thread id (`tid` — the identity pair that makes streams from
+multiple processes and threads correlatable), function name,
+parsed args, return value, `call_duration_us`.
 
 Since v2.3.0 the hot path is a **lock-free SPSC ring** per
 thread: the intercepting thread pushes an entry with two relaxed
@@ -365,6 +367,35 @@ every consumer — `retrace run`, `retrace attach`, the Frida
 bridge, and the eBPF bridge all emit the same JSON shape, and
 audit/diff/replay/ws/to-otlp all read it. Pipelines compose
 without format conversion.
+
+## The three-layer correlation model
+
+Detecting that an operation bypassed a virtualized environment (a
+VFS like tebako's tfs, a sandbox, a container) is a two-stream
+problem: what the inside saw, and what actually happened outside.
+The outside view has three layers, and retrace owns the middle one
+on every platform:
+
+| Layer | POSIX | Windows |
+|---|---|---|
+| Inside the VFS | the VFS's own log (e.g. tfs) | the VFS's own log |
+| Libc boundary | retrace preload (`LD_PRELOAD`) | retrace inline hooks (ADR-0009) — machinery shipped, engine port + first hooks in progress |
+| Kernel syscall | ptrace backend, eBPF bridge | ETW/procmon (offline producer) |
+
+`retrace-correlate` joins the streams: it normalizes every path
+(NT forms `\??\`, `\\?\`, `\Device\HarddiskVolumeN\`
+included), subtracts the inside set from the outside set under a
+prefix, and reports the residue as escapes. The scanner is
+tolerant by design — retrace writes one JSON array document, a
+crashed trace leaves the tail truncated, and every complete entry
+must survive. Golden fixtures in `tools/correlate/golden/` pin the
+behavior and double as the parity contract for third-party
+correlators.
+
+Layer honesty is part of the model: a libc-boundary capture
+cannot certify the absence of raw-syscall escapes. Claims about
+the kernel layer need a kernel-layer capture (ptrace, eBPF,
+ETW) — the correlator reports what its inputs cover, no more.
 
 ## Per-platform backends
 
