@@ -25,7 +25,7 @@
 
 #include "caller_match.h"
 
-#include <dlfcn.h>
+#include "posix_compat.h"
 #include <string.h>
 
 #include "real_impls.h"
@@ -55,19 +55,19 @@ static const char *path_basename(const char *path)
 }
 
 /* Cached dladdr lookup. On cache miss, calls dladdr and inserts.
- * On cache hit, returns the stored Dl_info without calling dladdr.
+ * On cache hit, returns the stored rc_dl_info_t without calling dladdr.
  * Returns 1 on populated info, 0 on dladdr failure.
  */
-static int cached_dladdr(void *ret_addr, Dl_info *info)
+static int cached_dladdr(void *ret_addr, rc_dl_info_t *info)
 {
-	Dl_info local = {0};
+	rc_dl_info_t local = {0};
 
 	if (retrace_caller_cache_lookup(ret_addr, &local)) {
 		*info = local;
 		return 1;
 	}
 
-	if (dladdr(ret_addr, &local) == 0)
+	if (rc_dladdr(ret_addr, &local) == 0)
 		return 0;
 
 	retrace_caller_cache_insert(ret_addr, &local);
@@ -88,7 +88,7 @@ int retrace_caller_match_address(void *ret_addr,
 int retrace_caller_match_symbol(void *ret_addr,
 				const char *expected_symbol)
 {
-	Dl_info info = {0};
+	rc_dl_info_t info = {0};
 
 	if (ret_addr == NULL || expected_symbol == NULL ||
 	    expected_symbol[0] == '\0')
@@ -112,7 +112,7 @@ int retrace_caller_match_module_offset(void *ret_addr,
 				       const char *expected_module_basename,
 				       unsigned long long expected_offset)
 {
-	Dl_info info = {0};
+	rc_dl_info_t info = {0};
 	const char *actual_base;
 	unsigned long long actual_offset;
 

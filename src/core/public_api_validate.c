@@ -31,7 +31,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+/* MSVC: no format attribute; SAL annotations later. */
+#else
 __attribute__((format(printf, 3, 4)))
+#endif
 static void set_err(char *err_buf, size_t err_len, const char *fmt,
 		    ...)
 {

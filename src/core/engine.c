@@ -23,7 +23,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __GNUC__
+/*
+ * printf_compat.h carries the portable fallbacks (musl path);
+ * MSVC/clang-cl compile without GNU extensions.
+ */
+#if !defined(__GNUC__) && !defined(_MSC_VER) && \
+	!defined(__clang__)
 #error GNU extensions are required!
 #endif
 

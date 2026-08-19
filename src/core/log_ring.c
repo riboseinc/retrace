@@ -25,7 +25,6 @@
 
 #include "log_ring.h"
 
-#include <pthread.h>
 #include <stdatomic.h>
 #include <stddef.h>
 
@@ -61,12 +60,12 @@ struct RingNode {
 };
 
 static struct {
-	pthread_mutex_t mtx;
+	rc_mutex_t mtx;
 	struct RingNode *head;
 	uint64_t total_dropped;
 } g_registry;
 
-static pthread_key_t g_ring_key;
+static rc_tss_t g_ring_key;
 
 /*
  * Allocate a new ring with the given capacity (must be power-of-2).
@@ -135,10 +134,10 @@ static void registry_add(struct LogRing *r)
 	}
 	node->ring = r;
 
-	retrace_real_impls.pthread_mutex_lock(&g_registry.mtx);
+	retrace_real_impls.rc_mutex_lock(&g_registry.mtx);
 	node->next = g_registry.head;
 	g_registry.head = node;
-	retrace_real_impls.pthread_mutex_unlock(&g_registry.mtx);
+	retrace_real_impls.rc_mutex_unlock(&g_registry.mtx);
 }
 
 /*
@@ -153,7 +152,7 @@ static void registry_add(struct LogRing *r)
 static void ring_key_destructor(void *p)
 {
 	(void)p;
-	retrace_real_impls.pthread_setspecific(g_ring_key, NULL);
+	retrace_real_impls.rc_tss_set(g_ring_key, NULL);
 }
 
 static uint32_t g_ring_cap;
@@ -190,17 +189,17 @@ int retrace_log_ring_init(void)
 
 	g_ring_cap = ring_configured_cap();
 
-	rc = retrace_real_impls.pthread_mutex_init(&g_registry.mtx, NULL);
+	rc = retrace_real_impls.rc_mutex_init(&g_registry.mtx);
 	if (rc != 0) {
 		log_err("log_ring: pthread_mutex_init failed: %d", rc);
 		return -1;
 	}
 
-	rc = retrace_real_impls.pthread_key_create(&g_ring_key,
+	rc = retrace_real_impls.rc_tss_create(&g_ring_key,
 		ring_key_destructor);
 	if (rc != 0) {
 		log_err("log_ring: pthread_key_create failed: %d", rc);
-		retrace_real_impls.pthread_mutex_destroy(&g_registry.mtx);
+		retrace_real_impls.rc_mutex_destroy(&g_registry.mtx);
 		return -1;
 	}
 
@@ -224,13 +223,13 @@ void retrace_log_ring_deinit(void)
 	}
 
 	g_registry.head = NULL;
-	retrace_real_impls.pthread_mutex_destroy(&g_registry.mtx);
+	retrace_real_impls.rc_mutex_destroy(&g_registry.mtx);
 }
 
 struct LogRing *retrace_log_ring_get(void)
 {
 	struct LogRing *r = (struct LogRing *)
-		retrace_real_impls.pthread_getspecific(g_ring_key);
+		retrace_real_impls.rc_tss_get(g_ring_key);
 
 	if (r != NULL)
 		return r;
@@ -241,7 +240,7 @@ struct LogRing *retrace_log_ring_get(void)
 
 	registry_add(r);
 
-	if (retrace_real_impls.pthread_setspecific(g_ring_key, r) != 0) {
+	if (retrace_real_impls.rc_tss_set(g_ring_key, r) != 0) {
 		/* Rare. Ring is in the registry; the flusher will
 		 * drain it but the caller can't push. Let the caller
 		 * see NULL and skip the log.

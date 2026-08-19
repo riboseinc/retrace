@@ -155,6 +155,6 @@ int retrace_datatypes_init(void);
 #define retrace_datatype_define_prototypes(datatype_name) \
 	retrace_as_define_var_in_sec(const struct DataType,\
 		retrace_dt_##datatype_name[], \
-			"__DATA", "__retrace_dt") __attribute__((aligned(1)))
+			"__DATA", "__retrace_dt")
 
 #endif /* SRC_RETRACE_V2_DATA_TYPES_H_ */

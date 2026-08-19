@@ -106,6 +106,6 @@ int retrace_funcs_init(void);
 #define retrace_func_define_prototypes(lib_name) \
 	retrace_as_define_var_in_sec(const struct FuncPrototype,\
 		retrace_proto_##lib_name[], \
-			"__DATA", "__retrace_funcs")__attribute__((aligned(1)))
+			"__DATA", "__retrace_funcs")
 
 #endif /* SRC_RETRACE_V2_FUNCS_H_ */

@@ -12,7 +12,8 @@
  * init and closed at deinit) and JSONL (one compact object per
  * line, no brackets). The logger keeps process-global state
  * (first-entry flag, ring readiness), so each scenario runs in
- * a forked child -- exactly like a real traced process.
+ * a fresh process driven by RETRACE_FMT_UNDER_TEST -- exactly
+ * like a real traced process, identically on POSIX and Windows.
  */
 
 #include "parson.h"
@@ -20,10 +21,39 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
 #include <time.h>
-#include <unistd.h>
 
+#include "parson.h"
+
+#ifdef _WIN32
+static int rc_setenv_win(const char *n, const char *v,
+	int ow);
+static int rc_unsetenv_win(const char *n);
+/* MinGW/MSVC have no setenv/unsetenv; the CRT spelling is
+ * _putenv with "NAME=" clearing.
+ */
+static int rc_setenv_win(const char *name, const char *val,
+	int overwrite)
+{
+	char buf[512];
+
+	(void)overwrite;
+	snprintf(buf, sizeof(buf), "%s=%s", name, val);
+	return _putenv(buf);
+}
+
+static int rc_unsetenv_win(const char *name)
+{
+	char buf[512];
+
+	snprintf(buf, sizeof(buf), "%s=", name);
+	return _putenv(buf);
+}
+#else
+#include <unistd.h>
+#define rc_setenv_win(n, v, o) setenv(n, v, o)
+#define rc_unsetenv_win(n) unsetenv(n)
+#endif
 #include "logger.h"
 #include "real_impls.h"
 
@@ -49,7 +79,7 @@ static int tests_fail;
 		}                                                               \
 	} while (0)
 
-static const char *g_log_path = "/tmp/retrace-test-fmt.json";
+static const char *g_log_path = "retrace-test-fmt.json";
 
 static char *slurp(const char *path)
 {
@@ -74,60 +104,60 @@ static char *slurp(const char *path)
 }
 
 /*
- * Fork; the child drives init -> two entries -> deinit with the
- * given FMT (NULL = unset, the default). Returns the log file
- * content owned by the caller.
+ * Drive init -> two entries -> deinit with the given FMT (NULL =
+ * unset, the default). The logger keeps process-global state
+ * (first-entry flag, ring readiness), so each ctest invocation
+ * runs ONE scenario in a fresh process; the scenario is chosen
+ * by RETRACE_FMT_UNDER_TEST (unset = the default format). This
+ * is fork-free and runs identically on POSIX and Windows.
  */
-static char *run_logger_forked(const char *fmt)
+static char *run_logger(const char *fmt)
 {
-	pid_t pid;
-	int status = -1;
+	JSON_Value *msg;
 
 	remove(g_log_path);
-	pid = fork();
-	if (pid == 0) {
-		JSON_Value *msg;
+	rc_setenv_win("RETRACE_LOGGER_DEF_ENA", "1", 1);
+	rc_setenv_win("RETRACE_LOGGER_DEF_STDOUT_ENA", "0", 1);
+	rc_setenv_win("RETRACE_LOGGER_DEF_FN", g_log_path, 1);
+	rc_setenv_win("RETRACE_LOGGER_RING", "0", 1);
+	if (fmt != NULL)
+		rc_setenv_win("RETRACE_LOGGER_FMT", fmt, 1);
+	else
+		rc_unsetenv_win("RETRACE_LOGGER_FMT");
 
-		setenv("RETRACE_LOGGER_DEF_ENA", "1", 1);
-		setenv("RETRACE_LOGGER_DEF_STDOUT_ENA", "0", 1);
-		setenv("RETRACE_LOGGER_DEF_FN", g_log_path, 1);
-		setenv("RETRACE_LOGGER_RING", "0", 1);
-		if (fmt != NULL)
-			setenv("RETRACE_LOGGER_FMT", fmt, 1);
-		else
-			unsetenv("RETRACE_LOGGER_FMT");
-
-		if (retrace_logger_init() != 0)
-			_exit(3);
-
-		msg = json_value_init_object();
-		json_object_set_string(json_value_get_object(msg),
-			"func", "open");
-		retrace_logger_log_json(FUNCS, SEVERITY_INFO, msg);
-
-		msg = json_value_init_object();
-		json_object_set_string(json_value_get_object(msg),
-			"func", "close");
-		retrace_logger_log_json(FUNCS, SEVERITY_INFO, msg);
-
-		retrace_logger_deinit();
-		_exit(0);
-	}
-	if (waitpid(pid, &status, 0) != pid) {
+	if (retrace_logger_init() != 0) {
 		tests_fail++;
 		return NULL;
 	}
-	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-		tests_fail++;
-		return NULL;
-	}
+
+	msg = json_value_init_object();
+	json_object_set_string(json_value_get_object(msg),
+		"func", "open");
+	retrace_logger_log_json(FUNCS, SEVERITY_INFO, msg);
+
+	msg = json_value_init_object();
+	json_object_set_string(json_value_get_object(msg),
+		"func", "close");
+	retrace_logger_log_json(FUNCS, SEVERITY_INFO, msg);
+
+	retrace_logger_deinit();
 	return slurp(g_log_path);
+}
+
+/* One scenario per process: chosen by the test harness env. */
+static int scenario_is(const char *want)
+{
+	const char *v = getenv("RETRACE_FMT_UNDER_TEST");
+
+	if (want == NULL)
+		return v == NULL;
+	return v != NULL && strcmp(v, want) == 0;
 }
 
 static void
 test_default_is_array_document(void)
 {
-	char *buf = run_logger_forked(NULL);
+	char *buf = run_logger(NULL);
 
 	CHECK(buf != NULL);
 	CHECK(strncmp(buf, "[\n", 2) == 0);
@@ -139,7 +169,7 @@ test_default_is_array_document(void)
 static void
 test_json_mode_is_array_document(void)
 {
-	char *buf = run_logger_forked("json");
+	char *buf = run_logger("json");
 
 	CHECK(buf != NULL);
 	CHECK(strncmp(buf, "[\n", 2) == 0);
@@ -156,7 +186,7 @@ test_jsonl_is_one_object_per_line(void)
 	char *line;
 	int lines = 0;
 
-	buf = run_logger_forked("jsonl");
+	buf = run_logger("jsonl");
 	CHECK(buf != NULL);
 	CHECK(buf[0] == '{');
 
@@ -201,9 +231,19 @@ main(void)
 	retrace_real_impls.getenv = getenv;
 	retrace_real_impls.atoi = atoi;
 
-	TEST(default_is_array_document);
-	TEST(json_mode_is_array_document);
-	TEST(jsonl_is_one_object_per_line);
+	/*
+	 * MSVC has no constructors: drive the real-impls init
+	 * explicitly (idempotent on POSIX, whose constructor
+	 * already ran it).
+	 */
+	retrace_real_impls_init();
+
+	if (scenario_is("json"))
+		TEST(json_mode_is_array_document);
+	else if (scenario_is("jsonl"))
+		TEST(jsonl_is_one_object_per_line);
+	else
+		TEST(default_is_array_document);
 
 	printf("%d run, %d pass, %d fail\n", tests_run, tests_pass,
 		tests_fail);

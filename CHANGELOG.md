@@ -47,6 +47,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 13-test matcher suite (classify, index, pid/window/probe
   semantics); 75/75 overall (10 golden correlation cases).
 
+## [2.11.0] - 2026-08-19
+
+### Added
+- **The v2 core engine builds and links on Windows**
+  (TODO.windows/04, Track B slice 1 — the blocker for Windows
+  interception since the beginning: RETRACE_BUILD_V2 was
+  disabled there because the core assumed POSIX).
+  - `src/core/posix_compat.h` — the ONLY place platform
+    thread/symbol APIs are touched: rc_mutex_t
+    (pthread_mutex | SRWLOCK), destructor-capable rc_tss_t
+    (pthread_key | FlsAlloc), rc_thread_* (pthread |
+    CreateThread/WaitForSingleObject), rc_getpid/
+    rc_thread_self_tid, rc_dladdr (Windows: module base+path
+    via RtlPcToFileHeader; symbol matching degrades to module
+    matching), rc_backtrace (CaptureStackBackTrace). The
+    RetraceRealImpls fields are retyped to the rc_* names —
+    the reentrancy guard now holds on both platforms.
+  - PE section macros (`win_common/arch_spec_macros.h`):
+    registry variables land in one short `.retrc` section
+    (PE names cap at 8 chars, no start/stop symbols); the
+    walkers report empty registries this slice — item 05
+    (first wrapper) wires role-aware registration.
+  - `win_common/arch_spec_stub.c`: the retrace_as_*
+    trampoline contract links as no-ops until item 05.
+  - sockaddr_inspect on winsock2 (sa_family_t/sockaddr_un
+    compile shims; AF_UNIX branch is POSIX-runtime-only);
+    windows.h macro hygiene (undef ERROR/SEVERITY_ERROR/...)
+    so the core enums survive the include.
+  - CMake: the Windows build now compiles src/config + src/core
+    + backends; Windows CI legs run the portable unit set
+    (logger format scenarios, trace load) — 79/79 on POSIX
+    unchanged, verified behavior-preserving.
+  - Local verification: x86_64-w64-mingw32 cross-build of the
+    full tree (core + tests + backends DLL) — the cross
+    compiler caught four real Windows-side defects before CI
+    (RtlPcToFileHeader arity, SEVERITY_ERROR collision, const
+    tss signature, unbalanced braces).
+
 ## [2.10.0] - 2026-08-19
 
 ### Added

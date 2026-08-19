@@ -1,3 +1,13 @@
+retrace (2.11.0-1) unstable; urgency=medium
+
+  * New: the v2 core engine builds and links on Windows
+    (TODO.windows/04): posix_compat platform shim, PE section
+    macros, retrace_as_* link stubs, winsock sockaddr support;
+    portable unit set (logger format, trace load) runs on
+    Windows CI.
+
+ -- Ribose Inc <opensource@ribose.com>  Wed, 19 Aug 2026 23:30:00 +0000
+
 retrace (2.10.0-1) unstable; urgency=medium
 
   * New: RETRACE_LOGGER_FMT=jsonl streaming log output (one

@@ -25,7 +25,6 @@
 
 #include "call_hash.h"
 
-#include <pthread.h>
 #include <stdatomic.h>
 #include <stddef.h>
 
@@ -62,12 +61,12 @@ struct HashNode {
 static struct {
 	int enabled;
 
-	pthread_mutex_t mtx;
+	rc_mutex_t mtx;
 
 	struct HashNode *head;
 } g_state;
 
-static pthread_key_t g_thread_key;
+static rc_tss_t g_thread_key;
 
 /*
  * pthread_key destructor. The thread is exiting; its hash is
@@ -76,7 +75,7 @@ static pthread_key_t g_thread_key;
 static void hash_key_destructor(void *p)
 {
 	(void)p;
-	retrace_real_impls.pthread_setspecific(g_thread_key, NULL);
+	retrace_real_impls.rc_tss_set(g_thread_key, NULL);
 }
 
 int retrace_call_hash_init(void)
@@ -88,17 +87,17 @@ int retrace_call_hash_init(void)
 	g_state.enabled = (env != NULL && env[0] != '\0' &&
 		env[0] != '0');
 
-	rc = retrace_real_impls.pthread_mutex_init(&g_state.mtx, NULL);
+	rc = retrace_real_impls.rc_mutex_init(&g_state.mtx);
 	if (rc != 0) {
 		log_err("call_hash: pthread_mutex_init failed: %d", rc);
 		return -1;
 	}
 
-	rc = retrace_real_impls.pthread_key_create(&g_thread_key,
+	rc = retrace_real_impls.rc_tss_create(&g_thread_key,
 		hash_key_destructor);
 	if (rc != 0) {
 		log_err("call_hash: pthread_key_create failed: %d", rc);
-		retrace_real_impls.pthread_mutex_destroy(&g_state.mtx);
+		retrace_real_impls.rc_mutex_destroy(&g_state.mtx);
 		return -1;
 	}
 
@@ -114,7 +113,7 @@ int retrace_call_hash_enabled(void)
 static struct ThreadHash *thread_hash_get(void)
 {
 	struct HashNode *node = (struct HashNode *)
-		retrace_real_impls.pthread_getspecific(g_thread_key);
+		retrace_real_impls.rc_tss_get(g_thread_key);
 
 	if (node != NULL)
 		return &node->h;
@@ -127,12 +126,12 @@ static struct ThreadHash *thread_hash_get(void)
 	node->h.observed = 0;
 	node->next = NULL;
 
-	retrace_real_impls.pthread_mutex_lock(&g_state.mtx);
+	retrace_real_impls.rc_mutex_lock(&g_state.mtx);
 	node->next = g_state.head;
 	g_state.head = node;
-	retrace_real_impls.pthread_mutex_unlock(&g_state.mtx);
+	retrace_real_impls.rc_mutex_unlock(&g_state.mtx);
 
-	if (retrace_real_impls.pthread_setspecific(g_thread_key, node) != 0) {
+	if (retrace_real_impls.rc_tss_set(g_thread_key, node) != 0) {
 		/* Rare. The hash is in the registry but the caller
 		 * can't update it. Subsequent observe() calls will
 		 * allocate a new node -- wasteful but safe.
@@ -214,5 +213,5 @@ void retrace_call_hash_deinit(void)
 	}
 
 	g_state.head = NULL;
-	retrace_real_impls.pthread_mutex_destroy(&g_state.mtx);
+	retrace_real_impls.rc_mutex_destroy(&g_state.mtx);
 }
