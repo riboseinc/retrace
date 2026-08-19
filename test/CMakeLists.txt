@@ -1,4 +1,13 @@
 # SPDX-License-Identifier: BSD-2-Clause
+
+# Windows (TODO.windows/04): the per-feature LD_PRELOAD targets and
+# the sh-based integration runner are POSIX-only. Windows runs its
+# portable unit set only.
+if(RETRACE_PLATFORM_WINDOWS)
+	add_subdirectory(unit)
+	return()
+endif()
+
 #
 # retrace tests. Structured into three layers (see modernization plan/08):
 #   - integration/: per-feature test binaries, run under v2.

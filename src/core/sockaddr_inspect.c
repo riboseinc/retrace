@@ -33,11 +33,40 @@
  * engine. Manual equivalents below.
  */
 
+#ifdef _WIN32
+#include "posix_compat.h" /* windows.h first + macro hygiene */
+#include <stddef.h>
+
+/*
+ * Winsock has no sa_family_t and no unix-domain sockets; the
+ * inspector's AF_UNIX branch is POSIX-only at runtime, so the
+ * types only need to exist for compilation on Windows.
+ */
+typedef unsigned short sa_family_t_win;
+#define sa_family_t sa_family_t_win
+#ifndef AF_UNIX
+struct sockaddr_un_win {
+	unsigned short sun_family;
+	char sun_path[108];
+};
+#define sockaddr_un sockaddr_un_win
+#define AF_UNIX 1
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <sys/socket.h>
+#endif
+#ifndef _WIN32
 #include <sys/types.h>
 #include <netinet/in.h>
+#endif
+#ifndef _WIN32
 #include <sys/un.h>
+#endif
+#ifndef _WIN32
 #include <arpa/inet.h>
+#endif
 
 #include "sockaddr_inspect.h"
 #include "real_impls.h"

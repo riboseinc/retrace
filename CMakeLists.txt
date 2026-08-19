@@ -358,7 +358,11 @@ if(RETRACE_BUILD_V2)
 	add_subdirectory(src/backends)
 	add_subdirectory(src/v2)
 elseif(RETRACE_PLATFORM_WINDOWS)
-	# Windows: build the inline-hooking backends standalone (ADR-0009).
+	# Windows: the v2 core (TODO.windows/04) + the inline-hooking
+	# backends (ADR-0009). The core builds and the logger runs;
+	# function registration/hooking lands with TODO.windows/05.
+	add_subdirectory(src/config)
+	add_subdirectory(src/core)
 	add_subdirectory(src/backends)
 endif()
 
@@ -370,7 +374,7 @@ if(RETRACE_BUILD_CLI AND NOT RETRACE_PLATFORM_WINDOWS)
 endif()
 
 if(RETRACE_BUILD_TESTS)
-	if(RETRACE_BUILD_V2)
+	if(RETRACE_BUILD_V2 OR RETRACE_PLATFORM_WINDOWS)
 		enable_testing()
 		add_subdirectory(test)
 	else()

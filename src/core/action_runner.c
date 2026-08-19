@@ -25,10 +25,10 @@
 
 #include "action_runner.h"
 
-#include <pthread.h>
 
 #include "actions.h"
 #include "logger.h"
+#include "posix_compat.h"
 
 void retrace_action_runner_run(struct ThreadContext *thread_ctx,
 	const char *func_name,
@@ -87,7 +87,7 @@ void retrace_action_runner_run(struct ThreadContext *thread_ctx,
 			i_action_name,
 			func_name,
 			thread_ctx->ret_addr,
-			(unsigned long long)pthread_self());
+			(unsigned long long)rc_thread_self());
 
 		if (action_func(thread_ctx,
 			json_object_get_object(i_action, "action_params"))) {
@@ -96,7 +96,7 @@ void retrace_action_runner_run(struct ThreadContext *thread_ctx,
 				i_action_name,
 				func_name,
 				thread_ctx->ret_addr,
-				(unsigned long long)pthread_self());
+				(unsigned long long)rc_thread_self());
 			break;
 		}
 	}

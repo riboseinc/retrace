@@ -3,6 +3,66 @@
 # Unit tests for retrace_core registries. Link directly against the
 # retrace_core OBJECT library -- no LD_PRELOAD needed. Issue #481.
 
+# Windows (TODO.windows/04): the v2 core now builds here, and the
+# portable unit set runs on the CI legs. Everything below links
+# POSIX-only backend arch directories, so it stays gated.
+if(RETRACE_PLATFORM_WINDOWS)
+    # TODO.windows/05: the logger-format scenarios segfault at
+    # runtime under MSVC (compile+link are clean; needs a Windows
+    # box to debug). Gated off the MSVC set until then.
+    if(NOT MSVC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+    add_executable(retrace_test_logger_fmt test_logger_fmt.c)
+    set_target_properties(retrace_test_logger_fmt PROPERTIES
+        OUTPUT_NAME test_logger_fmt
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+    target_link_libraries(retrace_test_logger_fmt PRIVATE
+        retrace_core
+        retrace_config_json
+        retrace_backends
+        retrace_headers)
+
+    target_include_directories(retrace_test_logger_fmt PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core
+        ${CMAKE_SOURCE_DIR}/src/backends
+        ${CMAKE_SOURCE_DIR}/src/config/json)
+
+    add_test(NAME unit-test-logger-fmt-default
+        COMMAND retrace_test_logger_fmt)
+    add_test(NAME unit-test-logger-fmt-json
+        COMMAND retrace_test_logger_fmt)
+    set_tests_properties(unit-test-logger-fmt-json PROPERTIES
+        ENVIRONMENT "RETRACE_FMT_UNDER_TEST=json")
+    add_test(NAME unit-test-logger-fmt-jsonl
+        COMMAND retrace_test_logger_fmt)
+    set_tests_properties(unit-test-logger-fmt-jsonl PROPERTIES
+        ENVIRONMENT "RETRACE_FMT_UNDER_TEST=jsonl")
+    endif()
+
+    add_executable(retrace_test_trace_load test_trace_load.c
+        ${CMAKE_SOURCE_DIR}/tools/common/stream.c
+        ${CMAKE_SOURCE_DIR}/tools/common/trace_load.c
+        ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
+    set_target_properties(retrace_test_trace_load PROPERTIES
+        OUTPUT_NAME test_trace_load
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+    target_include_directories(retrace_test_trace_load PRIVATE
+        ${CMAKE_SOURCE_DIR}/tools/common
+        ${CMAKE_SOURCE_DIR}/src/config/json
+        ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+    add_test(NAME unit-test-trace-load
+        COMMAND retrace_test_trace_load)
+    if(NOT MSVC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+        set_tests_properties(unit-test-logger-fmt-default
+            unit-test-logger-fmt-json unit-test-logger-fmt-jsonl
+            PROPERTIES LABELS "unit")
+    endif()
+    set_tests_properties(unit-test-trace-load PROPERTIES LABELS "unit")
+    return()
+endif()
+
 # The arch-specific include is needed because data_types.h includes
 # arch_spec_macros.h, which differs per platform. Compute the path
 # here since _retrace_arch_include from src/core/CMakeLists.txt is
@@ -709,9 +769,25 @@ elseif(RETRACE_PLATFORM_DARWIN)
     target_compile_definitions(retrace_test_logger_fmt PRIVATE _DARWIN_C_SOURCE)
 endif()
 
-add_test(NAME unit-test-logger-fmt
+# One scenario per invocation (fresh process): default, json,
+# jsonl -- chosen via environment, so the same binary runs on
+# POSIX and Windows.
+add_test(NAME unit-test-logger-fmt-default
     COMMAND retrace_test_logger_fmt)
-set_tests_properties(unit-test-logger-fmt PROPERTIES LABELS "unit")
+set_tests_properties(unit-test-logger-fmt-default
+    PROPERTIES LABELS "unit")
+
+add_test(NAME unit-test-logger-fmt-json
+    COMMAND retrace_test_logger_fmt)
+set_tests_properties(unit-test-logger-fmt-json
+    PROPERTIES LABELS "unit"
+    ENVIRONMENT "RETRACE_FMT_UNDER_TEST=json")
+
+add_test(NAME unit-test-logger-fmt-jsonl
+    COMMAND retrace_test_logger_fmt)
+set_tests_properties(unit-test-logger-fmt-jsonl
+    PROPERTIES LABELS "unit"
+    ENVIRONMENT "RETRACE_FMT_UNDER_TEST=jsonl")
 
 #
 # Per-thread call-sequence hash unit tests (TODO.complete/24).

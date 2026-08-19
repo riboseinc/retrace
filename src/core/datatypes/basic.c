@@ -61,7 +61,7 @@ static int get_member(const struct DataType *struct_type,
 
 		/* FIXME! Handle alignment */
 		m_struct++;
-		m_data += m_size;
+		m_data = (const char *)m_data + m_size;
 		//m_type = get_member_type(m_struct->type);
 		m_type = retrace_datatype_get(m_struct->type);
 		if (m_type == NULL)
@@ -170,7 +170,8 @@ size_t retrace_struct_to_sz(const void *data,
 					break;
 				}
 
-				arr_member_data += arr_member_size;
+				arr_member_data = (const char *)arr_member_data +
+					arr_member_size;
 				arr_count--;
 			}
 

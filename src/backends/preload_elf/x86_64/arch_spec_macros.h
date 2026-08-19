@@ -27,7 +27,8 @@
 #define ARCH_SPEC_MACROS_H_
 
 #define retrace_as_define_var_in_sec(type, name, seg_name, sec_name) \
-	static type name __attribute__ ((used, section(seg_name""sec_name)))
+	static type name __attribute__((used, aligned(1), \
+		section(seg_name""sec_name)))
 
 #define retrace_as_get_section_info(seg_name, sec_name, addr_ptr, size_ptr) \
 do { \

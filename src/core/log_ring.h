@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
  *
@@ -101,9 +102,18 @@ struct LogRing {
 
 	uint32_t dropped;
 
+/*
+ * MSVC has no C11 _Atomic; its ring is stubbed out this slice
+ * (win_common/ring_stub_msvc.c) so the fields are inert there.
+ * TODO.windows/05 wires Interlocked-based atomics.
+ */
+#if defined(_MSC_VER) && !defined(__clang__)
+	uint32_t head;
+	uint32_t tail;
+#else
 	_Atomic uint32_t head;
-
 	_Atomic uint32_t tail;
+#endif
 
 	struct LogEntry *entries;
 };

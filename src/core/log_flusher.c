@@ -25,7 +25,6 @@
 
 #include "log_flusher.h"
 
-#include <pthread.h>
 #include <stdatomic.h>
 #include <stddef.h>
 #include <time.h>
@@ -50,7 +49,7 @@ struct FlusherState {
 
 	void *ctx;
 
-	pthread_t tid;
+	rc_thread_h tid;
 
 	_Atomic int running;
 
@@ -164,7 +163,7 @@ int retrace_log_flusher_init(retrace_log_flusher_emit_cb cb, void *ctx)
 	atomic_store_explicit(&g_flusher.stop_signal, 0,
 		memory_order_relaxed);
 
-	rc = retrace_real_impls.pthread_create(&g_flusher.tid, NULL,
+	rc = retrace_real_impls.rc_thread_create(&g_flusher.tid,
 		flusher_main, &g_flusher);
 	if (rc != 0) {
 		log_err("log_flusher: pthread_create failed: %d", rc);
@@ -210,6 +209,6 @@ void retrace_log_flusher_stop(void)
 	 * This is the safe path: the thread is fully terminated
 	 * before we return.
 	 */
-	retrace_real_impls.pthread_join(g_flusher.tid, NULL);
+	retrace_real_impls.rc_thread_join(&g_flusher.tid);
 #endif
 }

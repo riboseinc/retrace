@@ -265,16 +265,16 @@ int main(void)
 	retrace_real_impls.malloc = malloc;
 	retrace_real_impls.free = free;
 	retrace_real_impls.real_snprintf = snprintf;
-	retrace_real_impls.pthread_mutex_lock = pthread_mutex_lock;
-	retrace_real_impls.pthread_mutex_unlock = pthread_mutex_unlock;
-	retrace_real_impls.pthread_mutex_init = pthread_mutex_init;
-	retrace_real_impls.pthread_mutex_destroy = pthread_mutex_destroy;
-	retrace_real_impls.pthread_key_create = pthread_key_create;
-	retrace_real_impls.pthread_key_delete = pthread_key_delete;
-	retrace_real_impls.pthread_getspecific = pthread_getspecific;
-	retrace_real_impls.pthread_setspecific = pthread_setspecific;
-	retrace_real_impls.pthread_create = pthread_create;
-	retrace_real_impls.pthread_join = pthread_join;
+	retrace_real_impls.rc_mutex_lock = rc_mutex_lock_posix;
+	retrace_real_impls.rc_mutex_unlock = rc_mutex_unlock_posix;
+	retrace_real_impls.rc_mutex_init = rc_mutex_init_posix;
+	retrace_real_impls.rc_mutex_destroy = rc_mutex_destroy_posix;
+	retrace_real_impls.rc_tss_create = rc_tss_create_posix;
+	retrace_real_impls.rc_tss_delete = rc_tss_delete_posix;
+	retrace_real_impls.rc_tss_get = rc_tss_get_posix;
+	retrace_real_impls.rc_tss_set = rc_tss_set_posix;
+	retrace_real_impls.rc_thread_create = rc_thread_create_posix;
+	retrace_real_impls.rc_thread_join = rc_thread_join_posix;
 
 	printf("log_flusher tests:\n");
 

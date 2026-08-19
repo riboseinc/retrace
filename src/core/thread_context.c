@@ -25,12 +25,11 @@
 
 #include "thread_context.h"
 
-#include <pthread.h>
 
 #include "real_impls.h"
 #include "logger.h"
 
-static pthread_key_t thread_ctx_key;
+static rc_tss_t thread_ctx_key;
 
 /*
  * Per-thread destructor. Frees the thread's ThreadContext.
@@ -51,7 +50,7 @@ static void thread_ctx_destructor(void *thread_ctx)
 
 int retrace_thread_context_init(void)
 {
-	int rc = retrace_real_impls.pthread_key_create(&thread_ctx_key,
+	int rc = retrace_real_impls.rc_tss_create(&thread_ctx_key,
 		thread_ctx_destructor);
 
 	if (rc)
@@ -65,7 +64,7 @@ struct ThreadContext *retrace_thread_context_get(void)
 	struct ThreadContext *thread_ctx;
 
 	thread_ctx = (struct ThreadContext *)
-		retrace_real_impls.pthread_getspecific(thread_ctx_key);
+		retrace_real_impls.rc_tss_get(thread_ctx_key);
 
 	if (thread_ctx == NULL) {
 		thread_ctx = (struct ThreadContext *)
@@ -74,7 +73,7 @@ struct ThreadContext *retrace_thread_context_get(void)
 		if (thread_ctx == NULL)
 			return NULL;
 
-		if (retrace_real_impls.pthread_setspecific(
+		if (retrace_real_impls.rc_tss_set(
 			thread_ctx_key, thread_ctx)) {
 
 			retrace_real_impls.free(thread_ctx);

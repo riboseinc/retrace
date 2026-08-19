@@ -28,7 +28,7 @@
  *
  * dladdr is ~10us per call on macOS -- tolerable for one-off
  * config scripts but a real cost on hot paths. The cache stores
- * the most recent N (ret_addr -> Dl_info) mappings so repeat
+ * the most recent N (ret_addr -> rc_dl_info_t) mappings so repeat
  * lookups for the same address are O(1).
  *
  * Cache is process-global and mutex-protected. Threads can
@@ -48,7 +48,7 @@
 #ifndef RETRACE_CORE_CALLER_CACHE_H_
 #define RETRACE_CORE_CALLER_CACHE_H_
 
-#include <dlfcn.h>
+#include "posix_compat.h"
 
 /*
  * Look up ret_addr in the cache. On hit, returns 1 and writes
@@ -57,7 +57,7 @@
  *
  * Thread-safe.
  */
-int retrace_caller_cache_lookup(void *ret_addr, Dl_info *out);
+int retrace_caller_cache_lookup(void *ret_addr, rc_dl_info_t *out);
 
 /*
  * Insert a (ret_addr -> info) mapping. Safe to call with the
@@ -65,7 +65,7 @@ int retrace_caller_cache_lookup(void *ret_addr, Dl_info *out);
  *
  * Thread-safe.
  */
-void retrace_caller_cache_insert(void *ret_addr, const Dl_info *info);
+void retrace_caller_cache_insert(void *ret_addr, const rc_dl_info_t *info);
 
 /*
  * Test-only: clear the cache and reset stats. Used by unit

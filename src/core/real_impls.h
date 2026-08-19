@@ -27,7 +27,7 @@
 #define RETRACE_REAL_IMPLS_H_
 
 #include <stdlib.h>
-#include <pthread.h>
+#include "posix_compat.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <time.h>
@@ -69,20 +69,19 @@
 
 RETRACE_PUSH_MACROS()
 struct RetraceRealImpls {
-	int (*pthread_key_create)(pthread_key_t *key,
+	int (*rc_tss_create)(rc_tss_t *key,
 		void (*destructor)(void *));
 
-	void *(*pthread_getspecific)(pthread_key_t key);
-	int (*pthread_setspecific)(pthread_key_t key, const void *value);
-	int (*pthread_key_delete)(pthread_key_t key);
-	int (*pthread_mutex_init)(pthread_mutex_t *mutex,
-			    const pthread_mutexattr_t *attr);
-	int (*pthread_mutex_lock)(pthread_mutex_t *mutex);
-	int (*pthread_mutex_unlock)(pthread_mutex_t *mutex);
-	int (*pthread_mutex_destroy)(pthread_mutex_t *mutex);
-	int (*pthread_create)(pthread_t *thread, const pthread_attr_t *attr,
+	void *(*rc_tss_get)(rc_tss_t key);
+	int (*rc_tss_set)(rc_tss_t key, const void *value);
+	int (*rc_tss_delete)(rc_tss_t key);
+	int (*rc_mutex_init)(rc_mutex_t *mutex);
+	int (*rc_mutex_lock)(rc_mutex_t *mutex);
+	int (*rc_mutex_unlock)(rc_mutex_t *mutex);
+	int (*rc_mutex_destroy)(rc_mutex_t *mutex);
+	int (*rc_thread_create)(rc_thread_h *thread,
 			    void *(*start_routine)(void *), void *arg);
-	int (*pthread_join)(pthread_t thread, void **retval);
+	int (*rc_thread_join)(rc_thread_h *thread);
 
 	void *(*malloc)(size_t size);
 	void (*free)(void *ptr);

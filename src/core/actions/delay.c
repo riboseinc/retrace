@@ -26,6 +26,7 @@
 #include <time.h>
 
 #include "actions.h"
+#include "posix_compat.h"
 #include "logger.h"
 
 /*
@@ -84,7 +85,7 @@ static int ia_delay(struct ThreadContext *t_ctx,
 	 * so retrace doesn't intercept it; the call goes straight to
 	 * libc without re-entering the engine.
 	 */
-	nanosleep(&ts, NULL);
+	rc_nanosleep(&ts);
 
 	return 0;
 }

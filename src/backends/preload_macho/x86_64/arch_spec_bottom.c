@@ -89,7 +89,7 @@ static void as_thread_ctx_destructor(void *thread_ctx)
 {
 	free_printf_domain(((struct AsThreadContext *) thread_ctx)->domain);
 	retrace_real_impls.free(thread_ctx);
-	retrace_real_impls.pthread_key_delete(as_thread_ctx_key);
+	retrace_real_impls.rc_tss_delete(as_thread_ctx_key);
 }
 
 static int as_arginfo_function(const struct printf_info *__info,
@@ -186,7 +186,7 @@ static inline struct AsThreadContext *as_get_thread_context(void)
 	struct AsThreadContext *thread_ctx;
 
 	thread_ctx = (struct AsThreadContext *)
-		retrace_real_impls.pthread_getspecific(as_thread_ctx_key);
+		retrace_real_impls.rc_tss_get(as_thread_ctx_key);
 
 	/* try to create if does not exist */
 	if (thread_ctx == NULL) {
@@ -199,7 +199,7 @@ static inline struct AsThreadContext *as_get_thread_context(void)
 			return NULL;
 		}
 
-		if (retrace_real_impls.pthread_setspecific(
+		if (retrace_real_impls.rc_tss_set(
 			as_thread_ctx_key, thread_ctx)) {
 
 			log_err("failed to set specific thread key");
@@ -215,7 +215,7 @@ static inline struct AsThreadContext *as_get_thread_context(void)
 		if (thread_ctx->domain == NULL) {
 			log_err("failed to create printf domain");
 
-			retrace_real_impls.pthread_key_delete(as_thread_ctx_key);
+			retrace_real_impls.rc_tss_delete(as_thread_ctx_key);
 			retrace_real_impls.free(thread_ctx);
 			return NULL;
 		}
@@ -564,7 +564,7 @@ int retrace_as_init_late(void)
 {
 	int key_res;
 
-	key_res = retrace_real_impls.pthread_key_create(&as_thread_ctx_key,
+	key_res = retrace_real_impls.rc_tss_create(&as_thread_ctx_key,
 		as_thread_ctx_destructor);
 
 	if (key_res)

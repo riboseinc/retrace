@@ -27,17 +27,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
-#include <unistd.h>
-
-#if defined(__linux__)
-#include <sys/syscall.h>
-#elif defined(__APPLE__)
-#include <pthread.h>
-#elif defined(__FreeBSD__)
-#include <pthread.h>
-#elif defined(_WIN32)
-#include <windows.h>
-#endif
+#include "posix_compat.h"
 
 #include "logger.h"
 #include "real_impls.h"
@@ -45,7 +35,7 @@
 #include "log_flusher.h"
 
 /* Forward declarations for the lazy-spawn function. */
-static int g_flusher_spawned;  /* guarded by __sync CAS */
+static volatile int g_flusher_spawned; /* guarded by rc_cas */
 static int logger_emit_entry(const struct LogEntry *entry, void *ctx);
 
 /* Set in main.c's constructor when all init is complete. */
@@ -66,9 +56,7 @@ static int g_logger_ring_enabled;
  */
 static void ensure_flusher_running(void)
 {
-	int expected = 0;
-
-	if (__sync_bool_compare_and_swap(&g_flusher_spawned, expected, 1)) {
+	if (rc_cas(&g_flusher_spawned, 0, 1)) {
 		if (retrace_log_flusher_init(logger_emit_entry, NULL) != 0)
 			log_err("logger: log_flusher_init failed");
 	}
@@ -167,6 +155,18 @@ static int g_first_json;
 static int g_logger_fmt_jsonl;
 
 /*
+ * MSVC's ring atomics are staged out (log_ring.h note): the
+ * synchronous logger is the default there -- correct, just
+ * hotter on the writing thread. MinGW/GCC have real C11
+ * atomics.
+ */
+#if defined(_MSC_VER) && !defined(__clang__)
+#define RC_RING_DEFAULT_ENABLED 0
+#else
+#define RC_RING_DEFAULT_ENABLED 1
+#endif
+
+/*
  * Thread-local "logging disabled" flag (TODO.complete/19 PR C).
  *
  * Set in the flusher thread (and any future internal thread)
@@ -190,6 +190,14 @@ static _Thread_local int g_this_thread_logging_disabled;
  * by env at a later stage.
  */
 static int g_logger_ring_ready;
+
+/*
+ * Set when logger init has completed and cleared at deinit: libc
+ * calls keep arriving during process teardown (musl's exit path
+ * calls strcmp on "core..." AFTER retrace's destructor ran), and
+ * they must be declined, not logged into torn-down state.
+ */
+static int g_logger_active;
 
 /*
  * One-time guard for lazy flusher spawn. Set atomically; only
@@ -332,6 +340,9 @@ static int logger_emit_entry(const struct LogEntry *entry, void *ctx)
 
 void retrace_logger_deinit(void)
 {
+	g_logger_active = 0;
+	g_logger_ring_ready = 0;
+
 	/* Stop the flusher first so it drains every pending entry
 	 * before we write the closing "]" and tear down the rings.
 	 * Only stop if it was actually spawned (lazy init: the
@@ -453,8 +464,11 @@ int retrace_logger_init(void)
 
 			if (ring_env != NULL && ring_env[0] == '0')
 				g_logger_ring_enabled = 0;
-			else
+			else if (ring_env != NULL && ring_env[0] == '1')
 				g_logger_ring_enabled = 1;
+			else
+				g_logger_ring_enabled =
+					RC_RING_DEFAULT_ENABLED;
 		}
 		if (g_logger_ring_enabled) {
 			if (retrace_log_ring_init() != 0) {
@@ -467,6 +481,7 @@ int retrace_logger_init(void)
 		}
 	}
 
+	g_logger_active = 1;
 	return 0;
 }
 
@@ -521,23 +536,13 @@ static long g_logger_pid = -1;
 static long logger_pid(void)
 {
 	if (g_logger_pid < 0)
-		g_logger_pid = (long)getpid();
+		g_logger_pid = rc_getpid();
 	return g_logger_pid;
 }
 
 static long logger_tid(void)
 {
-#if defined(__linux__)
-	return (long)syscall(SYS_gettid);
-#elif defined(__APPLE__)
-	return (long)pthread_mach_thread_np(pthread_self());
-#elif defined(__FreeBSD__)
-	return (long)pthread_getthreadid_np();
-#elif defined(_WIN32)
-	return (long)GetCurrentThreadId();
-#else
-	return 0;
-#endif
+	return (long)rc_thread_self_tid();
 }
 
 void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
@@ -549,6 +554,9 @@ void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 	struct LogRing *ring;
 
 	if (g_this_thread_logging_disabled)
+		return;
+
+	if (!g_logger_active)
 		return;
 
 	if (!(g_logger_config.ena &&

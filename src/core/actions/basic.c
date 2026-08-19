@@ -225,7 +225,7 @@ static int ia_log_params
 					break;
 				}
 
-				ref_data += ref_data_size;
+				ref_data = (const char *)ref_data + ref_data_size;
 				arr_size--;
 			}
 
@@ -624,7 +624,7 @@ static int ia_call_real
 		JSON_Value *timing;
 		JSON_Object *timing_obj;
 
-		clock_gettime(CLOCK_MONOTONIC, &ts_start);
+		rc_monotonic(&ts_start);
 
 		if (t_ctx->prototype->fmt == FAT_PRINTF ||
 		    t_ctx->prototype->fmt == FAT_SCANF) {
@@ -640,7 +640,7 @@ static int ia_call_real
 				t_ctx->params_cnt);
 		}
 
-		clock_gettime(CLOCK_MONOTONIC, &ts_end);
+		rc_monotonic(&ts_end);
 
 		duration_us = (ts_end.tv_sec - ts_start.tv_sec) * 1000000L +
 			      (ts_end.tv_nsec - ts_start.tv_nsec) / 1000L;

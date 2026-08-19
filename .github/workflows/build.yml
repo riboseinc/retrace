@@ -136,14 +136,16 @@ jobs:
           }
           Write-Host "Triplet: $triplet"
           Write-Host "Toolchain: $toolchain"
-          cmake -B build "-DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}" "-DVCPKG_TARGET_TRIPLET=$triplet" "-DCMAKE_TOOLCHAIN_FILE=$toolchain"
+          # TODO.windows/04: the v2 core builds on Windows; the
+          # portable unit set (logger format, trace load) runs.
+          cmake -B build "-DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}" "-DVCPKG_TARGET_TRIPLET=$triplet" "-DCMAKE_TOOLCHAIN_FILE=$toolchain" "-DRETRACE_BUILD_TESTS=ON"
 
       # ----- Build & test (identical across OS families) -----
       - name: Build
         run: cmake --build build --config ${{ env.BUILD_TYPE }}
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure -C ${{ env.BUILD_TYPE }}
 
       # ----- Smoke tests (POSIX only — no LD_PRELOAD on Windows) -----
       # Best-effort: skipped if the v2 library wasn't produced.

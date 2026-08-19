@@ -84,8 +84,8 @@ test_array_document(void)
 
 	snprintf(doc, sizeof(doc), "[\n%s,\n%s\n]\n", g_entry_a,
 		g_entry_b);
-	write_file("/tmp/retrace-test-tl.json", doc);
-	arr = trace_load_file("/tmp/retrace-test-tl.json", NULL);
+	write_file("retrace-test-tl.json", doc);
+	arr = trace_load_file("retrace-test-tl.json", NULL);
 	CHECK(arr != NULL);
 	check_two_entries(arr);
 	json_value_free(arr);
@@ -98,8 +98,8 @@ test_jsonl(void)
 	JSON_Value *arr;
 
 	snprintf(doc, sizeof(doc), "%s\n%s\n", g_entry_a, g_entry_b);
-	write_file("/tmp/retrace-test-tl.json", doc);
-	arr = trace_load_file("/tmp/retrace-test-tl.json", NULL);
+	write_file("retrace-test-tl.json", doc);
+	arr = trace_load_file("retrace-test-tl.json", NULL);
 	CHECK(arr != NULL);
 	check_two_entries(arr);
 	json_value_free(arr);
@@ -114,8 +114,8 @@ test_truncated_tail(void)
 	/* Crashed trace: the last object never closes. */
 	snprintf(doc, sizeof(doc), "[\n%s,\n%s,\n{ \"time\": 3, \"pi",
 		g_entry_a, g_entry_b);
-	write_file("/tmp/retrace-test-tl.json", doc);
-	arr = trace_load_file("/tmp/retrace-test-tl.json", NULL);
+	write_file("retrace-test-tl.json", doc);
+	arr = trace_load_file("retrace-test-tl.json", NULL);
 	CHECK(arr != NULL);
 	check_two_entries(arr);
 	json_value_free(arr);
@@ -133,8 +133,8 @@ test_empty_file(void)
 {
 	JSON_Value *arr;
 
-	write_file("/tmp/retrace-test-tl.json", "");
-	arr = trace_load_file("/tmp/retrace-test-tl.json", NULL);
+	write_file("retrace-test-tl.json", "");
+	arr = trace_load_file("retrace-test-tl.json", NULL);
 	CHECK(arr != NULL);
 	CHECK(json_array_get_count(json_value_get_array(arr)) == 0);
 	json_value_free(arr);

@@ -161,8 +161,8 @@ int main(void)
 	/* Mutex ops -- caller_cache uses a static PTHREAD_MUTEX_INITIALIZER
 	 * which doesn't need init, but lock/unlock go through real_impls.
 	 */
-	retrace_real_impls.pthread_mutex_lock = pthread_mutex_lock;
-	retrace_real_impls.pthread_mutex_unlock = pthread_mutex_unlock;
+	retrace_real_impls.rc_mutex_lock = rc_mutex_lock_posix;
+	retrace_real_impls.rc_mutex_unlock = rc_mutex_unlock_posix;
 
 	printf("caller_cache tests:\n");
 

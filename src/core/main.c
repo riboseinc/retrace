@@ -24,7 +24,9 @@
  */
 #include <stdio.h>
 #include <string.h>
+#ifndef _WIN32
 #include <sys/uio.h>
+#endif
 #include <stdlib.h>
 
 #include "real_impls.h"
@@ -41,8 +43,16 @@
 
 int retrace_inited;
 
+#if defined(_MSC_VER) && !defined(__clang__)
+/*
+ * MSVC has no constructors; DllMain (TODO.windows/05) or the
+ * embedder calls the boot explicitly.
+ */
+void retrace_core_boot(void)
+#else
 __attribute__((constructor(101)))
 static void retrace_main(void)
+#endif
 {
 	/* The order of module inits is strict */
 	/* __asm("int $3;"); */
@@ -121,6 +131,7 @@ static void hash_print_cb(uint64_t hash, void *ctx)
 		(unsigned long long)hash);
 }
 
+#if !defined(_MSC_VER) || defined(__clang__)
 __attribute__((destructor))
 static void retrace_destructor(void)
 {
@@ -137,3 +148,4 @@ static void retrace_destructor(void)
 	retrace_call_hash_deinit();
 	retrace_logger_deinit();
 }
+#endif /* MSVC has no destructors */
