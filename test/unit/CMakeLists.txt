@@ -37,6 +37,10 @@ if(RETRACE_PLATFORM_WINDOWS)
         COMMAND retrace_test_logger_fmt)
     set_tests_properties(unit-test-logger-fmt-jsonl PROPERTIES
         ENVIRONMENT "RETRACE_FMT_UNDER_TEST=jsonl")
+    add_test(NAME unit-test-logger-fmt-ring
+        COMMAND retrace_test_logger_fmt)
+    set_tests_properties(unit-test-logger-fmt-ring PROPERTIES
+        ENVIRONMENT "RETRACE_FMT_UNDER_TEST=ring")
     endif()
 
     add_executable(retrace_test_trace_load test_trace_load.c

@@ -1,3 +1,12 @@
+retrace (2.11.1-1) unstable; urgency=medium
+
+  * Fixed: ring-logger entries lost on immediate process exit
+    (deinit final-drain was dead code after the late-call gate).
+  * New: examples/escape-hunting (recipe-33 demo, POSIX +
+    Windows flows); portable example set builds on Windows.
+
+ -- Ribose Inc <opensource@ribose.com>  Thu, 20 Aug 2026 07:30:00 +0000
+
 retrace (2.11.0-1) unstable; urgency=medium
 
   * New: the v2 core engine builds and links on Windows

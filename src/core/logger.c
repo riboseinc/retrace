@@ -340,6 +340,12 @@ static int logger_emit_entry(const struct LogEntry *entry, void *ctx)
 
 void retrace_logger_deinit(void)
 {
+	int ring_was_ready = g_logger_ring_ready;
+
+	/* Decline late callers (musl's exit path) BEFORE tearing
+	 * anything down -- but capture the ring state first: the
+	 * final drain below still needs it.
+	 */
 	g_logger_active = 0;
 	g_logger_ring_ready = 0;
 
@@ -348,9 +354,9 @@ void retrace_logger_deinit(void)
 	 * Only stop if it was actually spawned (lazy init: the
 	 * flusher starts on first push, not in logger_init).
 	 */
-	if (g_logger_ring_ready && g_flusher_spawned)
+	if (ring_was_ready && g_flusher_spawned)
 		retrace_log_flusher_stop();
-	if (g_logger_ring_ready)
+	if (ring_was_ready)
 		retrace_log_ring_deinit();
 
 	/* experimental JSON, close the array of log messages */

@@ -1,0 +1,18 @@
+{
+  "intercept_scripts": [
+    {
+      "func_name": "open",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    },
+    {
+      "func_name": "close",
+      "actions": [
+        { "action_name": "log_params" },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}

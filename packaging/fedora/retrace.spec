@@ -5,7 +5,7 @@
 # Install: dnf install retrace-2.10.0-1.*.rpm
 
 Name:           retrace
-Version:        2.11.0
+Version:        2.11.1
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,9 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Thu Aug 20 2026 Ribose Inc <opensource@ribose.com> - 2.11.1-1
+- Ring-logger exit-drain regression fix; escape-hunting example
+
 * Wed Aug 19 2026 Ribose Inc <opensource@ribose.com> - 2.11.0-1
 - v2 core engine builds and links on Windows (portability shim)
 

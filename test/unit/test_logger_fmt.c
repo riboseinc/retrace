@@ -154,6 +154,53 @@ static int scenario_is(const char *want)
 	return v != NULL && strcmp(v, want) == 0;
 }
 
+/*
+ * Regression (v2.11.1): entries pushed to the ring must survive
+ * an immediate exit -- deinit's final drain had been dead code
+ * after the late-call gate cleared the ring-ready flag before
+ * the guards that used it.
+ */
+static void
+test_ring_drains_on_immediate_exit(void)
+{
+	char *buf;
+	char *copy;
+	char *line;
+	int lines = 0;
+
+	/* Ring left ENABLED (no RETRACE_LOGGER_RING env). */
+	remove(g_log_path);
+	rc_setenv_win("RETRACE_LOGGER_DEF_ENA", "1", 1);
+	rc_setenv_win("RETRACE_LOGGER_DEF_STDOUT_ENA", "0", 1);
+	rc_setenv_win("RETRACE_LOGGER_DEF_FN", g_log_path, 1);
+	rc_unsetenv_win("RETRACE_LOGGER_RING");
+
+	CHECK(retrace_logger_init() == 0);
+
+	{
+		JSON_Value *msg = json_value_init_object();
+
+		json_object_set_string(json_value_get_object(msg),
+			"func", "open");
+		retrace_logger_log_json(FUNCS, SEVERITY_INFO, msg);
+	}
+
+	retrace_logger_deinit();
+
+	buf = slurp(g_log_path);
+	CHECK(buf != NULL);
+	copy = strdup(buf);
+	line = strtok(copy, "\n");
+	while (line != NULL) {
+		if (line[0] == '{')
+			lines++;
+		line = strtok(NULL, "\n");
+	}
+	free(copy);
+	CHECK(lines >= 1);
+	free(buf);
+}
+
 static void
 test_default_is_array_document(void)
 {
@@ -242,6 +289,8 @@ main(void)
 		TEST(json_mode_is_array_document);
 	else if (scenario_is("jsonl"))
 		TEST(jsonl_is_one_object_per_line);
+	else if (scenario_is("ring"))
+		TEST(ring_drains_on_immediate_exit);
 	else
 		TEST(default_is_array_document);
 
