@@ -1316,3 +1316,42 @@ target_include_directories(retrace_test_correlate_stream PRIVATE
 add_test(NAME unit-test-correlate-stream
     COMMAND retrace_test_correlate_stream)
 set_tests_properties(unit-test-correlate-stream PROPERTIES LABELS "unit")
+
+#
+# Procmon CSV scanner unit tests (TODO.next-level/06). Quoted
+# fields, embedded commas/quotes/CRLF, BOM, truncation, and the
+# dropped-unterminated-quote policy.
+#
+add_executable(retrace_test_procmon_csv test_procmon_csv.c
+    ${CMAKE_SOURCE_DIR}/tools/procmon2retrace/csv.c)
+set_target_properties(retrace_test_procmon_csv PROPERTIES
+    OUTPUT_NAME test_procmon_csv
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_procmon_csv PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/procmon2retrace)
+
+add_test(NAME unit-test-procmon-csv
+    COMMAND retrace_test_procmon_csv)
+set_tests_properties(unit-test-procmon-csv PROPERTIES LABELS "unit")
+
+#
+# Procmon -> retrace entry converter unit tests
+# (TODO.next-level/06): header mapping and the entry shape.
+#
+add_executable(retrace_test_procmon_convert test_procmon_convert.c
+    ${CMAKE_SOURCE_DIR}/tools/procmon2retrace/csv.c
+    ${CMAKE_SOURCE_DIR}/tools/procmon2retrace/convert.c
+    ${_parson_for_tools})
+set_target_properties(retrace_test_procmon_convert PROPERTIES
+    OUTPUT_NAME test_procmon_convert
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_procmon_convert PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/procmon2retrace
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-procmon-convert
+    COMMAND retrace_test_procmon_convert)
+set_tests_properties(unit-test-procmon-convert PROPERTIES LABELS "unit")

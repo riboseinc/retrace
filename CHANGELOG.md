@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.8.0] - 2026-08-19
+
+### Added
+- **`retrace-procmon2retrace` — the Windows outer-layer producer.**
+  Converts a procmon CSV export (File > Save as CSV) into a
+  retrace JSON log so `retrace-correlate` consumes the kernel
+  layer's view on Windows like any other outside stream
+  (TODO.next-level Phase 3):
+  - `tools/procmon2retrace/csv.{c,h}` — tolerant CSV scanner:
+    quoted fields with embedded commas and doubled quotes, CRLF
+    (between records AND inside quoted Detail fields), UTF-8 BOM,
+    per-field truncation guard, dropped-unterminated-quote policy
+    (same tolerance as the correlate scanner). Header row maps
+    columns case-insensitively; a missing header falls back to
+    procmon's canonical order.
+  - `tools/procmon2retrace/convert.{c,h}` — one row to one
+    retrace-shaped entry: pid numeric, module ETW, Result SUCCESS
+    -> INFO / anything else -> WARN, Operation -> func, the
+    original wall-clock timestamp preserved in the message (time
+    is 0: procmon's clock has no date), NT paths passed through
+    for the correlate normalizer.
+  - CLI `retrace-procmon2retrace <in.csv> [out.json]`, streaming
+    one array document in retrace's emission shape.
+- Cookbook recipe 33 gains the "Windows outer layer: procmon CSV"
+  section (convert then correlate, end to end).
+
+- libsass hardening (independently verified tebako's libsass
+  investigation @ 9bb4ebcc): corr_normalize now also strips the
+  '//?/' forward-slash prefix spelling libsass builds before
+  flipping separators (src/file.cpp); new golden case
+  06-libsass-importer pins the real-world importer shapes end to
+  end — QueryOpen (GetFileAttributesW) probe misses as escapes
+  (read-attributes leak), \\??\\ covered hits, and the
+  wildcard-not-declared escape — with a sync CTest proving the
+  case's outside.json regenerates identically from its procmon
+  CSV.
+
+### Tests
+- 11-case CSV scanner unit suite, 6-case converter suite, a
+  round-trip CTest, the libsass golden case + CSV<->JSON sync
+  CTest, and 2 new normalizer cases. 71/71 overall.
+
 ## [2.7.0] - 2026-08-19
 
 ### Added

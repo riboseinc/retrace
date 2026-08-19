@@ -38,9 +38,19 @@ corr_normalize(const char *in, char *out, size_t outsz)
 		return 0;
 	out[0] = '\0';
 
-	/* NT prefix forms -> plain path. */
+	/*
+	 * NT prefix forms -> plain path. The '//?/' spelling is the
+	 * forward-slash variant libsass builds before flipping the
+	 * separators (src/file.cpp read_file/file_exists).
+	 */
 	if (strncmp(p, "\\??\\", 4) == 0) {
 		p += 4;
+	} else if (strncmp(p, "//?/", 4) == 0 &&
+		   p[4] != '\0') {
+		/* Keep it a path: only strip when something follows
+		 * that is not another '/' (a '//server' UNC stays). */
+		if (p[4] != '/')
+			p += 4;
 	} else if (strncmp(p, "\\\\?\\", 4) == 0) {
 		p += 4;
 	} else if (strncmp(p, "\\Device\\HarddiskVolume", 22) == 0) {

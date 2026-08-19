@@ -31,9 +31,9 @@ absence of raw-syscall escapes — a static binary or a hand-rolled
 `syscall()` call goes straight to the kernel layer. For
 sub-libc-certified reports on Linux use the ptrace backend
 (recipe 29/30 cover the adjacent bridges); on Windows the kernel
-layer (ETW/procmon, recipe below when the converter ships) is
-currently the honest capture — the ntdll hook set is in progress. `retrace-correlate` reports what the
-captures cover — no more.
+layer (ETW/procmon via `retrace-procmon2retrace`, below) is
+currently the honest capture — the ntdll hook set is in progress.
+`retrace-correlate` reports what the captures cover — no more.
 
 ## Capturing the outside stream
 
@@ -114,6 +114,22 @@ the parity contract for any correlator — retrace's and
 third-party implementations (tebako's Rust correlator runs the
 same cases in its CI). Add a case by adding a directory; the
 CTest loop picks it up at configure time.
+
+## Windows outer layer: procmon CSV
+
+The kernel layer on Windows is procmon/ETW. Convert its CSV export
+to the retrace shape and feed the correlation exactly as above:
+
+```sh
+$ retrace-procmon2retrace ProcmonCSV.csv outside.json
+$ retrace-correlate --inside tfs.json --outside outside.json \
+                    --prefix "C:/pkg"
+```
+
+The converter handles procmon's quoting (commas and doubled quotes
+inside fields, CRLF, BOM) and passes NT path forms through — the
+correlator's normalizer maps `\Device\HarddiskVolume3\pkg\x`
+and `\??\C:\pkg\x` onto `C:/pkg/x` before the join.
 
 ## Variations
 

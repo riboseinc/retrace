@@ -98,6 +98,10 @@ test_normalize_nt_prefixes(void)
 {
 	norm_case("\\??\\C:\\pkg\\file", "C:/pkg/file");
 	norm_case("\\\\?\\C:\\pkg\\file", "C:/pkg/file");
+	/* libsass's forward-slash spelling before it flips the
+	 * separators (src/file.cpp). */
+	norm_case("//?/C:\\pkg\\file", "C:/pkg/file");
+	norm_case("//?/C:/pkg/file", "C:/pkg/file");
 	/* Case is preserved past the drive letter. */
 	norm_case("\\??\\c:\\PKG\\File", "c:/PKG/File");
 }

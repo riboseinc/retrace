@@ -1,3 +1,11 @@
+retrace (2.8.0-1) unstable; urgency=medium
+
+  * New: retrace-procmon2retrace -- procmon CSV export to
+    retrace JSON (the Windows outer-layer producer); tolerant CSV
+    scanner + entry converter + correlate round-trip test.
+
+ -- Ribose Inc <opensource@ribose.com>  Wed, 19 Aug 2026 14:00:00 +0000
+
 retrace (2.7.0-1) unstable; urgency=medium
 
   * New: pid + tid on every log entry (correlatable streams);
