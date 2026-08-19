@@ -149,6 +149,7 @@ Compact form. For the full CLI and env var reference, see
 | `RETRACE_LOGGER_DEF_ENA` | `0` disables logging entirely (interception still runs). |
 | `RETRACE_LOGGER_DEF_STDOUT_ENA` | `0` suppresses stdout log output (use with `--log`). |
 | `RETRACE_LOGGER_DEF_FN` | Path to a log file (JSON appended). |
+| `RETRACE_LOGGER_FMT` | `jsonl` for one-object-per-line streaming output (default `json`, one array document). Both are read by every tool. |
 | `RETRACE_LOGGER_ALLOWED_FUNCS` | Comma-separated allowlist of function names. |
 | `RETRACE_LOGGER_EXCLUDED_FUNCS` | Comma-separated denylist of function names. |
 | `RETRACE_LIB` | Override the path to the retrace shared library. |

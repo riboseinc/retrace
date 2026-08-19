@@ -47,6 +47,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 13-test matcher suite (classify, index, pid/window/probe
   semantics); 75/75 overall (10 golden correlation cases).
 
+## [2.10.0] - 2026-08-19
+
+### Added
+- **Streaming JSONL log output** (`RETRACE_LOGGER_FMT=jsonl`,
+  default `json` unchanged -- TODO.windows/07). The array
+  document opens `[` at init and closes `]` at exit: a crashed
+  trace truncates the tail, nothing can tail it live, and there
+  is no per-entry framing. JSONL emits one COMPACT object per
+  line: crash evidence survives line-by-line, `tail -f | jq -c`
+  works mid-run, and the flusher's per-entry framing is the
+  only code that changed (the ring hot path is untouched).
+  Verified live through the real library's ring+flusher path.
+- **One tolerant scanner for every tool.** The correlate
+  scanner moved to `tools/common/stream.{c,h}`; new
+  `trace_load_file()` yields the same parsed array from array
+  documents, JSONL, and truncated tails. retrace-audit and
+  retrace-diff switched to it -- format-agnostic input, zero
+  downstream changes (verified: audit and diff produce
+  identical output on the same trace in both formats; diff of
+  array-vs-JSONL of one trace reports no differences).
+
+### Tests
+- 3-case logger-format suite (forked per scenario: the logger
+  keeps process-global state -- first-entry flag, ring
+  readiness), 5-case trace-load suite. 77/77 overall.
+
 ## [2.9.0] - 2026-08-19
 
 ### Added

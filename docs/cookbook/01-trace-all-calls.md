@@ -55,6 +55,23 @@ Each entry includes:
 
 ## Variations
 
+### Stream live instead of one document
+
+Set `RETRACE_LOGGER_FMT=jsonl` and the log becomes one compact
+JSON object per line -- tail it live and pipe through jq while
+the target runs:
+
+```sh
+$ RETRACE_LOGGER_FMT=jsonl RETRACE_LOGGER_DEF_FN=/tmp/t.jsonl \
+    retrace run -- ./slow-program &
+$ tail -f /tmp/t.jsonl | jq -c '.message.func'
+```
+
+A crashed target no longer leaves a truncated array either:
+every complete line survives, and every retrace tool reads both
+formats.
+
+
 ### Send logs to a file instead of stdout
 
 ```sh

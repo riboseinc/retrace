@@ -1,3 +1,12 @@
+retrace (2.10.0-1) unstable; urgency=medium
+
+  * New: RETRACE_LOGGER_FMT=jsonl streaming log output (one
+    compact object per line; crash-tolerant, tail-able); the
+    tolerant scanner promoted to tools/common and retrace-audit
+    + retrace-diff now read array and JSONL alike.
+
+ -- Ribose Inc <opensource@ribose.com>  Wed, 19 Aug 2026 22:00:00 +0000
+
 retrace (2.9.0-1) unstable; urgency=medium
 
   * New: retrace-procmon2retrace (procmon CSV -> retrace JSON,

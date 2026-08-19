@@ -84,6 +84,7 @@ static void ensure_flusher_running(void)
 #define ENVAR_LOGGER_DEF_DECOR_ENA "RETRACE_LOGGER_DEF_DECOR_ENA"
 #define ENVAR_LOGGER_DEF_STDOUT_ENA "RETRACE_LOGGER_DEF_STDOUT_ENA"
 #define ENVAR_LOGGER_DEF_FN "RETRACE_LOGGER_DEF_FN"
+#define ENVAR_LOGGER_FMT "RETRACE_LOGGER_FMT"
 
 /*
  * Per-function log filter env vars (issue #486):
@@ -159,6 +160,11 @@ static char *g_retrace_severities[SEVERITY_CNT] = {"DEBUG",
 };
 
 static int g_first_json;
+
+/* TODO.windows/07: 1 = one JSON object per line (JSONL),
+ * 0 (default) = a single JSON array document.
+ */
+static int g_logger_fmt_jsonl;
 
 /*
  * Thread-local "logging disabled" flag (TODO.complete/19 PR C).
@@ -282,6 +288,22 @@ int retrace_logger_func_loggable(const char *func_name)
  * Receives a serialized JSON entry as entry->text and writes it
  * with the leading-comma logic that produces a valid JSON array.
  */
+/*
+ * One serialized entry, framed per the active format: JSONL
+ * always emits a bare line; the array format prefixes later
+ * entries with a comma (retrace's leading-comma emission).
+ */
+static void logger_write_entry_line(FILE *f, const char *text)
+{
+	if (g_logger_fmt_jsonl) {
+		retrace_real_impls.fprintf(f, "%s\n", text);
+	} else if (g_first_json) {
+		retrace_real_impls.fprintf(f, ",\n%s\n", text);
+	} else {
+		retrace_real_impls.fprintf(f, "%s\n", text);
+	}
+}
+
 static int logger_emit_entry(const struct LogEntry *entry, void *ctx)
 {
 	(void)ctx;
@@ -290,25 +312,17 @@ static int logger_emit_entry(const struct LogEntry *entry, void *ctx)
 		return 0;
 
 	if (g_logger_config.stdout_ena &&
-	    retrace_real_impls.printf &&
+	    retrace_real_impls.fprintf &&
 	    retrace_real_impls.fflush) {
-		if (g_first_json)
-			retrace_real_impls.printf(",\n%s\n", entry->text);
-		else
-			retrace_real_impls.printf("%s\n", entry->text);
+		logger_write_entry_line(stdout, entry->text);
 		retrace_real_impls.fflush(stdout);
 	}
 
 	if (g_logger_config.logfile != NULL &&
 	    retrace_real_impls.fprintf &&
 	    retrace_real_impls.fflush) {
-		if (g_first_json) {
-			retrace_real_impls.fprintf(g_logger_config.logfile,
-				",\n%s\n", entry->text);
-		} else {
-			retrace_real_impls.fprintf(g_logger_config.logfile,
-				"%s\n", entry->text);
-		}
+		logger_write_entry_line(g_logger_config.logfile,
+			entry->text);
 		retrace_real_impls.fflush(g_logger_config.logfile);
 	}
 
@@ -328,8 +342,9 @@ void retrace_logger_deinit(void)
 	if (g_logger_ring_ready)
 		retrace_log_ring_deinit();
 
-	/* experimental JSON, make array of log messages */
-	if (g_logger_config.ena &&
+	/* experimental JSON, close the array of log messages */
+	if (!g_logger_fmt_jsonl &&
+		g_logger_config.ena &&
 		(g_logger_config.stdout_ena || g_logger_config.logfile)) {
 
 		/*
@@ -385,6 +400,14 @@ int retrace_logger_init(void)
 		g_logger_config.logfile =
 			retrace_real_impls.fopen(env_val, "a");
 
+	/* TODO.windows/07: streaming output -- one object per
+	 * line instead of one array document.
+	 */
+	env_val = retrace_real_impls.getenv(ENVAR_LOGGER_FMT);
+	if (env_val != NULL &&
+	    retrace_real_impls.strcmp(env_val, "jsonl") == 0)
+		g_logger_fmt_jsonl = 1;
+
 	/* parse per-function filter env vars */
 	logger_parse_func_filter(ENVAR_LOGGER_ALLOWED_FUNCS,
 		&g_logger_allowed_funcs);
@@ -395,14 +418,21 @@ int retrace_logger_init(void)
 	if (g_logger_config.ena &&
 		(g_logger_config.stdout_ena || g_logger_config.logfile)) {
 
-		if (g_logger_config.stdout_ena) {
-			retrace_real_impls.printf("[\n");
-			retrace_real_impls.fflush(stdout);
-		}
+		/* The array format opens the document here; JSONL
+		 * has no framing to write.
+		 */
+		if (!g_logger_fmt_jsonl) {
+			if (g_logger_config.stdout_ena) {
+				retrace_real_impls.printf("[\n");
+				retrace_real_impls.fflush(stdout);
+			}
 
-		if (g_logger_config.logfile != NULL) {
-			retrace_real_impls.fprintf(g_logger_config.logfile, "[\n");
-			retrace_real_impls.fflush(g_logger_config.logfile);
+			if (g_logger_config.logfile != NULL) {
+				retrace_real_impls.fprintf(
+					g_logger_config.logfile, "[\n");
+				retrace_real_impls.fflush(
+					g_logger_config.logfile);
+			}
 		}
 
 		/* Init the lock-free ring subsystem. The background
@@ -543,7 +573,13 @@ void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 			g_retrace_severities[sev]);
 	json_object_set_value(root_object, "message", msg_value);
 
-	serialized_string = json_serialize_to_string_pretty(root_value);
+	/*
+	 * JSONL is one object per LINE, so it serializes compact;
+	 * the array document keeps the pretty form.
+	 */
+	serialized_string = g_logger_fmt_jsonl ?
+		json_serialize_to_string(root_value) :
+		json_serialize_to_string_pretty(root_value);
 
 	/*
 	 * Lock-free hot path (post-init): push the serialized JSON
@@ -571,23 +607,13 @@ void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 		 * no lock needed.
 		 */
 		if (g_logger_config.stdout_ena) {
-			if (g_first_json)
-				retrace_real_impls.printf(",\n%s\n",
-					serialized_string);
-			else
-				retrace_real_impls.printf("%s\n",
-					serialized_string);
+			logger_write_entry_line(stdout,
+				serialized_string);
 			retrace_real_impls.fflush(stdout);
 		}
 		if (g_logger_config.logfile != NULL) {
-			if (g_first_json)
-				retrace_real_impls.fprintf(
-					g_logger_config.logfile,
-					",\n%s\n", serialized_string);
-			else
-				retrace_real_impls.fprintf(
-					g_logger_config.logfile,
-					"%s\n", serialized_string);
+			logger_write_entry_line(g_logger_config.logfile,
+				serialized_string);
 			retrace_real_impls.fflush(
 				g_logger_config.logfile);
 		}

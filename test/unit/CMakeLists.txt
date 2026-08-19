@@ -679,6 +679,41 @@ add_test(NAME unit-test-log-flusher
 set_tests_properties(unit-test-log-flusher PROPERTIES LABELS "unit")
 
 #
+# Logger output-format tests (TODO.windows/07): the default JSON
+# array document vs RETRACE_LOGGER_FMT=jsonl streaming output.
+#
+add_executable(retrace_test_logger_fmt test_logger_fmt.c)
+set_target_properties(retrace_test_logger_fmt PROPERTIES
+    OUTPUT_NAME test_logger_fmt
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_logger_fmt PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_logger_fmt PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_logger_fmt PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_logger_fmt PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-logger-fmt
+    COMMAND retrace_test_logger_fmt)
+set_tests_properties(unit-test-logger-fmt PROPERTIES LABELS "unit")
+
+#
 # Per-thread call-sequence hash unit tests (TODO.complete/24).
 # Verifies FNV-1a rolling hash: env gating, determinism, uniqueness,
 # per-thread isolation, walk semantics, NULL safety, multi-thread.
@@ -1302,20 +1337,42 @@ set_tests_properties(unit-test-correlate-match PROPERTIES LABELS "unit")
 # JSONL, and truncated shapes.
 #
 add_executable(retrace_test_correlate_stream test_correlate_stream.c
-    ${CMAKE_SOURCE_DIR}/tools/correlate/stream.c
+    ${CMAKE_SOURCE_DIR}/tools/common/stream.c
     ${_parson_for_tools})
 set_target_properties(retrace_test_correlate_stream PROPERTIES
     OUTPUT_NAME test_correlate_stream
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
 
 target_include_directories(retrace_test_correlate_stream PRIVATE
-    ${CMAKE_SOURCE_DIR}/tools/correlate
+    ${CMAKE_SOURCE_DIR}/tools/common
     ${CMAKE_SOURCE_DIR}/src/config/json
     ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
 
 add_test(NAME unit-test-correlate-stream
     COMMAND retrace_test_correlate_stream)
 set_tests_properties(unit-test-correlate-stream PROPERTIES LABELS "unit")
+
+#
+# Shared tolerant trace loader tests (TODO.windows/07): array
+# document, JSONL, and truncated tails all yield the same
+# entries for the offline tools (audit, diff, correlate).
+#
+add_executable(retrace_test_trace_load test_trace_load.c
+    ${CMAKE_SOURCE_DIR}/tools/common/stream.c
+    ${CMAKE_SOURCE_DIR}/tools/common/trace_load.c
+    ${_parson_for_tools})
+set_target_properties(retrace_test_trace_load PROPERTIES
+    OUTPUT_NAME test_trace_load
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_trace_load PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/common
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-trace-load
+    COMMAND retrace_test_trace_load)
+set_tests_properties(unit-test-trace-load PROPERTIES LABELS "unit")
 
 #
 # Procmon CSV scanner unit tests (TODO.next-level/06). Quoted
