@@ -47,6 +47,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 13-test matcher suite (classify, index, pid/window/probe
   semantics); 75/75 overall (10 golden correlation cases).
 
+## [2.11.1] - 2026-08-20
+
+### Fixed
+- **Ring-logger entries were lost when the traced process
+  exited immediately after its last calls.** The v2.11.0
+  late-call gate cleared `g_logger_ring_ready` at the top of
+  `retrace_logger_deinit` -- BEFORE the guards that used it --
+  so the flusher's final drain and the ring teardown were dead
+  code. Every ring-buffered entry after the first was dropped
+  at exit (instant-exit programs lost nearly their whole
+  trace). Found by the new escape-hunting demo; bisected
+  v2.10.0 (good) vs v2.11.0 (bad) via worktree builds; pinned
+  by a new logger-fmt scenario (`ring`) that leaves the ring
+  enabled and asserts entries survive an immediate exit.
+
+### Added
+- **examples/escape-hunting** (TODO.windows/04 examples
+  parity): the recipe-33 flow as a runnable demo -- a packaged
+  app reading from a virtualized prefix, an inside.json VFS
+  stream, run-posix.sh (retrace capture -> retrace-correlate;
+  prints the hidden.dat escape, exit 1) and run-windows.md
+  (procmon capture -> retrace-procmon2retrace --pid ->
+  correlate). Portable open()-based demo binary; documented
+  that current macOS SDKs remap fopen to fopen$DARWIN_EXTSN in
+  optimized builds, which the interposition table does not
+  export (recorded in TODO.windows/05).
+- **Examples build on Windows**: the portable set (getenv,
+  escape-demo) compiles on the Windows legs; the socket-based
+  demos and root-check carry documented platform notes. The
+  examples CMakeLists had never been parsed in the CMake era
+  (flag defaulted OFF) -- its root-relative paths are fixed.
+
 ## [2.11.0] - 2026-08-19
 
 ### Added
