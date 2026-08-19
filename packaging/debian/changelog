@@ -1,3 +1,13 @@
+retrace (2.7.0-1) unstable; urgency=medium
+
+  * New: pid + tid on every log entry (correlatable streams);
+    retrace-correlate escape-report tool (inside-vs-outside VFS
+    correlation, NT path normalization, tolerant truncated-log
+    scanner, golden parity fixtures); cookbook recipe 33 and the
+    three-layer architecture section.
+
+ -- Ribose Inc <opensource@ribose.com>  Wed, 19 Aug 2026 12:00:00 +0000
+
 retrace (2.6.1-1) unstable; urgency=medium
 
   * New: retrace_config_validate_buffer() public API; CLI

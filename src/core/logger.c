@@ -27,6 +27,17 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
+#include <unistd.h>
+
+#if defined(__linux__)
+#include <sys/syscall.h>
+#elif defined(__APPLE__)
+#include <pthread.h>
+#elif defined(__FreeBSD__)
+#include <pthread.h>
+#elif defined(_WIN32)
+#include <windows.h>
+#endif
 
 #include "logger.h"
 #include "real_impls.h"
@@ -469,6 +480,36 @@ void retrace_logger_log(int module, int sev, const char *fmt, ...)
 	 */
 }
 
+/*
+ * Process/thread identity for correlation (tebako-style inside vs
+ * outside stream joins -- TODO.next-level/01). Neither getpid nor
+ * the tid getters are in retrace's intercept inventory, so plain
+ * libc calls carry no reentrancy risk.
+ */
+static long g_logger_pid = -1;
+
+static long logger_pid(void)
+{
+	if (g_logger_pid < 0)
+		g_logger_pid = (long)getpid();
+	return g_logger_pid;
+}
+
+static long logger_tid(void)
+{
+#if defined(__linux__)
+	return (long)syscall(SYS_gettid);
+#elif defined(__APPLE__)
+	return (long)pthread_mach_thread_np(pthread_self());
+#elif defined(__FreeBSD__)
+	return (long)pthread_getthreadid_np();
+#elif defined(_WIN32)
+	return (long)GetCurrentThreadId();
+#else
+	return 0;
+#endif
+}
+
 void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 {
 	time_t rawtime;
@@ -494,6 +535,8 @@ void retrace_logger_log_json(int module, int sev, JSON_Value *msg_value)
 	retrace_real_impls.time(&rawtime);
 
 	json_object_set_number(root_object, "time", rawtime);
+	json_object_set_number(root_object, "pid", logger_pid());
+	json_object_set_number(root_object, "tid", logger_tid());
 	json_object_set_string(root_object, "module",
 		g_retrace_module_pref[module]);
 	json_object_set_string(root_object, "severity",

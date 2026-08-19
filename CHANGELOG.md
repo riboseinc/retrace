@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.7.0] - 2026-08-19
+
+### Added
+- **`pid` + `tid` on every log entry.** The log schema grows the
+  process/thread identity pair (getpid / gettid and platform
+  equivalents), making streams from multi-process, multi-thread
+  targets correlatable — two same-second events are no longer
+  ambiguous. Verified live: same pid across threads, distinct
+  tids per thread.
+- **`retrace-correlate` — the escape-report tool.** Joins an
+  inside (VFS, e.g. tebako's tfs) stream against an outside
+  (retrace) stream and reports host-filesystem touches the VFS
+  never saw:
+  - `tools/correlate/match.{c,h}` — path extraction from any
+    string field at any depth, path normalization (NT forms
+    `\??\`, `\\?\`, `\Device\HarddiskVolumeN\` -> DOS
+    drive guess, slash unification, component-boundary prefix
+    match), the sorted inside-set and the escape decision.
+  - `tools/correlate/stream.{c,h}` — tolerant log scanner: one
+    JSON array document, leading-comma emission, truncated tail
+    (a crashed trace still yields every complete entry), or
+    JSONL.
+  - CLI exit codes 0/1/2 mirror retrace-diff (clean / escapes /
+    usage-IO); `--json` for machine consumers.
+- **Golden parity fixtures** (`tools/correlate/golden/`) — five
+  language-neutral cases (posix-clean, posix-escape, nt-forms,
+  truncated-tail, jsonl-stream) that pin the correlation
+  contract. Third-party correlators (tebako's Rust
+  implementation) assert the same cases in their CI; ours do via
+  a per-case CTest.
+- Cookbook recipe 33 ("Detect filesystem escapes from a
+  virtualized environment") and the three-layer correlation model
+  section in docs/architecture.md, including the layer-honesty
+  statement: a libc-boundary capture cannot certify raw-syscall
+  absence.
+
+### Tests
+- 9-case correlate matcher unit suite + 8-case scanner unit
+  suite + 5 golden CTest cases; 66/66 overall.
+
 ## [2.6.1] - 2026-08-19
 
 ### Added

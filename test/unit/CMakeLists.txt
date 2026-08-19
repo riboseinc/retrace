@@ -1272,3 +1272,47 @@ endif()
 add_test(NAME unit-test-public-api
     COMMAND retrace_test_public_api)
 set_tests_properties(unit-test-public-api PROPERTIES LABELS "unit")
+
+#
+# Correlate matcher unit tests (TODO.next-level/02). Path
+# normalization (NT forms), path comparison, the sorted path set,
+# and the escape set-difference decision. Compiles match.c
+# directly from tools/correlate/.
+#
+add_executable(retrace_test_correlate_match test_correlate_match.c
+    ${CMAKE_SOURCE_DIR}/tools/correlate/match.c
+    ${_parson_for_tools})
+set_target_properties(retrace_test_correlate_match PROPERTIES
+    OUTPUT_NAME test_correlate_match
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_correlate_match PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/correlate
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-correlate-match
+    COMMAND retrace_test_correlate_match)
+set_tests_properties(unit-test-correlate-match PROPERTIES LABELS "unit")
+
+#
+# Tolerant log scanner unit tests (TODO.next-level/02). retrace
+# emits one JSON array document; a crashed trace truncates the
+# tail. The scanner must yield every complete entry from array,
+# JSONL, and truncated shapes.
+#
+add_executable(retrace_test_correlate_stream test_correlate_stream.c
+    ${CMAKE_SOURCE_DIR}/tools/correlate/stream.c
+    ${_parson_for_tools})
+set_target_properties(retrace_test_correlate_stream PROPERTIES
+    OUTPUT_NAME test_correlate_stream
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_correlate_stream PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/correlate
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-correlate-stream
+    COMMAND retrace_test_correlate_stream)
+set_tests_properties(unit-test-correlate-stream PROPERTIES LABELS "unit")
