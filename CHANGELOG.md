@@ -6,6 +6,89 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+- **Correlation coverage criteria** (TODO.windows/01-03) — three
+  correctness/ergonomics upgrades to the escape join:
+  - **pid scoping.** A procmon capture is system-wide; the
+    procmon2retrace → correlate chain now scopes by process:
+    `--pid N` on both tools, and coverage is ALWAYS pid-aware
+    (an inside record from pid A never covers a touch by pid B;
+    pid-less entries stay wildcards).
+  - **Time-window covering** (`--window SECONDS`). Pure
+    set-difference is time-blind: a materialize logged after an
+    open covers it, hiding touches the VFS cleaned up after
+    instead of serving in time. With a window, covered = the
+    inside stream saw the path within ±SECONDS of the touch.
+    Semantics correction caught by writing the unit test first:
+    the original TODO claimed set semantics produce phantom
+    escapes — backwards; the window is the stricter mode.
+  - **Probe/read/write classification.** libsass's importer
+    storms ~14 GetFileAttributesW existence probes per @import;
+    a probe is an information leak, not a data access. Every
+    report line now carries `class=probe|read|write|none`
+    (func-name tables + Detail heuristics, pinned by tests) and
+    `--exclude-probes` drops probe-class hits (jail-grant
+    policies that grant read-attributes wholesale).
+- Model: the matcher's inside set became an index of
+  {path, pid, time} records (sorted by path+time, binary-search
+  coverage probe); the decision takes one criteria value object
+  (`struct CorrCriteria` — new criteria extend it, never fork
+  the code path); one string-walker feeds both the index and the
+  per-entry decision (OCP sink).
+- retrace-procmon2retrace `--pid N` — scope system-wide CSVs at
+  conversion time.
+- Golden contract grows optional per-case `options.txt`;
+  report-line format now `escape <path> func=<f> tid=<t>
+  pid=<p> class=<c>`. Four new cases: 07-pid-scope (decoy
+  process), 08-time-window (lazy materialize discrimination),
+  09/10 probe policy on/off; 06-libsass gains a decoy-pid row
+  and runs with --pid.
+
+### Tests
+- 13-test matcher suite (classify, index, pid/window/probe
+  semantics); 75/75 overall (10 golden correlation cases).
+
+## [2.9.0] - 2026-08-19
+
+### Added
+- **`retrace-procmon2retrace` — the Windows outer-layer producer.**
+  Converts a procmon CSV export (File > Save as CSV) into a
+  retrace JSON log so `retrace-correlate` consumes the kernel
+  layer's view on Windows like any other outside stream
+  (TODO.next-level Phase 3):
+  - `tools/procmon2retrace/csv.{c,h}` — tolerant CSV scanner:
+    quoted fields with embedded commas and doubled quotes, CRLF
+    (between records AND inside quoted Detail fields), UTF-8 BOM,
+    per-field truncation guard, dropped-unterminated-quote policy
+    (same tolerance as the correlate scanner). Header row maps
+    columns case-insensitively; a missing header falls back to
+    procmon's canonical order.
+  - `tools/procmon2retrace/convert.{c,h}` — one row to one
+    retrace-shaped entry: pid numeric, module ETW, Result SUCCESS
+    -> INFO / anything else -> WARN, Operation -> func, the
+    original wall-clock timestamp preserved in the message (time
+    is 0: procmon's clock has no date), NT paths passed through
+    for the correlate normalizer.
+  - CLI `retrace-procmon2retrace <in.csv> [out.json]`, streaming
+    one array document in retrace's emission shape.
+- Cookbook recipe 33 gains the "Windows outer layer: procmon CSV"
+  section (convert then correlate, end to end).
+
+- libsass hardening (independently verified tebako's libsass
+  investigation @ 9bb4ebcc): corr_normalize now also strips the
+  '//?/' forward-slash prefix spelling libsass builds before
+  flipping separators (src/file.cpp); new golden case
+  06-libsass-importer pins the real-world importer shapes end to
+  end — QueryOpen (GetFileAttributesW) probe misses as escapes
+  (read-attributes leak), \\??\\ covered hits, and the
+  wildcard-not-declared escape — with a sync CTest proving the
+  case's outside.json regenerates identically from its procmon
+  CSV.
+
+### Tests
+- 11-case CSV scanner unit suite, 6-case converter suite, a
+  round-trip CTest, the libsass golden case + CSV<->JSON sync
+  CTest, and 2 new normalizer cases. 71/71 overall.
+
 ## [2.7.0] - 2026-08-19
 
 ### Added

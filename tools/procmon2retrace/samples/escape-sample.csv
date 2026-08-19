@@ -1,0 +1,6 @@
+﻿"Time of Day","Process Name","PID","Operation","Path","Result","Detail"
+"10:33:45.1234567 AM","app.exe","4212","CreateFile","C:\Program Files\Vendor\app.exe","SUCCESS","Desired Access: Read Attributes"
+"10:33:45.1240031 AM","app.exe","4212","CreateFile","\Device\HarddiskVolume3\pkg\main.dat","SUCCESS","Desired Access: Generic Read"
+"10:33:45.1250199 AM","app.exe","4212","CreateFile","\??\C:\pkg\hidden.bin","SUCCESS","Desired Access: Generic Write"
+"10:33:45.1261142 AM","app.exe","4212","CreateFile","C:\Users\bob\Desktop","NAME NOT FOUND","SyncType: Sync+Create"
+"10:33:45.1277710 AM","app.exe","4212","ReadFile","\Device\HarddiskVolume3\pkg\main.dat","SUCCESS","Offset: 0, Length: 4,096"
