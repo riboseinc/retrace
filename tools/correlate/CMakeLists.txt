@@ -10,12 +10,14 @@
 
 set(_parson_source ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 
-add_executable(retrace_correlate correlate.c match.c stream.c ${_parson_source})
+add_executable(retrace_correlate correlate.c match.c
+    ${CMAKE_SOURCE_DIR}/tools/common/stream.c ${_parson_source})
 set_target_properties(retrace_correlate PROPERTIES
     OUTPUT_NAME retrace-correlate
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools")
 
 target_include_directories(retrace_correlate PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/common
     ${CMAKE_SOURCE_DIR}/src/config/json
     ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
 

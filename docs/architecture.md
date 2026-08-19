@@ -331,6 +331,15 @@ interception for its own thread to avoid a feedback loop. Set
 `RETRACE_LOGGER_RING=0` for synchronous writes (OHOS/QEMU/debug
 builds where thread creation during init is fragile).
 
+Output format: by default one JSON array document (opening `[`
+at init, leading-comma entries, closing `]` at exit).
+`RETRACE_LOGGER_FMT=jsonl` emits one compact JSON object per
+line instead -- crash-tolerant (a truncated tail loses nothing
+already written), `tail -f`-able, and every retrace tool
+(`retrace-correlate`, `retrace-audit`, `retrace-diff`, `pp`,
+`html`) reads both shapes through one tolerant scanner
+(`tools/common/stream.c`).
+
 `retrace pp <log.json>` pretty-prints a log as text.
 `retrace html <log.json>` converts it to an interactive HTML page.
 

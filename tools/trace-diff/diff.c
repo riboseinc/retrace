@@ -37,6 +37,7 @@
  */
 
 #include "parson.h"
+#include "trace_load.h"
 #include "normalize.h"
 #include "threshold.h"
 #include "lcs.h"
@@ -277,7 +278,7 @@ static int load_trace(const char *path, struct NormalizedLog *out,
 	JSON_Value *root;
 	JSON_Array *arr;
 
-	root = json_parse_file(path);
+	root = trace_load_file(path, NULL);
 	if (root == NULL) {
 		fprintf(stderr, "retrace-diff: cannot parse %s\n", path);
 		return -1;

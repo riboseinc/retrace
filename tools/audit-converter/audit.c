@@ -28,6 +28,7 @@
  */
 
 #include "parson.h"
+#include "trace_load.h"
 #include "policy.h"
 #include "scan.h"
 #include "format.h"
@@ -130,7 +131,7 @@ int main(int argc, char **argv)
 	if (policy_load_from_file(policy_path, &policy) != 0)
 		return 1;
 
-	trace_root = json_parse_file(trace_path);
+	trace_root = trace_load_file(trace_path, NULL);
 	if (trace_root == NULL) {
 		fprintf(stderr, "retrace-audit: cannot parse %s\n",
 			trace_path);
