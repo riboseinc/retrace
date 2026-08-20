@@ -1,3 +1,20 @@
+retrace (2.12.0-1) unstable; urgency=medium
+
+  * Added: retrace-profile -- claims-vs-truth risk profiler
+    (functions, file accesses, env, net) with kernel-layer delta
+    (sub-libc detection), static capability scan, and --jail-out
+    deny-by-default sandbox policy emission.
+  * Added: retrace-strace2retrace (Linux kernel-truth converter).
+  * Added: sandbox action allow_paths mode (deny-by-default);
+    path params found via prototype metadata; failures fail
+    closed with EACCES.
+  * Added: offline analysis tools (correlate, procmon2retrace,
+    strace2retrace, profile) now build on Windows.
+  * Changed: log_params entries carry the function name so
+    offline tools can attribute calls without banner parsing.
+
+ -- Ribose Inc <opensource@ribose.com>  Thu, 20 Aug 2026 12:00:00 +0000
+
 retrace (2.11.2-1) unstable; urgency=medium
 
   * Fixed: fopen interception silently bypassed on macOS for

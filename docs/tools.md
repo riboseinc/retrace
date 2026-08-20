@@ -21,6 +21,9 @@ to do.
 | Browse a trace without leaving VS Code | [VS Code extension](#vs-code-extension) |
 | Put a trace on a Grafana dashboard | [Grafana plugin](#grafana-plugin) |
 | Ship trace spans to Tempo / Jaeger / Honeycomb | [`retrace-to-otlp`](#retrace-to-otlp) |
+| Reduce a trace to what a binary does (profile) | [`retrace-profile`](#retrace-profile) |
+| Turn a profile / declared set into a runtime file-access jail | [`retrace-profile --jail-out`](#retrace-profile) |
+| Convert an strace file capture to the trace format | [`retrace-strace2retrace`](#retrace-strace2retrace) |
 
 ## Tool reference
 
@@ -80,6 +83,29 @@ Converts a retrace JSON log to OTLP/JSON — the standard ingest
 format for OpenTelemetry collectors (Jaeger, Tempo, Honeycomb,
 Datadog). Pairs well with recipe 04 (timing data) and recipe 22
 (protocol decoding). **Cookbook**: [recipe 23](cookbook/23-otlp-bridge.md).
+
+### `retrace-profile`
+
+Claims-vs-truth risk profiler (≥ 2.12.0). Reduces libc-layer
+traces to a profile (functions, filesystem accesses by class,
+env vars, network addresses), grades them against a kernel-layer
+truth stream (`--kernel`; kernel-only accesses = sub-libc risk),
+statically scans the binary for raw-syscall gadgets and ntdll
+imports (`--binary`), and emits a ready-to-run sandbox jail
+(`--jail-out`; allowlist from `--inside`, the declared set).
+
+- **Inputs**: any standard trace (retrace capture, strace or
+  procmon converted, VFS inside log).
+- **Cookbook**: [recipe 34 — Profile a binary, then jail it](cookbook/34-profile-and-jail.md).
+- **Runnable demo**: `examples/profile-hunting/`.
+
+### `retrace-strace2retrace`
+
+strace log → trace JSON. Feeds `retrace-profile --kernel` and
+`retrace-correlate --outside` from an
+`strace -f -e trace=%file` capture on Linux.
+
+- **Cookbook**: [recipe 34](cookbook/34-profile-and-jail.md).
 
 ### Frida bridge — `retrace-frida.js`
 

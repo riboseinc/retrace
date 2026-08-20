@@ -31,35 +31,34 @@
 #include "real_impls.h"
 
 /*
- * sandbox -- deny access to specific paths.
+ * sandbox -- jail file access behind an explicit policy.
  *
  * A runtime security policy for file access. When applied to open,
  * openat, fopen, etc., the action checks the path argument against
- * a deny list and blocks access if matched.
+ * the configured lists and blocks access on a match (or, in
+ * allow mode, on a non-match).
  *
  * Run BEFORE call_real (or as the only action) so the real call
  * never executes for denied paths. The action sets ret_val to -1
  * and aborts the script.
  *
- * action_params:
- *   deny_paths - JSON array of path strings to block. Exact match
- *                or prefix match (if the entry ends with '/').
+ * action_params (exactly one of the two):
+ *   deny_paths  - JSON array of path strings to block. Exact match
+ *                 or prefix match (if the entry ends with '/' or
+ *                 '\'). Allow-by-default.
+ *   allow_paths - JSON array of paths that MAY be touched.
+ *                 Deny-by-default: anything not on the list is
+ *                 blocked. This is the jail mode retrace-profile
+ *                 emits (--jail-out).
+ * When both are present a path must pass both checks.
  *
  * Example JSON (block access to /etc/shadow and /root/):
- *   {
- *     "action_name": "sandbox",
- *     "action_params": {
- *       "deny_paths": ["/etc/shadow", "/etc/sudoers", "/root/"]
- *     }
- *   }
- *
- * Recipe (sandbox a binary so it can't read credentials):
  *   {
  *     "func_name": "open",
  *     "actions": [
  *       { "action_name": "sandbox",
  *         "action_params": {
- *           "deny_paths": ["/etc/shadow", "/etc/gshadow"]
+ *           "deny_paths": ["/etc/shadow", "/etc/sudoers", "/root/"]
  *         }
  *       },
  *       { "action_name": "call_real" }
@@ -67,67 +66,99 @@
  *   }
  */
 
+/*
+ * One list check. Returns 1 when path_arg matches entry (exact, or
+ * prefix when the entry ends with a separator).
+ */
+static int path_matches(const char *path_arg, const char *entry)
+{
+	size_t elen = retrace_real_impls.strlen(entry);
+	char last;
+
+	if (elen == 0)
+		return 0;
+	last = entry[elen - 1];
+	if (last == '/' || last == '\\') {
+		/* Prefix match: everything under this directory */
+		return retrace_real_impls.strncmp(path_arg, entry,
+			elen) == 0;
+	}
+	return retrace_real_impls.strcmp(path_arg, entry) == 0;
+}
+
+static int list_contains(const char *path_arg, JSON_Array *list)
+{
+	size_t i, n = json_array_get_count(list);
+
+	for (i = 0; i < n; i++) {
+		const char *entry = json_array_get_string(list, i);
+
+		if (entry != NULL && path_matches(path_arg, entry))
+			return 1;
+	}
+	return 0;
+}
+
 static int ia_sandbox(struct ThreadContext *t_ctx,
 		      const JSON_Object *action_params)
 {
-	JSON_Array *deny_paths;
-	size_t i, n;
+	JSON_Array *deny_paths, *allow_paths;
 	const char *path_arg = NULL;
 	int arg_idx;
 
 	if (action_params == NULL) {
 		log_err("sandbox: action_params required");
+		t_ctx->ret_val = -1;
 		return -1;
 	}
 
 	deny_paths = json_object_get_array(action_params, "deny_paths");
-	if (deny_paths == NULL) {
-		log_err("sandbox: 'deny_paths' array required");
+	allow_paths = json_object_get_array(action_params, "allow_paths");
+	if (deny_paths == NULL && allow_paths == NULL) {
+		log_err("sandbox: 'deny_paths' or 'allow_paths' array required");
+		t_ctx->ret_val = -1;
 		return -1;
 	}
 
 	/*
-	 * Find the path argument. For open(), it's params[0].val.
-	 * For fopen(), same. For openat(), it's params[1].val (dirfd,
-	 * path). We check param[0] first, then param[1].
+	 * Find the path argument via prototype metadata: the first
+	 * string param among the first two args (open: path; openat:
+	 * dirfd, path). Non-pointer params (close(fd)) are skipped --
+	 * comparing those as strings would dereference garbage.
 	 */
 	for (arg_idx = 0; arg_idx < t_ctx->params_cnt && arg_idx < 2; arg_idx++) {
-		if (t_ctx->params[arg_idx].val != 0) {
+		const struct ParamMeta *pm =
+			&t_ctx->params[arg_idx].param_meta;
+
+		if ((pm->modifiers & CDM_POINTER) &&
+		    t_ctx->params[arg_idx].val != 0 &&
+		    retrace_real_impls.strncmp(pm->ref_type_name,
+			"sz", 3) == 0) {
 			path_arg = (const char *)t_ctx->params[arg_idx].val;
 			break;
 		}
 	}
 
+	/*
+	 * No path argument (non-file function under a wildcard
+	 * script): nothing to police, let the call through.
+	 */
 	if (path_arg == NULL)
 		return 0;
 
-	n = json_array_get_count(deny_paths);
-	for (i = 0; i < n; i++) {
-		const char *denied = json_array_get_string(deny_paths, i);
-		size_t dlen;
-
-		if (denied == NULL)
-			continue;
-
-		dlen = retrace_real_impls.strlen(denied);
-
-		if (denied[dlen - 1] == '/') {
-			/* Prefix match: block everything under this dir */
-			if (retrace_real_impls.strncmp(path_arg, denied,
-				dlen) == 0) {
-				log_warn("sandbox: DENIED '%s' (matches prefix '%s')",
-					path_arg, denied);
-				t_ctx->ret_val = -1;
-				return -1;
-			}
-		} else {
-			/* Exact match */
-			if (retrace_real_impls.strcmp(path_arg, denied) == 0) {
-				log_warn("sandbox: DENIED '%s'", path_arg);
-				t_ctx->ret_val = -1;
-				return -1;
-			}
-		}
+	if (allow_paths != NULL && !list_contains(path_arg, allow_paths)) {
+		log_warn("sandbox: DENIED '%s' (not in allow_paths)",
+			path_arg);
+		errno = EACCES;
+		t_ctx->ret_val = -1;
+		return -1;
+	}
+	if (deny_paths != NULL && list_contains(path_arg, deny_paths)) {
+		log_warn("sandbox: DENIED '%s' (matches deny_paths)",
+			path_arg);
+		errno = EACCES;
+		t_ctx->ret_val = -1;
+		return -1;
 	}
 
 	return 0;

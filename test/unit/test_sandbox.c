@@ -5,24 +5,29 @@
  */
 
 /*
- * Unit tests for the sandbox action (file-path deny-list).
+ * Unit tests for the sandbox action (file-path policy).
  *
  * The action is the file-system counterpart of addr_deny (PR #553):
- * it scans t_ctx->params for a path argument, compares against the
- * deny_paths array, and on match sets ret_val=-1 and returns -1.
+ * it finds the first string param (prototype metadata: CDM_POINTER
+ * with ref "sz") among the first two args, compares it against the
+ * deny_paths / allow_paths lists, and on a hit sets ret_val=-1,
+ * errno=EACCES and returns -1.
+ *
+ * allow_paths is the jail mode (TODO.windows/08): deny-by-default,
+ * emitted by retrace-profile --jail-out.
  *
  * Tests:
  *   - Action lookup succeeds
- *   - Required params validation (NULL params, missing deny_paths)
- *   - Exact-match deny
- *   - Prefix-match deny (entry ending in '/')
+ *   - Required params validation (NULL params, missing lists)
+ *   - Exact-match deny / prefix-match deny (also '\' separator)
  *   - No-match passes through
- *   - First-non-null param is picked (params[0] vs params[1])
+ *   - allow_paths: deny-by-default, listed path passes
+ *   - deny + allow combined: a path must pass both
+ *   - Non-string params (close(fd)) are never treated as paths
  *
- * Part of TODO.complete/14.
+ * Part of TODO.complete/14 and TODO.windows/08.
  */
 
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -49,6 +54,15 @@ static int tests_fail;
 	printf("OK\n"); \
 } while (0)
 
+/* Always-on check: CHECK() compiles to nothing under NDEBUG. */
+#define CHECK(cond) do { \
+	if (!(cond)) { \
+		printf("FAIL [%s:%d] %s\n", __FILE__, __LINE__, #cond); \
+		tests_fail++; \
+		return; \
+	} \
+} while (0)
+
 static JSON_Object *build_params_with_array(const char *key,
 					     const char **vals, int n)
 {
@@ -65,41 +79,43 @@ static JSON_Object *build_params_with_array(const char *key,
 	return root;
 }
 
-/* Build a ThreadContext with up to 2 named path-like params.
- * n==1: single param at index 0 with given name + value.
- * n==2: param[0] with name0/value0; param[1] with name1/value1.
+/*
+ * One param descriptor: name, value, and whether it is a string
+ * pointer (like open's path) or a plain int (like close's fd).
  */
-static struct ThreadContext *build_ctx_with_paths(int n,
-						   const char *name0,
-						   const char *val0,
-						   const char *name1,
-						   const char *val1)
+struct param_desc {
+	const char *name;
+	const char *str_val;
+	long int_val;
+	int is_string;
+};
+
+/* Build a ThreadContext with up to 2 params (see param_desc). */
+static struct ThreadContext *build_ctx(const struct param_desc *p, int n)
 {
 	static struct ThreadContext ctx;
-	static struct FuncParam params[8];
-	static char buf0[256];
-	static char buf1[256];
+	static char bufs[2][256];
+	int i;
 
 	memset(&ctx, 0, sizeof(ctx));
-	memset(params, 0, sizeof(params));
-
-	if (n >= 1) {
-		strncpy(params[0].param_meta.name, name0,
-			sizeof(params[0].param_meta.name) - 1);
-		strncpy(buf0, val0, sizeof(buf0) - 1);
-		buf0[sizeof(buf0) - 1] = '\0';
-		params[0].val = (long)buf0;
-	}
-	if (n >= 2) {
-		strncpy(params[1].param_meta.name, name1,
-			sizeof(params[1].param_meta.name) - 1);
-		strncpy(buf1, val1, sizeof(buf1) - 1);
-		buf1[sizeof(buf1) - 1] = '\0';
-		params[1].val = (long)buf1;
-	}
-
 	ctx.params_cnt = n;
-	memcpy(ctx.params, params, sizeof(params));
+	for (i = 0; i < n && i < 2; i++) {
+		strncpy(ctx.params[i].param_meta.name, p[i].name,
+			sizeof(ctx.params[i].param_meta.name) - 1);
+		if (p[i].is_string) {
+			strncpy(bufs[i], p[i].str_val, sizeof(bufs[i]) - 1);
+			bufs[i][sizeof(bufs[i]) - 1] = '\0';
+			ctx.params[i].val = (long)bufs[i];
+			ctx.params[i].param_meta.modifiers = CDM_POINTER;
+			strncpy(ctx.params[i].param_meta.ref_type_name,
+				"sz",
+				sizeof(ctx.params[i].param_meta
+					.ref_type_name) - 1);
+		} else {
+			ctx.params[i].val = p[i].int_val;
+			ctx.params[i].param_meta.modifiers = CDM_NOMOD;
+		}
+	}
 	ctx.ret_val = 0;
 	return &ctx;
 }
@@ -112,10 +128,15 @@ static struct ThreadContext *build_empty_ctx(void)
 	return &ctx;
 }
 
+static void free_params(JSON_Object *params)
+{
+	json_value_free(json_object_get_wrapping_value(params));
+}
+
 static void test_action_lookup(void)
 {
 	retrace_actions_init();
-	assert(retrace_actions_get("sandbox") != NULL);
+	CHECK(retrace_actions_get("sandbox") != NULL);
 }
 
 static void test_params_null(void)
@@ -125,20 +146,25 @@ static void test_params_null(void)
 	int rc;
 
 	rc = action(ctx, NULL);
-	assert(rc == -1);
+	CHECK(rc == -1);
+	CHECK(ctx->ret_val == -1);
 }
 
-static void test_missing_deny_paths(void)
+static void test_missing_lists(void)
 {
 	action_fn_t action = retrace_actions_get("sandbox");
 	struct ThreadContext *ctx = build_empty_ctx();
 	JSON_Value *root_val = json_value_init_object();
 	JSON_Object *root = json_value_get_object(root_val);
+	struct param_desc pd = { "path", "/etc/shadow", 0, 1 };
+	struct ThreadContext *pctx;
 	int rc;
 
 	json_object_set_string(root, "unrelated", "foo");
-	rc = action(ctx, root);
-	assert(rc == -1);
+	pctx = build_ctx(&pd, 1);
+	rc = action(pctx, root);
+	CHECK(rc == -1);
+	CHECK(pctx->ret_val == -1);
 
 	json_value_free(root_val);
 }
@@ -149,15 +175,15 @@ static void test_exact_match(void)
 	const char *paths[] = { "/etc/shadow" };
 	JSON_Object *params =
 		build_params_with_array("deny_paths", paths, 1);
-	struct ThreadContext *ctx =
-		build_ctx_with_paths(1, "path", "/etc/shadow", NULL, NULL);
+	struct param_desc pd = { "path", "/etc/shadow", 0, 1 };
+	struct ThreadContext *ctx = build_ctx(&pd, 1);
 	int rc;
 
 	rc = action(ctx, params);
-	assert(rc == -1);
-	assert(ctx->ret_val == -1);
+	CHECK(rc == -1);
+	CHECK(ctx->ret_val == -1);
 
-	json_value_free(json_object_get_wrapping_value(params));
+	free_params(params);
 }
 
 static void test_no_match_passes_through(void)
@@ -166,15 +192,15 @@ static void test_no_match_passes_through(void)
 	const char *paths[] = { "/etc/shadow" };
 	JSON_Object *params =
 		build_params_with_array("deny_paths", paths, 1);
-	struct ThreadContext *ctx =
-		build_ctx_with_paths(1, "path", "/tmp/safe.txt", NULL, NULL);
+	struct param_desc pd = { "path", "/tmp/safe.txt", 0, 1 };
+	struct ThreadContext *ctx = build_ctx(&pd, 1);
 	int rc;
 
 	rc = action(ctx, params);
-	assert(rc == 0);
-	assert(ctx->ret_val == 0);
+	CHECK(rc == 0);
+	CHECK(ctx->ret_val == 0);
 
-	json_value_free(json_object_get_wrapping_value(params));
+	free_params(params);
 }
 
 static void test_prefix_match_directory(void)
@@ -183,15 +209,31 @@ static void test_prefix_match_directory(void)
 	const char *paths[] = { "/root/" };
 	JSON_Object *params =
 		build_params_with_array("deny_paths", paths, 1);
-	struct ThreadContext *ctx =
-		build_ctx_with_paths(1, "path", "/root/.ssh/id_rsa", NULL, NULL);
+	struct param_desc pd = { "path", "/root/.ssh/id_rsa", 0, 1 };
+	struct ThreadContext *ctx = build_ctx(&pd, 1);
 	int rc;
 
 	rc = action(ctx, params);
-	assert(rc == -1);
-	assert(ctx->ret_val == -1);
+	CHECK(rc == -1);
+	CHECK(ctx->ret_val == -1);
 
-	json_value_free(json_object_get_wrapping_value(params));
+	free_params(params);
+}
+
+static void test_prefix_backslash_separator(void)
+{
+	action_fn_t action = retrace_actions_get("sandbox");
+	const char *paths[] = { "C:\\Users\\secret\\" };
+	JSON_Object *params =
+		build_params_with_array("deny_paths", paths, 1);
+	struct param_desc pd = { "path", "C:\\Users\\secret\\k.dat", 0, 1 };
+	struct ThreadContext *ctx = build_ctx(&pd, 1);
+	int rc;
+
+	rc = action(ctx, params);
+	CHECK(rc == -1);
+
+	free_params(params);
 }
 
 static void test_prefix_no_match_different_dir(void)
@@ -200,40 +242,58 @@ static void test_prefix_no_match_different_dir(void)
 	const char *paths[] = { "/root/" };
 	JSON_Object *params =
 		build_params_with_array("deny_paths", paths, 1);
-	struct ThreadContext *ctx =
-		build_ctx_with_paths(1, "path", "/etc/passwd", NULL, NULL);
+	struct param_desc pd = { "path", "/etc/passwd", 0, 1 };
+	struct ThreadContext *ctx = build_ctx(&pd, 1);
 	int rc;
 
 	rc = action(ctx, params);
-	assert(rc == 0);
+	CHECK(rc == 0);
 
-	json_value_free(json_object_get_wrapping_value(params));
+	free_params(params);
 }
 
-static void test_openat_uses_param_at_index_1(void)
+static void test_openat_picks_string_param(void)
 {
-	/* openat(dirfd, path, flags) -- path is at params[1] because
-	 * the action's loop checks param[0] first, then param[1].
-	 * If param[0].val is non-zero it picks that; we need a
-	 * scenario where param[0] is the fd (numeric, non-zero) and
-	 * param[1] is the path. The current action treats any
-	 * non-zero val at params[0] as a path pointer -- which is
-	 * wrong for openat but it's the existing behavior. The test
-	 * documents this: sandbox picks params[0] first.
+	/* openat(dirfd, path, flags): param[0] is an int fd, param[1]
+	 * is the path. The prototype-metadata gate must skip the fd
+	 * and police the string.
 	 */
 	action_fn_t action = retrace_actions_get("sandbox");
 	const char *paths[] = { "/etc/shadow" };
 	JSON_Object *params =
 		build_params_with_array("deny_paths", paths, 1);
-	struct ThreadContext *ctx =
-		build_ctx_with_paths(1, "path", "/etc/shadow",
-				     "flags", "ignored");
+	struct param_desc pd[2] = {
+		{ "dirfd", NULL, 3, 0 },
+		{ "path", "/etc/shadow", 0, 1 }
+	};
+	struct ThreadContext *ctx = build_ctx(pd, 2);
 	int rc;
 
 	rc = action(ctx, params);
-	assert(rc == -1);
+	CHECK(rc == -1);
+	CHECK(ctx->ret_val == -1);
 
-	json_value_free(json_object_get_wrapping_value(params));
+	free_params(params);
+}
+
+static void test_int_param_never_a_path(void)
+{
+	/* close(fd): no string param at all -- even in
+	 * deny-by-default allow mode the call passes through.
+	 */
+	action_fn_t action = retrace_actions_get("sandbox");
+	const char *paths[] = { "/only/allowed.dat" };
+	JSON_Object *params =
+		build_params_with_array("allow_paths", paths, 1);
+	struct param_desc pd = { "fd", NULL, 7, 0 };
+	struct ThreadContext *ctx = build_ctx(&pd, 1);
+	int rc;
+
+	rc = action(ctx, params);
+	CHECK(rc == 0);
+	CHECK(ctx->ret_val == 0);
+
+	free_params(params);
 }
 
 static void test_first_match_wins(void)
@@ -242,15 +302,93 @@ static void test_first_match_wins(void)
 	const char *paths[] = { "/safe", "/etc/shadow", "/other" };
 	JSON_Object *params =
 		build_params_with_array("deny_paths", paths, 3);
-	struct ThreadContext *ctx =
-		build_ctx_with_paths(1, "path", "/etc/shadow", NULL, NULL);
+	struct param_desc pd = { "path", "/etc/shadow", 0, 1 };
+	struct ThreadContext *ctx = build_ctx(&pd, 1);
 	int rc;
 
 	rc = action(ctx, params);
-	assert(rc == -1);
-	assert(ctx->ret_val == -1);
+	CHECK(rc == -1);
+	CHECK(ctx->ret_val == -1);
 
-	json_value_free(json_object_get_wrapping_value(params));
+	free_params(params);
+}
+
+static void test_allow_denies_unlisted(void)
+{
+	action_fn_t action = retrace_actions_get("sandbox");
+	const char *paths[] = { "/vfs/entry.dat" };
+	JSON_Object *params =
+		build_params_with_array("allow_paths", paths, 1);
+	struct param_desc pd = { "path", "/vfs/leaked.dat", 0, 1 };
+	struct ThreadContext *ctx = build_ctx(&pd, 1);
+	int rc;
+
+	rc = action(ctx, params);
+	CHECK(rc == -1);
+	CHECK(ctx->ret_val == -1);
+
+	free_params(params);
+}
+
+static void test_allow_passes_listed(void)
+{
+	action_fn_t action = retrace_actions_get("sandbox");
+	const char *paths[] = { "/vfs/entry.dat", "/vfs/settings.dat" };
+	JSON_Object *params =
+		build_params_with_array("allow_paths", paths, 2);
+	struct param_desc pd = { "path", "/vfs/settings.dat", 0, 1 };
+	struct ThreadContext *ctx = build_ctx(&pd, 1);
+	int rc;
+
+	rc = action(ctx, params);
+	CHECK(rc == 0);
+	CHECK(ctx->ret_val == 0);
+
+	free_params(params);
+}
+
+static void test_allow_prefix_entry(void)
+{
+	action_fn_t action = retrace_actions_get("sandbox");
+	const char *paths[] = { "/vfs/" };
+	JSON_Object *params =
+		build_params_with_array("allow_paths", paths, 1);
+	struct param_desc pd = { "path", "/vfs/sub/deep/file.dat", 0, 1 };
+	struct ThreadContext *ctx = build_ctx(&pd, 1);
+	int rc;
+
+	rc = action(ctx, params);
+	CHECK(rc == 0);
+
+	free_params(params);
+}
+
+static void test_deny_wins_over_allow(void)
+{
+	/* Both lists: allowed by allow_paths but listed in
+	 * deny_paths -- deny wins.
+	 */
+	action_fn_t action = retrace_actions_get("sandbox");
+	const char *allow[] = { "/vfs/entry.dat" };
+	const char *deny[] = { "/vfs/entry.dat" };
+	JSON_Value *root_val = json_value_init_object();
+	JSON_Object *root = json_value_get_object(root_val);
+	JSON_Value *av = json_value_init_array();
+	JSON_Value *dv = json_value_init_array();
+	struct param_desc pd = { "path", "/vfs/entry.dat", 0, 1 };
+	struct ThreadContext *ctx = build_ctx(&pd, 1);
+	int rc;
+
+	json_array_append_string(json_array(av), allow[0]);
+	json_array_append_string(json_array(dv), deny[0]);
+	json_object_set_value(root, "allow_paths", av);
+	json_object_set_value(root, "deny_paths", dv);
+
+	rc = action(ctx, root);
+	CHECK(rc == -1);
+	CHECK(ctx->ret_val == -1);
+
+	json_value_free(root_val);
 }
 
 int main(void)
@@ -270,19 +408,24 @@ int main(void)
 	printf("  -- lookup + params validation --\n");
 	TEST(action_lookup);
 	TEST(params_null);
-	TEST(missing_deny_paths);
+	TEST(missing_lists);
 
-	printf("  -- match paths --\n");
+	printf("  -- deny_paths matching --\n");
 	TEST(exact_match);
 	TEST(prefix_match_directory);
-
-	printf("  -- non-match paths --\n");
-	TEST(no_match_passes_through);
+	TEST(prefix_backslash_separator);
 	TEST(prefix_no_match_different_dir);
-
-	printf("  -- array semantics --\n");
-	TEST(openat_uses_param_at_index_1);
 	TEST(first_match_wins);
+
+	printf("  -- param selection --\n");
+	TEST(openat_picks_string_param);
+	TEST(int_param_never_a_path);
+
+	printf("  -- allow_paths (jail mode) --\n");
+	TEST(allow_denies_unlisted);
+	TEST(allow_passes_listed);
+	TEST(allow_prefix_entry);
+	TEST(deny_wins_over_allow);
 
 	printf("\nPass: %d, Fail: %d (of %d)\n",
 		tests_pass, tests_fail, tests_run);

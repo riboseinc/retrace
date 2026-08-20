@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.12.0] — 2026-08-20
+
+**Profiles: see what a binary does, then jail it to that.**
+(TODO.windows/08.) The correlation arc (2.7.0–2.11.2) detected
+escapes; this release closes the loop with enforcement.
+
+- **`retrace-profile`** — the claims-vs-truth risk profiler.
+  Reduces any trace to a profile (functions, filesystem accesses
+  by class, env vars, network addresses). With a kernel-layer
+  truth stream (`--kernel`), grades every access by layer
+  provenance: kernel-only accesses are the sub-libc surface a
+  libc capture can never see (verdict `SUBLIBC_ACCESS_FOUND`).
+  A static capability scan (`--binary`) counts raw
+  `syscall`/`svc` instruction gadgets in executable segments and
+  PE ntdll imports. `--jail-out` emits a ready-to-run
+  deny-by-default jail config; the allowlist comes from the
+  declared set (`--inside`), never the observed trace — a
+  self-allowlisted jail would allowlist its own escapes.
+- **`retrace-strace2retrace`** — `strace -f -e trace=%file`
+  logs → the common trace format, so the Linux kernel layer
+  feeds the profiler (and correlate) like any other stream.
+- **`sandbox` `allow_paths`** — deny-by-default mode. Fixes the
+  action's param selection (prototype metadata: string params
+  only — `close(fd)` integers were previously compared as
+  strings) and fails closed (`ret_val = -1`, `errno = EACCES`)
+  on misuse. Prefix entries accept `/` and `\`.
+- **`log_params` stamps `func`** into every param entry, so
+  offline tools attribute calls without parsing banner text.
+- **Offline tools on Windows** — `retrace-correlate`,
+  `retrace-procmon2retrace`, `retrace-strace2retrace`, and
+  `retrace-profile` are portable C and now build on Windows
+  (previously the whole `tools/` tree was POSIX-gated).
+- **Docs** — cookbook recipe 34 (profile → tailor → jail,
+  cross-platform capture matrix), `examples/profile-hunting/`
+  runnable end-to-end demo, tools.md / configuration.md /
+  architecture.md updates.
+
 - **Correlation coverage criteria** (TODO.windows/01-03) — three
   correctness/ergonomics upgrades to the escape join:
   - **pid scoping.** A procmon capture is system-wide; the

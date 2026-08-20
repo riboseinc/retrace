@@ -406,6 +406,19 @@ cannot certify the absence of raw-syscall escapes. Claims about
 the kernel layer need a kernel-layer capture (ptrace, eBPF,
 ETW) — the correlator reports what its inputs cover, no more.
 
+The same two-stream model generalizes into the profiler
+(≥ 2.12.0): `retrace-profile` reduces any capture to a profile
+(functions, path accesses by class, env, net), grades libc
+claims against kernel truth (`--kernel`, fed by
+`retrace-strace2retrace` on Linux or `retrace-procmon2retrace`
+on Windows — kernel-only accesses are the sub-libc surface),
+adds a static capability scan of the binary (raw `syscall`/`svc`
+gadgets, ntdll imports), and emits the enforcement half: a
+deny-by-default `sandbox` allow-list jail (`--jail-out`,
+allowlist from the declared set via `--inside`) that runs under
+the preload library like any config. Detect (`retrace-correlate`)
+and enforce (`sandbox` jail) compose with the same trace format.
+
 ## Per-platform backends
 
 Each backend owns exactly one (OS, arch) combination. MECE by

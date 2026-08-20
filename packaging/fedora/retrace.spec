@@ -5,7 +5,7 @@
 # Install: dnf install retrace-2.10.0-1.*.rpm
 
 Name:           retrace
-Version:        2.11.2
+Version:        2.12.0
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,8 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Thu Aug 20 2026 Ribose Inc <opensource@ribose.com> - 2.12.0-1
+- Profiles: retrace-profile claims-vs-truth risk profiler + sandbox allow_paths jail; retrace-strace2retrace kernel-truth converter; offline tools build on Windows
 * Thu Aug 20 2026 Ribose Inc <opensource@ribose.com> - 2.11.2-1
 - fopen$DARWIN_EXTSN interposition (macOS _DARWIN_C_SOURCE builds)
 

@@ -30,7 +30,8 @@ install(TARGETS retrace_correlate
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/tools/correlate/golden
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/retrace/correlate)
 
-if(RETRACE_BUILD_TESTS)
+if(RETRACE_BUILD_TESTS AND NOT RETRACE_PLATFORM_WINDOWS)
+    # golden_runner drives the CLI with POSIX wait helpers.
     add_executable(retrace_correlate_golden golden_runner.c)
     set_target_properties(retrace_correlate_golden PROPERTIES
         OUTPUT_NAME correlate-golden

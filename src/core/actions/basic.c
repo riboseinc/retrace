@@ -90,6 +90,16 @@ static int ia_log_params
 	root_value = json_value_init_object();
 	root_object = json_value_get_object(root_value);
 
+	/*
+	 * Stamp the function name into the entry so offline consumers
+	 * (retrace-profile, retrace-correlate) can attribute the
+	 * params without parsing banner text. Key matches the
+	 * correlate golden parity format.
+	 */
+	if (t_ctx->prototype != NULL)
+		json_object_set_string(root_object, "func",
+			t_ctx->prototype->name);
+
 	omit_params = NULL;
 	if (action_params != NULL)
 		omit_params = json_object_get_array(action_params, "omit_params");

@@ -327,24 +327,36 @@ function's counter.
 
 #### `sandbox`
 
-Denies file access by path. The wrapped call returns `-ENOENT` if
-its path argument matches any entry in `deny_paths`.
+File-access policy by path. Two modes:
+
+- `deny_paths` — allow-by-default, block the listed paths.
+- `allow_paths` — deny-by-default (the jail mode, ≥ 2.12.0):
+  block every path NOT on the list. Emitted by
+  `retrace-profile --jail-out` (cookbook recipe 34).
 
 ```json
 {
   "action_name": "sandbox",
   "action_params": {
-    "deny_paths": ["/etc/shadow", "/etc/sudoers", "/root/.ssh/"]
+    "allow_paths": ["/vfs/entry.dat", "/vfs/settings.dat"]
   }
 }
 ```
 
-| Param         | Type    | Required | Notes                                              |
-|---------------|---------|----------|----------------------------------------------------|
-| `deny_paths`  | array   | yes      | List of paths to block. Prefix match (e.g. `/root/.ssh/` blocks everything under that directory); exact match otherwise. |
+A denied call returns `-1` with `errno = EACCES` before libc
+executes it. When both lists are present a path must pass both
+(`deny_paths` wins on conflict).
 
-Apply to `open`, `openat`, `fopen`, and any other path-accepting
-call you want to gate.
+| Param         | Type    | Required            | Notes                                              |
+|---------------|---------|---------------------|----------------------------------------------------|
+| `deny_paths`  | array   | one of the two      | Paths to block. Prefix match when the entry ends in `/` or `\`; exact match otherwise. |
+| `allow_paths` | array   | one of the two      | Paths that may be touched; everything else is blocked. Same match rules. |
+
+The path argument is found via prototype metadata (a string
+param among the first two arguments — `open(path, ...)`,
+`openat(dirfd, path, ...)`); calls without a string param (e.g.
+`close(fd)`) pass through unpoliced even under a `*` script.
+Follow the action with `call_real` so allowed paths execute.
 
 ## Order matters
 
