@@ -342,6 +342,7 @@ void retrace_logger_deinit(void)
 {
 	int ring_was_ready = g_logger_ring_ready;
 
+
 	/* Decline late callers (musl's exit path) BEFORE tearing
 	 * anything down -- but capture the ring state first: the
 	 * final drain below still needs it.
@@ -392,6 +393,7 @@ int retrace_logger_init(void)
 {
 	char *env_val;
 
+	/* TEMPORARY diagnostic: CI-only crash localization */
 	/* override def config with env parameters */
 	env_val =
 		retrace_real_impls.getenv(ENVAR_LOGGER_DEF_ENA);
@@ -415,7 +417,13 @@ int retrace_logger_init(void)
 		retrace_real_impls.getenv(ENVAR_LOGGER_DEF_FN);
 	if (env_val != NULL)
 		g_logger_config.logfile =
-			retrace_real_impls.fopen(env_val, "a");
+			/*
+			 * binary: the MSVC text mode would translate
+			 * every \n to \r\n and break the array-document
+			 * framing (and every downstream parser that
+			 * expects LF)
+			 */
+			retrace_real_impls.fopen(env_val, "ab");
 
 	/* TODO.windows/07: streaming output -- one object per
 	 * line instead of one array document.

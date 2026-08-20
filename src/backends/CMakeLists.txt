@@ -23,17 +23,24 @@ endif()
 # Backend registry. Linked into the retrace_v2 shared library so its
 # exported API (retrace_backend_register/select/list/find) is visible to
 # downstream library consumers.
-# Windows (TODO.windows/04): the retrace_as_* trampoline contract
-# links as no-op stubs until the first wrapper lands (item 05);
-# ws2_32 covers sockaddr_inspect's ntohs on winsock.
+# Windows (TODO.windows/05): the trampoline contract (arch_spec_win),
+# the PE-section registry walk (section_walk), and the hook table
+# (hook_targets) replace the item-04 no-op stubs; ws2_32 covers
+# sockaddr_inspect's ntohs on winsock.
 if(RETRACE_PLATFORM_WINDOWS)
 	add_library(retrace_backends OBJECT registry.c
-		${CMAKE_CURRENT_SOURCE_DIR}/win_common/arch_spec_stub.c)
+		${CMAKE_CURRENT_SOURCE_DIR}/win_common/arch_spec_win.c
+		${CMAKE_CURRENT_SOURCE_DIR}/win_common/section_walk.c
+		${CMAKE_CURRENT_SOURCE_DIR}/win_common/hook_targets.c)
 	set_target_properties(retrace_backends PROPERTIES
 		INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/win_common")
 	target_include_directories(retrace_backends PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR}/win_common
-		${CMAKE_SOURCE_DIR}/src/core)
+		${CMAKE_SOURCE_DIR}/src/core
+		${CMAKE_SOURCE_DIR}/src/config/json)
+	# The arch-spec contract needs the hook machinery and the
+	# assembly wrappers (hook_targets resolves trampolines).
+	target_link_libraries(retrace_backends PUBLIC retrace_win_common)
 else()
 	add_library(retrace_backends OBJECT registry.c)
 endif()

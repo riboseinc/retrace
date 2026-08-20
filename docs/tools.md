@@ -24,6 +24,7 @@ to do.
 | Reduce a trace to what a binary does (profile) | [`retrace-profile`](#retrace-profile) |
 | Turn a profile / declared set into a runtime file-access jail | [`retrace-profile --jail-out`](#retrace-profile) |
 | Convert an strace file capture to the trace format | [`retrace-strace2retrace`](#retrace-strace2retrace) |
+| Trace a Windows binary (inject `retrace.dll`) | [`retrace-win-run`](#retrace-win-run) |
 
 ## Tool reference
 
@@ -98,6 +99,15 @@ imports (`--binary`), and emits a ready-to-run sandbox jail
   procmon converted, VFS inside log).
 - **Cookbook**: [recipe 34 — Profile a binary, then jail it](cookbook/34-profile-and-jail.md).
 - **Runnable demo**: `examples/profile-hunting/`.
+
+### `retrace-win-run`
+
+The Windows launcher (≥ 2.13.0). No `LD_PRELOAD` on Windows:
+`retrace-win-run [--lib <retrace.dll>] target.exe` creates the
+target suspended, injects `retrace.dll` (hooks install + engine
+boots inside the child), and resumes it under trace. Opt into
+ntdll-depth hooks with `RETRACE_WIN_NTDLL=1` — see
+[windows.md](windows.md).
 
 ### `retrace-strace2retrace`
 

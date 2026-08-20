@@ -43,10 +43,12 @@
 
 int retrace_inited;
 
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_WIN32)
 /*
- * MSVC has no constructors; DllMain (TODO.windows/05) or the
- * embedder calls the boot explicitly.
+ * Windows: DllMain is the boot point (TODO.windows/05) -- MSVC
+ * has no constructors, and under MinGW a DLL constructor would
+ * run after DllMain's hook installation. Idempotent so embedders
+ * and tests may also call it.
  */
 void retrace_core_boot(void)
 #else
@@ -57,6 +59,9 @@ static void retrace_main(void)
 	/* The order of module inits is strict */
 	/* __asm("int $3;"); */
 	int ret;
+
+	if (retrace_inited)
+		return;
 
 	if (retrace_as_init())
 		/* can't report error... */

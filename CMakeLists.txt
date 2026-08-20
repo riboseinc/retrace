@@ -118,13 +118,26 @@ if(RETRACE_BUILD_V2 AND NOT _retrace_proc_supported)
 	set(RETRACE_BUILD_V2 OFF)
 endif()
 
-# v2 core (engine.c) is POSIX-only. On Windows, the inline-hooking backends
-# (preload-msvc, preload-mingw) build standalone — they link win_common
-# directly and inject via CreateRemoteThread. See ADR-0009.
+# v2 core (engine.c) is POSIX-only. On Windows, the engine builds
+# via the standalone branch below and lives inside retrace.dll
+# together with the inline-hooking backends (ADR-0009,
+# TODO.windows/05).
 if(RETRACE_PLATFORM_WINDOWS)
 	if(RETRACE_BUILD_V2)
 		message(STATUS "retrace v2 core (engine.c) requires POSIX APIs; disabling on Windows. The Windows inline-hooking backends build standalone.")
 		set(RETRACE_BUILD_V2 OFF)
+	endif()
+
+	# MSVC: the generic ASM language does not select MASM under the
+	# Visual Studio generators -- wrapper_x64.asm needs ASM_MASM
+	# enabled explicitly (TODO.windows/05).
+	if(MSVC)
+		enable_language(ASM_MASM)
+
+		# The registry arrays (.rtrA/.rtrF/.rtrD) are static and
+		# unreferenced by code; /OPT:REF strips them and the
+		# sections vanish from the image. Keep them.
+		add_link_options("/OPT:NOREF")
 	endif()
 endif()
 
@@ -394,6 +407,7 @@ endif()
 # them (profile/jail flows); the process-driving tools (spawn,
 # stringinjector, replay, ws-stream, ...) use POSIX-only headers.
 if(RETRACE_PLATFORM_WINDOWS)
+	add_subdirectory(tools/win-run)
 	add_subdirectory(tools/correlate)
 	add_subdirectory(tools/procmon2retrace)
 	add_subdirectory(tools/strace2retrace)

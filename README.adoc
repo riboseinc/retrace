@@ -259,7 +259,7 @@ DYLD_INSERT_LIBRARIES=$PWD/build/src/v2/libretrace.dylib /bin/id
 
 # Windows (PowerShell, after install)
 $env:RETRACE_JSON_CONFIG = "config.json"
-myapp.exe  # retrace.dll is auto-attached via CreateProcess hook
+retrace-win-run myapp.exe  # injects retrace.dll (hooks + boot in the child)
 ----
 ====
 

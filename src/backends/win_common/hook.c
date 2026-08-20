@@ -96,33 +96,67 @@ retrace_hook_required_patch_size(void)
 #ifdef RETRACE_HOOK_ARCH_X64
 
 static retrace_hook_status_t
-build_trampoline_x64(void *target, size_t prologue_len, void **out)
+build_trampoline_x64_ex(void *target, size_t prologue_len,
+			const unsigned char *prefix, size_t prefix_len,
+			void **out)
 {
-	/* Trampoline body:
+	/*
+	 * Trampoline body:
+	 *   <prefix bytes>                         ; thunk arg setup
 	 *   <relocated prologue bytes>
-	 *   mov rax, (target + prologue_len)     ; 48 B8 + 8 bytes
-	 *   jmp rax                                ; FF E0
-	 * Total: prologue_len + 10 + 2 bytes.
+	 *   jmp rel32 (target + prologue_len)
+	 *
+	 * The prefix replays a thunk's argument setup (ucrt thunks
+	 * load a hidden variant selector into a register before
+	 * tail-jumping the shared worker -- skipping it hands the
+	 * worker garbage in that argument).
+	 *
+	 * The tail MUST be a DIRECT rel32 jump, not mov rax/jmp
+	 * rax: the indirect form is a Control Flow Guard check
+	 * point, and (target + prologue_len) is mid-function --
+	 * not a valid CFG target -- so the process dies with
+	 * STATUS_STACK_BUFFER_OVERRUN. The trampoline is
+	 * allocated within rel32 range of the target, so the
+	 * direct form always fits.
 	 */
-	const size_t total = prologue_len + 12;
+	const size_t total = prefix_len + prologue_len + 5;
 	unsigned char *buf = (unsigned char *)
 		retrace_trampoline_alloc_near(target, total);
-	ULONG_PTR back_addr;
+	ptrdiff_t rel;
 
 	if (buf == NULL)
 		return RETRACE_HOOK_NO_MEMORY;
 
-	memcpy(buf, target, prologue_len);
+	if (prefix_len > 0)
+		memcpy(buf, prefix, prefix_len);
+	memcpy(buf + prefix_len, target, prologue_len);
 
-	back_addr = (ULONG_PTR)target + prologue_len;
-	buf[prologue_len + 0] = 0x48;            /* REX.W */
-	buf[prologue_len + 1] = 0xB8;            /* mov rax, imm64 */
-	memcpy(buf + prologue_len + 2, &back_addr, 8);
-	buf[prologue_len + 10] = 0xFF;           /* jmp r/m64 */
-	buf[prologue_len + 11] = 0xE0;           /* ModR/M: r/m=rax */
+	/*
+	 * The trampoline must jump to the worker's ENTRY -- not past
+	 * its prologue. The hook overwrote the THUNK bytes (this
+	 * original `target`); the worker bytes are pristine and must
+	 * execute their prologue from scratch. Skipping into the
+	 * middle of the prologue is invalid: the prologue sets up
+	 * the frame (rax = rsp, home slots) and skipping it writes
+	 * to unmapped stack memory.
+	 */
+	rel = (const char *)target -
+	      ((const char *)buf + prefix_len + prologue_len + 5);
+	if (rel > 0x7fffffffLL || rel < -0x80000000LL)
+		return RETRACE_HOOK_INTERNAL;
+
+	buf[prefix_len + prologue_len] = 0xE9;    /* jmp rel32 */
+	memcpy(buf + prefix_len + prologue_len + 1, &rel, 4);
 
 	*out = buf;
 	return RETRACE_HOOK_OK;
+}
+
+static retrace_hook_status_t
+build_trampoline_x64(void *target, size_t prologue_len, void **out)
+{
+	return build_trampoline_x64_ex(target, prologue_len,
+		NULL, 0, out);
 }
 
 static retrace_hook_status_t
@@ -255,10 +289,12 @@ write_jump_arm64(void *target, void *wrapper)
 #endif /* RETRACE_HOOK_ARCH_ARM64 */
 
 retrace_hook_status_t
-retrace_hook_install(void *target_addr,
-		     void *wrapper_addr,
-		     void **trampoline_out,
-		     retrace_hook_t **hook_out)
+retrace_hook_install_ex(void *target_addr,
+			void *wrapper_addr,
+			const unsigned char *prefix,
+			size_t prefix_len,
+			void **trampoline_out,
+			retrace_hook_t **hook_out)
 {
 	retrace_hook_t *hook;
 	size_t patch_size = required_patch();
@@ -267,6 +303,8 @@ retrace_hook_install(void *target_addr,
 
 	if (target_addr == NULL || wrapper_addr == NULL ||
 	    trampoline_out == NULL || hook_out == NULL)
+		return RETRACE_HOOK_INTERNAL;
+	if (prefix_len > 16)
 		return RETRACE_HOOK_INTERNAL;
 
 #ifdef RETRACE_HOOK_ARCH_X64
@@ -300,7 +338,8 @@ retrace_hook_install(void *target_addr,
 	memcpy(hook->saved_bytes, target_addr, prologue_len);
 
 #ifdef RETRACE_HOOK_ARCH_X64
-	st = build_trampoline_x64(target_addr, prologue_len, &hook->trampoline);
+	st = build_trampoline_x64_ex(target_addr, prologue_len,
+		prefix, prefix_len, &hook->trampoline);
 #else
 	st = build_trampoline_arm64(target_addr, prologue_len, &hook->trampoline);
 #endif
@@ -327,6 +366,16 @@ retrace_hook_install(void *target_addr,
 	*trampoline_out = hook->trampoline;
 	*hook_out = hook;
 	return RETRACE_HOOK_OK;
+}
+
+retrace_hook_status_t
+retrace_hook_install(void *target_addr,
+		     void *wrapper_addr,
+		     void **trampoline_out,
+		     retrace_hook_t **hook_out)
+{
+	return retrace_hook_install_ex(target_addr, wrapper_addr,
+		NULL, 0, trampoline_out, hook_out);
 }
 
 retrace_hook_status_t

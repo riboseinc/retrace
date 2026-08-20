@@ -77,6 +77,19 @@ typedef enum {
  *   x64:   5 bytes (rel32) or 14 bytes (absolute)
  *   arm64: 16 bytes (always)
  */
+/*
+ * Extended install: `prefix` bytes are replayed in the
+ * trampoline BEFORE the relocated prologue -- the argument
+ * setup a thunk performed before tail-jumping its worker.
+ */
+retrace_hook_status_t
+retrace_hook_install_ex(void *target_addr,
+			void *wrapper_addr,
+			const unsigned char *prefix,
+			size_t prefix_len,
+			void **trampoline_out,
+			retrace_hook_t **hook_out);
+
 retrace_hook_status_t
 retrace_hook_install(void *target_addr,
 		     void *wrapper_addr,

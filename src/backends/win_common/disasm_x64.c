@@ -162,10 +162,33 @@ decode_one(const unsigned char *code, size_t avail)
 		return 0;
 	}
 	if (op == 0x0F) {
-		/* Two-byte opcode 0F xx -- includes Jcc rel32 (0F 80-8F) which
-		 * is unsafe. Conservatively refuse all 0F-prefixed instructions
-		 * in the prologue window.
+		/*
+		 * Two-byte opcodes. Jcc rel32 (0F 80-8F), and most other
+		 * 0F forms, are unsafe to relocate -- refuse. Two forms
+		 * ARE position-independent and appear in real prologues:
+		 *
+		 *   0F 1E FA  endbr64 (CET landing pad -- every function
+		 *             in CET-enabled builds starts with it)
+		 *   0F 1F /0  multi-byte NOP (alignment filler)
 		 */
+		if (len >= avail)
+			return 0;
+		if (code[len] == 0x1E) {
+			if (len + 2 > avail)
+				return 0;
+			if (code[len + 1] == 0xFA)
+				return len + 2; /* endbr64 */
+			return 0;
+		}
+		if (code[len] == 0x1F) {
+			int sib = 0;
+			int disp;
+
+			disp = modrm_extra(code + len, avail - len, &sib);
+			if (disp < 0)
+				return 0;
+			return len + 1 + (sib ? 1 : 0) + (size_t)disp;
+		}
 		return 0;
 	}
 

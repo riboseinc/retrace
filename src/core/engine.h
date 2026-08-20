@@ -54,6 +54,13 @@ struct ThreadContext {
 extern int retrace_inited;
 
 /*
+ * Windows boot (src/core/main.c): DllMain calls this -- MSVC has
+ * no constructors and MinGW DLL constructors run after DllMain's
+ * hook installation. Idempotent. POSIX uses the constructor.
+ */
+void retrace_core_boot(void);
+
+/*
  * dlopen reentrance guard (issue #450). Returns 1 while the current
  * thread is inside a dlopen/dlclose/dlsym/dlerror call. The engine
  * skips action processing while this is active.

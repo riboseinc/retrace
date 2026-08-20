@@ -49,6 +49,13 @@ set(_core_action_sources
 set(_core_datatype_sources
 	datatypes/basic.c datatypes/uio.c datatypes/unistd.c)
 
+# Windows (TODO.windows/06): ntdll prototypes + the
+# OBJECT_ATTRIBUTES/UNICODE_STRING path decoders.
+if(RETRACE_PLATFORM_WINDOWS)
+	list(APPEND _core_prototype_sources prototypes/ntdll.c)
+	list(APPEND _core_datatype_sources datatypes/nt_decode.c)
+endif()
+
 # Core is a single CMake OBJECT library so the eventual retrace_v2 shared
 # library (built by src/v2/) can pull these in without exporting them.
 # Downstream library users (the modernization plan/05) will get a real library

@@ -46,7 +46,12 @@ Kernel layer:
 
 - **Linux**: `strace -f -e trace=%file -o strace.log ./app`
   then `retrace-strace2retrace strace.log -o kernel.json`
-- **Windows**: capture in procmon (CSV), then
+- **Windows**: `retrace-win-run` injects `retrace.dll` and
+  hooks the ucrt layer (`fopen`, growing set); set
+  `RETRACE_WIN_NTDLL=1` to also hook the ntdll file API
+  (`NtCreateFile`, `NtQueryAttributesFile`, ...) that
+  Win32-direct callers use — see [windows.md](../windows.md).
+  For kernel truth, capture in procmon (CSV), then
   `retrace-procmon2retrace capture.csv -o kernel.json`
   (recipe 33 has the procmon steps)
 - **macOS**: guard non-system binaries — SIP blocks
@@ -138,6 +143,10 @@ Enforce:
 RETRACE_JSON_CONFIG=jail.json \
 LD_PRELOAD=libretrace.so ./app        # DYLD_INSERT_LIBRARIES on macOS
 ```
+
+Windows: `set RETRACE_JSON_CONFIG=jail.json` then
+`retrace-win-run myapp.exe` (with `RETRACE_WIN_NTDLL=1` for
+Win32-direct callers).
 
 Every observed-function call whose path is not on the list dies
 with `EACCES` before libc executes it:

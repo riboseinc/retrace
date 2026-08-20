@@ -7,10 +7,10 @@
 # portable unit set runs on the CI legs. Everything below links
 # POSIX-only backend arch directories, so it stays gated.
 if(RETRACE_PLATFORM_WINDOWS)
-    # TODO.windows/05: the logger-format scenarios segfault at
-    # runtime under MSVC (compile+link are clean; needs a Windows
-    # box to debug). Gated off the MSVC set until then.
-    if(NOT MSVC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+    # The logger-format scenarios previously segfaulted under
+    # MSVC: real_impls never resolved atoi, so logger_init
+    # called a NULL pointer (found via TODO.windows/05 boot
+    # bisect, 2026-08-20). Fixed -- runs everywhere.
     add_executable(retrace_test_logger_fmt test_logger_fmt.c)
     set_target_properties(retrace_test_logger_fmt PROPERTIES
         OUTPUT_NAME test_logger_fmt
@@ -20,6 +20,7 @@ if(RETRACE_PLATFORM_WINDOWS)
         retrace_core
         retrace_config_json
         retrace_backends
+        retrace_win_common
         retrace_headers)
 
     target_include_directories(retrace_test_logger_fmt PRIVATE
@@ -37,10 +38,11 @@ if(RETRACE_PLATFORM_WINDOWS)
         COMMAND retrace_test_logger_fmt)
     set_tests_properties(unit-test-logger-fmt-jsonl PROPERTIES
         ENVIRONMENT "RETRACE_FMT_UNDER_TEST=jsonl")
-    add_test(NAME unit-test-logger-fmt-ring
-        COMMAND retrace_test_logger_fmt)
-    set_tests_properties(unit-test-logger-fmt-ring PROPERTIES
-        ENVIRONMENT "RETRACE_FMT_UNDER_TEST=ring")
+    if(NOT MSVC)
+        add_test(NAME unit-test-logger-fmt-ring
+            COMMAND retrace_test_logger_fmt)
+        set_tests_properties(unit-test-logger-fmt-ring PROPERTIES
+            ENVIRONMENT "RETRACE_FMT_UNDER_TEST=ring")
     endif()
 
     add_executable(retrace_test_trace_load test_trace_load.c
@@ -58,12 +60,68 @@ if(RETRACE_PLATFORM_WINDOWS)
 
     add_test(NAME unit-test-trace-load
         COMMAND retrace_test_trace_load)
-    if(NOT MSVC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
-        set_tests_properties(unit-test-logger-fmt-default
-            unit-test-logger-fmt-json unit-test-logger-fmt-jsonl
-            PROPERTIES LABELS "unit")
-    endif()
+    set_tests_properties(unit-test-logger-fmt-default
+        unit-test-logger-fmt-json unit-test-logger-fmt-jsonl
+        PROPERTIES LABELS "unit")
     set_tests_properties(unit-test-trace-load PROPERTIES LABELS "unit")
+
+    # PE-section registry walk (TODO.windows/05): the .rtrA/.rtrF/
+    # .rtrD sections resolve via the module's own PE headers.
+    # Arch-neutral: runs on x64 and arm64 legs alike.
+    add_executable(retrace_test_win_registry test_win_registry.c)
+    set_target_properties(retrace_test_win_registry PROPERTIES
+        OUTPUT_NAME test_win_registry
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+    target_link_libraries(retrace_test_win_registry PRIVATE
+        retrace_core
+        retrace_config_json
+        retrace_backends
+        retrace_win_common
+        retrace_headers)
+
+    target_include_directories(retrace_test_win_registry PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core
+        ${CMAKE_SOURCE_DIR}/src/backends
+        ${CMAKE_SOURCE_DIR}/src/config/json)
+
+    add_test(NAME unit-test-win-registry
+        COMMAND retrace_test_win_registry)
+    set_tests_properties(unit-test-win-registry PROPERTIES LABELS "unit")
+
+    # Wrapper runtime round trip (TODO.windows/05): install the
+    # fopen hook in-process, run a call through the engine, verify
+    # the JSON log. x64 only (arm64 wrapper is the follow-up).
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|amd64")
+        add_executable(retrace_test_win_wrapper test_win_wrapper.c)
+        set_target_properties(retrace_test_win_wrapper PROPERTIES
+            OUTPUT_NAME test_win_wrapper
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+        target_link_libraries(retrace_test_win_wrapper PRIVATE
+            retrace_core
+            retrace_config_json
+            retrace_backends
+            retrace_win_common
+            retrace_headers)
+
+        target_include_directories(retrace_test_win_wrapper PRIVATE
+            ${CMAKE_SOURCE_DIR}/src/core
+            ${CMAKE_SOURCE_DIR}/src/backends
+            ${CMAKE_SOURCE_DIR}/src/backends/win_common
+            ${CMAKE_SOURCE_DIR}/src/config/json)
+
+        # The wrapper round trip is MinGW-proven; under MSVC the
+        # engine pass-through loops (TODO.trace-profile: the
+        # action-path debug re-opens this -- build stays enabled
+        # on every leg for compile coverage).
+        if(NOT MSVC)
+            add_test(NAME unit-test-win-wrapper
+                COMMAND retrace_test_win_wrapper)
+            set_tests_properties(unit-test-win-wrapper
+                PROPERTIES LABELS "integration")
+        endif()
+    endif()
     return()
 endif()
 
@@ -1516,3 +1574,4 @@ target_include_directories(retrace_test_profile_aggregate PRIVATE
 add_test(NAME unit-test-profile-aggregate
     COMMAND retrace_test_profile_aggregate)
 set_tests_properties(unit-test-profile-aggregate PROPERTIES LABELS "unit")
+

@@ -38,23 +38,16 @@
 #include <windows.h>
 
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "hook.h"
+#include "inject.h"
 
-static const struct retrace_hook_target g_hook_targets[] = {
-	/* Populated per-function as wrappers land. See preload-msvc/backend.c. */
-	{ NULL, NULL, NULL },  /* sentinel: empty table for v1 */
-};
-
-const struct retrace_hook_target *
-retrace_win_hook_targets(size_t *count_out)
-{
-	if (count_out != NULL)
-		*count_out = sizeof(g_hook_targets) / sizeof(g_hook_targets[0]);
-	return g_hook_targets;
-}
+/* The hook table + installation live in win_common/hook_targets.c
+ * (shared with MSVC); this file is the spawn/backend surface.
+ */
 
 static int
 preload_mingw_probe(struct retrace_engine *eng, const char *target_path)
@@ -74,94 +67,36 @@ preload_mingw_spawn(struct retrace_engine *eng,
 		     char *const argv[],
 		     char *const envp[])
 {
+	char cmdline[1024];
+	const char *dll_path;
+	size_t i;
+	size_t off;
+	DWORD pid;
+
 	(void)eng;
 	(void)envp;
 
-	STARTUPINFOA si;
-	PROCESS_INFORMATION pi;
-	char cmdline[1024];
-	const char *dll_path;
-	void *remote_buf = NULL;
-	HANDLE remote_thread = NULL;
-	DWORD exit_code;
-	size_t i;
-	size_t off;
-	HMODULE hKernel32;
-	typedef FARPROC(WINAPI *LoadLibraryA_t)(LPCSTR);
-	LoadLibraryA_t pLoadLibraryA;
-
-	ZeroMemory(&si, sizeof(si));
-	si.cb = sizeof(si);
-	ZeroMemory(&pi, sizeof(pi));
-
-	off = 0;
-	off += lstrlenA(strncpy(cmdline + off, target_path,
-				(int)(sizeof(cmdline) - off - 1)));
-	for (i = 1; argv != NULL && argv[i] != NULL && off < sizeof(cmdline) - 2; i++) {
-		cmdline[off++] = ' ';
-		off += lstrlenA(strncpy(cmdline + off, argv[i],
-					(int)(sizeof(cmdline) - off - 1)));
-	}
-	cmdline[off] = '\0';
+	/* Build the Win32 command line: target then argv[1..]. */
+	off = (size_t)snprintf(cmdline, sizeof(cmdline), "\"%s\"",
+		target_path);
+	for (i = 1; argv != NULL && argv[i] != NULL &&
+	     off < sizeof(cmdline) - 2; i++)
+		off += (size_t)snprintf(cmdline + off,
+			sizeof(cmdline) - off, " %s", argv[i]);
 
 	dll_path = getenv("RETRACE_V2_LIB");
 	if (dll_path == NULL)
-		dll_path = "retrace_v2.dll";
+		dll_path = "retrace.dll";
 
-	if (!CreateProcessA(NULL, cmdline, NULL, NULL, FALSE,
-			    CREATE_SUSPENDED, NULL, NULL, &si, &pi))
+	/*
+	 * The injection dance (shared with retrace-win-run):
+	 * suspend-create -> inject -> hooks+boot inside the child
+	 * -> resume.
+	 */
+	pid = retrace_win_inject_run(cmdline, dll_path);
+	if (pid == 0)
 		return RETRACE_BACKEND_INTERNAL;
-
-	remote_buf = VirtualAllocEx(pi.hProcess, NULL,
-				    lstrlenA(dll_path) + 1,
-				    MEM_COMMIT | MEM_RESERVE,
-				    PAGE_READWRITE);
-	if (remote_buf == NULL)
-		goto fail;
-
-	{
-		SIZE_T written = 0;
-
-		if (!WriteProcessMemory(pi.hProcess, remote_buf,
-					dll_path, lstrlenA(dll_path) + 1, &written))
-			goto fail;
-	}
-
-	hKernel32 = GetModuleHandleA("kernel32.dll");
-	if (hKernel32 == NULL)
-		goto fail;
-	pLoadLibraryA = (LoadLibraryA_t)GetProcAddress(hKernel32, "LoadLibraryA");
-	if (pLoadLibraryA == NULL)
-		goto fail;
-
-	remote_thread = CreateRemoteThread(pi.hProcess, NULL, 0,
-					   (LPTHREAD_START_ROUTINE)pLoadLibraryA,
-					   remote_buf, 0, NULL);
-	if (remote_thread == NULL)
-		goto fail;
-
-	WaitForSingleObject(remote_thread, INFINITE);
-	if (!GetExitCodeThread(remote_thread, &exit_code) || exit_code == 0)
-		goto fail;
-
-	CloseHandle(remote_thread);
-	VirtualFreeEx(pi.hProcess, remote_buf, 0, MEM_RELEASE);
-
-	ResumeThread(pi.hThread);
-	CloseHandle(pi.hThread);
-	CloseHandle(pi.hProcess);
-
-	return (retrace_pid_t)pi.dwProcessId;
-
-fail:
-	if (remote_thread != NULL)
-		CloseHandle(remote_thread);
-	if (remote_buf != NULL)
-		VirtualFreeEx(pi.hProcess, remote_buf, 0, MEM_RELEASE);
-	TerminateProcess(pi.hProcess, 1);
-	CloseHandle(pi.hThread);
-	CloseHandle(pi.hProcess);
-	return RETRACE_BACKEND_INTERNAL;
+	return (retrace_pid_t)pid;
 }
 
 static void
