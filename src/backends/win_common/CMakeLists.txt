@@ -12,14 +12,18 @@ set(_win_common_sources
 	disasm_arm64.c)
 
 # x64 wrappers (TODO.windows/05): gas dialect for MinGW, MASM for
-# MSVC -- identical semantics. arm64 lands with the
-# WrapperWinArm64Frame variant.
+# MSVC -- identical semantics.
+# arm64 wrappers (TODO.trace-profile/05): gas dialect (MinGW /
+# Clang arm64). The armasm64 variant for MSVC-arm64 is the
+# documented follow-up (docs/windows.md capability table).
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|amd64")
 	if(MSVC)
 		list(APPEND _win_common_sources wrapper_x64.asm)
 	else()
 		list(APPEND _win_common_sources wrapper_x64.S)
 	endif()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64" AND NOT MSVC)
+	list(APPEND _win_common_sources wrapper_arm64.S)
 endif()
 
 add_library(retrace_win_common OBJECT ${_win_common_sources})

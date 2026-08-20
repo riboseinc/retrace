@@ -1,3 +1,23 @@
+retrace (2.14.0-1) unstable; urgency=medium
+
+  * Added: retrace-profile capture (one-shot: run under preload,
+    trace, profile, jail -- POSIX), diff (drift between two
+    profiles: new paths, class escalations, new functions;
+    CI-able exit code), validate (profile contract; schema in
+    share/profile-schema.json).
+  * Added: Windows ucrt hook set expanded from fopen to
+    _open/_close/_read/_write/_lseek/_stat/_unlink/_remove/
+    _rename/_rmdir (underscore exports mapped to the
+    POSIX-shaped prototypes).
+  * Added: Windows arm64 assembly wrapper (gas dialect; the
+    armasm64 variant for MSVC-arm64 is the documented
+    follow-up). Dual-arch arch_spec.
+  * Fixed: MSVC logger -- real_impls never resolved atoi, so
+    logger_init called a NULL pointer (un-gates the
+    logger-format tests on MSVC).
+
+ -- Ribose Inc <opensource@ribose.com>  Thu, 20 Aug 2026 22:00:00 +0000
+
 retrace (2.13.0-1) unstable; urgency=medium
 
   * Added: live Windows hooks end to end -- inline hook ->

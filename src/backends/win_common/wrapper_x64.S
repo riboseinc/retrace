@@ -39,7 +39,7 @@
  * flag == 0 -> rax = synthesized ret_val, ret to the user.
  */
 
-	.macro WRAPPER_ENTRY_WIN_X64 fname
+	.macro WRAPPER_ENTRY_WIN_X64 fname, idx
 	.text
 	.balign 16
 	.globl retrace_wrap_\fname
@@ -59,9 +59,13 @@ retrace_wrap_\fname:
 	movq	$0, 40(%rsp)		/* frame+8: real_impl */
 	movq	$0, 48(%rsp)		/* frame+16: ret_val */
 
-	leaq	.Lstr_\fname(%rip), %rcx
+	/*
+	 * Label-free: the name lives in the C-side table
+	 * (hook_targets.c), same order as the entries below.
+	 */
+	movl	\idx, %ecx
 	leaq	32(%rsp), %rdx
-	call	retrace_engine_wrapper
+	call	retrace_win_enter
 
 	cmpq	$1, 32(%rsp)
 	jne	.Lsynth_\fname
@@ -79,24 +83,21 @@ retrace_wrap_\fname:
 	addq	$120, %rsp
 	ret
 
-	.section .rdata
-.Lstr_\fname:
-	.asciz "\fname"
 	.endm
 
-	WRAPPER_ENTRY_WIN_X64 fopen
-	WRAPPER_ENTRY_WIN_X64 open
-	WRAPPER_ENTRY_WIN_X64 close
-	WRAPPER_ENTRY_WIN_X64 read
-	WRAPPER_ENTRY_WIN_X64 write
-	WRAPPER_ENTRY_WIN_X64 lseek
-	WRAPPER_ENTRY_WIN_X64 stat
-	WRAPPER_ENTRY_WIN_X64 unlink
-	WRAPPER_ENTRY_WIN_X64 remove
-	WRAPPER_ENTRY_WIN_X64 rename
-	WRAPPER_ENTRY_WIN_X64 rmdir
-	WRAPPER_ENTRY_WIN_X64 NtCreateFile
-	WRAPPER_ENTRY_WIN_X64 NtOpenFile
-	WRAPPER_ENTRY_WIN_X64 NtQueryAttributesFile
-	WRAPPER_ENTRY_WIN_X64 NtClose
-	WRAPPER_ENTRY_WIN_X64 LdrLoadDll
+	WRAPPER_ENTRY_WIN_X64 fopen, 0
+	WRAPPER_ENTRY_WIN_X64 open, 6
+	WRAPPER_ENTRY_WIN_X64 close, 7
+	WRAPPER_ENTRY_WIN_X64 read, 8
+	WRAPPER_ENTRY_WIN_X64 write, 9
+	WRAPPER_ENTRY_WIN_X64 lseek, 10
+	WRAPPER_ENTRY_WIN_X64 stat, 11
+	WRAPPER_ENTRY_WIN_X64 unlink, 12
+	WRAPPER_ENTRY_WIN_X64 remove, 13
+	WRAPPER_ENTRY_WIN_X64 rename, 14
+	WRAPPER_ENTRY_WIN_X64 rmdir, 15
+	WRAPPER_ENTRY_WIN_X64 NtCreateFile, 1
+	WRAPPER_ENTRY_WIN_X64 NtOpenFile, 2
+	WRAPPER_ENTRY_WIN_X64 NtQueryAttributesFile, 3
+	WRAPPER_ENTRY_WIN_X64 NtClose, 4
+	WRAPPER_ENTRY_WIN_X64 LdrLoadDll, 5

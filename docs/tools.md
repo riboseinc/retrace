@@ -109,6 +109,22 @@ boots inside the child), and resumes it under trace. Opt into
 ntdll-depth hooks with `RETRACE_WIN_NTDLL=1` — see
 [windows.md](windows.md).
 
+### `retrace-profile`
+
+The profiler (≥ 2.12.0; subcommands ≥ 2.14.0): reduce a trace to
+what a binary does, grade libc claims against kernel truth, scan
+static syscall capability, and emit a deny-by-default jail.
+Three modes beyond the flags documented in
+[cookbook 34](cookbook/34-profile-and-jail.md):
+
+- `retrace-profile capture [-o p.json] [--inside d.json]
+  [--jail-out j.json] -- cmd` — one-shot: run under the preload,
+  trace, profile, jail (POSIX).
+- `retrace-profile diff base.json cand.json [--json]` — drift
+  between two profiles (upgrades); exit 1 on drift.
+- `retrace-profile validate p.json` — check the profile against
+  `share/profile-schema.json`; exit 1 on violations.
+
 ### `retrace-strace2retrace`
 
 strace log → trace JSON. Feeds `retrace-profile --kernel` and

@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://retrace.readthedocs.io/profile-schema.json",
+  "title": "retrace profile",
+  "description": "Output of retrace-profile: what a binary does (functions, file accesses), how it was covered, and the risk verdicts. The `retrace-profile validate` command enforces this contract; this schema documents it for external tooling.",
+  "type": "object",
+  "required": ["profile", "coverage"],
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "type": "object",
+      "required": ["entries", "functions", "env", "net", "accesses"],
+      "additionalProperties": false,
+      "properties": {
+        "entries": { "type": "number", "minimum": 0 },
+        "functions": { "$ref": "#/definitions/nameCountArray" },
+        "env": { "$ref": "#/definitions/nameCountArray" },
+        "net": { "$ref": "#/definitions/nameCountArray" },
+        "accesses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "class", "hits"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "class": { "enum": ["read", "write", "probe", "none"] },
+              "hits": { "type": "number", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["libc_layer", "kernel_layer"],
+      "additionalProperties": false,
+      "properties": {
+        "libc_layer": { "enum": ["captured", "ABSENT"] },
+        "kernel_layer": { "enum": ["captured", "ABSENT"] }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "required": ["agreed", "libc_only", "kernel_only", "verdict"],
+      "additionalProperties": false,
+      "properties": {
+        "agreed": { "type": "number", "minimum": 0 },
+        "libc_only": { "type": "number", "minimum": 0 },
+        "kernel_only": { "type": "number", "minimum": 0 },
+        "verdict": { "enum": ["clean", "SUBLIBC_ACCESS_FOUND"] },
+        "kernel_only_accesses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "hits"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string" },
+              "hits": { "type": "number", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "static_capability": {
+      "type": "object",
+      "required": ["raw_syscall_gadgets", "ntdll_imports"],
+      "additionalProperties": false,
+      "properties": {
+        "raw_syscall_gadgets": { "type": "number", "minimum": 0 },
+        "ntdll_imports": { "type": "number", "minimum": 0 },
+        "ntdll_names": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "definitions": {
+    "nameCountArray": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "count"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "count": { "type": "number", "minimum": 1 }
+        }
+      }
+    }
+  }
+}

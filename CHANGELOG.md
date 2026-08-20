@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.14.0] — 2026-08-20
+
+**The trace + profile workstream** (TODO.trace-profile): the
+recipe-34 loop is now one command, upgrade-aware, and
+contract-checked.
+
+- **`retrace-profile capture`** — one-shot: run a command under
+  the preload with the right logger env, trace it, reduce to a
+  profile, optionally emit the jail. The built-in default config
+  scopes tracing to the file/env/net function set (a user
+  RETRACE_JSON_CONFIG always wins); a wildcard default traced
+  printf-family variadics -- noisy and fragile. POSIX; Windows
+  uses retrace-win-run (examples/profile-hunting/run-windows.md).
+- **`retrace-profile diff`** — drift between two profiles: new
+  paths, class escalations (read → write is the headline),
+  removed paths, new functions. Human report + --json; exit 1
+  on drift (CI-able). The upgrade story for the tailor loop.
+- **`retrace-profile validate` + `share/profile-schema.json`** —
+  the profile contract, machine-checkable: enum values, required
+  sections, and the cross-field rule a schema cannot express
+  (risk present iff the kernel layer was captured).
+- **Windows ucrt hook set expanded** (fopen-only before):
+  `_open _close _read _write _lseek _stat _unlink _remove
+  _rename _rmdir`, mapped to the POSIX-shaped prototypes via the
+  new export→engine name field in the hook table.
+- **Windows arm64 wrapper** (gas dialect; TODO.trace-profile/05):
+  AAPCS64 frame with x30 preserved for the tail-jump; dual-arch
+  arch_spec. The armasm64 variant for MSVC-arm64 is the
+  documented follow-up.
+- **MSVC logger fix**: real_impls never resolved `atoi`, so
+  logger_init called a NULL pointer on any env override -- the
+  long-gated logger-format tests now run on MSVC.
+
+Bumps: version.h 2.13.0 -> 2.14.0, retrace_cli.c banner,
+nix/debian/fedora packaging, CHANGELOG.md.
+
 ## [2.13.0] — 2026-08-20
 
 **Windows: the first live hooks.** (TODO.windows/05-06.) The

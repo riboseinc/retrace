@@ -38,6 +38,16 @@ const char *const retrace_win_wrapper_names[] = {
 	"NtQueryAttributesFile",    /* 3 */
 	"NtClose",		    /* 4 */
 	"LdrLoadDll",		    /* 5 */
+	"open",			    /* 6 */
+	"close",		    /* 7 */
+	"read",			    /* 8 */
+	"write",		    /* 9 */
+	"lseek",		    /* 10 */
+	"stat",			    /* 11 */
+	"unlink",		    /* 12 */
+	"remove",		    /* 13 */
+	"rename",		    /* 14 */
+	"rmdir",		    /* 15 */
 };
 
 void retrace_win_enter(int idx, void *frame)
@@ -85,6 +95,19 @@ static const struct win_hook g_hook_table[] = {
 	 * Windows profiles and jails cover normal C programs.
 	 */
 	{ "fopen", NULL, "ucrtbase.dll", retrace_wrap_fopen, 0 },
+	{ "_open", "open", "ucrtbase.dll", retrace_wrap_open, 0 },
+	{ "_close", "close", "ucrtbase.dll", retrace_wrap_close, 0 },
+	{ "_read", "read", "ucrtbase.dll", retrace_wrap_read, 0 },
+	{ "_write", "write", "ucrtbase.dll", retrace_wrap_write, 0 },
+	{ "_lseek", "lseek", "ucrtbase.dll", retrace_wrap_lseek, 0 },
+	{ "_stat", "stat", "ucrtbase.dll", retrace_wrap_stat, 0 },
+	{ "_unlink", "unlink", "ucrtbase.dll",
+		retrace_wrap_unlink, 0 },
+	{ "_remove", "remove", "ucrtbase.dll",
+		retrace_wrap_remove, 0 },
+	{ "_rename", "rename", "ucrtbase.dll",
+		retrace_wrap_rename, 0 },
+	{ "_rmdir", "rmdir", "ucrtbase.dll", retrace_wrap_rmdir, 0 },
 
 	/* ntdll layer (TODO.windows/06): opt-in only. Catches
 	 * Win32-direct callers (CreateFileW funnels into

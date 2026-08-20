@@ -36,9 +36,19 @@
 
 #include <stddef.h>
 
+#if defined(_M_ARM64) || defined(__aarch64__)
+
+#define WRAPPER_FRAME struct WrapperWinArm64Frame
+
+#else /* x64 */
+
+#define WRAPPER_FRAME struct WrapperWinX64Frame
+
+#endif /* arch */
+
 void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl)
 {
-	struct WrapperWinX64Frame *frame = arch_spec_ctx;
+	WRAPPER_FRAME *frame = arch_spec_ctx;
 
 	frame->call_real_flag = 1;
 	frame->real_impl = real_impl;
@@ -46,12 +56,12 @@ void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl)
 
 void retrace_as_cancel_sched_real(void *arch_spec_ctx)
 {
-	((struct WrapperWinX64Frame *)arch_spec_ctx)->call_real_flag = 0;
+	((WRAPPER_FRAME *)arch_spec_ctx)->call_real_flag = 0;
 }
 
 void retrace_as_set_ret_val(void *arch_spec_ctx, long ret_val)
 {
-	((struct WrapperWinX64Frame *)arch_spec_ctx)->ret_val =
+	((WRAPPER_FRAME *)arch_spec_ctx)->ret_val =
 		(int64_t)ret_val;
 }
 
@@ -89,11 +99,34 @@ int retrace_as_init_late(void)
 }
 
 /*
- * Read one argument value. i < 4: from the captured register;
- * i >= 4: from the caller's stack (value, not pointer -- reg
- * params store values too, so params[i].val is uniform).
+ * Read one argument value. Register params store values (both
+ * frames), so params[i].val is uniform; stack params are read
+ * from the caller's frame at the ABI-correct offset.
+ *
+ * Both frames lead with call_real_flag / real_impl / ret_val
+ * at identical offsets, so the frame writers are shared via the
+ * WRAPPER_FRAME alias.
  */
-static uint64_t win_arg(const struct WrapperWinX64Frame *frame, int i)
+#if defined(_M_ARM64) || defined(__aarch64__)
+
+static uint64_t win_arg(const struct WrapperWinArm64Frame *frame,
+			int i)
+{
+	if (i >= 0 && i <= 7)
+		return frame->x[i];
+
+	/*
+	 * AAPCS64: stack args start at [entry sp] (the hook jmp
+	 * pushed nothing)
+	 */
+	return *(const uint64_t *)(frame->sp +
+				   8 * (size_t)(i - 8));
+}
+
+#else /* x64 */
+
+static uint64_t win_arg(const struct WrapperWinX64Frame *frame,
+			int i)
 {
 	const uint64_t *stack_arg;
 
@@ -107,7 +140,8 @@ static uint64_t win_arg(const struct WrapperWinX64Frame *frame, int i)
 	case 3:
 		return frame->r9;
 	default:
-		/* entry rsp points at the return address; args 5+
+		/*
+		 * entry rsp points at the return address; args 5+
 		 * start after the 32-byte shadow space
 		 */
 		stack_arg = (const uint64_t *)(frame->rsp + 0x28 +
@@ -116,11 +150,13 @@ static uint64_t win_arg(const struct WrapperWinX64Frame *frame, int i)
 	}
 }
 
+#endif /* arch */
+
 int retrace_as_setup_params(void *arch_spec_ctx,
 	const struct FuncPrototype *proto, struct FuncParam params[],
 	int *params_cnt)
 {
-	struct WrapperWinX64Frame *frame = arch_spec_ctx;
+	WRAPPER_FRAME *frame = arch_spec_ctx;
 	int param_idx;
 
 	if (*params_cnt < proto->params_cnt) {

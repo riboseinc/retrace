@@ -30,6 +30,16 @@ extern "C" {
 
 /* wrapper symbols (wrapper_x64.S / wrapper_x64.asm) */
 void retrace_wrap_fopen(void);
+void retrace_wrap_open(void);
+void retrace_wrap_close(void);
+void retrace_wrap_read(void);
+void retrace_wrap_write(void);
+void retrace_wrap_lseek(void);
+void retrace_wrap_stat(void);
+void retrace_wrap_unlink(void);
+void retrace_wrap_remove(void);
+void retrace_wrap_rename(void);
+void retrace_wrap_rmdir(void);
 void retrace_wrap_NtCreateFile(void);
 void retrace_wrap_NtOpenFile(void);
 void retrace_wrap_NtQueryAttributesFile(void);

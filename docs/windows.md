@@ -43,7 +43,7 @@ Inside the child, `DLL_PROCESS_ATTACH`:
 
 | Layer | Default | Functions | Notes |
 |---|---|---|---|
-| ucrt | ON | `fopen` (v1 set; grows per release) | The CRT layer — what a normal C program calls |
+| ucrt | ON | `fopen`, `_open`, `_close`, `_read`, `_write`, `_lseek`, `_stat`, `_unlink`, `_remove`, `_rename`, `_rmdir` | The CRT layer — a normal C program's file traffic (v2.14.0 expands the v1 `fopen`-only set) |
 | ntdll | OPT-IN | `NtCreateFile`, `NtOpenFile`, `NtQueryAttributesFile`, `NtClose`, `LdrLoadDll` | One level deeper: catches Win32-direct callers that never touch the CRT |
 
 ### The ntdll layer (opt-in)
@@ -115,12 +115,12 @@ the Win32-direct depth at the ntdll boundary.
 
 ## What runs where (v2.13.0)
 
-| Capability | windows-x64 | windows-arm64 |
-|---|---|---|
-| Engine + registries (PE-section walk) | yes | yes |
-| ucrt/ntdll inline hooks + wrappers | yes | arm64 wrapper: follow-up |
-| Offline tools (profile, correlate, procmon2retrace, strace2retrace) | yes | yes |
-| ptrace attach | n/a (Linux backend) | n/a |
+| Capability | windows-x64 | windows-arm64 (MSVC) | windows-arm64 (MinGW/Clang) |
+|---|---|---|---|
+| Engine + registries (PE-section walk) | yes | yes | yes |
+| ucrt/ntdll inline hooks + wrappers | yes | armasm64 wrapper: follow-up | yes (gas dialect, TODO.trace-profile/05) |
+| Offline tools (profile, correlate, procmon2retrace, strace2retrace) | yes | yes | yes |
+| ptrace attach | n/a (Linux backend) | n/a | n/a |
 
 ## See also
 
