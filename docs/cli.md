@@ -235,7 +235,7 @@ the launch required. This reaches the targets the preload backends
 structurally cannot: any running PID, and static binaries after they
 started. Output is the same JSON format as `retrace run` and feeds
 the same downstream tools (`retrace-audit`, `retrace-diff`,
-`retrace-replay`).
+`retrace-replay`, `retrace-profile`).
 
 ```sh
 $ retrace attach --log /tmp/trace.json $(pidof my-server)

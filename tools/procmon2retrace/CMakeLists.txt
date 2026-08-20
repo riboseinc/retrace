@@ -22,10 +22,9 @@ target_include_directories(retrace_procmon2retrace PRIVATE
 install(TARGETS retrace_procmon2retrace
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-if(RETRACE_BUILD_TESTS)
+if(RETRACE_BUILD_TESTS AND NOT RETRACE_PLATFORM_WINDOWS)
     # Round-trip: sample CSV -> JSON -> retrace-correlate smoke
-    # (TODO.next-level/06 acceptance). POSIX sh: tools/ is
-    # POSIX-gated today.
+    # (TODO.next-level/06 acceptance). POSIX sh driver.
     add_test(NAME procmon2retrace-roundtrip
         COMMAND sh -c
             "$<TARGET_FILE:retrace_procmon2retrace> \

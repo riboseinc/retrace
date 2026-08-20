@@ -125,6 +125,8 @@ automatically sandboxes every binary.
 
 ## See also
 
+- [34 — Profile a binary, then jail it](34-profile-and-jail.md)
+  (`allow_paths`: the deny-by-default inverse of this recipe)
 - [06 — Redirect open() paths](06-redirect-open.md)
 - [13 — Audit system() for injection](13-audit-system.md)
 - [19 — CI fuzzing](19-ci-fuzzing.md)

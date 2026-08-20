@@ -390,8 +390,15 @@ if(RETRACE_ENABLE_RPC)
 	add_subdirectory(rpc)
 endif()
 
-# tools/ uses POSIX-only headers (sys/wait.h etc.) -- skip on Windows.
-if(NOT RETRACE_PLATFORM_WINDOWS)
+# The offline analysis tools are portable C and Windows users need
+# them (profile/jail flows); the process-driving tools (spawn,
+# stringinjector, replay, ws-stream, ...) use POSIX-only headers.
+if(RETRACE_PLATFORM_WINDOWS)
+	add_subdirectory(tools/correlate)
+	add_subdirectory(tools/procmon2retrace)
+	add_subdirectory(tools/strace2retrace)
+	add_subdirectory(tools/profiler)
+else()
 	add_subdirectory(tools)
 	add_subdirectory(frida-bridge)
 

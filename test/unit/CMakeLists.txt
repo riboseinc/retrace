@@ -1492,3 +1492,27 @@ target_include_directories(retrace_test_procmon_convert PRIVATE
 add_test(NAME unit-test-procmon-convert
     COMMAND retrace_test_procmon_convert)
 set_tests_properties(unit-test-procmon-convert PROPERTIES LABELS "unit")
+
+#
+# Profiler aggregation + capability scan unit tests (TODO.windows/08).
+# aggregate.c reduces both trace schemas; capability.c statically
+# scans executable segments for raw-syscall gadgets.
+#
+add_executable(retrace_test_profile_aggregate test_profile_aggregate.c
+    ${CMAKE_SOURCE_DIR}/tools/profiler/aggregate.c
+    ${CMAKE_SOURCE_DIR}/tools/profiler/capability.c
+    ${CMAKE_SOURCE_DIR}/tools/correlate/match.c
+    ${_parson_for_tools})
+set_target_properties(retrace_test_profile_aggregate PROPERTIES
+    OUTPUT_NAME test_profile_aggregate
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_profile_aggregate PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/profiler
+    ${CMAKE_SOURCE_DIR}/tools/correlate
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-profile-aggregate
+    COMMAND retrace_test_profile_aggregate)
+set_tests_properties(unit-test-profile-aggregate PROPERTIES LABELS "unit")
