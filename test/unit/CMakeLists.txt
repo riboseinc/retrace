@@ -1575,3 +1575,28 @@ add_test(NAME unit-test-profile-aggregate
     COMMAND retrace_test_profile_aggregate)
 set_tests_properties(unit-test-profile-aggregate PROPERTIES LABELS "unit")
 
+
+#
+# Profile drift + validation unit tests (TODO.trace-profile/02,
+# 06). diff.c merges two aggregated profiles; validate.c checks
+# the profile contract.
+#
+add_executable(retrace_test_profile_diff test_profile_diff.c
+    ${CMAKE_SOURCE_DIR}/tools/profiler/aggregate.c
+    ${CMAKE_SOURCE_DIR}/tools/profiler/diff.c
+    ${CMAKE_SOURCE_DIR}/tools/profiler/validate.c
+    ${CMAKE_SOURCE_DIR}/tools/correlate/match.c
+    ${_parson_for_tools})
+set_target_properties(retrace_test_profile_diff PROPERTIES
+    OUTPUT_NAME test_profile_diff
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_profile_diff PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/profiler
+    ${CMAKE_SOURCE_DIR}/tools/correlate
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-profile-diff
+    COMMAND retrace_test_profile_diff)
+set_tests_properties(unit-test-profile-diff PROPERTIES LABELS "unit")

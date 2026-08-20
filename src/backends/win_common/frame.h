@@ -79,14 +79,11 @@ struct WrapperWinArm64Frame {
 	void  *real_impl;
 	int64_t ret_val;
 
-	uint64_t x0;
-	uint64_t x1;
-	uint64_t x2;
-	uint64_t x3;
-	uint64_t x4;
-	uint64_t x5;
-	uint64_t x6;
-	uint64_t x7;
+	/*
+	 * x0-x7 in one array: the trampoline stores them contiguously
+	 * (wrapper_arm64.S, [sp+24..80]) and win_arg() indexes them.
+	 */
+	uint64_t x[8];
 	uint64_t sp;
 };
 

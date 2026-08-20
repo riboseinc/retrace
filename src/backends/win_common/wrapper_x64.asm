@@ -60,6 +60,16 @@ retrace_wrap_&fname& ENDP
 .code
 
         WRAPPER_ENTRY_WIN_X64 fopen, 0
+        WRAPPER_ENTRY_WIN_X64 open, 6
+        WRAPPER_ENTRY_WIN_X64 close, 7
+        WRAPPER_ENTRY_WIN_X64 read, 8
+        WRAPPER_ENTRY_WIN_X64 write, 9
+        WRAPPER_ENTRY_WIN_X64 lseek, 10
+        WRAPPER_ENTRY_WIN_X64 stat, 11
+        WRAPPER_ENTRY_WIN_X64 unlink, 12
+        WRAPPER_ENTRY_WIN_X64 remove, 13
+        WRAPPER_ENTRY_WIN_X64 rename, 14
+        WRAPPER_ENTRY_WIN_X64 rmdir, 15
         WRAPPER_ENTRY_WIN_X64 NtCreateFile, 1
         WRAPPER_ENTRY_WIN_X64 NtOpenFile, 2
         WRAPPER_ENTRY_WIN_X64 NtQueryAttributesFile, 3

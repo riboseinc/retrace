@@ -14,7 +14,7 @@
 set(_parson_source ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 
 add_executable(retrace_profile
-    profile.c aggregate.c capability.c
+    profile.c aggregate.c capability.c diff.c capture.c validate.c
     ${CMAKE_SOURCE_DIR}/tools/correlate/match.c
     ${CMAKE_SOURCE_DIR}/tools/common/stream.c
     ${_parson_source})
@@ -31,3 +31,9 @@ target_include_directories(retrace_profile PRIVATE
 
 install(TARGETS retrace_profile
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# The profile contract (TODO.trace-profile/06): documents the
+# output shape for external tooling; `retrace-profile validate`
+# enforces it.
+install(FILES ${CMAKE_SOURCE_DIR}/share/profile-schema.json
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/retrace)

@@ -104,11 +104,39 @@ PE, the imported ntdll entry points. Zero does not prove purity
 (a gadget can hide behind computed addresses) but any non-zero
 count means the binary can talk to the kernel without libc.
 
+## One-shot capture
+
+`retrace-profile capture` runs the whole capture step in one
+command (POSIX):
+
+```sh
+retrace-profile capture -o profile.json --inside inside.json     --jail-out jail.json -- ./app args...
+```
+
+The built-in default config scopes tracing to the file/env/net
+function set (set `RETRACE_JSON_CONFIG` to override). Windows:
+see `examples/profile-hunting/run-windows.md`.
+
 ## Tailor
 
-The profile is data: edit it, diff it (`retrace-diff` over two
-profiles shows drift between versions of a build), feed it to an
-audit. The jail step below is where the tailoring bites.
+The profile is data: edit it, feed it to an audit, and when the
+build changes, DIFF it — `retrace-profile diff baseline.json
+candidate.json` reports new paths, class escalations
+(read → write is the headline), and new functions; exit 1 when
+drift exists (CI-able):
+
+```
+profile-diff: baseline 26 entries, candidate 31 entries
+  + /vfs/telemetry.dat (added, write, 3 hits)
+  ! /vfs/config.dat (read -> write)
+  + fn fopen64 (new)
+profile-diff: DRIFT FOUND
+```
+
+The jail step below is where the tailoring bites. Validate any
+hand-edited profile against the contract with
+`retrace-profile validate profile.json` (schema:
+`share/profile-schema.json`).
 
 ## Jail
 

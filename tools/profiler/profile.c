@@ -38,6 +38,9 @@
 
 #include "aggregate.h"
 #include "capability.h"
+#include "capture.h"
+#include "diff.h"
+#include "validate.h"
 #include "match.h"
 #include "stream.h"
 #include "parson.h"
@@ -45,6 +48,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 static char *read_file(const char *path, size_t *len_out)
 {
@@ -237,6 +243,295 @@ static void capability_to_json(JSON_Object *root,
 	json_object_set_value(root, "static_capability", o);
 }
 
+/*
+ * `retrace-profile diff baseline.json candidate.json [--json]`:
+ * drift report between two profiles (TODO.trace-profile/02).
+ * Exit 1 when drift exists (CI-able).
+ */
+static int diff_mode(int argc, char **argv)
+{
+	const char *baseline_path = NULL;
+	const char *candidate_path = NULL;
+	int json_out = 0;
+	struct ProfFeed baseline, candidate;
+	struct ProfDiff d;
+	int drift;
+	int i;
+
+	for (i = 2; i < argc; i++) {
+		if (strcmp(argv[i], "--json") == 0)
+			json_out = 1;
+		else if (argv[i][0] == '-' && argv[i][1] != '\0') {
+			fprintf(stderr,
+"Usage: retrace-profile diff <baseline.json> <candidate.json> [--json]\n");
+			return 2;
+		} else if (baseline_path == NULL)
+			baseline_path = argv[i];
+		else if (candidate_path == NULL)
+			candidate_path = argv[i];
+	}
+	if (baseline_path == NULL || candidate_path == NULL) {
+		fprintf(stderr,
+"Usage: retrace-profile diff <baseline.json> <candidate.json> [--json]\n");
+		return 2;
+	}
+	if (load_profile(baseline_path, &baseline) != 0) {
+		fprintf(stderr, "retrace-profile: cannot read %s\n",
+			baseline_path);
+		return 2;
+	}
+	if (load_profile(candidate_path, &candidate) != 0) {
+		fprintf(stderr, "retrace-profile: cannot read %s\n",
+			candidate_path);
+		return 2;
+	}
+
+	prof_diff_init(&d);
+	drift = prof_diff_compute(&baseline.prof, &candidate.prof, &d);
+
+	if (json_out) {
+		char *ser;
+
+		{
+			JSON_Value *v = prof_diff_to_json(&d);
+
+			ser = json_serialize_to_string_pretty(v);
+			json_value_free(v);
+		}
+		printf("%s\n", ser);
+		json_free_serialized_string(ser);
+	} else {
+		size_t k;
+
+		printf("profile-diff: baseline %zu entries, candidate %zu entries\n",
+			baseline.prof.entries, candidate.prof.entries);
+		for (k = 0; k < d.count; k++) {
+			const struct ProfPathChange *c = &d.changes[k];
+
+			if (c->class_from < 0)
+				printf("  + %s (added, %s, %zu hits)\n",
+					c->path,
+					corr_class_str((enum CorrClass)
+						c->class_to),
+					c->hits_to);
+			else if (c->class_to < 0)
+				printf("  - %s (removed)\n", c->path);
+			else
+				printf("  ! %s (%s -> %s)\n", c->path,
+					corr_class_str((enum CorrClass)
+						c->class_from),
+					corr_class_str((enum CorrClass)
+						c->class_to));
+		}
+		for (k = 0; k < d.new_functions_cnt; k++)
+			printf("  + fn %s (new)\n", d.new_functions[k]);
+		printf("%s\n", drift ?
+			"profile-diff: DRIFT FOUND" :
+			"profile-diff: no drift");
+	}
+
+	prof_diff_free(&d);
+	prof_free(&baseline.prof);
+	prof_free(&candidate.prof);
+	return drift ? 1 : 0;
+}
+
+/*
+ * `retrace-profile capture [-o profile.json] [--inside d.json]
+ *   [--jail-out j.json] [-- cmd args...]` -- the whole recipe-34
+ * flow in one command: run the command under the preload, trace
+ * it, reduce to a profile, optionally emit the jail
+ * (TODO.trace-profile/03). POSIX; Windows uses retrace-win-run.
+ */
+static int capture_mode(int argc, char **argv)
+{
+#ifdef _WIN32
+	(void)argc;
+	(void)argv;
+	fprintf(stderr,
+"retrace-profile capture: POSIX only -- Windows uses retrace-win-run\n");
+	return 2;
+#else
+	const char *out_path = NULL;
+	const char *jail_path = NULL;
+	const char *inside_path = NULL;
+	char trace_tpl[128];
+	char trace_path[128];
+	const char *lib;
+	struct ProfFeed feed, inside_feed;
+	int cmd_start = -1;
+	int fd;
+	int i;
+	int rc;
+
+	for (i = 2; i < argc; i++) {
+		if (strcmp(argv[i], "--") == 0) {
+			cmd_start = i + 1;
+			break;
+		} else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+			out_path = argv[++i];
+		} else if (strcmp(argv[i], "--jail-out") == 0 &&
+			   i + 1 < argc) {
+			jail_path = argv[++i];
+		} else if (strcmp(argv[i], "--inside") == 0 &&
+			   i + 1 < argc) {
+			inside_path = argv[++i];
+		} else {
+			fprintf(stderr,
+"Usage: retrace-profile capture [-o profile.json] [--inside d.json]\n"
+"                              [--jail-out jail.json] -- cmd [args...]\n");
+			return 2;
+		}
+	}
+	if (cmd_start < 0 || argv[cmd_start] == NULL) {
+		fprintf(stderr,
+"retrace-profile capture: no command after --\n");
+		return 2;
+	}
+
+	lib = prof_capture_find_lib();
+	if (lib == NULL) {
+		fprintf(stderr,
+"retrace-profile capture: libretrace not found; set RETRACE_V2_LIB\n");
+		return 2;
+	}
+
+	/*
+	 * Default config: the file/env/net function set. A wildcard
+	 * would trace printf-family variadics too -- noisy for a
+	 * profile and fragile on some platforms. An explicit
+	 * RETRACE_JSON_CONFIG always wins.
+	 */
+	if (getenv("RETRACE_JSON_CONFIG") == NULL) {
+		static const char *const prof_funcs[] = {
+			"open", "openat", "close", "fopen", "fclose",
+			"fread", "fwrite", "stat", "lstat", "fstatat",
+			"access", "faccessat", "readlink", "unlink",
+			"rename", "mkdir", "rmdir", "creat", "truncate",
+			"read", "write", "getenv", "setenv", "putenv",
+			"connect", "send", "recv", "dlopen", NULL
+		};
+		size_t k;
+		FILE *cf;
+
+		snprintf(trace_tpl, sizeof(trace_tpl),
+			"/tmp/retrace-capture-XXXXXX");
+		fd = mkstemp(trace_tpl);
+		if (fd < 0) {
+			fprintf(stderr,
+"retrace-profile capture: mkstemp failed\n");
+			return 2;
+		}
+		close(fd);
+		cf = fopen(trace_tpl, "w");
+		if (cf == NULL) {
+			remove(trace_tpl);
+			return 2;
+		}
+		fputs("{\"intercept_scripts\":[", cf);
+		for (k = 0; prof_funcs[k] != NULL; k++)
+			fprintf(cf,
+"%s{\"func_name\":\"%s\",\"actions\":["
+"{\"action_name\":\"log_params\"},"
+"{\"action_name\":\"call_real\"}]}",
+				k ? "," : "", prof_funcs[k]);
+		fputs("]}\n", cf);
+		fclose(cf);
+		setenv("RETRACE_JSON_CONFIG", trace_tpl, 0);
+	}
+
+	snprintf(trace_tpl, sizeof(trace_tpl),
+		"/tmp/retrace-capture-XXXXXX");
+	fd = mkstemp(trace_tpl);
+	if (fd < 0) {
+		fprintf(stderr, "retrace-profile capture: mkstemp failed\n");
+		return 2;
+	}
+	close(fd);
+	snprintf(trace_path, sizeof(trace_path), "%s", trace_tpl);
+
+	fprintf(stderr, "retrace-profile capture: lib=%s trace=%s\n",
+		lib, trace_path);
+	rc = prof_capture_run(&argv[cmd_start], lib, trace_path);
+	if (rc < 0) {
+		fprintf(stderr, "retrace-profile capture: launch failed\n");
+		remove(trace_path);
+		return 2;
+	}
+
+	if (load_profile(trace_path, &feed) != 0) {
+		fprintf(stderr, "retrace-profile capture: no trace\n");
+		remove(trace_path);
+		return 2;
+	}
+
+	{
+		JSON_Value *out = json_value_init_object();
+		JSON_Object *root = json_value_get_object(out);
+		JSON_Value *cov = json_value_init_object();
+
+		json_object_set_value(root, "profile",
+			prof_to_json(&feed.prof));
+		json_object_set_string(json_value_get_object(cov),
+			"libc_layer", "captured");
+		json_object_set_string(json_value_get_object(cov),
+			"kernel_layer", "ABSENT");
+		json_object_set_value(root, "coverage", cov);
+
+		{
+			char *ser = json_serialize_to_string_pretty(out);
+
+			if (out_path != NULL) {
+				FILE *of = fopen(out_path, "w");
+
+				if (of == NULL) {
+					fprintf(stderr,
+"retrace-profile: cannot write %s\n", out_path);
+					return 2;
+				}
+				fprintf(of, "%s\n", ser);
+				fclose(of);
+			} else {
+				printf("%s\n", ser);
+			}
+			json_free_serialized_string(ser);
+		}
+		json_value_free(out);
+	}
+
+	if (jail_path != NULL) {
+		struct ProfFeed *allow_src = &feed;
+
+		if (inside_path != NULL &&
+		    load_profile(inside_path, &inside_feed) == 0)
+			allow_src = &inside_feed;
+		{
+			JSON_Value *jc = jail_config(&feed.prof,
+				&allow_src->prof);
+			FILE *jf = fopen(jail_path, "w");
+
+			if (jf == NULL) {
+				fprintf(stderr,
+"retrace-profile: cannot write %s\n", jail_path);
+				return 2;
+			}
+			fprintf(jf, "%s\n",
+				json_serialize_to_string_pretty(jc));
+			fclose(jf);
+			json_value_free(jc);
+		}
+	}
+
+	fprintf(stderr,
+"retrace-profile capture: %zu entries, %zu functions, %zu paths (cmd exit %d)\n",
+		feed.prof.entries, feed.prof.functions.count,
+		feed.prof.accesses.count, rc);
+
+	remove(trace_path);
+	return rc;
+#endif /* !_WIN32 */
+}
+
 int main(int argc, char **argv)
 {
 	const char *libc_path = NULL;
@@ -246,6 +541,33 @@ int main(int argc, char **argv)
 	const char *jail_path = NULL;
 	const char *inside_path = NULL;
 	struct ProfFeed libc_feed, kernel_feed, inside_feed;
+
+	if (argc >= 2 && strcmp(argv[1], "diff") == 0)
+		return diff_mode(argc, argv);
+	if (argc >= 2 && strcmp(argv[1], "capture") == 0)
+		return capture_mode(argc, argv);
+	if (argc >= 2 && strcmp(argv[1], "validate") == 0) {
+		char err[2048];
+		int n;
+
+		if (argc != 3) {
+			fprintf(stderr,
+"Usage: retrace-profile validate <profile.json>\n");
+			return 2;
+		}
+		n = prof_validate_file(argv[2], err, sizeof(err));
+		if (n == 0) {
+			printf("profile: valid\n");
+			return 0;
+		}
+		if (n < 0) {
+			printf("profile: NOT PARSEABLE\n%s\n", err);
+			return 1;
+		}
+		printf("profile: %d violation%s\n%s\n", n,
+			n == 1 ? "" : "s", err);
+		return 1;
+	}
 	struct ProfCapability cap;
 	int have_kernel = 0;
 	int have_inside = 0;
