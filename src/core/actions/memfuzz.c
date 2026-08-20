@@ -88,7 +88,11 @@ static int ia_memory_fuzz
 	return 0;
 }
 
-retrace_actions_define_package(basic) = {
+/*
+ * Package name must be unique (it names the external symbol on
+ * PE): memfuzz extends the basic set but lives in its own TU.
+ */
+retrace_actions_define_package(memfuzz) = {
 	{
 		.name = "memory_fuzz",
 		.action = ia_memory_fuzz

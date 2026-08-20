@@ -38,11 +38,12 @@
 struct RetraceRealImpls retrace_real_impls;
 
 /*
- * TODO.windows/04: on Windows nothing is hooked at this stage,
- * so the plain CRT/Win32 entry points ARE the real
- * implementations. Item 05 (first wrapper) replaces the
- * resolution for hooked functions with their relocated
- * trampolines; until then a direct call cannot recurse.
+ * Windows: the plain CRT/Win32 entry points are the real
+ * implementations -- EXCEPT for hooked functions, which must
+ * resolve to their relocated TRAMPOLINE (the plain CRT address
+ * is the patched bytes once the hook exists; calling it would
+ * re-enter the wrapper). DllMain installs hooks BEFORE boot so
+ * the trampoline map is already populated here (TODO.windows/05).
  */
 #ifdef _WIN32
 /*
@@ -76,10 +77,36 @@ int retrace_real_impls_init(void)
 	retrace_real_impls.printf = printf;
 	retrace_real_impls.fprintf = fprintf;
 	retrace_real_impls.fflush = fflush;
-	retrace_real_impls.fopen = fopen;
+	/*
+	 * Hookable name: prefer the hook's trampoline. get_real_safe
+	 * resolves via ucrtbase/msvcrt GetProcAddress -- under a
+	 * STATIC CRT (/MT test binaries) neither module is loaded
+	 * and it returns NULL; the compile-time-linked symbol is the
+	 * correct real implementation in that build.
+	 */
+	retrace_real_impls.fopen =
+		retrace_as_get_real_safe("fopen");
+	if (retrace_real_impls.fopen == NULL)
+		retrace_real_impls.fopen = fopen;
 	retrace_real_impls.fclose = fclose;
-	retrace_real_impls.time = time;
+	/*
+	 * conf_init reads the config through these; a NULL here is
+	 * the v2.13.0 boot segfault (same class as atoi)
+	 */
+	retrace_real_impls.fseek = fseek;
+	retrace_real_impls.ftell = ftell;
+	retrace_real_impls.fread = fread;
 	retrace_real_impls.real_vsnprintf = vsnprintf;
+	retrace_real_impls.time = time;
+	retrace_real_impls.atoi = atoi;
+	retrace_real_impls.getenv = getenv;
+	retrace_real_impls.real_snprintf = snprintf;
+	/*
+	 * parson's NUMBER serialization goes through this (parson.c
+	 * real_sprintf) -- the v2.11.0 "MSVC logger segfault": any
+	 * JSON entry with a number crashed on the NULL call.
+	 */
+	retrace_real_impls.real_sprintf = sprintf;
 	return 0;
 }
 

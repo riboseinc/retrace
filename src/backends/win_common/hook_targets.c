@@ -1,0 +1,456 @@
+/*
+ * Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+ *
+ * BSD-2-Clause license -- see LICENSE for details.
+ */
+
+/*
+ * The Windows hook table (TODO.windows/05-06). See hook_targets.h
+ * for the layer/opt-in policy. This module owns: the table,
+ * target resolution, hook installation, and the name->trampoline
+ * map the arch-spec consults for real-impl resolution.
+ */
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include "hook.h"
+#include "hook_targets.h"
+#include "trampoline_allocator.h"
+
+#include "engine.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/*
+ * Wrapper name table: SAME ORDER as the wrapper entries in
+ * wrapper_x64.S / wrapper_x64.asm. The assembly is label-free:
+ * each wrapper passes its table INDEX to retrace_win_enter as a
+ * pure immediate (assemblers disagree on label addressing; they
+ * agree on immediates and extern calls).
+ */
+const char *const retrace_win_wrapper_names[] = {
+	"fopen",		    /* 0 */
+	"NtCreateFile",		    /* 1 */
+	"NtOpenFile",		    /* 2 */
+	"NtQueryAttributesFile",    /* 3 */
+	"NtClose",		    /* 4 */
+	"LdrLoadDll",		    /* 5 */
+};
+
+void retrace_win_enter(int idx, void *frame)
+{
+	if (idx < 0 || (size_t)idx >=
+	    sizeof(retrace_win_wrapper_names) /
+		    sizeof(retrace_win_wrapper_names[0]))
+		return;
+	retrace_engine_wrapper(
+		(char *)retrace_win_wrapper_names[idx], frame);
+}
+
+struct win_hook {
+	/*
+	 * name: the EXPORT to patch. engine: the prototype/engine
+	 * name (NULL = same as name) -- ucrt exports carry a leading
+	 * underscore the POSIX-shaped prototype tables do not.
+	 */
+	const char *name;
+	const char *engine;
+	const char *module;   /* module to resolve the export from */
+	void *wrapper;        /* assembly wrapper entry */
+	int opt_in;           /* 1: only when RETRACE_WIN_NTDLL=1 */
+};
+
+/*
+ * The wrappers exist for x64 (gas + MASM) and arm64 (gas --
+ * TODO.trace-profile/05; MSVC-arm64 awaits the armasm64
+ * dialect). The table compiles everywhere (the registry walk is
+ * arch-neutral); only the hookable entries are gated.
+ */
+#if (defined(__aarch64__) && !defined(_MSC_VER)) ||	\
+	defined(_M_X64) || defined(__x86_64__)
+#define HAVE_WRAPPERS 1
+#else
+#define HAVE_WRAPPERS 0
+#endif
+
+#if HAVE_WRAPPERS
+static const struct win_hook g_hook_table[] = {
+	/*
+	 * ucrt layer (TODO.trace-profile/04): default-on. The
+	 * underscore exports map to the POSIX-shaped prototypes the
+	 * engine looks up (open/close/read/write/stat/...), so
+	 * Windows profiles and jails cover normal C programs.
+	 */
+	{ "fopen", NULL, "ucrtbase.dll", retrace_wrap_fopen, 0 },
+
+	/* ntdll layer (TODO.windows/06): opt-in only. Catches
+	 * Win32-direct callers (CreateFileW funnels into
+	 * NtCreateFile; GetFileAttributesW into
+	 * NtQueryAttributesFile) that never touch the CRT.
+	 */
+	{ "NtCreateFile", NULL, "ntdll.dll",
+		retrace_wrap_NtCreateFile, 1 },
+	{ "NtOpenFile", NULL, "ntdll.dll",
+		retrace_wrap_NtOpenFile, 1 },
+	{ "NtQueryAttributesFile", NULL, "ntdll.dll",
+		retrace_wrap_NtQueryAttributesFile, 1 },
+	{ "NtClose", NULL, "ntdll.dll", retrace_wrap_NtClose, 1 },
+	{ "LdrLoadDll", NULL, "ntdll.dll",
+		retrace_wrap_LdrLoadDll, 1 },
+};
+#else
+static const struct win_hook g_hook_table[] = {
+	{ NULL, NULL, NULL, NULL, 0 }
+};
+#endif
+
+#define G_HOOK_COUNT (sizeof(g_hook_table) / sizeof(g_hook_table[0]))
+
+struct installed_hook {
+	retrace_hook_t *handle;
+	void *trampoline;
+	const char *name;
+};
+
+static struct installed_hook g_installed[G_HOOK_COUNT];
+static int g_installed_count;
+
+/* last refusal reason, for tests/diagnostics (OutputDebugString
+ * is invisible in CI logs)
+ */
+static char g_last_refusal[128] = "none";
+
+const char *retrace_win_last_refusal(void)
+{
+	return g_last_refusal;
+}
+
+/*
+ * Thunk-path installer: build trampoline = [prefix][jmp rel32
+ * worker+0] and patch [E9 wrapper] at the thunk. The worker is
+ * never patched -- its prologue runs fresh from worker+0.
+ */
+retrace_hook_status_t retrace_win_install_thunk(void *thunk_target,
+	void *worker, void *wrapper, const unsigned char *prefix,
+	size_t prefix_len, void **trampoline_out,
+	retrace_hook_t **hook_out);
+
+retrace_hook_status_t
+retrace_win_install_thunk(void *thunk_target, void *worker,
+	void *wrapper, const unsigned char *prefix,
+	size_t prefix_len, void **trampoline_out,
+	retrace_hook_t **hook_out)
+{
+	size_t tramp_size = prefix_len + 5; /* prefix + jmp rel32 */
+	unsigned char *buf = (unsigned char *)
+		retrace_trampoline_alloc_near(thunk_target, tramp_size);
+	ptrdiff_t rel;
+	retrace_hook_status_t st;
+	unsigned char patch[5];
+	ptrdiff_t patch_rel;
+	DWORD old_protect = 0;
+
+	(void)worker;
+	if (buf == NULL)
+		return RETRACE_HOOK_NO_MEMORY;
+
+	if (prefix_len > 0)
+		memcpy(buf, prefix, prefix_len);
+	rel = (const char *)worker -
+	      ((const char *)buf + prefix_len + 5);
+	if (rel > 0x7fffffffLL || rel < -0x80000000LL)
+		return RETRACE_HOOK_INTERNAL;
+	/* TEMPORARY diagnostic */
+	fprintf(stderr, "retrace: thunk trampoline at %p, "
+		"rel %lld (worker=%p)\n", (void *)buf,
+		(long long)rel, (void *)worker);
+	buf[prefix_len] = 0xE9;
+	memcpy(buf + prefix_len + 1, &rel, 4);
+
+	/*
+	 * Thunk patch: always the 14-byte absolute form. The thunk
+	 * export's pad bytes (CC/CC...) extend the writable window
+	 * to 14, and rel32 can't reach the wrapper (system DLL
+	 * vs retrace.dll -- arbitrary 47-bit distance). Use the
+	 * E9 rel32 path only when we happen to be within ±2GB,
+	 * but staying on the uniform 14-byte form keeps the code
+	 * path simple.
+	 */
+	patch[0] = 0x48;            /* REX.W */
+	patch[1] = 0xB8;            /* mov rax, imm64 */
+	memcpy(patch + 2, &wrapper, 8);
+	patch[10] = 0xFF;           /* jmp r/m64 */
+	patch[11] = 0xE0;           /* ModR/M: r/m = rax */
+	/*
+	 * ret_or_int pad = 90 (NOP) so the bytes past our patch
+	 * remain valid instructions if execution somehow falls
+	 * through (it shouldn't)
+	 */
+	patch[12] = 0x90;
+	patch[13] = 0x90;
+
+	if (!VirtualProtect(thunk_target, 14,
+		PAGE_EXECUTE_READWRITE, &old_protect))
+		return RETRACE_HOOK_INTERNAL;
+	memcpy(thunk_target, patch, 14);
+	VirtualProtect(thunk_target, 14, old_protect, &old_protect);
+	FlushInstructionCache(GetCurrentProcess(), thunk_target, 14);
+
+	*trampoline_out = buf;
+	(void)hook_out;
+	(void)st;
+	return RETRACE_HOOK_OK;
+}
+
+static int ntdll_opt_in(void)
+{
+	const char *env = getenv("RETRACE_WIN_NTDLL");
+
+	return env != NULL && env[0] == '1' && env[1] == '\0';
+}
+
+/*
+ * CRT exports are thin thunks: ucrtbase!fopen is
+ * "mov r8d, 0x40; jmp __common_fopen" -- the tail jump makes the
+ * thunk itself unhookable (relocation-unsafe prologue), but the
+ * jump target is the real worker every variant funnels into.
+ * Follow (bounded) and hook THERE.
+ */
+static void *follow_thunk(void *addr, const unsigned char **prefix,
+			  size_t *prefix_len)
+{
+	const unsigned char *p;
+	int hop;
+
+	p = (const unsigned char *)addr;
+	*prefix = NULL;
+	*prefix_len = 0;
+	for (hop = 0; hop < 4; hop++) {
+		size_t skip = 0;
+
+		/* mov r32/r8d, imm32 (b8..bf / 41 b8..bf): skip it */
+		if (p[0] == 0x41 && p[1] >= 0xB8 && p[1] <= 0xBF)
+			skip = 6;
+		else if (p[0] >= 0xB8 && p[0] <= 0xBF)
+			skip = 5;
+
+		/*
+		 * only the FIRST hop may set up arguments; a chain
+		 * of prefixed thunks is pathological -- stop there
+		 */
+		if (skip > 0) {
+			if (hop == 0) {
+				*prefix = p;
+				*prefix_len = skip;
+			} else {
+				break;
+			}
+		}
+
+		/* jmp rel32 */
+		if (p[skip] == 0xE9) {
+			const unsigned char *dest =
+				p + skip + 5 + *(const int *)(p + skip + 1);
+
+			if (dest == p)
+				break; /* self-loop guard */
+			p = dest;
+			continue;
+		}
+
+		/* jmp [rip+disp32] -- read the indirect target */
+		if (p[skip] == 0xFF && p[skip + 1] == 0x25) {
+			const void *const *slot =
+				(const void *const *)(p + skip + 6 +
+					*(const int *)(p + skip + 2));
+
+			if (*slot == NULL || *slot == (const void *)p)
+				break;
+			p = (const unsigned char *)*slot;
+			continue;
+		}
+		break;
+	}
+	return (void *)p;
+}
+
+/*
+ * The table accessor hook.h declares for the backends. Windows
+ * resolves targets at install time (GetProcAddress), so the raw
+ * table is internal; expose the count for the install driver.
+ */
+const struct retrace_hook_target *
+retrace_win_hook_targets(size_t *count_out)
+{
+	if (count_out != NULL)
+		*count_out = 0;
+	return NULL;
+}
+
+int retrace_win_install_hooks(void)
+{
+	size_t i;
+	int opt_in = ntdll_opt_in();
+
+	g_installed_count = 0;
+	for (i = 0; i < G_HOOK_COUNT; i++) {
+		const struct win_hook *h = &g_hook_table[i];
+		HMODULE mod;
+		void *target;
+		void *trampoline = NULL;
+		retrace_hook_t *handle = NULL;
+		retrace_hook_status_t st;
+		char msg[128];
+
+		if (h->opt_in && !opt_in)
+			continue;
+
+		mod = GetModuleHandleA(h->module);
+		if (mod == NULL) {
+			snprintf(msg, sizeof(msg),
+				"retrace: module '%s' not loaded, not hooking %s",
+				h->module, h->name);
+			snprintf(g_last_refusal, sizeof(g_last_refusal), "%s",
+				msg);
+			OutputDebugStringA(msg);
+			continue;
+		}
+		target = (void *)GetProcAddress(mod, h->name);
+		if (target == NULL) {
+			snprintf(msg, sizeof(msg),
+				"retrace: no export '%s' in %s",
+				h->name, h->module);
+			snprintf(g_last_refusal, sizeof(g_last_refusal), "%s",
+				msg);
+			OutputDebugStringA(msg);
+			continue;
+		}
+
+		st = retrace_hook_install(target, h->wrapper,
+					  &trampoline, &handle);
+		if (st == RETRACE_HOOK_UNSAFE) {
+			/*
+			 * a thunk? follow the tail jump to the worker
+			 * and hook the real implementation instead.
+			 * The thunk's argument-setup prefix is replayed
+			 * in the trampoline so calls through it still
+			 * deliver the variant selector.
+			 */
+			const unsigned char *prefix = NULL;
+			size_t prefix_len = 0;
+			void *resolved = follow_thunk(target, &prefix,
+						      &prefix_len);
+
+			if (resolved != target) {
+				/*
+				 * TEMPORARY diagnostic: the worker's first
+				 * bytes (CI-visible; verifies decoder sizing)
+				 */
+				{
+					const unsigned char *b = resolved;
+					int bi;
+
+					fprintf(stderr,
+"retrace: thunk '%s' -> worker bytes:",
+						h->name);
+					for (bi = 0; bi < 20; bi++)
+						fprintf(stderr, " %02x", b[bi]);
+					fprintf(stderr, "\n");
+				}
+				/*
+				 * Thunk path: the worker's bytes were never
+				 * patched -- the trampoline must only replay
+				 * the prefix and JMP to the worker's entry
+				 * (its intact prologue executes fresh). The
+				 * generic install_ex would also copy a
+				 * prologue window of the worker into the
+				 * trampoline, which is BOTH unnecessary AND
+				 * unsafe (truncating a multi-byte instruction
+				 * at a disasm boundary crashes inside the
+				 * trampoline). Inline the thunk trampoline
+				 * here.
+				 */
+				st = retrace_win_install_thunk(target,
+					resolved, h->wrapper, prefix,
+					prefix_len, &trampoline, &handle);
+				if (st == RETRACE_HOOK_OK)
+					goto installed;
+			}
+		}
+		if (st != RETRACE_HOOK_OK) {
+			/*
+			 * conservative v1: log and skip. Include the
+			 * first prologue bytes -- CI-visible ground
+			 * truth for decoder gaps.
+			 */
+			const unsigned char *bytes = target;
+			int bi;
+
+			snprintf(msg, sizeof(msg),
+				"retrace: refused to hook '%s' (status %d) bytes:",
+				h->name, (int)st);
+			for (bi = 0; bi < 16; bi++) {
+				char hex[8];
+
+				snprintf(hex, sizeof(hex), " %02x",
+					bytes[bi]);
+				strncat(msg, hex, sizeof(msg) -
+					strlen(msg) - 1);
+			}
+			snprintf(g_last_refusal, sizeof(g_last_refusal), "%s",
+				msg);
+			OutputDebugStringA(msg);
+			continue;
+		}
+
+		/*
+		 * TEMPORARY diagnostic: the target's first bytes
+		 * (CI-visible ground truth for decoder verification)
+		 */
+		{
+			const unsigned char *b = target;
+			int bi;
+
+			fprintf(stderr, "retrace: hooked '%s' bytes:",
+				h->name);
+			for (bi = 0; bi < 16; bi++)
+				fprintf(stderr, " %02x", b[bi]);
+			fprintf(stderr, "\n");
+		}
+
+installed:
+		g_installed[g_installed_count].handle = handle;
+		g_installed[g_installed_count].trampoline = trampoline;
+		g_installed[g_installed_count].name =
+			h->engine != NULL ? h->engine : h->name;
+		g_installed_count++;
+	}
+	return g_installed_count;
+}
+
+void retrace_win_uninstall_hooks(void)
+{
+	int i;
+
+	for (i = 0; i < g_installed_count; i++) {
+		if (g_installed[i].handle != NULL)
+			retrace_hook_uninstall(g_installed[i].handle);
+	}
+	g_installed_count = 0;
+}
+
+void *retrace_win_trampoline_for(const char *func_name)
+{
+	int i;
+
+	if (func_name == NULL)
+		return NULL;
+	for (i = 0; i < g_installed_count; i++) {
+		if (strcmp(g_installed[i].name, func_name) == 0)
+			return g_installed[i].trampoline;
+	}
+	return NULL;
+}

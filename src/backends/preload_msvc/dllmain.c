@@ -25,9 +25,11 @@
 
 /*
  * DLL entry point for the Windows inline-hooking backends. On
- * DLL_PROCESS_ATTACH, walks the prototype registry and installs an inline
- * hook per entry. Refuses-to-hook entries that don't pass the prologue
- * safety check (ADR-0009).
+ * DLL_PROCESS_ATTACH: install the hook set, then boot the
+ * engine (registries, config, real-impls -- MSVC has no
+ * constructors, so this is the boot point; see the ordering
+ * note at the install call). Refused hooks (unsafe prologue,
+ * missing export) are logged and skipped (ADR-0009).
  *
  * This file is shared between preload-msvc and preload-mingw; it contains
  * no compiler-specific code (no #ifdef _MSC_VER). Toolchain differences
@@ -37,7 +39,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-#include "hook.h"
+#include "hook_targets.h"
 
 /*
  * The list of functions to hook is provided by the backend via an
@@ -46,66 +48,13 @@
  * definition.
  */
 
-/* Per-hook handles, retained for detach. */
-static retrace_hook_t **g_hooks;
-static size_t g_hook_count;
-
-static void
-install_all_hooks(void)
-{
-	const struct retrace_hook_target *targets;
-	size_t count = 0;
-	size_t i;
-
-	targets = retrace_win_hook_targets(&count);
-	if (targets == NULL || count == 0)
-		return;
-
-	g_hooks = (retrace_hook_t **)
-		HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
-			  count * sizeof(retrace_hook_t *));
-	if (g_hooks == NULL)
-		return;
-
-	for (i = 0; i < count; i++) {
-		retrace_hook_status_t st;
-		void *trampoline = NULL;
-
-		if (targets[i].target_addr == NULL || targets[i].wrapper_addr == NULL)
-			continue;
-
-		st = retrace_hook_install(targets[i].target_addr,
-					  targets[i].wrapper_addr,
-					  &trampoline,
-					  &g_hooks[g_hook_count]);
-		if (st != RETRACE_HOOK_OK) {
-			/* Conservative v1: log and skip. */
-			OutputDebugStringA("retrace: refused to hook '");
-			OutputDebugStringA(targets[i].name ? targets[i].name : "(null)");
-			OutputDebugStringA("' (prologue unsafe)\n");
-			continue;
-		}
-		g_hook_count++;
-	}
-}
-
-static void
-uninstall_all_hooks(void)
-{
-	size_t i;
-
-	if (g_hooks == NULL)
-		return;
-
-	for (i = 0; i < g_hook_count; i++) {
-		if (g_hooks[i] != NULL)
-			retrace_hook_uninstall(g_hooks[i]);
-	}
-
-	HeapFree(GetProcessHeap(), 0, g_hooks);
-	g_hooks = NULL;
-	g_hook_count = 0;
-}
+/* The engine boots BEFORE any hook exists: a hooked call must
+ * find initialized registries, config, and real-impls.
+ * retrace_core_boot() is the MSVC constructor equivalent
+ * (src/core/main.c). Hook installation/refusal lives in
+ * hook_targets.c (the table, resolution, trampoline map).
+ */
+void retrace_core_boot(void);
 
 BOOL WINAPI
 DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
@@ -116,16 +65,19 @@ DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	switch (fdwReason) {
 	case DLL_PROCESS_ATTACH:
 		DisableThreadLibraryCalls(hinstDLL);
-#ifdef _MSC_VER
-		/* MSVC has no __attribute__((constructor)); MinGW auto-registers
-		 * via the constructor attribute in backend.c instead.
+		/*
+		 * Hooks FIRST, boot second: real-impl resolution runs
+		 * during boot and a hooked name must resolve to its
+		 * TRAMPOLINE (resolving after boot would capture the
+		 * patched bytes and re-enter the wrapper forever).
+		 * Calls racing the boot pass through the wrapper's
+		 * !retrace_inited path straight to the trampoline.
 		 */
-		register_preload_msvc();
-#endif
-		install_all_hooks();
+		retrace_win_install_hooks();
+		retrace_core_boot();
 		break;
 	case DLL_PROCESS_DETACH:
-		uninstall_all_hooks();
+		retrace_win_uninstall_hooks();
 		break;
 	default:
 		break;

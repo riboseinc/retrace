@@ -30,6 +30,15 @@
 #include "data_types.h"
 #include "funcs.h"
 
+/*
+ * Role-specific registry declarations: each core header defines
+ * its role macro next to its only call site (see actions.h,
+ * funcs.h, data_types.h). POSIX -> the generic section macro;
+ * Windows (RETRACE_WIN_PE_REGISTRY, defined by win_common's
+ * arch_spec_macros.h) -> short PE sections walked via the
+ * module's own headers (section_walk.c).
+ */
+
 struct FuncParam {
 	struct ParamMeta param_meta;
 	const struct DataType *data_type;

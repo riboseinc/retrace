@@ -52,9 +52,21 @@ struct Action {
 			const JSON_Object *action_params);
 };
 
+/*
+ * Registry storage: POSIX section walk, or the Windows
+ * PE-section registry (win_common/arch_spec_macros.h).
+ */
+#ifdef RETRACE_WIN_PE_REGISTRY
+#define retrace_as_define_var_in_acts(type, name) \
+	retrace_win_declare_(".rtrA", type, name)
+#else
+#define retrace_as_define_var_in_acts(type, name) \
+	retrace_as_define_var_in_sec(type, name[], \
+		"__DATA", "__retrace_acts")
+#endif
+
 #define retrace_actions_define_package(pkg_name) \
-	retrace_as_define_var_in_sec(const struct Action,\
-		retrace_actions_##pkg_name[], \
-			"__DATA", "__retrace_acts")
+	retrace_as_define_var_in_acts(const struct Action,\
+		retrace_actions_##pkg_name)
 
 #endif /* SRC_RETRACE_V2_ACTIONS_H_ */

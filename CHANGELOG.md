@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.13.0] — 2026-08-20
+
+**Windows: the first live hooks.** (TODO.windows/05-06.) The
+engine has built on Windows since 2.11.0; now calls actually
+flow through it: inline hook -> assembly wrapper ->
+WrapperWinX64Frame -> engine -> trampoline back to the real
+function.
+
+- **PE-section registry** — actions, prototypes, and data types
+  register on Windows (.rtrA/.rtrF/.rtrD sections found via the
+  module's own PE headers; PE gives no __start_ symbols and MSVC
+  has no constructors). Previously the registries walked empty.
+- **Hook layers** — ucrt `fopen` default-on; the ntdll set
+  (`NtCreateFile`, `NtOpenFile`, `NtQueryAttributesFile`,
+  `NtClose`, `LdrLoadDll`) strictly opt-in via
+  `RETRACE_WIN_NTDLL=1` (AV/EDR sensitivity documented). Paths
+  decode from OBJECT_ATTRIBUTES/UNICODE_STRING to UTF-8, so
+  profile/correlate consume them like any path. libsass-style
+  Win32-direct importers are visible at this depth.
+- **One injectable `retrace.dll`** — engine + hook core +
+  backend in a single DLL (the backend DLL previously shipped
+  without the engine). DllMain installs hooks BEFORE boot so
+  hooked names resolve to their trampolines, never the patched
+  bytes.
+- **`retrace-win-run`** — the Windows launcher:
+  CreateProcess(SUSPENDED) -> inject -> hooks+boot in the child
+  -> resume. One shared injection implementation
+  (win_common/inject.c).
+- **Windows-arm64** — engine + registry run (tested); the
+  arm64 wrapper is the follow-up slice.
+- **Docs** — docs/windows.md (injection, hook layers, jail,
+  procmon kernel truth), cookbook 34 + tools.md updates.
+
+Bumps: version.h 2.12.0 -> 2.13.0, retrace_cli.c banner,
+nix/debian/fedora packaging, CHANGELOG.md.
+
 ## [2.12.0] — 2026-08-20
 
 **Profiles: see what a binary does, then jail it to that.**

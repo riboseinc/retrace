@@ -152,9 +152,21 @@ int retrace_datatypes_init(void);
 /* aligned 1 is used because i group all DataType in the same
  * section, creating an array
  */
+/*
+ * Registry storage: POSIX section walk, or the Windows
+ * PE-section registry (win_common/arch_spec_macros.h).
+ */
+#ifdef RETRACE_WIN_PE_REGISTRY
+#define retrace_as_define_var_in_datatypes(type, name) \
+	retrace_win_declare_(".rtrD", type, name)
+#else
+#define retrace_as_define_var_in_datatypes(type, name) \
+	retrace_as_define_var_in_sec(type, name[], \
+		"__DATA", "__retrace_dt")
+#endif
+
 #define retrace_datatype_define_prototypes(datatype_name) \
-	retrace_as_define_var_in_sec(const struct DataType,\
-		retrace_dt_##datatype_name[], \
-			"__DATA", "__retrace_dt")
+	retrace_as_define_var_in_datatypes(const struct DataType,\
+		retrace_dt_##datatype_name)
 
 #endif /* SRC_RETRACE_V2_DATA_TYPES_H_ */
