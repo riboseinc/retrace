@@ -12,11 +12,11 @@
  * only the declared files (see inside.json). Reading
  * leaked.dat is the escape -- a host touch the VFS never saw.
  *
- * Uses open(2) rather than fopen(3): current macOS SDKs remap
- * fopen to fopen$DARWIN_EXTSN in optimized builds, which the
- * interposition table does not export (recorded in
- * TODO.windows/05); open's prototype also derefs the path
- * pointer, which is what the correlator consumes.
+ * Uses open(2): its prototype derefs the path pointer (the
+ * correlator consumes *path), and it maps 1:1 to _open on
+ * Windows. fopen is interposed too -- including the
+ * fopen$DARWIN_EXTSN variant macOS SDKs emit in optimized
+ * _DARWIN_C_SOURCE builds (v2.12.0).
  */
 
 #include <fcntl.h>

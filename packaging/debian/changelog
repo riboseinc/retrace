@@ -1,3 +1,14 @@
+retrace (2.11.2-1) unstable; urgency=medium
+
+  * Fixed: fopen interception silently bypassed on macOS for
+    every target compiled with _DARWIN_C_SOURCE (the project's
+    own CMake adds it to all Darwin targets): modern SDKs emit
+    fopen$DARWIN_EXTSN in optimized builds. The variant symbol
+    is now interposed; the engine strips the suffix so configs,
+    prototypes, and logs use the plain name.
+
+ -- Ribose Inc <opensource@ribose.com>  Thu, 20 Aug 2026 09:40:00 +0000
+
 retrace (2.11.1-1) unstable; urgency=medium
 
   * Fixed: ring-logger entries lost on immediate process exit
