@@ -36,6 +36,7 @@
 #define _GNU_SOURCE
 #endif
 #include <stdio.h>
+#include <string.h>
 
 #include "engine.h"
 #include "real_impls.h"
@@ -73,6 +74,41 @@
  * Steps 3, 11, 12 live in their own modules (ADR-0013); this function
  * is the orchestrator that calls them in order.
  */
+/*
+ * macOS SDKs with _DARWIN_C_SOURCE remap some libc names (fopen)
+ * to $DARWIN_EXTSN variants in optimized builds. The Mach-O
+ * backends interpose the variant symbols too; stripping the
+ * suffix here makes every downstream lookup -- prototype,
+ * config script, real-impl resolution, log output -- see the
+ * clean name. Single normalization point (SSOT).
+ *
+ * Deliberately libc-free (manual loops): a plain strlen/strcmp
+ * here is an interposed call -- the wrapper would re-enter the
+ * engine and recurse (every preload test died to this on Linux).
+ */
+static char *strip_darwin_extsn(char *name, char *buf, size_t bufsz)
+{
+	static const char suffix[] = "$DARWIN_EXTSN";
+	const size_t slen = sizeof(suffix) - 1;
+	size_t n = 0;
+	size_t i;
+
+	while (name[n] != '\0')
+		n++;
+	if (n <= slen)
+		return name;
+	for (i = 0; i < slen; i++) {
+		if (name[n - slen + i] != suffix[i])
+			return name;
+	}
+	if (n - slen >= bufsz)
+		return name;
+	for (i = 0; i < n - slen; i++)
+		buf[i] = name[i];
+	buf[n - slen] = '\0';
+	return buf;
+}
+
 void retrace_engine_wrapper(char *func_name,
 	void *arch_spec_ctx)
 {
@@ -80,6 +116,10 @@ void retrace_engine_wrapper(char *func_name,
 	struct ThreadContext *thread_ctx;
 	const JSON_Object *i_script;
 	const JSON_Array *i_scripts;
+	char clean_name[64]; /* MAXLEN_FUNC_NAME; funcs.h not included here */
+
+	func_name = strip_darwin_extsn(func_name, clean_name,
+		sizeof(clean_name));
 
 	real_impl = retrace_as_get_real_safe(func_name);
 	if (!retrace_inited) {

@@ -46,5 +46,15 @@
  * recursion. On Darwin, the constructor uses a different resolution
  * path (dyld interpose section walk), so dlsym interception is safe.
  */
+/*
+ * macOS SDKs with _DARWIN_C_SOURCE remap fopen to
+ * fopen$DARWIN_EXTSN in optimized builds (the project's CMake
+ * adds _DARWIN_C_SOURCE to every Darwin target). Interpose the
+ * variant symbol; the engine strips the suffix (engine.c,
+ * strip_darwin_extsn) so configs, prototypes, and logs all
+ * use the plain name.
+ */
+WRAPPER_ENTRY_AARCH64 fopen$DARWIN_EXTSN
+
 WRAPPER_ENTRY_AARCH64 dlerror
 WRAPPER_ENTRY_AARCH64 dlsym

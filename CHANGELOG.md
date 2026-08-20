@@ -47,6 +47,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 13-test matcher suite (classify, index, pid/window/probe
   semantics); 75/75 overall (10 golden correlation cases).
 
+## [2.11.2] - 2026-08-20
+
+### Fixed
+- **fopen interception was silently bypassed on macOS for every
+  target compiled with `_DARWIN_C_SOURCE`** — which includes
+  everything built by this project's CMake (it adds the define
+  to all Darwin targets). Modern macOS SDKs remap `fopen` to
+  `fopen$DARWIN_EXTSN` under that define in optimized builds,
+  and the interposition table had no entry for the variant —
+  calls went straight to libc, unlogged. Notably, the CI's own
+  test/file binary was affected: the macOS legs had zero real
+  fopen coverage until now.
+  - The Mach-O backends (arm64 + the shared x86_64 table)
+    interpose `fopen$DARWIN_EXTSN`.
+  - The engine strips the `$DARWIN_EXTSN` suffix at the single
+    normalization point (`strip_darwin_extsn`), so prototype
+    lookup, config scripts, real-impl resolution, and log
+    output all use the clean name — user configs need no
+    changes.
+  - Verified end to end: a `_DARWIN_C_SOURCE` -O3 binary's
+    EXTSN call is interposed, logged as plain `fopen` with the
+    dereferenced `*filename` param, and `call_real` executes
+    (the CI file test's 2 fopen calls now appear in traces).
+
 ## [2.11.1] - 2026-08-20
 
 ### Fixed

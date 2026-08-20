@@ -37,6 +37,17 @@
 #undef RETRACE_WRAP
 
 /*
+ * macOS (x86_64 path -- this file is the fallback when no
+ * arch-specific funcs_symbols.S exists): SDKs with
+ * _DARWIN_C_SOURCE remap fopen to fopen$DARWIN_EXTSN in
+ * optimized builds. Interpose the variant symbol; the engine
+ * strips the suffix (engine.c, strip_darwin_extsn).
+ */
+#ifdef __MACH__
+WRAPPER_ENTRY_SYSTEM_V fopen$DARWIN_EXTSN
+#endif
+
+/*
  * glibc-specific: __isoc99_* scanf variants.
  *
  * Modern gcc + glibc redirects scanf/fscanf/sscanf/v*scanf to
