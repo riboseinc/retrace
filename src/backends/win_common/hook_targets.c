@@ -245,13 +245,22 @@ retrace_win_install_thunk(void *thunk_target, void *worker,
 	retrace_hook_t **hook_out)
 {
 	size_t tramp_size = prefix_len + 5; /* prefix + jmp rel32 */
+#if defined(_M_ARM64) || defined(__aarch64__)
+	/* [ldr x17, [pc,#8]][br x17][.quad worker] -- 16 bytes */
+	tramp_size = prefix_len + 16;
+#endif
 	unsigned char *buf = (unsigned char *)
 		retrace_trampoline_alloc_near(thunk_target, tramp_size);
 	ptrdiff_t rel;
 	retrace_hook_status_t st;
-	unsigned char patch[5];
+	unsigned char patch[16];
+	size_t patch_len = 0;
 	ptrdiff_t patch_rel;
 	DWORD old_protect = 0;
+	static const unsigned char ldr_x17_pc8[4] = { 0x51, 0x00,
+						      0x00, 0x58 };
+	static const unsigned char br_x17[4] = { 0x20, 0x02,
+						 0x1F, 0xD6 };
 
 	(void)worker;
 	if (buf == NULL)
@@ -259,36 +268,45 @@ retrace_win_install_thunk(void *thunk_target, void *worker,
 
 	if (prefix_len > 0)
 		memcpy(buf, prefix, prefix_len);
+#if defined(_M_ARM64) || defined(__aarch64__)
+	memcpy(buf + prefix_len + 0, ldr_x17_pc8, 4);
+	memcpy(buf + prefix_len + 4, br_x17, 4);
+	memcpy(buf + prefix_len + 8, &worker, 8);
+#else
 	rel = (const char *)worker -
 	      ((const char *)buf + prefix_len + 5);
 	if (rel > 0x7fffffffLL || rel < -0x80000000LL)
 		return RETRACE_HOOK_INTERNAL;
 	buf[prefix_len] = 0xE9;
 	memcpy(buf + prefix_len + 1, &rel, 4);
+#endif
 
 	/*
-	 * Thunk patch: always the 14-byte absolute form. The thunk
-	 * export's pad bytes (CC/CC...) extend the writable window
-	 * to 14, and rel32 can't reach the wrapper (system DLL
-	 * vs retrace.dll -- arbitrary 47-bit distance). Use the
-	 * E9 rel32 path only when we happen to be within ±2GB,
-	 * but staying on the uniform 14-byte form keeps the code
-	 * path simple.
+	 * Thunk patch: always the absolute form. The thunk export's
+	 * pad bytes (x86 CC/CC, arm64 NOP/zero) extend the writable
+	 * window, and rel32 can't reach the wrapper (system DLL vs
+	 * retrace.dll -- arbitrary 47-bit distance).
 	 */
+#if defined(_M_ARM64) || defined(__aarch64__)
+	patch_len = 16;
+	memcpy(patch + 0, ldr_x17_pc8, 4);
+	memcpy(patch + 4, br_x17, 4);
+	memcpy(patch + 8, &wrapper, 8);
+#else
+	patch_len = 14;
 	patch[0] = 0x48;            /* REX.W */
 	patch[1] = 0xB8;            /* mov rax, imm64 */
 	memcpy(patch + 2, &wrapper, 8);
 	patch[10] = 0xFF;           /* jmp r/m64 */
 	patch[11] = 0xE0;           /* ModR/M: r/m = rax */
-	/*
-	 * ret_or_int pad = 90 (NOP) so the bytes past our patch
-	 * remain valid instructions if execution somehow falls
-	 * through (it shouldn't)
+	/* pad with NOPs so a fall-through (there is none) stays
+	 * executable
 	 */
 	patch[12] = 0x90;
 	patch[13] = 0x90;
+#endif
 
-	if (!VirtualProtect(thunk_target, 14,
+	if (!VirtualProtect(thunk_target, patch_len,
 		PAGE_EXECUTE_READWRITE, &old_protect))
 		return RETRACE_HOOK_INTERNAL;
 	/* capture the original bytes BEFORE the patch: uninstall
@@ -296,18 +314,65 @@ retrace_win_install_thunk(void *thunk_target, void *worker,
 	 * the wrapper forever -- the fallback real-impl resolution
 	 * returns the patched export itself)
 	 */
-	st = retrace_hook_bookmark(thunk_target, 14, buf, hook_out);
+	st = retrace_hook_bookmark(thunk_target, patch_len, buf, hook_out);
 	if (st != RETRACE_HOOK_OK) {
-		VirtualProtect(thunk_target, 14, old_protect, &old_protect);
+		VirtualProtect(thunk_target, patch_len, old_protect,
+			&old_protect);
 		return st;
 	}
-	memcpy(thunk_target, patch, 14);
-	VirtualProtect(thunk_target, 14, old_protect, &old_protect);
-	FlushInstructionCache(GetCurrentProcess(), thunk_target, 14);
+	memcpy(thunk_target, patch, patch_len);
+	VirtualProtect(thunk_target, patch_len, old_protect, &old_protect);
+	FlushInstructionCache(GetCurrentProcess(), thunk_target, patch_len);
 
 	*trampoline_out = buf;
 	return RETRACE_HOOK_OK;
 }
+
+/*
+ * arm64 thunk follower (TODO.trace-profile/12): arm64 ucrt
+ * exports are "b <worker>" branch stubs (the arm64 shape of the
+ * x86 tail-jump thunk): [b imm26][nop][nop][pad]. Follow ONE
+ * unconditional branch to the worker; a destination that is
+ * itself padding/nop is refused (mirrors the x86 guards).
+ */
+#if defined(_M_ARM64) || defined(__aarch64__)
+static void *follow_thunk_arm64(void *addr, size_t *prefix_len)
+{
+	const unsigned char *p = (const unsigned char *)addr;
+	uint32_t insn;
+	int64_t imm;
+	const unsigned char *dest;
+	uint32_t first;
+
+	*prefix_len = 0;
+	memcpy(&insn, p, sizeof(insn));
+	/*
+	 * movz/movn/movk prefix: the arm64 shape of the x86 thunk's
+	 * "mov r8d, 0x40" variant-selector setup (ucrtbase fopen is
+	 * [movz w2, #0x40][b <worker>]). Replayed in the trampoline.
+	 */
+	if ((insn & 0x7F800000U) == 0x52800000U ||
+	    (insn & 0x7F800000U) == 0x12800000U ||
+	    (insn & 0x7F800000U) == 0x72800000U) {
+		*prefix_len = 4;
+		p += 4;
+		memcpy(&insn, p, sizeof(insn));
+	}
+	if ((insn & 0xFC000000U) != 0x14000000U) /* B imm26 */
+		return addr;
+	imm = (int64_t)(insn & 0x03FFFFFFU);
+	if (imm & 0x02000000U)
+		imm -= 0x04000000U;
+	dest = p + ((ptrdiff_t)imm << 2);
+	if (dest == addr)
+		return addr;
+	memcpy(&first, dest, sizeof(first));
+	/* landing in zero padding or on a nop: not a worker */
+	if (first == 0x00000000U || first == 0xD503201FU)
+		return addr;
+	return (void *)dest;
+}
+#endif
 
 static int ntdll_opt_in(void)
 {
@@ -438,17 +503,43 @@ int retrace_win_install_hooks(void)
 		}
 		target = (void *)GetProcAddress(mod, h->name);
 		if (target == NULL) {
+			/*
+			 * Export tables vary per arch/image (arm64
+			 * ucrtbase lacks several x86-decorated names) --
+			 * a normal skip, not a refusal: do not overwrite
+			 * the decoder-refusal diagnostic the tests read.
+			 */
 			snprintf(msg, sizeof(msg),
 				"retrace: no export '%s' in %s",
 				h->name, h->module);
-			snprintf(g_last_refusal, sizeof(g_last_refusal), "%s",
-				msg);
 			OutputDebugStringA(msg);
 			continue;
 		}
 
 		st = retrace_hook_install(target, h->wrapper,
 					  &trampoline, &handle);
+#if defined(_M_ARM64) || defined(__aarch64__)
+		if (st == RETRACE_HOOK_UNSAFE) {
+			/*
+			 * arm64 CRT exports are "b <worker>" branch
+			 * stubs; follow one hop and hook the worker via
+			 * the arm64 thunk trampoline shape.
+			 */
+			size_t prefix_len = 0;
+			void *resolved = follow_thunk_arm64(target,
+				&prefix_len);
+
+			if (resolved != target) {
+				st = retrace_win_install_thunk(target,
+					resolved, h->wrapper,
+					(const unsigned char *)target,
+					prefix_len,
+					&trampoline, &handle);
+				if (st == RETRACE_HOOK_OK)
+					goto installed;
+			}
+		}
+#else
 		if (st == RETRACE_HOOK_UNSAFE) {
 			/*
 			 * a thunk? follow the tail jump to the worker
@@ -483,6 +574,7 @@ int retrace_win_install_hooks(void)
 					goto installed;
 			}
 		}
+#endif
 		if (st != RETRACE_HOOK_OK) {
 			/*
 			 * conservative v1: log and skip. Include the

@@ -68,6 +68,7 @@ static int tests_fail;
 
 static char g_log_path[MAX_PATH];
 static char g_cfg_path[MAX_PATH];
+static char g_deny_path[MAX_PATH];
 
 static void write_text(const char *path, const char *text)
 {
@@ -109,13 +110,47 @@ static void test_fopen_round_trip(void)
 	char log[8192];
 	size_t n;
 
-	/* 1. config: fopen -> log_params + call_real */
-	write_text(g_cfg_path,
-		"{\"intercept_scripts\":[{"
-		"\"func_name\":\"fopen\","
-		"\"actions\":["
-		"{\"action_name\":\"log_params\"},"
-		"{\"action_name\":\"call_real\"}]}]}");
+	/*
+	 * 1. config: fopen -> sandbox(allow: cfg + log) -> log_params
+	 * -> call_real. The allowlist jail (TODO.trace-profile/12):
+	 * an UNDECLARED path must be denied before libc executes.
+	 */
+	{
+		FILE *cf = fopen(g_cfg_path, "wb");
+		char esc_cfg[MAX_PATH * 2];
+		char esc_log[MAX_PATH * 2];
+		char *o;
+		const char *i;
+
+		CHECK(cf != NULL);
+		/* Windows paths carry backslashes: raw in a JSON
+		 * string they are invalid escapes -- conf_init would
+		 * reject the whole config and the engine would never
+		 * boot (the v2.17.0 CI lesson)
+		 */
+		for (o = esc_cfg, i = g_cfg_path; *i != '\0'; i++) {
+			if (*i == '\\')
+				*o++ = '\\';
+			*o++ = *i;
+		}
+		*o = '\0';
+		for (o = esc_log, i = g_log_path; *i != '\0'; i++) {
+			if (*i == '\\')
+				*o++ = '\\';
+			*o++ = *i;
+		}
+		*o = '\0';
+
+		fputs("{\"intercept_scripts\":[{\"func_name\":\"fopen\",", cf);
+		fputs("\"actions\":[{\"action_name\":\"sandbox\",", cf);
+		fputs("\"action_params\":{\"allow_paths\":[", cf);
+		fprintf(cf, "\"%s\",\"%s\"]}},", esc_cfg, esc_log);
+		fputs("{\"action_name\":\"log_params\"},", cf);
+		fputs("{\"action_name\":\"call_real\"}]}]}", cf);
+		fputs("\n", cf);
+		fclose(cf);
+	}
+	write_text(g_deny_path, "undocumented");
 	DeleteFileA(g_log_path);
 
 	setenv_str("RETRACE_JSON_CONFIG", g_cfg_path);
@@ -152,6 +187,17 @@ static void test_fopen_round_trip(void)
 	f = fopen(g_log_path, "rb");
 	CHECK(f != NULL);
 	fclose(f);
+
+	/*
+	 * Jail denial (TODO.trace-profile/12): g_deny_path is NOT in
+	 * allow_paths -- sandbox aborts the script and synthesizes
+	 * -1 (errno EACCES). The caller must NOT get a usable FILE*.
+	 */
+	{
+		FILE *denied = fopen(g_deny_path, "rb");
+
+		CHECK(denied == NULL || denied == (void *)-1);
+	}
 
 	/* give the ring flusher (non-MSVC) a beat */
 	Sleep(300);
@@ -253,6 +299,8 @@ int main(void)
 	snprintf(g_cfg_path, sizeof(g_cfg_path), "%sretrace_win_test.json",
 		tmp_dir);
 	snprintf(g_log_path, sizeof(g_log_path), "%sretrace_win_log.json",
+		tmp_dir);
+	snprintf(g_deny_path, sizeof(g_deny_path), "%sretrace_win_deny.txt",
 		tmp_dir);
 
 	/* minimal real_impls for the registry inits inside boot */

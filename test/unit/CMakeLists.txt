@@ -90,11 +90,12 @@ if(RETRACE_PLATFORM_WINDOWS)
     set_tests_properties(unit-test-win-registry PROPERTIES LABELS "unit")
 
     # Wrapper runtime round trip (TODO.windows/05,
-    # TODO.trace-profile/12): x64 legs. The arm64 HOOK MACHINERY
-    # is built and linked on the arm legs, but its first runtime
-    # run (v2.16.0) segfaults in the trampoline tail -- open in
-    # TODO.trace-profile/12; x64 is the runtime reference.
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|amd64")
+    # TODO.trace-profile/12): all arches. The arm64 decoder now
+    # REFUSES non-relocatable prologues (v2.16.0 attempt blindly
+    # copied ADRP instructions into the trampoline and
+    # segfaulted); a refusal fails this test with the reason
+    # instead of crashing.
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|amd64|aarch64|arm64|ARM64")
         add_executable(retrace_test_win_wrapper test_win_wrapper.c)
         set_target_properties(retrace_test_win_wrapper PROPERTIES
             OUTPUT_NAME test_win_wrapper
@@ -1629,3 +1630,24 @@ target_include_directories(retrace_test_profile_jail PRIVATE
 add_test(NAME unit-test-profile-jail
     COMMAND retrace_test_profile_jail)
 set_tests_properties(unit-test-profile-jail PROPERTIES LABELS "unit")
+# Kernel-truth converters (TODO.trace-profile/14): dtrace
+# (macOS) + truss (FreeBSD) log -> trace JSON.
+#
+add_executable(retrace_test_kernel_converters test_kernel_converters.c
+    ${CMAKE_SOURCE_DIR}/tools/dtrace2retrace/convert.c
+    ${CMAKE_SOURCE_DIR}/tools/truss2retrace/convert.c
+    ${_parson_for_tools})
+set_target_properties(retrace_test_kernel_converters PROPERTIES
+    OUTPUT_NAME test_kernel_converters
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_kernel_converters PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/dtrace2retrace
+    ${CMAKE_SOURCE_DIR}/tools/truss2retrace
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-kernel-converters
+    COMMAND retrace_test_kernel_converters)
+set_tests_properties(unit-test-kernel-converters PROPERTIES LABELS "unit")
+

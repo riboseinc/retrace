@@ -47,7 +47,8 @@ install_checkpatch() {
 		wget https://raw.githubusercontent.com/torvalds/linux/master/scripts/spelling.txt
 		patch -p0 < "$SPWD"/checkpatch.pl.patch
 		echo "invalid.struct.name" > const_structs.checkpatch
-		echo "JSON_Object" > typedefs.checkpatch
+		printf '%s\n' "JSON_Object" "JSON_Array" "JSON_Value" \
+			"JSON_Status" > typedefs.checkpatch
 	fi
 }
 

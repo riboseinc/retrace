@@ -1,3 +1,16 @@
+retrace (2.17.0-1) unstable; urgency=medium
+
+  * Added: retrace-dtrace2retrace (macOS dtruss -> trace; the
+    claims-vs-truth grading now runs on macOS) and
+    retrace-truss2retrace (FreeBSD truss).
+  * Fixed: arm64 hook decoder blindly relocated ADRP/branches --
+    real allowlist decoder now refuses non-relocatable prologues;
+    x86-only thunk follower compiled out on arm64.
+  * Added: jail denial proven in the Windows wrapper test
+    (sandbox allowlist denies an undeclared path).
+
+ -- Ribose Inc <opensource@ribose.com>  Sat, 22 Aug 2026 08:00:00 +0000
+
 retrace (2.16.0-1) unstable; urgency=medium
 
   * Added: Windows env/net visibility -- getenv (ucrt) and
