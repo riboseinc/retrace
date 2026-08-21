@@ -267,7 +267,7 @@ static int as_calc_params_specifiers(const char *fmt_string)
 }
 #endif
 
-long retrace_as_call_real(const void *real_impl,
+intptr_t retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt)
 {

@@ -40,6 +40,7 @@
 #include "capability.h"
 #include "capture.h"
 #include "diff.h"
+#include "jail.h"
 #include "validate.h"
 #include "match.h"
 #include "stream.h"
@@ -48,9 +49,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
 
 static char *read_file(const char *path, size_t *len_out)
 {
@@ -115,6 +113,46 @@ static int load_profile(const char *path, struct ProfFeed *feed)
 }
 
 /*
+ * Load a profile DOC ({"profile": ...}) or a trace. Doc form
+ * wins when the root object carries "profile"; JSONL/array
+ * traces fall through to the scanner. The jail subcommand
+ * accepts either artifact.
+ */
+static int load_any(const char *path, struct ProfFeed *feed)
+{
+	char *text;
+	size_t len = 0;
+	JSON_Value *v;
+	JSON_Object *root;
+
+	prof_init(&feed->prof);
+	feed->skipped = 0;
+	text = read_file(path, &len);
+	if (text == NULL)
+		return -1;
+
+	v = json_parse_string_with_comments(text);
+	root = v != NULL ? json_value_get_object(v) : NULL;
+	if (root != NULL &&
+	    json_object_get_object(root, "profile") != NULL) {
+		int rc = prof_from_json(
+			json_object_get_object(root, "profile"),
+			&feed->prof);
+
+		json_value_free(v);
+		free(text);
+		return rc;
+	}
+	if (v != NULL)
+		json_value_free(v);
+
+	(void)corr_stream_scan(text, len, feed_cb, feed, &feed->skipped);
+	free(text);
+	prof_finish(&feed->prof);
+	return 0;
+}
+
+/*
  * Delta: grade every kernel access by whether the libc layer
  * claims it (same normalized path). Kernel-only = sub-libc
  * surface = risk.
@@ -159,69 +197,6 @@ static void delta_compute(const struct ProfFeed *libc,
 			json_array_append_value(arr, o);
 		}
 	}
-}
-
-/*
- * The jail config: every function observed in the trace gets a
- * script whose first action is sandbox with the allowlist as
- * allow_paths, followed by call_real so allowed paths execute.
- * A path not on the list is denied before libc sees it.
- *
- * funcs_src scopes the scripts, paths_src supplies the
- * allowlist: with --inside these differ (declared set vs
- * observed functions). Scoped to observed functions rather than
- * a wildcard: a '*' jail also jails the dynamic loader's own
- * file opens and kills process startup. Re-profile to extend
- * coverage.
- */
-static JSON_Value *jail_config(const struct Profile *funcs_src,
-			       const struct Profile *paths_src)
-{
-	JSON_Value *v = json_value_init_object();
-	JSON_Object *root = json_value_get_object(v);
-	JSON_Value *scripts = json_value_init_array();
-	size_t i, f;
-
-	for (f = 0; f < funcs_src->functions.count; f++) {
-		JSON_Value *script = json_value_init_object();
-		JSON_Object *script_o = json_value_get_object(script);
-		JSON_Value *actions = json_value_init_array();
-		JSON_Value *action = json_value_init_object();
-		JSON_Object *action_o = json_value_get_object(action);
-		JSON_Value *params = json_value_init_object();
-		JSON_Object *params_o = json_value_get_object(params);
-		JSON_Value *allow = json_value_init_array();
-
-		for (i = 0; i < paths_src->accesses.count; i++)
-			json_array_append_string(
-				json_value_get_array(allow),
-				paths_src->accesses.items[i].path);
-
-		json_object_set_value(params_o, "allow_paths", allow);
-		json_object_set_string(action_o, "action_name",
-			"sandbox");
-		json_object_set_value(action_o, "action_params", params);
-		json_array_append_value(json_value_get_array(actions),
-			action);
-
-		/* allowed paths must still reach the real call */
-		{
-			JSON_Value *cr = json_value_init_object();
-
-			json_object_set_string(json_value_get_object(cr),
-				"action_name", "call_real");
-			json_array_append_value(
-				json_value_get_array(actions), cr);
-		}
-
-		json_object_set_string(script_o, "func_name",
-			funcs_src->functions.names[f]);
-		json_object_set_value(script_o, "actions", actions);
-		json_array_append_value(json_value_get_array(scripts),
-			script);
-	}
-	json_object_set_value(root, "intercept_scripts", scripts);
-	return v;
 }
 
 static void capability_to_json(JSON_Object *root,
@@ -337,30 +312,122 @@ static int diff_mode(int argc, char **argv)
 }
 
 /*
+ * `retrace-profile jail <profile.json> [--inside <declared.json>]
+ *   [-o <jail.json>]` (TODO.trace-profile/10): emit a jail
+ * config from an existing profile -- the "update the jail" step
+ * of the upgrade story (profile old -> upgrade -> profile new ->
+ * diff -> jail). Input may be a profile doc or a trace; the
+ * allowlist comes from --inside when given (the declared set --
+ * the observed trace would allowlist its own escapes), else from
+ * the observed accesses (self-jail of a known-good run).
+ */
+static int jail_mode(int argc, char **argv)
+{
+	const char *in_path = NULL;
+	const char *inside_path = NULL;
+	const char *out_path = NULL;
+	struct ProfFeed feed, inside_feed;
+	const struct Profile *allow_src;
+	JSON_Value *jc;
+	int i;
+
+	for (i = 2; i < argc; i++) {
+		if (strcmp(argv[i], "--inside") == 0 && i + 1 < argc)
+			inside_path = argv[++i];
+		else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc)
+			out_path = argv[++i];
+		else if (argv[i][0] == '-' && argv[i][1] != '\0') {
+			fprintf(stderr,
+	"Usage: retrace-profile jail <profile.json> [--inside d.json] [-o jail.json]\n");
+			return 2;
+		} else if (in_path == NULL) {
+			in_path = argv[i];
+		}
+	}
+	if (in_path == NULL) {
+		fprintf(stderr,
+	"Usage: retrace-profile jail <profile.json> [--inside d.json] [-o jail.json]\n");
+		return 2;
+	}
+
+	if (load_any(in_path, &feed) != 0) {
+		fprintf(stderr, "retrace-profile: cannot read %s\n",
+			in_path);
+		return 2;
+	}
+	if (feed.prof.functions.count == 0) {
+		fprintf(stderr,
+		"retrace-profile: no observed functions in %s\n",
+			in_path);
+		prof_free(&feed.prof);
+		return 2;
+	}
+
+	allow_src = &feed.prof;
+	if (inside_path != NULL) {
+		if (load_any(inside_path, &inside_feed) != 0) {
+			fprintf(stderr,
+				"retrace-profile: cannot read %s\n",
+				inside_path);
+			prof_free(&feed.prof);
+			return 2;
+		}
+		allow_src = &inside_feed.prof;
+	}
+
+	jc = prof_jail_config(&feed.prof, allow_src);
+	{
+		char *ser = json_serialize_to_string_pretty(jc);
+
+		if (out_path != NULL) {
+			FILE *of = fopen(out_path, "w");
+
+			if (of == NULL) {
+				fprintf(stderr,
+				"retrace-profile: cannot write %s\n",
+					out_path);
+				json_free_serialized_string(ser);
+				json_value_free(jc);
+				prof_free(&feed.prof);
+				if (inside_path != NULL)
+					prof_free(&inside_feed.prof);
+				return 2;
+			}
+			fprintf(of, "%s\n", ser);
+			fclose(of);
+		} else {
+			printf("%s\n", ser);
+		}
+		json_free_serialized_string(ser);
+	}
+	json_value_free(jc);
+
+	fprintf(stderr,
+"retrace-profile jail: %zu function(s) jailed, %zu allowed path(s) (allow: %s)\n",
+		feed.prof.functions.count, allow_src->accesses.count,
+		inside_path != NULL ? "declared (--inside)" : "observed");
+	prof_free(&feed.prof);
+	if (inside_path != NULL)
+		prof_free(&inside_feed.prof);
+	return 0;
+}
+
+/*
  * `retrace-profile capture [-o profile.json] [--inside d.json]
  *   [--jail-out j.json] [-- cmd args...]` -- the whole recipe-34
  * flow in one command: run the command under the preload, trace
  * it, reduce to a profile, optionally emit the jail
- * (TODO.trace-profile/03). POSIX; Windows uses retrace-win-run.
+ * (TODO.trace-profile/03).
  */
 static int capture_mode(int argc, char **argv)
 {
-#ifdef _WIN32
-	(void)argc;
-	(void)argv;
-	fprintf(stderr,
-"retrace-profile capture: POSIX only -- Windows uses retrace-win-run\n");
-	return 2;
-#else
 	const char *out_path = NULL;
 	const char *jail_path = NULL;
 	const char *inside_path = NULL;
-	char trace_tpl[128];
-	char trace_path[128];
+	char trace_path[1024];
 	const char *lib;
 	struct ProfFeed feed, inside_feed;
 	int cmd_start = -1;
-	int fd;
 	int i;
 	int rc;
 
@@ -414,18 +481,15 @@ static int capture_mode(int argc, char **argv)
 		size_t k;
 		FILE *cf;
 
-		snprintf(trace_tpl, sizeof(trace_tpl),
-			"/tmp/retrace-capture-XXXXXX");
-		fd = mkstemp(trace_tpl);
-		if (fd < 0) {
+		if (prof_capture_temp(trace_path, sizeof(trace_path),
+				      "retrace-capture") != 0) {
 			fprintf(stderr,
-"retrace-profile capture: mkstemp failed\n");
+	"retrace-profile capture: temp file failed\n");
 			return 2;
 		}
-		close(fd);
-		cf = fopen(trace_tpl, "w");
+		cf = fopen(trace_path, "w");
 		if (cf == NULL) {
-			remove(trace_tpl);
+			remove(trace_path);
 			return 2;
 		}
 		fputs("{\"intercept_scripts\":[", cf);
@@ -437,18 +501,14 @@ static int capture_mode(int argc, char **argv)
 				k ? "," : "", prof_funcs[k]);
 		fputs("]}\n", cf);
 		fclose(cf);
-		setenv("RETRACE_JSON_CONFIG", trace_tpl, 0);
+		prof_capture_setenv("RETRACE_JSON_CONFIG", trace_path);
 	}
 
-	snprintf(trace_tpl, sizeof(trace_tpl),
-		"/tmp/retrace-capture-XXXXXX");
-	fd = mkstemp(trace_tpl);
-	if (fd < 0) {
-		fprintf(stderr, "retrace-profile capture: mkstemp failed\n");
+	if (prof_capture_temp(trace_path, sizeof(trace_path),
+			      "retrace-trace") != 0) {
+		fprintf(stderr, "retrace-profile capture: temp file failed\n");
 		return 2;
 	}
-	close(fd);
-	snprintf(trace_path, sizeof(trace_path), "%s", trace_tpl);
 
 	fprintf(stderr, "retrace-profile capture: lib=%s trace=%s\n",
 		lib, trace_path);
@@ -506,7 +566,7 @@ static int capture_mode(int argc, char **argv)
 		    load_profile(inside_path, &inside_feed) == 0)
 			allow_src = &inside_feed;
 		{
-			JSON_Value *jc = jail_config(&feed.prof,
+			JSON_Value *jc = prof_jail_config(&feed.prof,
 				&allow_src->prof);
 			FILE *jf = fopen(jail_path, "w");
 
@@ -529,7 +589,6 @@ static int capture_mode(int argc, char **argv)
 
 	remove(trace_path);
 	return rc;
-#endif /* !_WIN32 */
 }
 
 int main(int argc, char **argv)
@@ -546,6 +605,8 @@ int main(int argc, char **argv)
 		return diff_mode(argc, argv);
 	if (argc >= 2 && strcmp(argv[1], "capture") == 0)
 		return capture_mode(argc, argv);
+	if (argc >= 2 && strcmp(argv[1], "jail") == 0)
+		return jail_mode(argc, argv);
 	if (argc >= 2 && strcmp(argv[1], "validate") == 0) {
 		char err[2048];
 		int n;
@@ -684,7 +745,7 @@ int main(int argc, char **argv)
 		 */
 		const struct ProfFeed *allow_src = have_inside ?
 			&inside_feed : &libc_feed;
-		JSON_Value *jc = jail_config(&libc_feed.prof,
+		JSON_Value *jc = prof_jail_config(&libc_feed.prof,
 			&allow_src->prof);
 		FILE *jf = fopen(jail_path, "w");
 

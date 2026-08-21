@@ -64,7 +64,7 @@ struct WrapperSystemVFrame {
 	long real_rsp;
 };
 
-long retrace_as_call_real(const void *real_impl,
+intptr_t retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt)
 {

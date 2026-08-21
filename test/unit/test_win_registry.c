@@ -95,6 +95,11 @@ static void test_datatypes_registry(void)
 {
 	CHECK(retrace_datatype_get("sz") != NULL);
 	CHECK(retrace_datatype_get("int") != NULL);
+	/* the exact types the wrapper path consumes (fopen et al):
+	 * a NULL here crashes log_params' first vtable call
+	 */
+	CHECK(retrace_datatype_get("ptr") != NULL);
+	CHECK(retrace_datatype_get("unsigned int") != NULL);
 	CHECK(retrace_datatype_get("no_such_type_xyz") == NULL);
 }
 

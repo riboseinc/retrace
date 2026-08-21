@@ -111,16 +111,22 @@ if(RETRACE_PLATFORM_WINDOWS)
             ${CMAKE_SOURCE_DIR}/src/backends/win_common
             ${CMAKE_SOURCE_DIR}/src/config/json)
 
-        # The wrapper round trip is MinGW-proven; under MSVC the
-        # engine pass-through loops (TODO.trace-profile: the
-        # action-path debug re-opens this -- build stays enabled
-        # on every leg for compile coverage).
-        if(NOT MSVC)
-            add_test(NAME unit-test-win-wrapper
-                COMMAND retrace_test_win_wrapper)
-            set_tests_properties(unit-test-win-wrapper
-                PROPERTIES LABELS "integration")
-        endif()
+        # The wrapper round trip: proven on MinGW and MSVC
+        # (TODO.trace-profile/07 closed: trampoline jump-back +
+        # LLP64 pointer truncation). TIMEOUT bounds any future
+        # regression loop to a fast failure, not a hung job.
+        #
+        # RETRACE_WIN_DIAG=1 is empirically LOAD-BEARING on the
+        # MSVC legs: without it the logger never observes the
+        # test's RETRACE_LOGGER_* env (not even the opening
+        # bracket lands in the file) and the content assertion
+        # fails on an empty log. Root cause open (TODO 07);
+        # forcing it keeps the suite deterministic.
+        add_test(NAME unit-test-win-wrapper
+            COMMAND retrace_test_win_wrapper)
+        set_tests_properties(unit-test-win-wrapper
+            PROPERTIES LABELS "integration" TIMEOUT 120
+            ENVIRONMENT "RETRACE_WIN_DIAG=1")
     endif()
     return()
 endif()
@@ -1600,3 +1606,24 @@ target_include_directories(retrace_test_profile_diff PRIVATE
 add_test(NAME unit-test-profile-diff
     COMMAND retrace_test_profile_diff)
 set_tests_properties(unit-test-profile-diff PROPERTIES LABELS "unit")
+
+# Jail emission + the profile JSON inverse (TODO.trace-profile/10).
+#
+add_executable(retrace_test_profile_jail test_profile_jail.c
+    ${CMAKE_SOURCE_DIR}/tools/profiler/aggregate.c
+    ${CMAKE_SOURCE_DIR}/tools/profiler/jail.c
+    ${CMAKE_SOURCE_DIR}/tools/correlate/match.c
+    ${_parson_for_tools})
+set_target_properties(retrace_test_profile_jail PROPERTIES
+    OUTPUT_NAME test_profile_jail
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_profile_jail PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/profiler
+    ${CMAKE_SOURCE_DIR}/tools/correlate
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-profile-jail
+    COMMAND retrace_test_profile_jail)
+set_tests_properties(unit-test-profile-jail PROPERTIES LABELS "unit")

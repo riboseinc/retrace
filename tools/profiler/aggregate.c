@@ -163,7 +163,7 @@ struct ProfAccess *prof_access_get(struct Profile *p, const char *path)
 static void access_add(struct Profile *p, const char *path,
 		       enum CorrClass cls)
 {
-	struct ProfAccess *a;
+	struct ProfAccess *a = NULL;
 
 	/* Sorted insert (bsearch position). */
 	size_t lo = 0, hi = p->accesses.count;
@@ -172,16 +172,19 @@ static void access_add(struct Profile *p, const char *path,
 		size_t mid = lo + (hi - lo) / 2;
 		int r = strcmp(p->accesses.items[mid].path, path);
 
-		if (r == 0)
+		if (r == 0) {
+			/* match is at mid, NOT lo (lo only converges
+			 * on the insert position for misses)
+			 */
+			a = &p->accesses.items[mid];
 			break;
+		}
 		if (r < 0)
 			lo = mid + 1;
 		else
 			hi = mid;
 	}
-	if (lo < hi) {
-		a = &p->accesses.items[lo];
-	} else {
+	if (a == NULL) {
 		size_t tail = p->accesses.count - lo;
 
 		if (p->accesses.count == p->accesses.cap) {
@@ -422,4 +425,98 @@ JSON_Value *prof_to_json(const struct Profile *p)
 	}
 	json_object_set_value(root, "accesses", arr);
 	return v;
+}
+
+static size_t names_index(const struct ProfNames *n, const char *name)
+{
+	size_t lo = 0, hi = n->count;
+
+	while (lo < hi) {
+		size_t mid = lo + (hi - lo) / 2;
+		int r = strcmp(n->names[mid], name);
+
+		if (r == 0)
+			return mid;
+		if (r < 0)
+			lo = mid + 1;
+		else
+			hi = mid;
+	}
+	return n->count; /* miss: never a valid index */
+}
+
+static void names_from_json(struct ProfNames *n, const JSON_Object *root,
+			    const char *key)
+{
+	JSON_Array *arr = json_object_get_array(root, key);
+	size_t i;
+
+	for (i = 0; arr != NULL && i < json_array_get_count(arr); i++) {
+		JSON_Object *o = json_array_get_object(arr, i);
+		const char *name = json_object_get_string(o, "name");
+		double count = json_object_get_number(o, "count");
+		size_t idx;
+
+		if (name == NULL || name[0] == '\0')
+			continue;
+		prof_names_add(n, name);
+		idx = names_index(n, name);
+		if (idx != n->count && count > 1)
+			n->counts[idx] = (size_t)count;
+	}
+}
+
+static enum CorrClass class_from_str(const char *s)
+{
+	if (s == NULL)
+		return CORR_CLS_NONE;
+	if (strcmp(s, "write") == 0)
+		return CORR_CLS_WRITE;
+	if (strcmp(s, "read") == 0)
+		return CORR_CLS_READ;
+	if (strcmp(s, "probe") == 0)
+		return CORR_CLS_PROBE;
+	return CORR_CLS_NONE;
+}
+
+/*
+ * prof_to_json's inverse (SSOT: the shape and its reader live in
+ * the same module). Rebuilds a Profile from the "profile" object
+ * of a profile doc -- the jail subcommand re-emits a config from
+ * an existing profile without re-aggregating the trace.
+ */
+int prof_from_json(const JSON_Object *root, struct Profile *p)
+{
+	JSON_Array *arr;
+	size_t i;
+
+	prof_init(p);
+	if (root == NULL)
+		return -1;
+
+	p->entries = (size_t)json_object_get_number(root, "entries");
+	names_from_json(&p->functions, root, "functions");
+	names_from_json(&p->env, root, "env");
+	names_from_json(&p->net, root, "net");
+
+	arr = json_object_get_array(root, "accesses");
+	for (i = 0; arr != NULL && i < json_array_get_count(arr); i++) {
+		JSON_Object *o = json_array_get_object(arr, i);
+		const char *path = json_object_get_string(o, "path");
+		double hits = json_object_get_number(o, "hits");
+
+		if (path == NULL || path[0] == '\0')
+			continue;
+		access_add(p, path,
+			class_from_str(json_object_get_string(o,
+							     "class")));
+		{
+			struct ProfAccess *a = prof_access_get(p, path);
+
+			if (a != NULL && hits > 0)
+				a->hits = (size_t)hits;
+		}
+	}
+	prof_finish(p);
+	return 0;
 }

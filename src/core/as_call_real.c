@@ -37,15 +37,16 @@
 #include "real_impls.h"
 #include "engine.h"
 
-long retrace_as_call_real_dispatch(const void *real_impl,
+intptr_t retrace_as_call_real_dispatch(const void *real_impl,
 				   const struct FuncParam params[],
 				   int params_cnt)
 {
-	long *vals;
-	long ret_val;
+	intptr_t *vals;
+	intptr_t ret_val;
 	int i;
 
-	vals = (long *)retrace_real_impls.malloc(sizeof(long) * params_cnt);
+	vals = (intptr_t *)retrace_real_impls.malloc(
+		sizeof(intptr_t) * params_cnt);
 	if (vals == NULL && params_cnt > 0)
 		return -1;
 
@@ -54,45 +55,50 @@ long retrace_as_call_real_dispatch(const void *real_impl,
 
 	switch (params_cnt) {
 	case 0: {
-		typedef long (*fn_t)(void);
+		typedef intptr_t (*fn_t)(void);
 
 		ret_val = ((fn_t)real_impl)();
 		break;
 	}
 	case 1: {
-		typedef long (*fn_t)(long);
+		typedef intptr_t (*fn_t)(intptr_t);
 
 		ret_val = ((fn_t)real_impl)(vals[0]);
 		break;
 	}
 	case 2: {
-		typedef long (*fn_t)(long, long);
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t);
 
 		ret_val = ((fn_t)real_impl)(vals[0], vals[1]);
 		break;
 	}
 	case 3: {
-		typedef long (*fn_t)(long, long, long);
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t, intptr_t);
 
 		ret_val = ((fn_t)real_impl)(vals[0], vals[1], vals[2]);
 		break;
 	}
 	case 4: {
-		typedef long (*fn_t)(long, long, long, long);
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t,
+					 intptr_t, intptr_t);
 
 		ret_val = ((fn_t)real_impl)(vals[0], vals[1], vals[2],
 					    vals[3]);
 		break;
 	}
 	case 5: {
-		typedef long (*fn_t)(long, long, long, long, long);
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t);
 
 		ret_val = ((fn_t)real_impl)(vals[0], vals[1], vals[2],
 					    vals[3], vals[4]);
 		break;
 	}
 	case 6: {
-		typedef long (*fn_t)(long, long, long, long, long, long);
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t);
 
 		ret_val = ((fn_t)real_impl)(vals[0], vals[1], vals[2],
 					    vals[3], vals[4], vals[5]);
@@ -126,19 +132,20 @@ long retrace_as_call_real_dispatch(const void *real_impl,
  * named_count is proto->params_cnt -- the number of NAMED arguments the
  * prototype declares (printf: 1 for fmt; fprintf-style: 2 for stream+fmt).
  */
-long retrace_as_call_real_variadic(const void *real_impl,
+intptr_t retrace_as_call_real_variadic(const void *real_impl,
 				   const struct FuncParam params[],
 				   int params_cnt,
 				   int named_count)
 {
-	long *vals;
-	long ret_val;
+	intptr_t *vals;
+	intptr_t ret_val;
 	int i;
 
 	if (named_count > params_cnt)
 		named_count = params_cnt;
 
-	vals = (long *)retrace_real_impls.malloc(sizeof(long) * params_cnt);
+	vals = (intptr_t *)retrace_real_impls.malloc(
+		sizeof(intptr_t) * params_cnt);
 	if (vals == NULL && params_cnt > 0)
 		return -1;
 
@@ -159,7 +166,7 @@ long retrace_as_call_real_variadic(const void *real_impl,
 	 */
 	switch (named_count) {
 	case 1: {
-		typedef long (*fn_t)(long, ...);
+		typedef intptr_t (*fn_t)(intptr_t, ...);
 
 		switch (params_cnt) {
 		case 0:
@@ -196,7 +203,7 @@ long retrace_as_call_real_variadic(const void *real_impl,
 	}
 
 	case 2: {
-		typedef long (*fn_t)(long, long, ...);
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t, ...);
 
 		switch (params_cnt) {
 		case 0:

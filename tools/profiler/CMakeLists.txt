@@ -5,8 +5,9 @@
 # kernel-layer truth stream (sub-libc detection), statically scans
 # the binary for raw-syscall capability, and emits a ready-to-run
 # sandbox jail. Pure offline tool: no engine linkage.
-#   profile.c      CLI driver + delta + jail emitter
+#   profile.c      CLI driver + delta
 #   aggregate.c    trace -> Profile reduction (functions/paths/env/net)
+#   jail.c         profile -> jail config emission
 #   capability.c   ELF/Mach-O/PE static capability scan
 #   match.c        path normalizer shared with retrace-correlate
 #   stream.c       tolerant log scanner (array doc / JSONL / truncated)
@@ -15,6 +16,7 @@ set(_parson_source ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 
 add_executable(retrace_profile
     profile.c aggregate.c capability.c diff.c capture.c validate.c
+    jail.c
     ${CMAKE_SOURCE_DIR}/tools/correlate/match.c
     ${CMAKE_SOURCE_DIR}/tools/common/stream.c
     ${_parson_source})

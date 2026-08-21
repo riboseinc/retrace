@@ -38,6 +38,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "win_diag.h"
+
 #include "engine.h"
 #include "real_impls.h"
 #include "arch_spec.h"
@@ -126,6 +128,7 @@ void retrace_engine_wrapper(char *func_name,
 		retrace_as_sched_real(arch_spec_ctx, real_impl);
 		return;
 	}
+	retrace_win_diag("enter", func_name, 0);
 
 	thread_ctx = retrace_thread_context_get();
 	if (thread_ctx == NULL) {
@@ -134,6 +137,7 @@ void retrace_engine_wrapper(char *func_name,
 			func_name);
 		return;
 	}
+	retrace_win_diag("ctx", func_name, 0);
 
 	if (real_impl == NULL) {
 		/* cannot process
@@ -153,13 +157,17 @@ void retrace_engine_wrapper(char *func_name,
 	 * would recurse unbounded. Bail if the current thread is
 	 * already inside an intercept (reentrance_guard.c).
 	 */
-	if (retrace_reentrance_guard_active(thread_ctx))
+	if (retrace_reentrance_guard_active(thread_ctx)) {
+		retrace_win_diag("guard-bail", func_name, 0);
 		return;
+	}
 
 	retrace_reentrance_guard_enter(thread_ctx, real_impl,
 		arch_spec_ctx);
 
 	thread_ctx->prototype = retrace_func_get(func_name);
+	retrace_win_diag("proto", func_name,
+		thread_ctx->prototype != NULL);
 
 	/* Coverage feedback for libFuzzer/AFL integration (TODO.complete/24).
 	 * Cheap (FNV-1a over the func name + arg count) and gated by env,
@@ -200,6 +208,7 @@ void retrace_engine_wrapper(char *func_name,
 			func_name);
 		goto clean_up;
 	}
+	retrace_win_diag("params", func_name, thread_ctx->params_cnt);
 
 	/* find intercept script for the func and return addr */
 	i_scripts = json_object_get_array(retrace_conf, "intercept_scripts");
@@ -215,19 +224,24 @@ void retrace_engine_wrapper(char *func_name,
 
 	if (!i_script) {
 		/* no script defined for this func, call real */
+		retrace_win_diag("no-script", func_name, 0);
 		goto clean_up;
 	}
+	retrace_win_diag("script", func_name, 0);
 
 	/* we have script, do not call real impl by default */
 	retrace_as_cancel_sched_real(arch_spec_ctx);
 
+	retrace_win_diag("actions", func_name, 0);
 	retrace_action_runner_run(thread_ctx, func_name, i_script);
+	retrace_win_diag("actions-done", func_name, thread_ctx->ret_val);
 
 	/* write back to arch spec. portion */
 	retrace_as_set_ret_val(arch_spec_ctx, thread_ctx->ret_val);
 
 clean_up:
 	/* mark hi-level intercept done */
+	retrace_win_diag("clean", func_name, 0);
 	retrace_thread_context_clear(thread_ctx);
 }
 

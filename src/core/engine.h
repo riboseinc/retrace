@@ -27,6 +27,7 @@
 #define ENGINE_H_
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "funcs.h"
 #include "arch_spec.h"
@@ -39,8 +40,10 @@ struct ThreadContext {
 	/* real implementation ptr */
 	void *real_impl;
 
-	/* value to set as return value */
-	long ret_val;
+	/* value to set as return value (intptr_t: may be a FILE* --
+	 * long is 32-bit on LLP64 Windows)
+	 */
+	intptr_t ret_val;
 
 	struct FuncParam params[ENGINE_MAXCOUNT_PARAMS];
 

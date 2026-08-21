@@ -5,9 +5,10 @@
  */
 
 /*
- * Windows arm64 assembly wrappers (TODO.trace-profile/05), GNU-as
- * dialect (MinGW/Clang arm64). The x64 twin is wrapper_x64.S --
- * see there for the rationale; arm64 specifics:
+ * Windows arm64 assembly wrappers (TODO.trace-profile/05, 08),
+ * GNU-as dialect (MinGW/Clang arm64). wrapper_arm64.asm is the
+ * armasm64 twin -- identical semantics. The x64 twin is
+ * wrapper_x64.S; see there for the rationale. arm64 specifics:
  *
  * AAPCS64: args in x0-x7, then the stack at [entry sp]. No
  * shadow space. The hook entered via a jmp, so x30 still holds
@@ -23,9 +24,15 @@
  *   [sp+24..+80] x0-x7
  *   [sp+88]  x30 (the user's return address)
  *   [sp+96]  entry sp
+ *
+ * Label-free (TODO.trace-profile/01 lesson): the wrapper passes
+ * a pure immediate INDEX into the C-side name table
+ * (hook_targets.c, same order as the entries below) to
+ * retrace_win_enter(idx, frame) -- label addressing is where
+ * assemblers disagree.
  */
 
-	.macro WRAPPER_ENTRY_WIN_ARM64 fname
+	.macro WRAPPER_ENTRY_WIN_ARM64 fname, idx
 	.text
 	.balign 16
 	.globl retrace_wrap_\fname
@@ -43,9 +50,9 @@ retrace_wrap_\fname:
 	stp	xzr, xzr, [sp, #0]
 	str	xzr, [sp, #16]
 
-	adr	x0, .Lstr_\fname
+	mov	w0, \idx
 	mov	x1, sp
-	bl	retrace_engine_wrapper
+	bl	retrace_win_enter
 
 	ldr	x9, [sp, #0]
 	cbnz	x9, .Lcall_\fname
@@ -68,24 +75,21 @@ retrace_wrap_\fname:
 	add	sp, sp, #112
 	br	x9
 
-	.section .rdata
-.Lstr_\fname:
-	.asciz "\fname"
 	.endm
 
-	WRAPPER_ENTRY_WIN_ARM64 fopen
-	WRAPPER_ENTRY_WIN_ARM64 open
-	WRAPPER_ENTRY_WIN_ARM64 close
-	WRAPPER_ENTRY_WIN_ARM64 read
-	WRAPPER_ENTRY_WIN_ARM64 write
-	WRAPPER_ENTRY_WIN_ARM64 lseek
-	WRAPPER_ENTRY_WIN_ARM64 stat
-	WRAPPER_ENTRY_WIN_ARM64 unlink
-	WRAPPER_ENTRY_WIN_ARM64 remove
-	WRAPPER_ENTRY_WIN_ARM64 rename
-	WRAPPER_ENTRY_WIN_ARM64 rmdir
-	WRAPPER_ENTRY_WIN_ARM64 NtCreateFile
-	WRAPPER_ENTRY_WIN_ARM64 NtOpenFile
-	WRAPPER_ENTRY_WIN_ARM64 NtQueryAttributesFile
-	WRAPPER_ENTRY_WIN_ARM64 NtClose
-	WRAPPER_ENTRY_WIN_ARM64 LdrLoadDll
+	WRAPPER_ENTRY_WIN_ARM64 fopen, 0
+	WRAPPER_ENTRY_WIN_ARM64 open, 6
+	WRAPPER_ENTRY_WIN_ARM64 close, 7
+	WRAPPER_ENTRY_WIN_ARM64 read, 8
+	WRAPPER_ENTRY_WIN_ARM64 write, 9
+	WRAPPER_ENTRY_WIN_ARM64 lseek, 10
+	WRAPPER_ENTRY_WIN_ARM64 stat, 11
+	WRAPPER_ENTRY_WIN_ARM64 unlink, 12
+	WRAPPER_ENTRY_WIN_ARM64 remove, 13
+	WRAPPER_ENTRY_WIN_ARM64 rename, 14
+	WRAPPER_ENTRY_WIN_ARM64 rmdir, 15
+	WRAPPER_ENTRY_WIN_ARM64 NtCreateFile, 1
+	WRAPPER_ENTRY_WIN_ARM64 NtOpenFile, 2
+	WRAPPER_ENTRY_WIN_ARM64 NtQueryAttributesFile, 3
+	WRAPPER_ENTRY_WIN_ARM64 NtClose, 4
+	WRAPPER_ENTRY_WIN_ARM64 LdrLoadDll, 5

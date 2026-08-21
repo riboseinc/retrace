@@ -269,7 +269,7 @@ static unsigned long wrapper_frame_get_arg(
 		sizeof(void *) * (idx - named_count));
 }
 
-long retrace_as_call_real(const void *real_impl,
+intptr_t retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt)
 {
@@ -322,7 +322,7 @@ int retrace_as_setup_params(
 		params[param_idx].data_type =
 			retrace_datatype_get(proto->params[param_idx].type_name);
 		params[param_idx].val =
-			(long) wrapper_frame_get_arg(frame, param_idx,
+			(intptr_t) wrapper_frame_get_arg(frame, param_idx,
 				proto->params_cnt);
 	}
 
@@ -395,7 +395,7 @@ int retrace_as_setup_params(
 
 		params[param_idx].data_type = dt;
 		params[param_idx].val =
-			(long) wrapper_frame_get_arg(frame, param_idx,
+			(intptr_t) wrapper_frame_get_arg(frame, param_idx,
 				proto->params_cnt);
 	}
 
@@ -417,7 +417,7 @@ void retrace_as_cancel_sched_real(void *arch_spec_ctx)
 	((struct WrapperAArch64Frame *) arch_spec_ctx)->call_real_flag = 0;
 }
 
-void retrace_as_set_ret_val(void *arch_spec_ctx, long ret_val)
+void retrace_as_set_ret_val(void *arch_spec_ctx, intptr_t ret_val)
 {
 	struct WrapperAArch64Frame *frame = arch_spec_ctx;
 

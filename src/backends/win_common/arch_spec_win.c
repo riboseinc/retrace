@@ -59,7 +59,7 @@ void retrace_as_cancel_sched_real(void *arch_spec_ctx)
 	((WRAPPER_FRAME *)arch_spec_ctx)->call_real_flag = 0;
 }
 
-void retrace_as_set_ret_val(void *arch_spec_ctx, long ret_val)
+void retrace_as_set_ret_val(void *arch_spec_ctx, intptr_t ret_val)
 {
 	((WRAPPER_FRAME *)arch_spec_ctx)->ret_val =
 		(int64_t)ret_val;
@@ -183,7 +183,7 @@ int retrace_as_setup_params(void *arch_spec_ctx,
 
 		/* setup value */
 		params[param_idx].val =
-			(long)win_arg(frame, param_idx);
+			(intptr_t)win_arg(frame, param_idx);
 	}
 
 	/*
@@ -201,7 +201,7 @@ int retrace_as_setup_params(void *arch_spec_ctx,
 	return 1;
 }
 
-long retrace_as_call_real(const void *real_impl,
+intptr_t retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[], int params_cnt)
 {
 	return retrace_as_call_real_dispatch(real_impl, params,
