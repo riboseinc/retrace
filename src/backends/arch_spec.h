@@ -26,6 +26,8 @@
 #ifndef ARCH_SPEC_H_
 #define ARCH_SPEC_H_
 
+#include <stdint.h>
+
 #include "arch_spec_macros.h"
 #include "data_types.h"
 #include "funcs.h"
@@ -42,7 +44,13 @@
 struct FuncParam {
 	struct ParamMeta param_meta;
 	const struct DataType *data_type;
-	long val;
+	/*
+	 * intptr_t, NOT long: Windows is LLP64 (long = 32 bits) and
+	 * val carries POINTERS (log_params derefs, call_real
+	 * dispatch). long truncated every pointer arg on MSVC -- the
+	 * v2.13/v2.14 "action-path crash". Identity on LP64 POSIX.
+	 */
+	intptr_t val;
 	int free_val;
 };
 
@@ -76,8 +84,10 @@ int retrace_as_setup_params(
 	struct FuncParam params[],
 	int *params_cnt);
 
-/* calls real_impls passing params accordingly to params_meta */
-long retrace_as_call_real(const void *real_impl,
+/* calls real_impls passing params accordingly to params_meta
+ * (intptr_t return: a real impl may return a pointer -- LLP64)
+ */
+intptr_t retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt);
 
@@ -86,7 +96,7 @@ long retrace_as_call_real(const void *real_impl,
  * args; the rare >6-arg case returns -1 (no known libc symbol needs
  * it).
  */
-long retrace_as_call_real_dispatch(const void *real_impl,
+intptr_t retrace_as_call_real_dispatch(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt);
 
@@ -105,14 +115,14 @@ long retrace_as_call_real_dispatch(const void *real_impl,
  * named_count is proto->params_cnt -- the number of named parameters
  * (printf: 1 for fmt; fprintf-style: 2 for stream+fmt).
  */
-long retrace_as_call_real_variadic(const void *real_impl,
+intptr_t retrace_as_call_real_variadic(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt,
 	int named_count);
 
 /* schedules real_impl to run after retrace_engine_wrapper */
 void retrace_as_set_ret_val(void *arch_spec_ctx,
-	long ret_val);
+	intptr_t ret_val);
 
 int retrace_as_init(void);
 

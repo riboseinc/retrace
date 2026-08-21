@@ -287,7 +287,7 @@ static inline struct AsThreadContext *as_setup_printf_context(void)
 	return thread_ctx;
 }
 
-long retrace_as_call_real(const void *real_impl,
+intptr_t retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt)
 {

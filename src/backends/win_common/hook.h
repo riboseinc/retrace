@@ -100,6 +100,18 @@ retrace_hook_install(void *target_addr,
 retrace_hook_status_t
 retrace_hook_uninstall(retrace_hook_t *hook);
 
+/*
+ * Bookmark patch_size bytes at target (captured NOW -- the caller
+ * patches afterwards) so a hand-rolled installer can uninstall.
+ * retrace_win_install_thunk writes its own 14-byte patch instead
+ * of going through retrace_hook_install_ex; without a bookmark the
+ * handle stays NULL and uninstall silently skips it, leaving the
+ * patch live forever (the post-uninstall fopen loop).
+ */
+retrace_hook_status_t
+retrace_hook_bookmark(void *target, size_t patch_size, void *trampoline,
+		      retrace_hook_t **hook_out);
+
 /* Minimum number of prologue bytes that must be safe-to-relocate. */
 size_t retrace_hook_required_patch_size(void);
 

@@ -1,3 +1,30 @@
+retrace (2.15.0-1) unstable; urgency=medium
+
+  * Added: retrace-profile capture on Windows -- delegates the
+    launch to retrace-win-run (no preload on Windows); the
+    recipe-34 flow is now one command on every platform.
+  * Added: retrace-profile jail <profile.json> -- emit a jail
+    config from an existing profile (the update-the-jail step
+    of the upgrade story: profile old, upgrade, profile new,
+    diff, jail), with --inside as the declared allowlist.
+  * Added: armasm64 wrapper dialect -- live hooks on the
+    MSVC-arm64 legs (wrapper_arm64.asm); the gas twin now uses
+    the label-free index design like x64.
+  * Fixed: profile aggregation mis-credited hits and classes to
+    the wrong path when a repeat access hit a sorted index > 0
+    (bsearch break vs insert position); found by the new jail
+    round-trip tests.
+  * Fixed: Windows direct-hook trampoline looped forever -- the
+    tail jump went back to the patched entry (target+0) instead
+    of past the patched window; on MSVC's ucrtbase _read is a
+    direct export, so the first config read during boot spun
+    millions of iterations (the v2.13-era "MSVC action-path
+    hang"). The arm64 twin had the correct formula already.
+  * Changed: the Windows wrapper runtime test runs ungated on
+    MSVC (TODO.trace-profile/07) with a bounded TIMEOUT.
+
+ -- Ribose Inc <opensource@ribose.com>  Fri, 21 Aug 2026 09:30:00 +0000
+
 retrace (2.14.0-1) unstable; urgency=medium
 
   * Added: retrace-profile capture (one-shot: run under preload,

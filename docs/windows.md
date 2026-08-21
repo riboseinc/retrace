@@ -90,13 +90,29 @@ bytes contain a relative branch or RIP-relative addressing, the
 hook is REFUSED (logged, skipped) and the function runs
 uninstrumented — never mis-traced (ADR-0009).
 
+### Runtime diagnostics
+
+`RETRACE_WIN_DIAG=1` prints breadcrumb tags at every engine
+dispatch and action step (pure Win32 I/O — no CRT, so it cannot
+recurse through the hooks). The last tag before a crash names
+the failing step; the wrapper layer prints per-function entry
+counts (a runaway count = a trampoline loop). This is the
+technique that cracked the v2.13-era MSVC crashes — two
+three-release-old bugs (a trampoline that jumped back into its
+own patch, and 32-bit `long` truncating every pointer argument
+under LLP64).
+
 ## The file-access jail
 
 The sandbox `allow_paths` jail (cookbook recipe 34) works on
-Windows exactly as on POSIX:
+Windows exactly as on POSIX, including the one-shot capture —
+there is no preload on Windows, so `retrace-profile capture`
+delegates the launch to `retrace-win-run` (found next to the
+profiler, with `retrace.dll`):
 
 ```bat
-retrace-profile --libc trace.json --inside inside.json --jail-out jail.json
+retrace-profile capture --jail-out jail.json -- myapp.exe
+retrace-profile jail candidate.json --inside inside.json -o jail.json
 set RETRACE_JSON_CONFIG=jail.json
 build\tools\retrace-win-run myapp.exe
 ```
@@ -113,12 +129,13 @@ capture a CSV, convert with `retrace-procmon2retrace`, and feed
 full flows). With the ntdll layer enabled, retrace itself covers
 the Win32-direct depth at the ntdll boundary.
 
-## What runs where (v2.13.0)
+## What runs where (v2.15.0)
 
 | Capability | windows-x64 | windows-arm64 (MSVC) | windows-arm64 (MinGW/Clang) |
 |---|---|---|---|
 | Engine + registries (PE-section walk) | yes | yes | yes |
-| ucrt/ntdll inline hooks + wrappers | yes | armasm64 wrapper: follow-up | yes (gas dialect, TODO.trace-profile/05) |
+| ucrt/ntdll inline hooks + wrappers | yes (MASM) | yes (armasm64, TODO.trace-profile/08) | yes (gas dialect) |
+| `retrace-profile capture` | yes (delegates to retrace-win-run) | yes | yes |
 | Offline tools (profile, correlate, procmon2retrace, strace2retrace) | yes | yes | yes |
 | ptrace attach | n/a (Linux backend) | n/a | n/a |
 

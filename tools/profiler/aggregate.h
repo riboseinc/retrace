@@ -82,4 +82,11 @@ struct ProfAccess *prof_access_get(struct Profile *p, const char *path);
 /* Serialize to an owned JSON object (caller frees). */
 JSON_Value *prof_to_json(const struct Profile *p);
 
+/*
+ * prof_to_json's inverse: fill p from a profile doc's "profile"
+ * object. Returns 0 on success, -1 when root is NULL. The
+ * profile.json reader for the jail subcommand.
+ */
+int prof_from_json(const JSON_Object *root, struct Profile *p);
+
 #endif /* RETRACE_PROFILER_AGGREGATE_H_ */

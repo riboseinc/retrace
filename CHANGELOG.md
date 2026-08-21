@@ -6,6 +6,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.15.0] — 2026-08-21
+
+**Trace + profile, completed** (TODO.trace-profile/07-10): the
+loop closes on Windows, and the upgrade story gets its last
+step.
+
+- **`retrace-profile capture` on Windows** — no preload on
+  Windows, so capture delegates the launch to `retrace-win-run`
+  (found next to the profiler, with `retrace.dll`); the
+  profile/jail emission path is the shared portable code. The
+  recipe-34 flow is now one command on every platform
+  (examples/profile-hunting/run-windows.md).
+- **`retrace-profile jail <profile.json>`** — emit a jail config
+  from an existing profile doc (or trace): the update-the-jail
+  step of the upgrade story (profile old → upgrade → profile
+  new → diff → jail), no re-capture. `--inside` supplies the
+  declared allowlist; without it the observed accesses self-jail
+  a known-good run. Jail emission extracted to
+  `tools/profiler/jail.c` (model logic out of the CLI).
+- **armasm64 wrapper dialect** (`wrapper_arm64.asm`) — live
+  ucrt/ntdll hooks on the MSVC-arm64 legs; CMake wires
+  `ASM_MARM64`. The gas arm64 twin now uses the label-free
+  immediate-index design like the x64 twins (label addressing is
+  where assemblers disagree).
+- **Fixed: profile aggregation corruption** — `access_add`
+  credited a repeat access to `items[lo]` after a bsearch break
+  when the match was at `items[mid]`: any profile with two or
+  more paths mis-credited hits and classes to the wrong row
+  (since 2.12.0). Found by the new jail round-trip tests
+  (`test/unit/test_profile_jail.c`, 5 tests: jail shape,
+  declared allowlist, to_json/from_json round trip, doc-vs-trace
+  jail parity, degenerate inputs).
+- **Fixed: Windows direct-hook trampoline loop** — the x64
+  trampoline's tail jump computed back to the patched entry
+  (`target+0`) instead of past the patched window
+  (`target+prologue_len`): prologue replay → jump into the hook
+  patch → wrapper → pass-through → trampoline → forever. On
+  MSVC's ucrtbase `_read` is a direct export (not a thunk), so
+  the first config read during boot looped millions of times —
+  the "MSVC action-path hang" since v2.13. Thunk-path functions
+  (fopen) use the separate correct builder, which is why MinGW
+  never showed it. Caught by the opt-in `RETRACE_WIN_DIAG`
+  counter (13,042,527 entries, all `read`); the arm64 twin
+  always had the right formula.
+- **Fixed: pointer arguments truncated on Windows (LLP64)** —
+  `struct FuncParam.val`, `ThreadContext.ret_val`, and the
+  `retrace_as_call_real*` / `retrace_as_set_ret_val` signatures
+  were `long`, which is 32-bit on Windows: every pointer
+  argument was truncated before `log_params` dereferenced it
+  (and before `call_real` re-dispatched it), crashing the
+  action path on MSVC while LP64 POSIX was unaffected. All
+  widened to `intptr_t` (identity on Linux/macOS/BSD).
+- **Fixed: Windows thunk hooks never uninstalled** —
+  `retrace_win_install_thunk` discarded its hook handle, so
+  `retrace_win_uninstall_hooks` silently skipped every
+  thunk-followed hook (fopen, _unlink): the 14-byte patch stayed
+  live and the next call looped forever through the wrapper
+  (fallback real-impl resolution returns the patched export
+  itself). New `retrace_hook_bookmark` captures the original
+  bytes so uninstall restores them (since v2.13).
+- **Windows wrapper test un-gated on MSVC** (TODO.trace-profile/
+  07): the log-content assertion runs strictly on MinGW and as a
+  documented WARN on MSVC (harness-level env-propagation open
+  question in TODO 07), with a bounded TIMEOUT so a trampoline
+  loop fails fast instead of hanging the job.
+
 ## [2.14.0] — 2026-08-20
 
 **The trace + profile workstream** (TODO.trace-profile): the

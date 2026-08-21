@@ -28,6 +28,7 @@
 #include "real_impls.h"
 #include "action_utils.h"
 #include "data_types.h"
+#include "win_diag.h"
 
 #include <time.h>
 
@@ -41,6 +42,8 @@ static int ia_log_params
 	(struct ThreadContext *t_ctx,
 		const JSON_Object *action_params)
 {
+	retrace_win_diag("lp-entry", t_ctx->prototype->name, t_ctx->params_cnt);
+
 	/*
 	 * serialization to JSON format.
 	 * Shall be the same for struct data type
@@ -126,6 +129,10 @@ static int ia_log_params
 
 		}
 
+		retrace_win_diag("lp-param",
+			param->param_meta.name,
+			(long)(param->data_type != NULL));
+
 		sz_size = param->data_type->get_sz_size(
 			(const void *) &param->val,
 			param->data_type);
@@ -136,6 +143,9 @@ static int ia_log_params
 			(const void *) &param->val,
 			param->data_type,
 			sz);
+
+		retrace_win_diag("lp-sz", param->param_meta.name,
+			(long)sz_size);
 
 		json_object_set_string(root_object,
 			param->param_meta.name,
@@ -161,6 +171,10 @@ static int ia_log_params
 				goto next_param;
 			}
 
+			retrace_win_diag("lp-deref",
+				param->param_meta.name,
+				(long long)param->val);
+
 			/* TODO: Maybe should cast via data_type? */
 
 			ref_data = (void *) param->val;
@@ -172,6 +186,8 @@ static int ia_log_params
 					param->param_meta.ref_type_name);
 				break;
 			}
+			retrace_win_diag("lp-ref",
+				param->param_meta.ref_type_name, 1);
 
 			/* pointer to ARRAY */
 			if (param->param_meta.modifiers & CDM_ARRAY) {
@@ -252,9 +268,13 @@ next_param:;
 
 	//serialized_string = json_serialize_to_string_pretty(root_value);
 
+	retrace_win_diag("lp-emit", t_ctx->prototype->name, 0);
+
 	/* finally */
 	//log_info("%s", serialized_string);
 	retrace_logger_log_json(ACTIONS, SEVERITY_INFO, root_value);
+
+	retrace_win_diag("lp-done", t_ctx->prototype->name, 0);
 
 	//json_free_serialized_string(serialized_string);
 	//json_value_free(root_value);
@@ -358,7 +378,7 @@ static int ia_modify_in_param_str
 	}
 
 	t_ctx->params[param_idx].val =
-		(long) retrace_real_impls.malloc(
+		(intptr_t) retrace_real_impls.malloc(
 			retrace_real_impls.strlen(new_str) + 1);
 	t_ctx->params[param_idx].free_val = 1;
 
@@ -486,7 +506,7 @@ static int ia_modify_in_param_arr
 	}
 
 	param->val =
-		(long) retrace_real_impls.malloc(
+		(intptr_t) retrace_real_impls.malloc(
 			json_array_get_count(new_arr));
 	param->free_val = 1;
 
@@ -603,7 +623,7 @@ static int ia_modify_in_param_int
 			param_name);
 
 	/* direct modification */
-	param->val = (long) new_int;
+	param->val = (intptr_t) new_int;
 
 	log_info("param '%s' set to '%d'",
 		param_name, (int) new_int);
@@ -617,6 +637,8 @@ static int ia_call_real
 		const JSON_Object *action_params)
 {
 	(void)(action_params);
+
+	retrace_win_diag("cr-entry", t_ctx->prototype->name, t_ctx->params_cnt);
 
 	log_dbg("calling real at 0x%lx for %s...",
 			(long) t_ctx->real_impl,
@@ -667,6 +689,7 @@ static int ia_call_real
 	}
 
 	log_dbg("real returned val=0x%lx", t_ctx->ret_val);
+	retrace_win_diag("cr-done", t_ctx->prototype->name, t_ctx->ret_val);
 
 	/* 0 indicates successful processing */
 	return 0;

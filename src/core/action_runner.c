@@ -29,6 +29,7 @@
 #include "actions.h"
 #include "logger.h"
 #include "posix_compat.h"
+#include "win_diag.h"
 
 void retrace_action_runner_run(struct ThreadContext *thread_ctx,
 	const char *func_name,
@@ -71,6 +72,7 @@ void retrace_action_runner_run(struct ThreadContext *thread_ctx,
 			break;
 		}
 
+		retrace_win_diag("runner-get", i_action_name, 0);
 		action_func = retrace_actions_get(i_action_name);
 		if (action_func == NULL) {
 			log_err(
@@ -83,11 +85,14 @@ void retrace_action_runner_run(struct ThreadContext *thread_ctx,
 			break;
 		}
 
+		retrace_win_diag("runner-info", i_action_name, (long)i);
+
 		log_info("Running action %s, for %s:%p, tpid 0x%llx...",
 			i_action_name,
 			func_name,
 			thread_ctx->ret_addr,
 			(unsigned long long)rc_thread_self());
+		retrace_win_diag("runner-info-done", i_action_name, 0);
 
 		if (action_func(thread_ctx,
 			json_object_get_object(i_action, "action_params"))) {
@@ -99,5 +104,6 @@ void retrace_action_runner_run(struct ThreadContext *thread_ctx,
 				(unsigned long long)rc_thread_self());
 			break;
 		}
+		retrace_win_diag("runner-act-done", i_action_name, 0);
 	}
 }

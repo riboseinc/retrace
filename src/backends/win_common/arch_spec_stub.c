@@ -37,7 +37,7 @@ void retrace_as_cancel_sched_real(void *arch_spec_ctx)
 	(void)arch_spec_ctx;
 }
 
-void retrace_as_set_ret_val(void *arch_spec_ctx, long ret_val)
+void retrace_as_set_ret_val(void *arch_spec_ctx, intptr_t ret_val)
 {
 	(void)arch_spec_ctx;
 	(void)ret_val;
@@ -61,7 +61,7 @@ int retrace_as_setup_params(void *arch_spec_ctx,
 	return 0;
 }
 
-long retrace_as_call_real(const void *real_impl,
+intptr_t retrace_as_call_real(const void *real_impl,
 	const struct FuncParam params[], int params_cnt)
 {
 	(void)real_impl;

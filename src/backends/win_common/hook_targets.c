@@ -50,12 +50,52 @@ const char *const retrace_win_wrapper_names[] = {
 	"rmdir",		    /* 15 */
 };
 
+/*
+ * Boot-loop diagnostics (TODO.trace-profile/07): RETRACE_WIN_DIAG=1
+ * prints every wrapper entry (name + repeat count) via WriteFile --
+ * NO CRT on this path (interposition recursion). A trampoline that
+ * re-enters its own patched target shows as one name repeating
+ * forever; the count proves the loop.
+ */
+static void win_diag_entry(const char *name)
+{
+	static int enabled = -1;
+	static char last[32];
+	static unsigned long repeats;
+
+	if (enabled < 0)
+		enabled = getenv("RETRACE_WIN_DIAG") != NULL &&
+			  getenv("RETRACE_WIN_DIAG")[0] == '1';
+	if (!enabled)
+		return;
+
+	if (strcmp(name, last) == 0) {
+		repeats++;
+		if (repeats % 64 != 0)
+			return;
+	} else {
+		strcpy(last, name);
+		repeats = 0;
+	}
+	{
+		char buf[96];
+		int len = snprintf(buf, sizeof(buf), "we: %s x%lu\n",
+			name, repeats + 1);
+		DWORD wrote = 0;
+		HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+
+		if (len > 0)
+			WriteFile(h, buf, (DWORD)len, &wrote, NULL);
+	}
+}
+
 void retrace_win_enter(int idx, void *frame)
 {
 	if (idx < 0 || (size_t)idx >=
 	    sizeof(retrace_win_wrapper_names) /
 		    sizeof(retrace_win_wrapper_names[0]))
 		return;
+	win_diag_entry(retrace_win_wrapper_names[idx]);
 	retrace_engine_wrapper(
 		(char *)retrace_win_wrapper_names[idx], frame);
 }
@@ -74,13 +114,13 @@ struct win_hook {
 };
 
 /*
- * The wrappers exist for x64 (gas + MASM) and arm64 (gas --
- * TODO.trace-profile/05; MSVC-arm64 awaits the armasm64
- * dialect). The table compiles everywhere (the registry walk is
- * arch-neutral); only the hookable entries are gated.
+ * The wrappers exist for x64 and arm64, both dialects (gas +
+ * MASM/armasm64 -- TODO.trace-profile/08). The table compiles
+ * everywhere (the registry walk is arch-neutral); only the
+ * hookable entries are gated.
  */
-#if (defined(__aarch64__) && !defined(_MSC_VER)) ||	\
-	defined(_M_X64) || defined(__x86_64__)
+#if defined(_M_X64) || defined(__x86_64__) ||	\
+	defined(_M_ARM64) || defined(__aarch64__)
 #define HAVE_WRAPPERS 1
 #else
 #define HAVE_WRAPPERS 0
@@ -186,10 +226,6 @@ retrace_win_install_thunk(void *thunk_target, void *worker,
 	      ((const char *)buf + prefix_len + 5);
 	if (rel > 0x7fffffffLL || rel < -0x80000000LL)
 		return RETRACE_HOOK_INTERNAL;
-	/* TEMPORARY diagnostic */
-	fprintf(stderr, "retrace: thunk trampoline at %p, "
-		"rel %lld (worker=%p)\n", (void *)buf,
-		(long long)rel, (void *)worker);
 	buf[prefix_len] = 0xE9;
 	memcpy(buf + prefix_len + 1, &rel, 4);
 
@@ -218,13 +254,21 @@ retrace_win_install_thunk(void *thunk_target, void *worker,
 	if (!VirtualProtect(thunk_target, 14,
 		PAGE_EXECUTE_READWRITE, &old_protect))
 		return RETRACE_HOOK_INTERNAL;
+	/* capture the original bytes BEFORE the patch: uninstall
+	 * restores them (a live patch after uninstall loops through
+	 * the wrapper forever -- the fallback real-impl resolution
+	 * returns the patched export itself)
+	 */
+	st = retrace_hook_bookmark(thunk_target, 14, buf, hook_out);
+	if (st != RETRACE_HOOK_OK) {
+		VirtualProtect(thunk_target, 14, old_protect, &old_protect);
+		return st;
+	}
 	memcpy(thunk_target, patch, 14);
 	VirtualProtect(thunk_target, 14, old_protect, &old_protect);
 	FlushInstructionCache(GetCurrentProcess(), thunk_target, 14);
 
 	*trampoline_out = buf;
-	(void)hook_out;
-	(void)st;
 	return RETRACE_HOOK_OK;
 }
 
@@ -369,21 +413,6 @@ int retrace_win_install_hooks(void)
 
 			if (resolved != target) {
 				/*
-				 * TEMPORARY diagnostic: the worker's first
-				 * bytes (CI-visible; verifies decoder sizing)
-				 */
-				{
-					const unsigned char *b = resolved;
-					int bi;
-
-					fprintf(stderr,
-"retrace: thunk '%s' -> worker bytes:",
-						h->name);
-					for (bi = 0; bi < 20; bi++)
-						fprintf(stderr, " %02x", b[bi]);
-					fprintf(stderr, "\n");
-				}
-				/*
 				 * Thunk path: the worker's bytes were never
 				 * patched -- the trampoline must only replay
 				 * the prefix and JMP to the worker's entry
@@ -429,20 +458,6 @@ int retrace_win_install_hooks(void)
 			continue;
 		}
 
-		/*
-		 * TEMPORARY diagnostic: the target's first bytes
-		 * (CI-visible ground truth for decoder verification)
-		 */
-		{
-			const unsigned char *b = target;
-			int bi;
-
-			fprintf(stderr, "retrace: hooked '%s' bytes:",
-				h->name);
-			for (bi = 0; bi < 16; bi++)
-				fprintf(stderr, " %02x", b[bi]);
-			fprintf(stderr, "\n");
-		}
 
 installed:
 		g_installed[g_installed_count].handle = handle;

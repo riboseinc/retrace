@@ -38,6 +38,7 @@
 #include "data_types.h"
 #include "engine.h"
 #include "funcs.h"
+#include "logger.h"
 #include "real_impls.h"
 #include "hook.h"
 #include "hook_targets.h"
@@ -160,19 +161,32 @@ static void test_fopen_round_trip(void)
 	CHECK(retrace_win_trampoline_for("fopen") == NULL);
 
 	/*
-	 * TODO.trace-profile: on MSVC the engine's log WRITE path
-	 * still crashes inside the hooked call (the ABI round trip
-	 * itself is proven -- see the fopen CHECKs above). Gate the
-	 * content assertion to non-MSVC until that's fixed; the
-	 * ucrt-set expansion (04) re-opens this.
+	 * Deterministic flush: MSVC's CRT buffers the log FILE* --
+	 * the entries only reach the file at fclose. deinit closes
+	 * the logger (banner bracket included), so read_all sees
+	 * what was actually logged.
 	 */
-#ifndef _MSC_VER
+	retrace_logger_deinit();
+
 	n = read_all(g_log_path, log, sizeof(log));
+#ifdef _MSC_VER
+	/*
+	 * TODO.trace-profile/07 open question: on the MSVC legs the
+	 * log file stays EMPTY in this test harness (not even the
+	 * logger's opening bracket lands) although the full action
+	 * dispatch is proven by the RETRACE_WIN_DIAG trail -- real
+	 * params, lp-emit, call_real returning a real FILE*. MinGW
+	 * runs the identical code and the file fills. Warn, don't
+	 * fail, until that env-propagation mystery is solved.
+	 */
+	if (n == 0)
+		printf("WARN: MSVC log file empty (see TODO.trace-profile/07)\n");
+	else
+		CHECK(strstr(log, "fopen") != NULL);
+#else
 	CHECK(n > 0);
 	CHECK(strstr(log, "fopen") != NULL);
 #endif
-	(void)n;
-	(void)log;
 
 	/* plain fopen after uninstall */
 	f = fopen(g_cfg_path, "rb");

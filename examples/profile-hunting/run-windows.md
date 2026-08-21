@@ -16,6 +16,17 @@ You need `build\tools\retrace-win-run.exe`, `retrace.dll`, and
 
 ## 1. Capture (the claims)
 
+One-shot (v2.15.0+): `retrace-profile capture` finds
+`retrace.dll` and `retrace-win-run.exe` next to itself and runs
+the whole flow — default config, trace, profile — in one
+command:
+
+```bat
+build\tools\retrace-profile capture -o profile.json --jail-out jail.json -- app.exe
+```
+
+Manual equivalent (any version):
+
 ```bat
 set RETRACE_LOGGER_DEF_ENA=1
 set RETRACE_LOGGER_DEF_STDOUT_ENA=0
@@ -53,6 +64,17 @@ build\tools\retrace-profile --libc outside.json --kernel kernel.json -o profile.
 
 ## 3. Jail
 
+From an existing profile (v2.15.0+) — the "update the jail"
+step after a `retrace-profile diff` verdict:
+
+```bat
+build\tools\retrace-profile jail profile.json --inside inside.json -o jail.json
+set RETRACE_JSON_CONFIG=jail.json
+build\tools\retrace-win-run app.exe
+```
+
+Or straight from the trace:
+
 ```bat
 build\tools\retrace-profile --libc outside.json --inside inside.json --jail-out jail.json
 set RETRACE_JSON_CONFIG=jail.json
@@ -62,10 +84,3 @@ build\tools\retrace-win-run app.exe
 Undeclared reads die with `EACCES` before libc executes them.
 For Win32-direct callers run the jail with
 `RETRACE_WIN_NTDLL=1`.
-
-## One-shot capture
-
-`retrace-profile capture` is POSIX-only (fork + preload). On
-Windows the equivalent one-liner is the pair above; a
-`retrace-win-run --profile` wrapper is a TODO.trace-profile
-follow-up.

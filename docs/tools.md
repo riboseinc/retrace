@@ -95,8 +95,22 @@ statically scans the binary for raw-syscall gadgets and ntdll
 imports (`--binary`), and emits a ready-to-run sandbox jail
 (`--jail-out`; allowlist from `--inside`, the declared set).
 
+Subcommands:
+
+- `capture [-- cmd]` — one-shot: run a command under retrace and
+  emit its profile (POSIX preload; Windows delegates the launch
+  to `retrace-win-run`, ≥ 2.15.0).
+- `diff <baseline> <candidate>` — drift report between two
+  profiles/traces; exit 1 when drift exists (CI-able).
+- `jail <profile.json> [--inside d.json]` — emit a jail config
+  from an existing profile (≥ 2.15.0): the update-the-jail step
+  of the upgrade story, no re-capture needed.
+- `validate <profile.json>` — check the profile contract
+  (`share/profile-schema.json`).
+
 - **Inputs**: any standard trace (retrace capture, strace or
-  procmon converted, VFS inside log).
+  procmon converted, VFS inside log), or a profile doc for
+  `jail`.
 - **Cookbook**: [recipe 34 — Profile a binary, then jail it](cookbook/34-profile-and-jail.md).
 - **Runnable demo**: `examples/profile-hunting/`.
 

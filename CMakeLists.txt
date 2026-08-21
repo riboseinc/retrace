@@ -129,10 +129,16 @@ if(RETRACE_PLATFORM_WINDOWS)
 	endif()
 
 	# MSVC: the generic ASM language does not select MASM under the
-	# Visual Studio generators -- wrapper_x64.asm needs ASM_MASM
-	# enabled explicitly (TODO.windows/05).
+	# Visual Studio generators -- wrapper_x64.asm needs ASM_MASM,
+	# wrapper_arm64.asm needs ASM_MARMASM (CMake's name for the
+	# Microsoft ARM assembler; there is no ASM_MARM64), both
+	# enabled explicitly (TODO.windows/05, TODO.trace-profile/08).
 	if(MSVC)
-		enable_language(ASM_MASM)
+		if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
+			enable_language(ASM_MARMASM)
+		else()
+			enable_language(ASM_MASM)
+		endif()
 
 		# The registry arrays (.rtrA/.rtrF/.rtrD) are static and
 		# unreferenced by code; /OPT:REF strips them and the

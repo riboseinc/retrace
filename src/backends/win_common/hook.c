@@ -132,15 +132,23 @@ build_trampoline_x64_ex(void *target, size_t prologue_len,
 	memcpy(buf + prefix_len, target, prologue_len);
 
 	/*
-	 * The trampoline must jump to the worker's ENTRY -- not past
-	 * its prologue. The hook overwrote the THUNK bytes (this
-	 * original `target`); the worker bytes are pristine and must
-	 * execute their prologue from scratch. Skipping into the
-	 * middle of the prologue is invalid: the prologue sets up
-	 * the frame (rax = rsp, home slots) and skipping it writes
-	 * to unmapped stack memory.
+	 * The tail MUST be a DIRECT rel32 jump, not mov rax/jmp
+	 * rax: the indirect form is a Control Flow Guard check
+	 * point, and (target + prologue_len) is mid-function --
+	 * not a valid CFG target -- so the process dies with
+	 * STATUS_STACK_BUFFER_OVERRUN. The trampoline is
+	 * allocated within rel32 range of the target, so the
+	 * direct form always fits.
+	 *
+	 * The jump lands PAST the patched window: target[0..len)
+	 * holds our jump to the wrapper, so jumping back to
+	 * target+0 re-enters the wrapper forever (the loop the
+	 * RETRACE_WIN_DIAG counter caught on MSVC's directly
+	 * hooked _read). The copied prologue executes here, then
+	 * control resumes at target + prologue_len -- the bytes
+	 * write_jump never touched.
 	 */
-	rel = (const char *)target -
+	rel = ((const char *)target + (ptrdiff_t)prologue_len) -
 	      ((const char *)buf + prefix_len + prologue_len + 5);
 	if (rel > 0x7fffffffLL || rel < -0x80000000LL)
 		return RETRACE_HOOK_INTERNAL;
@@ -376,6 +384,27 @@ retrace_hook_install(void *target_addr,
 {
 	return retrace_hook_install_ex(target_addr, wrapper_addr,
 		NULL, 0, trampoline_out, hook_out);
+}
+
+retrace_hook_status_t
+retrace_hook_bookmark(void *target, size_t patch_size, void *trampoline,
+		      retrace_hook_t **hook_out)
+{
+	retrace_hook_t *hook;
+
+	if (target == NULL || hook_out == NULL || patch_size == 0 ||
+	    patch_size > sizeof(hook->saved_bytes))
+		return RETRACE_HOOK_INTERNAL;
+	hook = (retrace_hook_t *)HeapAlloc(GetProcessHeap(), 0,
+		sizeof(*hook));
+	if (hook == NULL)
+		return RETRACE_HOOK_NO_MEMORY;
+	hook->target = target;
+	hook->trampoline = trampoline;
+	hook->patch_size = patch_size;
+	memcpy(hook->saved_bytes, target, patch_size);
+	*hook_out = hook;
+	return RETRACE_HOOK_OK;
 }
 
 retrace_hook_status_t
