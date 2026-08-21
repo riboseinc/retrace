@@ -32,9 +32,15 @@ static inline void retrace_win_diag(const char *tag, const char *name,
 	HANDLE h;
 
 	if (enabled < 0) {
-		const char *e = getenv("RETRACE_WIN_DIAG");
+		/* Win32 ONLY: getenv is a HOOKED export (v2.16.0) --
+		 * a CRT call here recurses wrapper->diag->getenv->
+		 * wrapper before the latch commits (stack overflow)
+		 */
+		char buf[8];
 
-		enabled = e != NULL && e[0] == '1';
+		enabled = GetEnvironmentVariableA(
+			"RETRACE_WIN_DIAG", buf, sizeof(buf)) > 0 &&
+			buf[0] == '1';
 	}
 	if (!enabled)
 		return;

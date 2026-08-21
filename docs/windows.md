@@ -43,8 +43,9 @@ Inside the child, `DLL_PROCESS_ATTACH`:
 
 | Layer | Default | Functions | Notes |
 |---|---|---|---|
-| ucrt | ON | `fopen`, `_open`, `_close`, `_read`, `_write`, `_lseek`, `_stat`, `_unlink`, `_remove`, `_rename`, `_rmdir` | The CRT layer — a normal C program's file traffic (v2.14.0 expands the v1 `fopen`-only set) |
-| ntdll | OPT-IN | `NtCreateFile`, `NtOpenFile`, `NtQueryAttributesFile`, `NtClose`, `LdrLoadDll` | One level deeper: catches Win32-direct callers that never touch the CRT |
+| ucrt | ON | `fopen`, `_open`, `_close`, `_read`, `_write`, `_lseek`, `_stat`, `_unlink`, `_remove`, `_rename`, `_rmdir`, `getenv` | The CRT layer — a normal C program's file and env traffic (v2.16.0 adds env reads) |
+| ws2_32 | ON | `connect`, `send`, `recv` | Net visibility: profiles get network activity like POSIX (v2.16.0) |
+| ntdll | OPT-IN | `NtCreateFile`, `NtOpenFile`, `NtQueryAttributesFile`, `NtClose`, `LdrLoadDll`, `NtWriteFile`, `NtReadFile`, `NtQueryDirectoryFile` | One level deeper: catches Win32-direct callers that never touch the CRT — including direct `WriteFile`/`ReadFile`/`FindFirstFile` (v2.16.0 adds the data ops) |
 
 ### The ntdll layer (opt-in)
 

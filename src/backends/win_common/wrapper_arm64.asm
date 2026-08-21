@@ -597,4 +597,258 @@ rmdir_call
     add         sp, sp, #112
     br          x9
 
+
+
+    EXPORT      retrace_wrap_getenv
+retrace_wrap_getenv
+    sub         sp, sp, #112
+    stp         x0, x1, [sp, #24]
+    stp         x2, x3, [sp, #40]
+    stp         x4, x5, [sp, #56]
+    stp         x6, x7, [sp, #72]
+    str         x30, [sp, #88]
+    add         x9, sp, #112
+    str         x9, [sp, #96]
+    stp         xzr, xzr, [sp, #0]
+    str         xzr, [sp, #16]
+    mov         w0, #16
+    mov         x1, sp
+    bl          retrace_win_enter
+    ldr         x9, [sp, #0]
+    cbnz        x9, getenv_call
+
+    ; synthesized return: x0 = ret_val, x30 restored
+    ldr         x0, [sp, #16]
+    ldr         x30, [sp, #88]
+    add         sp, sp, #112
+    ret
+
+getenv_call
+    ; tail-jump the trampoline with the original registers;
+    ; the user's return address rides in x30 and [entry sp]
+    ldp         x0, x1, [sp, #24]
+    ldp         x2, x3, [sp, #40]
+    ldp         x4, x5, [sp, #56]
+    ldp         x6, x7, [sp, #72]
+    ldr         x30, [sp, #88]
+    ldr         x9, [sp, #8]
+    add         sp, sp, #112
+    br          x9
+
+    EXPORT      retrace_wrap_connect
+retrace_wrap_connect
+    sub         sp, sp, #112
+    stp         x0, x1, [sp, #24]
+    stp         x2, x3, [sp, #40]
+    stp         x4, x5, [sp, #56]
+    stp         x6, x7, [sp, #72]
+    str         x30, [sp, #88]
+    add         x9, sp, #112
+    str         x9, [sp, #96]
+    stp         xzr, xzr, [sp, #0]
+    str         xzr, [sp, #16]
+    mov         w0, #17
+    mov         x1, sp
+    bl          retrace_win_enter
+    ldr         x9, [sp, #0]
+    cbnz        x9, connect_call
+
+    ; synthesized return: x0 = ret_val, x30 restored
+    ldr         x0, [sp, #16]
+    ldr         x30, [sp, #88]
+    add         sp, sp, #112
+    ret
+
+connect_call
+    ; tail-jump the trampoline with the original registers;
+    ; the user's return address rides in x30 and [entry sp]
+    ldp         x0, x1, [sp, #24]
+    ldp         x2, x3, [sp, #40]
+    ldp         x4, x5, [sp, #56]
+    ldp         x6, x7, [sp, #72]
+    ldr         x30, [sp, #88]
+    ldr         x9, [sp, #8]
+    add         sp, sp, #112
+    br          x9
+
+    EXPORT      retrace_wrap_send
+retrace_wrap_send
+    sub         sp, sp, #112
+    stp         x0, x1, [sp, #24]
+    stp         x2, x3, [sp, #40]
+    stp         x4, x5, [sp, #56]
+    stp         x6, x7, [sp, #72]
+    str         x30, [sp, #88]
+    add         x9, sp, #112
+    str         x9, [sp, #96]
+    stp         xzr, xzr, [sp, #0]
+    str         xzr, [sp, #16]
+    mov         w0, #18
+    mov         x1, sp
+    bl          retrace_win_enter
+    ldr         x9, [sp, #0]
+    cbnz        x9, send_call
+
+    ; synthesized return: x0 = ret_val, x30 restored
+    ldr         x0, [sp, #16]
+    ldr         x30, [sp, #88]
+    add         sp, sp, #112
+    ret
+
+send_call
+    ; tail-jump the trampoline with the original registers;
+    ; the user's return address rides in x30 and [entry sp]
+    ldp         x0, x1, [sp, #24]
+    ldp         x2, x3, [sp, #40]
+    ldp         x4, x5, [sp, #56]
+    ldp         x6, x7, [sp, #72]
+    ldr         x30, [sp, #88]
+    ldr         x9, [sp, #8]
+    add         sp, sp, #112
+    br          x9
+
+    EXPORT      retrace_wrap_recv
+retrace_wrap_recv
+    sub         sp, sp, #112
+    stp         x0, x1, [sp, #24]
+    stp         x2, x3, [sp, #40]
+    stp         x4, x5, [sp, #56]
+    stp         x6, x7, [sp, #72]
+    str         x30, [sp, #88]
+    add         x9, sp, #112
+    str         x9, [sp, #96]
+    stp         xzr, xzr, [sp, #0]
+    str         xzr, [sp, #16]
+    mov         w0, #19
+    mov         x1, sp
+    bl          retrace_win_enter
+    ldr         x9, [sp, #0]
+    cbnz        x9, recv_call
+
+    ; synthesized return: x0 = ret_val, x30 restored
+    ldr         x0, [sp, #16]
+    ldr         x30, [sp, #88]
+    add         sp, sp, #112
+    ret
+
+recv_call
+    ; tail-jump the trampoline with the original registers;
+    ; the user's return address rides in x30 and [entry sp]
+    ldp         x0, x1, [sp, #24]
+    ldp         x2, x3, [sp, #40]
+    ldp         x4, x5, [sp, #56]
+    ldp         x6, x7, [sp, #72]
+    ldr         x30, [sp, #88]
+    ldr         x9, [sp, #8]
+    add         sp, sp, #112
+    br          x9
+
+    EXPORT      retrace_wrap_NtWriteFile
+retrace_wrap_NtWriteFile
+    sub         sp, sp, #112
+    stp         x0, x1, [sp, #24]
+    stp         x2, x3, [sp, #40]
+    stp         x4, x5, [sp, #56]
+    stp         x6, x7, [sp, #72]
+    str         x30, [sp, #88]
+    add         x9, sp, #112
+    str         x9, [sp, #96]
+    stp         xzr, xzr, [sp, #0]
+    str         xzr, [sp, #16]
+    mov         w0, #20
+    mov         x1, sp
+    bl          retrace_win_enter
+    ldr         x9, [sp, #0]
+    cbnz        x9, NtWriteFile_call
+
+    ; synthesized return: x0 = ret_val, x30 restored
+    ldr         x0, [sp, #16]
+    ldr         x30, [sp, #88]
+    add         sp, sp, #112
+    ret
+
+NtWriteFile_call
+    ; tail-jump the trampoline with the original registers;
+    ; the user's return address rides in x30 and [entry sp]
+    ldp         x0, x1, [sp, #24]
+    ldp         x2, x3, [sp, #40]
+    ldp         x4, x5, [sp, #56]
+    ldp         x6, x7, [sp, #72]
+    ldr         x30, [sp, #88]
+    ldr         x9, [sp, #8]
+    add         sp, sp, #112
+    br          x9
+
+    EXPORT      retrace_wrap_NtReadFile
+retrace_wrap_NtReadFile
+    sub         sp, sp, #112
+    stp         x0, x1, [sp, #24]
+    stp         x2, x3, [sp, #40]
+    stp         x4, x5, [sp, #56]
+    stp         x6, x7, [sp, #72]
+    str         x30, [sp, #88]
+    add         x9, sp, #112
+    str         x9, [sp, #96]
+    stp         xzr, xzr, [sp, #0]
+    str         xzr, [sp, #16]
+    mov         w0, #21
+    mov         x1, sp
+    bl          retrace_win_enter
+    ldr         x9, [sp, #0]
+    cbnz        x9, NtReadFile_call
+
+    ; synthesized return: x0 = ret_val, x30 restored
+    ldr         x0, [sp, #16]
+    ldr         x30, [sp, #88]
+    add         sp, sp, #112
+    ret
+
+NtReadFile_call
+    ; tail-jump the trampoline with the original registers;
+    ; the user's return address rides in x30 and [entry sp]
+    ldp         x0, x1, [sp, #24]
+    ldp         x2, x3, [sp, #40]
+    ldp         x4, x5, [sp, #56]
+    ldp         x6, x7, [sp, #72]
+    ldr         x30, [sp, #88]
+    ldr         x9, [sp, #8]
+    add         sp, sp, #112
+    br          x9
+
+    EXPORT      retrace_wrap_NtQueryDirectoryFile
+retrace_wrap_NtQueryDirectoryFile
+    sub         sp, sp, #112
+    stp         x0, x1, [sp, #24]
+    stp         x2, x3, [sp, #40]
+    stp         x4, x5, [sp, #56]
+    stp         x6, x7, [sp, #72]
+    str         x30, [sp, #88]
+    add         x9, sp, #112
+    str         x9, [sp, #96]
+    stp         xzr, xzr, [sp, #0]
+    str         xzr, [sp, #16]
+    mov         w0, #22
+    mov         x1, sp
+    bl          retrace_win_enter
+    ldr         x9, [sp, #0]
+    cbnz        x9, NtQueryDirectoryFile_call
+
+    ; synthesized return: x0 = ret_val, x30 restored
+    ldr         x0, [sp, #16]
+    ldr         x30, [sp, #88]
+    add         sp, sp, #112
+    ret
+
+NtQueryDirectoryFile_call
+    ; tail-jump the trampoline with the original registers;
+    ; the user's return address rides in x30 and [entry sp]
+    ldp         x0, x1, [sp, #24]
+    ldp         x2, x3, [sp, #40]
+    ldp         x4, x5, [sp, #56]
+    ldp         x6, x7, [sp, #72]
+    ldr         x30, [sp, #88]
+    ldr         x9, [sp, #8]
+    add         sp, sp, #112
+    br          x9
+
     END

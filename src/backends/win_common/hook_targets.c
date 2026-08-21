@@ -48,6 +48,13 @@ const char *const retrace_win_wrapper_names[] = {
 	"remove",		    /* 13 */
 	"rename",		    /* 14 */
 	"rmdir",		    /* 15 */
+	"getenv",		    /* 16 */
+	"connect",		    /* 17 */
+	"send",			    /* 18 */
+	"recv",			    /* 19 */
+	"NtWriteFile",		    /* 20 */
+	"NtReadFile",		    /* 21 */
+	"NtQueryDirectoryFile",	    /* 22 */
 };
 
 /*
@@ -63,9 +70,16 @@ static void win_diag_entry(const char *name)
 	static char last[32];
 	static unsigned long repeats;
 
-	if (enabled < 0)
-		enabled = getenv("RETRACE_WIN_DIAG") != NULL &&
-			  getenv("RETRACE_WIN_DIAG")[0] == '1';
+	if (enabled < 0) {
+		/* Win32 ONLY -- getenv is hooked (TODO.trace-profile/11);
+		 * a CRT getenv here recurses through the wrapper
+		 */
+		char buf[8];
+
+		enabled = GetEnvironmentVariableA(
+			"RETRACE_WIN_DIAG", buf, sizeof(buf)) > 0 &&
+			buf[0] == '1';
+	}
 	if (!enabled)
 		return;
 
@@ -149,10 +163,27 @@ static const struct win_hook g_hook_table[] = {
 		retrace_wrap_rename, 0 },
 	{ "_rmdir", "rmdir", "ucrtbase.dll", retrace_wrap_rmdir, 0 },
 
-	/* ntdll layer (TODO.windows/06): opt-in only. Catches
-	 * Win32-direct callers (CreateFileW funnels into
-	 * NtCreateFile; GetFileAttributesW into
-	 * NtQueryAttributesFile) that never touch the CRT.
+	/*
+	 * Env visibility (TODO.trace-profile/11): the capture
+	 * default config always listed getenv -- without the hook,
+	 * Windows profiles reported env: [] silently.
+	 */
+	{ "getenv", NULL, "ucrtbase.dll", retrace_wrap_getenv, 0 },
+
+	/*
+	 * Net visibility (TODO.trace-profile/11): ws2_32 direct
+	 * exports; profiles get connect/send/recv like POSIX.
+	 */
+	{ "connect", NULL, "ws2_32.dll", retrace_wrap_connect, 0 },
+	{ "send", NULL, "ws2_32.dll", retrace_wrap_send, 0 },
+	{ "recv", NULL, "ws2_32.dll", retrace_wrap_recv, 0 },
+
+	/* ntdll layer (TODO.windows/06, TODO.trace-profile/13):
+	 * opt-in only. Catches Win32-direct callers (CreateFileW
+	 * funnels into NtCreateFile; GetFileAttributesW into
+	 * NtQueryAttributesFile; WriteFile/ReadFile into
+	 * NtWriteFile/NtReadFile; FindFirstFile into
+	 * NtQueryDirectoryFile) that never touch the CRT.
 	 */
 	{ "NtCreateFile", NULL, "ntdll.dll",
 		retrace_wrap_NtCreateFile, 1 },
@@ -163,6 +194,12 @@ static const struct win_hook g_hook_table[] = {
 	{ "NtClose", NULL, "ntdll.dll", retrace_wrap_NtClose, 1 },
 	{ "LdrLoadDll", NULL, "ntdll.dll",
 		retrace_wrap_LdrLoadDll, 1 },
+	{ "NtWriteFile", NULL, "ntdll.dll",
+		retrace_wrap_NtWriteFile, 1 },
+	{ "NtReadFile", NULL, "ntdll.dll",
+		retrace_wrap_NtReadFile, 1 },
+	{ "NtQueryDirectoryFile", NULL, "ntdll.dll",
+		retrace_wrap_NtQueryDirectoryFile, 1 },
 };
 #else
 static const struct win_hook g_hook_table[] = {
@@ -324,6 +361,20 @@ static void *follow_thunk(void *addr, const unsigned char **prefix,
 
 			if (dest == p)
 				break; /* self-loop guard */
+			/*
+			 * A jump that lands within this stub's own
+			 * neighborhood is NOT a worker: ucrtbase getenv
+			 * on older images is "e9 07" -- 7 bytes ahead,
+			 * into the export's CC padding. Following it
+			 * built a trampoline INTO padding (the 2022-leg
+			 * segfault). Same for a destination that starts
+			 * with int3 padding. Refuse: the hook is skipped,
+			 * the function runs uninstrumented.
+			 */
+			if (dest > p && dest < p + 32)
+				break;
+			if (dest[0] == 0xCC)
+				break;
 			p = dest;
 			continue;
 		}

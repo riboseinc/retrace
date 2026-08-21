@@ -1,3 +1,16 @@
+retrace (2.16.0-1) unstable; urgency=medium
+
+  * Added: Windows env/net visibility -- getenv (ucrt) and
+    connect/send/recv (ws2_32) hooked default-on; profiles no
+    longer silently report empty env/net sets.
+  * Added: NtWriteFile/NtReadFile/NtQueryDirectoryFile in the
+    opt-in ntdll set -- Win32-direct WriteFile/ReadFile/
+    FindFirstFile traffic becomes visible (23 wrappers/dialect).
+  * Changed: the Windows wrapper runtime test runs on the
+    MSVC-arm64 legs (armasm64 runtime evidence).
+
+ -- Ribose Inc <opensource@ribose.com>  Fri, 21 Aug 2026 11:30:00 +0000
+
 retrace (2.15.0-1) unstable; urgency=medium
 
   * Added: retrace-profile capture on Windows -- delegates the
