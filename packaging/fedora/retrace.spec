@@ -5,7 +5,7 @@
 # Install: dnf install retrace-2.10.0-1.*.rpm
 
 Name:           retrace
-Version:        2.15.0
+Version:        2.16.0
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,8 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Fri Aug 21 2026 Ribose Inc <opensource@ribose.com> - 2.16.0-1
+- Windows env/net hooks (getenv, ws2_32 connect/send/recv), ntdll data ops (NtWriteFile/NtReadFile/NtQueryDirectoryFile), arm64 runtime test un-gate
 * Fri Aug 21 2026 Ribose Inc <opensource@ribose.com> - 2.15.0-1
 - capture on Windows (delegates to retrace-win-run), jail from a profile doc, armasm64 wrapper (MSVC-arm64 live hooks), aggregation credit fix
 * Thu Aug 20 2026 Ribose Inc <opensource@ribose.com> - 2.14.0-1

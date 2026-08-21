@@ -76,4 +76,11 @@ retrace_wrap_&fname& ENDP
         WRAPPER_ENTRY_WIN_X64 NtClose, 4
         WRAPPER_ENTRY_WIN_X64 LdrLoadDll, 5
 
+        WRAPPER_ENTRY_WIN_X64 getenv, 16
+        WRAPPER_ENTRY_WIN_X64 connect, 17
+        WRAPPER_ENTRY_WIN_X64 send, 18
+        WRAPPER_ENTRY_WIN_X64 recv, 19
+        WRAPPER_ENTRY_WIN_X64 NtWriteFile, 20
+        WRAPPER_ENTRY_WIN_X64 NtReadFile, 21
+        WRAPPER_ENTRY_WIN_X64 NtQueryDirectoryFile, 22
 END

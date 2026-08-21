@@ -89,9 +89,11 @@ if(RETRACE_PLATFORM_WINDOWS)
         COMMAND retrace_test_win_registry)
     set_tests_properties(unit-test-win-registry PROPERTIES LABELS "unit")
 
-    # Wrapper runtime round trip (TODO.windows/05): install the
-    # fopen hook in-process, run a call through the engine, verify
-    # the JSON log. x64 only (arm64 wrapper is the follow-up).
+    # Wrapper runtime round trip (TODO.windows/05,
+    # TODO.trace-profile/12): x64 legs. The arm64 HOOK MACHINERY
+    # is built and linked on the arm legs, but its first runtime
+    # run (v2.16.0) segfaults in the trampoline tail -- open in
+    # TODO.trace-profile/12; x64 is the runtime reference.
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|amd64")
         add_executable(retrace_test_win_wrapper test_win_wrapper.c)
         set_target_properties(retrace_test_win_wrapper PROPERTIES

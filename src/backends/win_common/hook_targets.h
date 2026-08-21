@@ -45,6 +45,13 @@ void retrace_wrap_NtOpenFile(void);
 void retrace_wrap_NtQueryAttributesFile(void);
 void retrace_wrap_NtClose(void);
 void retrace_wrap_LdrLoadDll(void);
+void retrace_wrap_getenv(void);
+void retrace_wrap_connect(void);
+void retrace_wrap_send(void);
+void retrace_wrap_recv(void);
+void retrace_wrap_NtWriteFile(void);
+void retrace_wrap_NtReadFile(void);
+void retrace_wrap_NtQueryDirectoryFile(void);
 
 /*
  * Resolve every enabled target (GetProcAddress on the listed

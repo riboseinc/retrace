@@ -225,5 +225,222 @@ retrace_func_define_prototypes(ntdll) = {
 			}
 		},
 		.fmt = FAT_NOVARARGS
+	},
+	{
+		/*
+		 * The Win32-direct DATA path (TODO.trace-profile/13):
+		 * without these, a program calling WriteFile/ReadFile
+		 * directly shows opens but no writes -- the worst
+		 * false-negative for a claims-vs-truth tool. Paths come
+		 * from the handle; classification is by func name.
+		 */
+		.name = "NtWriteFile",
+		.conv = CC_MICROSOFT,
+		.type_name = "int",
+		.params_cnt = 9,
+		.params = {
+			{
+				.name = "filehandle",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "event",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "apcroutine",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "apccontext",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "iostatusblock",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_OUT
+			},
+			{
+				.name = "buffer",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "void",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "length",
+				.type_name = "unsigned int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "byteoffset",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "void",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "key",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "void",
+				.direction = PDIR_IN
+			}
+		},
+		.fmt = FAT_NOVARARGS
+	},
+	{
+		.name = "NtReadFile",
+		.conv = CC_MICROSOFT,
+		.type_name = "int",
+		.params_cnt = 9,
+		.params = {
+			{
+				.name = "filehandle",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "event",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "apcroutine",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "apccontext",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "iostatusblock",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_OUT
+			},
+			{
+				.name = "buffer",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_OUT
+			},
+			{
+				.name = "length",
+				.type_name = "unsigned int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "byteoffset",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "void",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "key",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "void",
+				.direction = PDIR_IN
+			}
+		},
+		.fmt = FAT_NOVARARGS
+	},
+	{
+		/*
+		 * FindFirstFile* funnels here: the directory-probe
+		 * pattern (libsass-style importers scanning @import
+		 * paths) becomes visible at the ntdll depth.
+		 */
+		.name = "NtQueryDirectoryFile",
+		.conv = CC_MICROSOFT,
+		.type_name = "int",
+		.params_cnt = 10,
+		.params = {
+			{
+				.name = "filehandle",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "event",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "apcroutine",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "apccontext",
+				.type_name = "ptr",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "fileinformation",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER,
+				.ref_type_name = "void",
+				.direction = PDIR_OUT
+			},
+			{
+				.name = "length",
+				.type_name = "unsigned int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "fileinformationclass",
+				.type_name = "unsigned int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "returnsingleentry",
+				.type_name = "unsigned int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			},
+			{
+				.name = "filename",
+				.type_name = "ptr",
+				.modifiers = CDM_POINTER | CDM_CONST,
+				.ref_type_name = "ntus",
+				.direction = PDIR_IN
+			},
+			{
+				.name = "restartscan",
+				.type_name = "unsigned int",
+				.modifiers = CDM_NOMOD,
+				.direction = PDIR_IN
+			}
+		},
+		.fmt = FAT_NOVARARGS
 	}
 };

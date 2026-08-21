@@ -31,6 +31,7 @@
 
 #include "real_impls.h"
 #include "engine.h"
+#include "win_diag.h"
 #include "parson.h"
 #include "conf.h"
 #include "arch_spec.h"
@@ -63,18 +64,22 @@ static void retrace_main(void)
 	if (retrace_inited)
 		return;
 
+	retrace_win_diag("boot-as", NULL, 0);
 	if (retrace_as_init())
 		/* can't report error... */
 		return;
 
+	retrace_win_diag("boot-ri", NULL, 0);
 	if (retrace_real_impls_init())
 		/* can't report error... */
 		return;
 
+	retrace_win_diag("boot-log", NULL, 0);
 	if (retrace_logger_init())
 		/* can't report error... */
 		return;
 
+	retrace_win_diag("boot-hash", NULL, 0);
 	if (retrace_call_hash_init())
 		log_err("retrace_call_hash_init() failed; "
 			"call-hash feature disabled");
@@ -83,34 +88,40 @@ static void retrace_main(void)
 	json_set_allocation_functions(retrace_real_impls.malloc,
 			retrace_real_impls.free);
 
+	retrace_win_diag("boot-conf", NULL, 0);
 	ret = retrace_conf_init();
 	if (ret) {
 		log_err("retrace_conf_init() failed, ret = %d", ret);
 		return;
 	}
 
+	retrace_win_diag("boot-cache", NULL, 0);
 	retrace_config_cache_build(retrace_conf);
 
 	retrace_loger_update_config();
 
+	retrace_win_diag("boot-eng", NULL, 0);
 	ret = retrace_engine_init();
 	if (ret) {
 		log_err("retrace_engine_init() failed, ret = %d", ret);
 		return;
 	}
 
+	retrace_win_diag("boot-funcs", NULL, 0);
 	ret = retrace_funcs_init();
 	if (ret) {
 		log_err("retrace_funcs_init() failed, ret = %d", ret);
 		return;
 	}
 
+	retrace_win_diag("boot-dt", NULL, 0);
 	ret = retrace_datatypes_init();
 	if (ret) {
 		log_err("retrace_datatypes_init() failed, ret = %d", ret);
 		return;
 	}
 
+	retrace_win_diag("boot-acts", NULL, 0);
 	ret = retrace_actions_init();
 	if (ret) {
 		log_err("retrace_actions_init() failed, ret = %d", ret);

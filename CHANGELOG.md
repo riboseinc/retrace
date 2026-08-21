@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.16.0] — 2026-08-21
+
+**Honest-gap closure round 1** (TODO.trace-profile/11, 13, 12a):
+Windows profiles stop reporting false negatives.
+
+- **Env/net visibility on Windows** (11): `getenv` (ucrt) and
+  `connect`/`send`/`recv` (ws2_32) are now hooked default-on.
+  Before, the capture config listed them but no hook existed --
+  profiles silently reported `env: []` and `net: []`.
+- **ntdll data ops** (13): `NtWriteFile`, `NtReadFile`,
+  `NtQueryDirectoryFile` join the opt-in ntdll set -- a
+  Win32-direct `WriteFile`/`ReadFile`/`FindFirstFile` program is
+  no longer invisible past its opens. Prototypes in
+  `src/core/prototypes/ntdll.c`; the write/read classification
+  lands by function name.
+- **23 wrappers** per dialect (was 16): all four
+  arch/toolchain twins extended in lockstep, name table
+  index-ordered.
+- **arm64 runtime un-gate** (12a): the wrapper round-trip test
+  runs on the MSVC-arm64 legs -- the armasm64 dialect gets its
+  first runtime evidence (bounded TIMEOUT as everywhere).
+
 ## [2.15.0] — 2026-08-21
 
 **Trace + profile, completed** (TODO.trace-profile/07-10): the
