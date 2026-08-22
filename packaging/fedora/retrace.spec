@@ -5,7 +5,7 @@
 # Install: dnf install retrace-2.10.0-1.*.rpm
 
 Name:           retrace
-Version:        2.20.0
+Version:        2.21.0
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,8 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Sat Aug 22 2026 Ribose Inc <opensource@ribose.com> - 2.21.0-1
+- fuzzing workbench: retrace-fuzz-report (clustering + reproducers), RETRACE_FUZZ_SEED determinism
 * Sat Aug 22 2026 Ribose Inc <opensource@ribose.com> - 2.20.0-1
 - packaging-layer audit + compose hardening export
 * Sat Aug 22 2026 Ribose Inc <opensource@ribose.com> - 2.19.0-1

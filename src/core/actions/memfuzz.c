@@ -53,6 +53,18 @@ static int ia_memory_fuzz
 			fuzz_seed = json_object_get_number(action_params, "fuzz_seed");
 
 			srand(fuzz_seed);
+		} else if (retrace_real_impls.getenv(
+			"RETRACE_FUZZ_SEED") != NULL) {
+			/*
+			 * External seed (TODO.trace-profile/20): makes
+			 * ANY memory_fuzz config deterministically
+			 * re-drivable without editing it -- the fuzz
+			 * workbench's reproducibility path (a reproducer
+			 * is config + this env var).
+			 */
+			srand((unsigned int)retrace_real_impls.atoi(
+				retrace_real_impls.getenv(
+					"RETRACE_FUZZ_SEED")));
 		} else {
 			srand(retrace_real_impls.time(NULL));
 		}

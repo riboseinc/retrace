@@ -1651,6 +1651,28 @@ target_include_directories(retrace_test_kernel_converters PRIVATE
 add_test(NAME unit-test-kernel-converters
     COMMAND retrace_test_kernel_converters)
 set_tests_properties(unit-test-kernel-converters PROPERTIES LABELS "unit")
+# Fuzz-report clustering tests (TODO.trace-profile/20).
+#
+add_executable(retrace_test_fuzz_cluster test_fuzz_cluster.c
+    ${CMAKE_SOURCE_DIR}/tools/fuzz-report/cluster.c
+    ${CMAKE_SOURCE_DIR}/tools/common/stream.c
+    ${CMAKE_SOURCE_DIR}/tools/correlate/match.c
+    ${_parson_for_tools})
+set_target_properties(retrace_test_fuzz_cluster PROPERTIES
+    OUTPUT_NAME test_fuzz_cluster
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_include_directories(retrace_test_fuzz_cluster PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools/fuzz-report
+    ${CMAKE_SOURCE_DIR}/tools/common
+    ${CMAKE_SOURCE_DIR}/tools/correlate
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+add_test(NAME unit-test-fuzz-cluster
+    COMMAND retrace_test_fuzz_cluster)
+set_tests_properties(unit-test-fuzz-cluster PROPERTIES LABELS "unit")
+
 # Packaging converters smoke tests (TODO.trace-profile/19):
 # snap2inside + flatpak2inside run on fixtures; output is
 # compared with the expected JSON.
