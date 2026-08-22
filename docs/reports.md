@@ -158,11 +158,32 @@ capture --jail-out ...`, or `retrace-profile jail
 ```
 
 Deny-by-default: a path not on `allow_paths` fails with
-`EACCES` before libc executes. The allowlist must come from the
-DECLARED set (`--inside`) when you have one — the observed
-trace would allowlist its own escapes. Scoped to observed
-functions, not `*` (a wildcard jail also jails the dynamic
-loader's opens and kills startup). Run it:
+`EACCES` before libc executes — pointer-returning calls deny
+with NULL, int calls with -1 (prototype-driven). The allowlist
+must come from the DECLARED set (`--inside`) when you have one —
+the observed trace would allowlist its own escapes. Scoped to
+observed functions, not `*` (a wildcard jail also jails the
+dynamic loader's opens and kills startup).
+
+The `sandbox` action accepts further policies (emitted by
+`retrace-profile jail` flags, or hand-written):
+
+- `deny_classes: ["write"]` (`--read-only`) — read-only
+  detonation: ANY write-class call dies regardless of path
+  (fopen "w/a/+", open O_WRONLY/O_RDWR, unlink/rename/...).
+- `allow_env` / `deny_env` — env NAME policy: denied getenv
+  returns NULL, denied setenv returns -1.
+- `decoy_dir` (`--decoy <dir>`) — DECEPTION: instead of denying
+  an undeclared READ, the path is rewritten to
+  `decoy_dir/<basename>` and the real call runs against the
+  decoy. A denial is a detectable signal; a plausible fake
+  keeps the sample on its happy path. Every redirect is logged
+  (`sandbox: DECOYED '...' -> '...'`).
+- `--pin-clock <epoch>` — appends a `time()` script pinned to a
+  fixed epoch (deterministic reruns for diff oracles; v1 pins
+  coarse time only).
+
+Run it:
 
 ```sh
 RETRACE_JSON_CONFIG=jail.json LD_PRELOAD=libretrace.so ./app     # POSIX

@@ -5,7 +5,7 @@
 # Install: dnf install retrace-2.10.0-1.*.rpm
 
 Name:           retrace
-Version:        2.18.0
+Version:        2.19.0
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,8 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Sat Aug 22 2026 Ribose Inc <opensource@ribose.com> - 2.19.0-1
+- jail depth: read-only detonation, deception mode (decoy dir), env NAME policy, clock pinning
 * Sat Aug 22 2026 Ribose Inc <opensource@ribose.com> - 2.18.0-1
 - prototype-driven jail denial returns (NULL for pointers); diff accepts profile docs; reports.md + platforms.md; quickstart example on 4 platforms
 * Sat Aug 22 2026 Ribose Inc <opensource@ribose.com> - 2.17.0-1

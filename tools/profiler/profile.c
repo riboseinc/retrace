@@ -327,18 +327,32 @@ static int jail_mode(int argc, char **argv)
 	const char *inside_path = NULL;
 	const char *out_path = NULL;
 	struct ProfFeed feed, inside_feed;
+	struct ProfJailOpts jopts;
 	const struct Profile *allow_src;
 	JSON_Value *jc;
 	int i;
+
+	memset(&jopts, 0, sizeof(jopts));
 
 	for (i = 2; i < argc; i++) {
 		if (strcmp(argv[i], "--inside") == 0 && i + 1 < argc)
 			inside_path = argv[++i];
 		else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc)
 			out_path = argv[++i];
-		else if (argv[i][0] == '-' && argv[i][1] != '\0') {
+		else if (strcmp(argv[i], "--read-only") == 0) {
+			jopts.read_only = 1;
+		} else if (strcmp(argv[i], "--decoy") == 0 &&
+			   i + 1 < argc) {
+			jopts.decoy_dir = argv[++i];
+		} else if (strcmp(argv[i], "--pin-clock") == 0 &&
+			   i + 1 < argc) {
+			jopts.pin_clock = atoll(argv[++i]);
+			jopts.pin_clock_set = 1;
+		} else if (argv[i][0] == '-' && argv[i][1] != '\0') {
 			fprintf(stderr,
-	"Usage: retrace-profile jail <profile.json> [--inside d.json] [-o jail.json]\n");
+	"Usage: retrace-profile jail <profile.json> [--inside d.json]\n"
+	"        [--read-only] [--decoy <dir>] [--pin-clock <epoch>]\n"
+	"        [-o jail.json]\n");
 			return 2;
 		} else if (in_path == NULL) {
 			in_path = argv[i];
@@ -346,7 +360,9 @@ static int jail_mode(int argc, char **argv)
 	}
 	if (in_path == NULL) {
 		fprintf(stderr,
-	"Usage: retrace-profile jail <profile.json> [--inside d.json] [-o jail.json]\n");
+	"Usage: retrace-profile jail <profile.json> [--inside d.json]\n"
+	"        [--read-only] [--decoy <dir>] [--pin-clock <epoch>]\n"
+	"        [-o jail.json]\n");
 		return 2;
 	}
 
@@ -375,7 +391,7 @@ static int jail_mode(int argc, char **argv)
 		allow_src = &inside_feed.prof;
 	}
 
-	jc = prof_jail_config(&feed.prof, allow_src);
+	jc = prof_jail_config(&feed.prof, allow_src, &jopts);
 	{
 		char *ser = json_serialize_to_string_pretty(jc);
 
@@ -567,7 +583,7 @@ static int capture_mode(int argc, char **argv)
 			allow_src = &inside_feed;
 		{
 			JSON_Value *jc = prof_jail_config(&feed.prof,
-				&allow_src->prof);
+				&allow_src->prof, NULL);
 			FILE *jf = fopen(jail_path, "w");
 
 			if (jf == NULL) {
@@ -746,7 +762,7 @@ int main(int argc, char **argv)
 		const struct ProfFeed *allow_src = have_inside ?
 			&inside_feed : &libc_feed;
 		JSON_Value *jc = prof_jail_config(&libc_feed.prof,
-			&allow_src->prof);
+			&allow_src->prof, NULL);
 		FILE *jf = fopen(jail_path, "w");
 
 		if (jf == NULL) {
