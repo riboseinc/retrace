@@ -1,3 +1,13 @@
+retrace (2.19.0-1) unstable; urgency=medium
+
+  * Added: jail depth -- read-only detonation (deny all
+    write-class calls), deception mode (undeclared reads served
+    from a decoy directory instead of denied), first-class env
+    NAME policy (allow_env/deny_env), clock pinning
+    (--pin-clock). All runtime-proven.
+
+ -- Ribose Inc <opensource@ribose.com>  Sat, 22 Aug 2026 15:30:00 +0000
+
 retrace (2.18.0-1) unstable; urgency=medium
 
   * Fixed: sandbox denial returns are prototype-driven -- denied

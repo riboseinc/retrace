@@ -78,7 +78,7 @@ static void test_jail_shape(void)
 	CHECK(p.functions.count == 1);
 	CHECK(p.accesses.count == 1);
 
-	jc = prof_jail_config(&p, &p);
+	jc = prof_jail_config(&p, &p, NULL);
 	root = json_value_get_object(jc);
 	CHECK(root != NULL);
 
@@ -134,7 +134,7 @@ static void test_jail_declared_allowlist(void)
 	feed(&obs, observed);
 	feed(&ins, declared);
 
-	jc = prof_jail_config(&obs, &ins);
+	jc = prof_jail_config(&obs, &ins, NULL);
 	root = json_value_get_object(jc);
 	script = json_array_get_object(
 		json_object_get_array(root, "intercept_scripts"), 0);
@@ -215,8 +215,8 @@ static void test_jail_from_doc_matches_trace(void)
 				       "profile"),
 		&from_doc) == 0);
 
-	j1 = prof_jail_config(&from_trace, &from_trace);
-	j2 = prof_jail_config(&from_doc, &from_doc);
+	j1 = prof_jail_config(&from_trace, &from_trace, NULL);
+	j2 = prof_jail_config(&from_doc, &from_doc, NULL);
 	s1 = json_serialize_to_string(j1);
 	s2 = json_serialize_to_string(j2);
 	same = strcmp(s1, s2) == 0;
@@ -229,6 +229,63 @@ static void test_jail_from_doc_matches_trace(void)
 	json_value_free(doc);
 	prof_free(&from_trace);
 	prof_free(&from_doc);
+}
+
+/* --read-only / --decoy / --pin-clock emission */
+static void test_jail_opts_emission(void)
+{
+	static const char *const e[] = {
+		"{\"message\":{\"func\":\"fopen\",\"params\":{\"path\":\"/data/in.dat\"}}}",
+		NULL
+	};
+	struct Profile p;
+	struct ProfJailOpts opts;
+	JSON_Value *jc;
+	JSON_Object *root;
+	JSON_Array *scripts;
+	JSON_Object *params;
+	JSON_Array *dc;
+	JSON_Object *time_script;
+	JSON_Object *mr;
+
+	feed(&p, e);
+	memset(&opts, 0, sizeof(opts));
+	opts.read_only = 1;
+	opts.decoy_dir = "/decoys";
+	opts.pin_clock = 1700000000LL;
+	opts.pin_clock_set = 1;
+
+	jc = prof_jail_config(&p, &p, &opts);
+	root = json_value_get_object(jc);
+	scripts = json_object_get_array(root, "intercept_scripts");
+	CHECK(json_array_get_count(scripts) == 2); /* fopen + time */
+
+	params = json_object_get_object(
+		json_array_get_object(
+			json_object_get_array(
+				json_array_get_object(scripts, 0),
+				"actions"),
+			0),
+		"action_params");
+	dc = json_object_get_array(params, "deny_classes");
+	CHECK(dc != NULL);
+	CHECK(json_array_get_count(dc) == 1);
+	CHECK(strcmp(json_array_get_string(dc, 0), "write") == 0);
+	CHECK(strcmp(json_object_get_string(params, "decoy_dir"),
+		"/decoys") == 0);
+
+	time_script = json_array_get_object(scripts, 1);
+	CHECK(strcmp(json_object_get_string(time_script, "func_name"),
+		"time") == 0);
+	mr = json_array_get_object(
+		json_object_get_array(time_script, "actions"), 0);
+	CHECK(strcmp(json_object_get_string(mr, "action_name"),
+		"modify_return_value_int") == 0);
+	CHECK((long long)json_object_get_number(mr, "new_int")
+		== 1700000000LL);
+
+	json_value_free(jc);
+	prof_free(&p);
 }
 
 /* junk input: NULL root rejected, empty objects yield empty */
@@ -261,6 +318,7 @@ int main(void)
 	TEST(jail_declared_allowlist);
 	TEST(profile_round_trip);
 	TEST(jail_from_doc_matches_trace);
+	TEST(jail_opts_emission);
 	TEST(from_json_degenerate);
 
 	printf("\nPass: %d, Fail: %d (of %d)\n",
