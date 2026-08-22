@@ -222,6 +222,12 @@ with a named function). A reproducer is the ORIGINAL config
 plus the recorded seed: `RETRACE_FUZZ_SEED=<seed>
 LD_PRELOAD=... <cmd>` replays the exact failure sequence.
 
+With `--baseline`, the report also carries the DRIFT section
+(clean iterations vs the baseline profile -- the drift-report
+shape above, nested as `"drift"`) plus `"drifted": true|false`:
+behavior the baseline never saw (a new path, a new function)
+surfaces even when nothing crashed.
+
 ## Validation output
 
 `retrace-profile validate profile.json` checks the contract

@@ -31,6 +31,9 @@
  */
 
 #include "cluster.h"
+#include "aggregate.h"
+#include "diff.h"
+#include "stream.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +42,7 @@
 #ifndef _WIN32
 
 #include <dirent.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -48,11 +52,18 @@ static void usage(FILE *out)
 {
 	fprintf(out,
 "Usage: retrace-fuzz-report --config <fuzz.json> --seeds <dir>\n"
-"       [--lib <libretrace>] [--marker <substr>] [-o report.json]\n"
+"       [--lib <libretrace>] [--marker <substr>]\n"
+"       [--baseline <profile.json>] [-o report.json]\n"
 "       [-- cmd args...]\n"
 "\n"
 "Runs the target once per seed under the fuzz config; clusters\n"
-"failures; emits report.json + per-cluster repro configs.\n");
+"failures; emits report.json + per-cluster repro configs.\n"
+"--baseline adds the DRIFT ORACLE: clean iterations aggregate\n"
+"into one profile, diffed against the baseline -- behavior the\n"
+"baseline never saw (new paths, new env reads) surfaces even\n"
+"without a crash.\n"
+"--emit-corpus <dir> writes the MINIMIZED corpus: one seed\n"
+"per failure cluster (the reproducing seeds).\n");
 }
 
 static unsigned long fnv1a_buf(const char *s, size_t n,
@@ -153,6 +164,31 @@ static char *read_file(const char *path, size_t *len)
 	return buf;
 }
 
+static void copy_file(const char *from, const char *to)
+{
+	FILE *src = fopen(from, "rb");
+	FILE *dst;
+	char buf[1024];
+	size_t n;
+
+	if (src == NULL)
+		return;
+	dst = fopen(to, "wb");
+	if (dst == NULL) {
+		fclose(src);
+		return;
+	}
+	while ((n = fread(buf, 1, sizeof(buf), src)) > 0)
+		fwrite(buf, 1, n, dst);
+	fclose(src);
+	fclose(dst);
+}
+
+static void fuzz_feed_cb(JSON_Object *entry, void *ctx)
+{
+	prof_add_entry(entry, (struct Profile *)ctx);
+}
+
 int main(int argc, char **argv)
 {
 	const char *config = NULL;
@@ -160,6 +196,8 @@ int main(int argc, char **argv)
 	const char *lib_arg = NULL;
 	const char *out_path = "fuzz-report.json";
 	const char *marker = NULL;
+	const char *baseline_path = NULL;
+	const char *emit_corpus = NULL;
 	char *const *cmd = NULL;
 	int cmd_start = -1;
 	int i;
@@ -171,17 +209,36 @@ int main(int argc, char **argv)
 	int exit_code = 0;
 
 	for (i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "--config") == 0 && i + 1 < argc)
+		if (strcmp(argv[i], "--config") == 0 && i + 1 < argc) {
 			config = argv[++i];
-		else if (strcmp(argv[i], "--seeds") == 0 && i + 1 < argc)
+			continue;
+		}
+		if (strcmp(argv[i], "--seeds") == 0 && i + 1 < argc) {
 			seeds_dir = argv[++i];
-		else if (strcmp(argv[i], "--lib") == 0 && i + 1 < argc)
+			continue;
+		}
+		if (strcmp(argv[i], "--lib") == 0 && i + 1 < argc) {
 			lib_arg = argv[++i];
-		else if (strcmp(argv[i], "--marker") == 0 && i + 1 < argc)
+			continue;
+		}
+		if (strcmp(argv[i], "--marker") == 0 && i + 1 < argc) {
 			marker = argv[++i];
-		else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc)
+			continue;
+		}
+		if (strcmp(argv[i], "--baseline") == 0 && i + 1 < argc) {
+			baseline_path = argv[++i];
+			continue;
+		}
+		if (strcmp(argv[i], "--emit-corpus") == 0 &&
+		    i + 1 < argc) {
+			emit_corpus = argv[++i];
+			continue;
+		}
+		if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
 			out_path = argv[++i];
-		else if (strcmp(argv[i], "--") == 0) {
+			continue;
+		}
+		if (strcmp(argv[i], "--") == 0) {
 			cmd_start = i + 1;
 			break;
 		}
@@ -202,6 +259,42 @@ int main(int argc, char **argv)
 		return 2;
 	}
 	setenv("RETRACE_JSON_CONFIG", config, 1);
+
+	/* drift oracle context (TODO.trace-profile/20): clean
+	 * iterations aggregate into one profile, diffed against
+	 * --baseline at the end
+	 */
+	struct Profile clean_prof;
+	struct Profile base_prof;
+	int have_base = 0;
+
+	if (baseline_path != NULL) {
+		char *btext = read_file(baseline_path, NULL);
+		JSON_Value *base_doc = btext != NULL ?
+			json_parse_string_with_comments(btext) : NULL;
+
+		if (btext != NULL)
+			free(btext);
+		if (base_doc != NULL &&
+		    json_object_get_object(
+			    json_value_get_object(base_doc), "profile")
+			    != NULL) {
+			prof_init(&base_prof);
+			prof_from_json(
+				json_object_get_object(
+					json_value_get_object(base_doc),
+					"profile"),
+				&base_prof);
+			have_base = 1;
+			json_value_free(base_doc);
+		} else {
+			fprintf(stderr,
+"retrace-fuzz-report: cannot parse baseline %s\n",
+				baseline_path);
+			return 2;
+		}
+	}
+	prof_init(&clean_prof);
 
 	{
 		DIR *d = opendir(seeds_dir);
@@ -264,13 +357,42 @@ int main(int argc, char **argv)
 					names[k], cid,
 					WIFSIGNALED(status) ? "crash" :
 					"assertion");
+			} else if (trace != NULL) {
+				/* drift oracle: clean runs aggregate */
+				size_t sk = 0;
+
+				corr_stream_scan(trace, strlen(trace),
+					fuzz_feed_cb, &clean_prof, &sk);
 			}
 			free(trace);
 			remove(trace_path);
 		}
 
+		prof_finish(&clean_prof);
+
 		/* repro configs: config + seed env per cluster */
 		jv = fuzz_report_to_json(&rep);
+		if (have_base) {
+			struct ProfDiff d;
+			int drifted;
+
+			prof_diff_init(&d);
+			drifted = prof_diff_compute(&base_prof,
+				&clean_prof, &d);
+			json_object_set_value(json_value_get_object(jv),
+				"drift", prof_diff_to_json(&d));
+			json_object_set_number(
+				json_value_get_object(jv), "drifted",
+				drifted);
+			fprintf(stderr,
+"retrace-fuzz-report: drift oracle: %s\n",
+				drifted ?
+				"behavior the baseline never saw" :
+				"clean runs within baseline behavior");
+			prof_diff_free(&d);
+			prof_free(&base_prof);
+		}
+		prof_free(&clean_prof);
 		{
 			JSON_Array *arr = json_object_get_array(
 				json_value_get_object(jv), "clusters");
@@ -304,6 +426,53 @@ int main(int argc, char **argv)
 				json_object_set_string(c, "repro",
 					repro_path);
 			}
+		}
+
+		if (emit_corpus != NULL) {
+			/* minimized corpus: copy the seed file of each
+			 * cluster's first_seed into the dir -- one
+			 * seed per failure, the reproducing set
+			 */
+			mkdir(emit_corpus, 0755);
+			{
+				JSON_Array *arr = json_object_get_array(
+					json_value_get_object(jv),
+					"clusters");
+				size_t ci;
+
+				for (ci = 0;
+				     ci < json_array_get_count(arr);
+				     ci++) {
+					JSON_Object *c =
+						json_array_get_object(arr,
+							ci);
+					const char *seed_s =
+						json_object_get_string(c,
+							"seed");
+					char from[1024];
+					char to[1024];
+
+					(void)seed_s;
+					/* map seed value back to file:
+					 * we did not keep the name --
+					 * copy from the report's repro
+					 * instead: the repro IS the
+					 * minimized entry
+					 */
+					snprintf(from, sizeof(from),
+						"%s", json_object_get_string(
+							c, "repro"));
+					snprintf(to, sizeof(to),
+						"%s/cluster-%s.json",
+						emit_corpus,
+						json_object_get_string(c,
+							"id"));
+					copy_file(from, to);
+				}
+			}
+			fprintf(stderr,
+"retrace-fuzz-report: minimized corpus -> %s (one reproducer per cluster)\n",
+				emit_corpus);
 		}
 
 		ser = json_serialize_to_string_pretty(jv);

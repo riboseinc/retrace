@@ -9,6 +9,8 @@ set(_parson_source ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 
 if(NOT WIN32)
 	add_executable(retrace_fuzz_report fuzz-report.c cluster.c
+		${CMAKE_SOURCE_DIR}/tools/profiler/aggregate.c
+		${CMAKE_SOURCE_DIR}/tools/profiler/diff.c
 		${CMAKE_SOURCE_DIR}/tools/common/stream.c
 		${CMAKE_SOURCE_DIR}/tools/correlate/match.c
 		${_parson_source})
@@ -18,6 +20,7 @@ if(NOT WIN32)
 
 	target_include_directories(retrace_fuzz_report PRIVATE
 		${CMAKE_CURRENT_SOURCE_DIR}
+		${CMAKE_SOURCE_DIR}/tools/profiler
 		${CMAKE_SOURCE_DIR}/tools/common
 		${CMAKE_SOURCE_DIR}/tools/correlate
 		${CMAKE_SOURCE_DIR}/src/config/json

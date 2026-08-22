@@ -54,4 +54,29 @@ if [ -n "$SEED" ]; then
 		echo "UNEXPECTED: survived" || echo "reproduced: crash"
 fi
 
+echo "=== drift oracle (behavior the baseline never saw)"
+# baseline: the same target with allocations never failing
+cat > base.json <<'CONF'
+{"intercept_scripts":[{"func_name":"malloc","actions":[
+ {"action_name":"log_params"},
+ {"action_name":"call_real"}]}]}
+CONF
+RETRACE_V2_LIB="$LIB" RETRACE_JSON_CONFIG=base.json \
+	"$BUILD/tools/retrace-profile" capture -o baseline.json \
+	-- ./crashy >/dev/null 2>&1 || true
+if [ -f baseline.json ]; then
+	"$BUILD/tools/retrace-fuzz-report" \
+		--config base.json --seeds seeds \
+		--baseline baseline.json -o drift.json \
+		-- ./crashy 2>&1 | grep -a "drift" || true
+fi
+
+echo "=== minimized corpus (one reproducer per cluster)"
+rm -rf mincorpus
+"$BUILD/tools/retrace-fuzz-report" \
+	--config fuzz.json --seeds seeds \
+	--emit-corpus mincorpus -o report2.json \
+	-- ./crashy >/dev/null 2>&1 || true
+ls mincorpus 2>/dev/null || echo "(no failures -> empty corpus)"
+
 echo "=== done: $WORK"
