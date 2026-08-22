@@ -1615,6 +1615,7 @@ set_tests_properties(unit-test-profile-diff PROPERTIES LABELS "unit")
 add_executable(retrace_test_profile_jail test_profile_jail.c
     ${CMAKE_SOURCE_DIR}/tools/profiler/aggregate.c
     ${CMAKE_SOURCE_DIR}/tools/profiler/jail.c
+    ${CMAKE_SOURCE_DIR}/tools/profiler/harden.c
     ${CMAKE_SOURCE_DIR}/tools/correlate/match.c
     ${_parson_for_tools})
 set_target_properties(retrace_test_profile_jail PROPERTIES
@@ -1650,4 +1651,26 @@ target_include_directories(retrace_test_kernel_converters PRIVATE
 add_test(NAME unit-test-kernel-converters
     COMMAND retrace_test_kernel_converters)
 set_tests_properties(unit-test-kernel-converters PROPERTIES LABELS "unit")
+# Packaging converters smoke tests (TODO.trace-profile/19):
+# snap2inside + flatpak2inside run on fixtures; output is
+# compared with the expected JSON.
+#
+add_test(NAME unit-test-snap2inside
+    COMMAND ${CMAKE_COMMAND}
+    -DTOOL=$<TARGET_FILE:retrace_snap2inside>
+    -DFIXTURE=${CMAKE_SOURCE_DIR}/test/fixtures/snapcraft.yaml
+    -DEXPECTED=${CMAKE_SOURCE_DIR}/test/fixtures/snap2inside.expected.json
+    -P ${CMAKE_SOURCE_DIR}/test/fixtures/run_converter.cmake)
+set_tests_properties(unit-test-snap2inside PROPERTIES
+    ENVIRONMENT "SNAP2INSIDE_HOME=/home/testuser")
+set_tests_properties(unit-test-snap2inside PROPERTIES LABELS "unit")
+
+add_test(NAME unit-test-flatpak2inside
+    COMMAND ${CMAKE_COMMAND}
+    -DTOOL=$<TARGET_FILE:retrace_flatpak2inside>
+    -DFIXTURE=${CMAKE_SOURCE_DIR}/test/fixtures/flatpak-manifest.json
+    -DEXPECTED=${CMAKE_SOURCE_DIR}/test/fixtures/flatpak2inside.expected.json
+    -P ${CMAKE_SOURCE_DIR}/test/fixtures/run_converter.cmake)
+set_tests_properties(unit-test-flatpak2inside PROPERTIES LABELS "unit")
+
 

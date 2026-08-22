@@ -41,6 +41,7 @@
 #include "capture.h"
 #include "diff.h"
 #include "jail.h"
+#include "harden.h"
 #include "validate.h"
 #include "match.h"
 #include "stream.h"
@@ -623,6 +624,50 @@ int main(int argc, char **argv)
 		return capture_mode(argc, argv);
 	if (argc >= 2 && strcmp(argv[1], "jail") == 0)
 		return jail_mode(argc, argv);
+	if (argc >= 2 && strcmp(argv[1], "harden") == 0) {
+		const char *hp = NULL;
+		const char *ho = NULL;
+		struct ProfFeed hf;
+		FILE *hf_out = stdout;
+		int hi;
+
+		for (hi = 2; hi < argc; hi++) {
+			if (strcmp(argv[hi], "-o") == 0 && hi + 1 < argc)
+				ho = argv[++hi];
+			else if (argv[hi][0] != '-')
+				hp = argv[hi];
+			else {
+				fprintf(stderr,
+	"Usage: retrace-profile harden <profile.json> [-o compose.yaml]\n");
+				return 2;
+			}
+		}
+		if (hp == NULL) {
+			fprintf(stderr,
+	"Usage: retrace-profile harden <profile.json> [-o compose.yaml]\n");
+			return 2;
+		}
+		if (load_any(hp, &hf) != 0) {
+			fprintf(stderr,
+				"retrace-profile: cannot read %s\n", hp);
+			return 2;
+		}
+		if (ho != NULL) {
+			hf_out = fopen(ho, "w");
+			if (hf_out == NULL) {
+				fprintf(stderr,
+				"retrace-profile: cannot write %s\n", ho);
+				return 2;
+			}
+		}
+		prof_harden_compose(&hf.prof, hf_out);
+		if (hf_out != stdout)
+			fclose(hf_out);
+		prof_free(&hf.prof);
+		fprintf(stderr,
+	"retrace-profile harden: compose fragment written\n");
+		return 0;
+	}
 	if (argc >= 2 && strcmp(argv[1], "validate") == 0) {
 		char err[2048];
 		int n;
@@ -678,7 +723,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "retrace-profile: --libc is required\n");
 		return 2;
 	}
-	if (load_profile(libc_path, &libc_feed) != 0) {
+	if (load_any(libc_path, &libc_feed) != 0) {
 		fprintf(stderr, "retrace-profile: cannot read %s\n",
 			libc_path);
 		return 2;
@@ -751,6 +796,35 @@ int main(int argc, char **argv)
 	}
 	if (have_cap)
 		capability_to_json(root, &cap);
+
+	/*
+	 * Declared-set grading (TODO.trace-profile/19): observed
+	 * accesses NOT covered by --inside are confinement
+	 * violations (packaging audit headline).
+	 */
+	if (have_inside) {
+		size_t vi;
+		size_t violations = 0;
+
+		for (vi = 0; vi < libc_feed.prof.accesses.count; vi++) {
+			const struct ProfAccess *a =
+				&libc_feed.prof.accesses.items[vi];
+
+			if (prof_access_get(&inside_feed.prof, a->path)
+				== NULL) {
+				if (violations == 0)
+					fprintf(stderr,
+"retrace-profile: DECLARED-SET VIOLATIONS (observed, not granted):\n");
+				fprintf(stderr, "  %s (%s)\n", a->path,
+					a->class_write ? "write" :
+					a->class_read ? "read" : "probe");
+				violations++;
+			}
+		}
+		if (violations == 0)
+			fprintf(stderr,
+"retrace-profile: declared set covers all observed accesses\n");
+	}
 
 	if (jail_path != NULL) {
 		/*

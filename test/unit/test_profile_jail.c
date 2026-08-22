@@ -14,6 +14,7 @@
 #include <stdlib.h>
 
 #include "aggregate.h"
+#include "harden.h"
 #include "jail.h"
 #include "match.h"
 #include "parson.h"
@@ -288,6 +289,48 @@ static void test_jail_opts_emission(void)
 	prof_free(&p);
 }
 
+/* harden: the jail exported as a compose fragment */
+static void test_harden_compose(void)
+{
+	static const char *const e[] = {
+		"{\"message\":{\"func\":\"open\",\"params\":{\"path\":\"/data/r.dat\"}}}",
+		"{\"message\":{\"func\":\"unlink\",\"params\":{\"path\":\"/data/w.dat\"}}}",
+		"{\"message\":{\"func\":\"getenv\",\"*name\":[\"HOME\"]}}",
+		NULL
+	};
+	struct Profile p;
+	FILE *f = tmpfile();
+	char buf[4096];
+	size_t n;
+
+	feed(&p, e);
+	CHECK(f != NULL);
+	CHECK(prof_harden_compose(&p, f) == 0);
+	rewind(f);
+	n = fread(buf, 1, sizeof(buf) - 1, f);
+	buf[n] = '\0';
+	fclose(f);
+
+	CHECK(strstr(buf, "read_only: true") != NULL);
+	CHECK(strstr(buf, "- ALL") != NULL);
+	CHECK(strstr(buf, "no-new-privileges:true") != NULL);
+	CHECK(strstr(buf, "network_mode: \"none\"") != NULL);
+	{
+		char rwline[600];
+		char roline[600];
+
+		snprintf(rwline, sizeof(rwline),
+			"\"/data/w.dat\":\"/data/w.dat\":rw");
+		snprintf(roline, sizeof(roline),
+			"\"/data/r.dat\":\"/data/r.dat\":ro");
+		CHECK(strstr(buf, rwline) != NULL);
+		CHECK(strstr(buf, roline) != NULL);
+	}
+	CHECK(strstr(buf, "\"HOME\": \"\"") != NULL);
+
+	prof_free(&p);
+}
+
 /* junk input: NULL root rejected, empty objects yield empty */
 static void test_from_json_degenerate(void)
 {
@@ -319,6 +362,8 @@ int main(void)
 	TEST(profile_round_trip);
 	TEST(jail_from_doc_matches_trace);
 	TEST(jail_opts_emission);
+	TEST(jail_opts_emission);
+	TEST(harden_compose);
 	TEST(from_json_degenerate);
 
 	printf("\nPass: %d, Fail: %d (of %d)\n",

@@ -1,0 +1,22 @@
+{
+    "profile": {
+        "accesses": [
+            {
+                "path": "$HOME\/",
+                "class": "read",
+                "hits": 1
+            },
+            {
+                "path": "\/var\/data",
+                "class": "write",
+                "hits": 1
+            }
+        ],
+        "net": [
+            "*"
+        ]
+    },
+    "notes_unmapped_args": [
+        "--device=dri"
+    ]
+}

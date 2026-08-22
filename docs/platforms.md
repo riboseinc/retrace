@@ -72,6 +72,27 @@ retrace-profile capture -o profile.json -- ./app args
 Kernel truth: `truss -f -o truss.log ./app`, then
 `retrace-truss2retrace -o kernel.json truss.log`.
 
+## Packaged apps (snap / flatpak / AppImage / containers)
+
+Claims-vs-truth at the packaging layer: the DECLARED surface
+(snapcraft.yaml plugs, flatpak finish-args) converts to the
+declared-set format, and the observed profile grades against it
+-- accesses outside the granted surface are confinement
+violations.
+
+```sh
+retrace-snap2inside -o inside.json snapcraft.yaml
+retrace-flatpak2inside -o inside.json manifest.json   # JSON form
+retrace-profile capture -o profile.json -- ./app
+retrace-profile --libc profile.json --inside inside.json
+```
+
+The jail can also be EXPORTED as container policy
+(`retrace-profile harden profile.json -o compose.yaml`):
+read_only root, cap_drop ALL, write-class paths as rw binds,
+network off when the profile shows none. Runnable demo:
+`examples/packaging-audit/`.
+
 ## The jail everywhere
 
 ```sh

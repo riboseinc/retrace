@@ -1,0 +1,9 @@
+name: demo-snap
+base: core22
+apps:
+  demo:
+    command: bin/demo
+    plugs:
+      - home
+      - network
+      - raw-usb

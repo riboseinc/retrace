@@ -1,0 +1,9 @@
+{
+  "app-id": "org.demo.App",
+  "finish-args": [
+    "--filesystem=home",
+    "--filesystem=/var/data:rw",
+    "--share=network",
+    "--device=dri"
+  ]
+}
