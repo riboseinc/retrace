@@ -250,12 +250,12 @@ static int diff_mode(int argc, char **argv)
 "Usage: retrace-profile diff <baseline.json> <candidate.json> [--json]\n");
 		return 2;
 	}
-	if (load_profile(baseline_path, &baseline) != 0) {
+	if (load_any(baseline_path, &baseline) != 0) {
 		fprintf(stderr, "retrace-profile: cannot read %s\n",
 			baseline_path);
 		return 2;
 	}
-	if (load_profile(candidate_path, &candidate) != 0) {
+	if (load_any(candidate_path, &candidate) != 0) {
 		fprintf(stderr, "retrace-profile: cannot read %s\n",
 			candidate_path);
 		return 2;

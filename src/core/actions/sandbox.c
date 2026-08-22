@@ -99,6 +99,16 @@ static int list_contains(const char *path_arg, JSON_Array *list)
 	return 0;
 }
 
+static intptr_t deny_ret(const struct ThreadContext *t_ctx)
+{
+	if (t_ctx->prototype != NULL &&
+	    t_ctx->prototype->type_name != NULL &&
+	    retrace_real_impls.strcmp(
+		    t_ctx->prototype->type_name, "ptr") == 0)
+		return 0;
+	return -1;
+}
+
 static int ia_sandbox(struct ThreadContext *t_ctx,
 		      const JSON_Object *action_params)
 {
@@ -146,18 +156,25 @@ static int ia_sandbox(struct ThreadContext *t_ctx,
 	if (path_arg == NULL)
 		return 0;
 
+	/*
+	 * Denial return value is PROTOTYPE-DRIVEN (TODO 17): a
+	 * synthesized -1 for a pointer-returning function hands the
+	 * caller (FILE *)-1 -- != NULL, so correct code USES it and
+	 * crashes. Pointer returns deny with NULL; int returns with
+	 * -1 (POSIX open-family error).
+	 */
 	if (allow_paths != NULL && !list_contains(path_arg, allow_paths)) {
 		log_warn("sandbox: DENIED '%s' (not in allow_paths)",
 			path_arg);
 		errno = EACCES;
-		t_ctx->ret_val = -1;
+		t_ctx->ret_val = deny_ret(t_ctx);
 		return -1;
 	}
 	if (deny_paths != NULL && list_contains(path_arg, deny_paths)) {
 		log_warn("sandbox: DENIED '%s' (matches deny_paths)",
 			path_arg);
 		errno = EACCES;
-		t_ctx->ret_val = -1;
+		t_ctx->ret_val = deny_ret(t_ctx);
 		return -1;
 	}
 
