@@ -1,3 +1,17 @@
+retrace (2.18.0-1) unstable; urgency=medium
+
+  * Fixed: sandbox denial returns are prototype-driven -- denied
+    pointer calls return NULL (were (TYPE*)-1; callers crashed
+    using them), int calls return -1.
+  * Added: retrace-profile diff accepts profile docs, not just
+    traces.
+  * Added: docs/reports.md (all output shapes annotated) and
+    docs/platforms.md (per-platform guide with honest limits);
+    examples/trace-profile-quickstart runs the whole loop on
+    Linux/macOS/FreeBSD/Windows.
+
+ -- Ribose Inc <opensource@ribose.com>  Sat, 22 Aug 2026 10:00:00 +0000
+
 retrace (2.17.0-1) unstable; urgency=medium
 
   * Added: retrace-dtrace2retrace (macOS dtruss -> trace; the

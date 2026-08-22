@@ -13,8 +13,12 @@
 if(RETRACE_PLATFORM_WINDOWS)
 	add_executable(getenv getenv-fuzzing/getenv.c)
 	add_executable(escape-demo escape-hunting/escape-demo.c)
+	add_executable(quickstart-app
+		trace-profile-quickstart/app.c)
 	return()
 endif()
+
+add_executable(quickstart-app trace-profile-quickstart/app.c)
 
 # dns-fuzz: axfr.c, query.c
 add_executable(axfr  dns-fuzz/axfr.c)

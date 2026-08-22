@@ -4,6 +4,11 @@ Welcome. This directory holds the reference documentation for retrace.
 Start with the [`README.adoc`](../README.adoc) in the repository root for
 install, quick start, and platform support.
 
+- [platforms.md](platforms.md) — the per-platform guide: capture,
+  kernel truth, jail, and each platform's honest limitations.
+- [reports.md](reports.md) — every output shape annotated: trace
+  entries, profiles, risk, drift, jail configs, validation.
+
 ## Where to go next
 
 | You want to… | Go to |
