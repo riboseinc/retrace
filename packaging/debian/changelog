@@ -1,3 +1,11 @@
+retrace (2.25.0-1) unstable; urgency=medium
+
+  * Changed: the Windows wrapper test drops the forced
+    RETRACE_WIN_DIAG env and asserts log content on every
+    platform (TODO 07 experiment).
+
+ -- Ribose Inc <opensource@ribose.com>  Sun, 23 Aug 2026 04:00:00 +0000
+
 retrace (2.24.0-1) unstable; urgency=medium
 
   * Added: examples/fuzz-target -- the libFuzzer harness
