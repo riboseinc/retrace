@@ -70,24 +70,30 @@ static int path_class(const struct ProfAccess *a)
 	return CORR_CLS_NONE;
 }
 
+static void name_add(char ***arr, size_t *cnt, size_t *cap,
+		      const char *name)
+{
+	if (*cnt == *cap) {
+		size_t newcap = (*cap == 0) ? 16 : *cap * 2;
+		char **grown = (char **)realloc(*arr,
+			newcap * sizeof(char *));
+
+		if (grown == NULL)
+			return;
+		*arr = grown;
+		*cap = newcap;
+	}
+	(*arr)[*cnt] = (char *)malloc(strlen(name) + 1);
+	if ((*arr)[*cnt] == NULL)
+		return;
+	strcpy((*arr)[*cnt], name);
+	(*cnt)++;
+}
+
 static void new_function_add(struct ProfDiff *d, const char *name)
 {
-	if (d->new_functions_cnt == d->new_functions_cap) {
-		size_t newcap = (d->new_functions_cap == 0) ?
-			16 : d->new_functions_cap * 2;
-
-		d->new_functions = (char **)realloc(d->new_functions,
-			newcap * sizeof(char *));
-		if (d->new_functions == NULL)
-			return;
-		d->new_functions_cap = newcap;
-	}
-	d->new_functions[d->new_functions_cnt] =
-		(char *)malloc(strlen(name) + 1);
-	if (d->new_functions[d->new_functions_cnt] == NULL)
-		return;
-	strcpy(d->new_functions[d->new_functions_cnt], name);
-	d->new_functions_cnt++;
+	name_add(&d->new_functions, &d->new_functions_cnt,
+		&d->new_functions_cap, name);
 }
 
 int prof_diff_compute(const struct Profile *baseline,
@@ -168,6 +174,33 @@ int prof_diff_compute(const struct Profile *baseline,
 		}
 	}
 
+	/* env/net drift (TODO.trace-profile/21): names/addresses
+	 * present only in the candidate -- a NEW env read or a NEW
+	 * address contacted is a supply-chain signal
+	 */
+	{
+		size_t e;
+
+		for (e = 0; e < candidate->env.count; e++) {
+			if (prof_names_get(&baseline->env,
+				candidate->env.names[e]) == 0) {
+				name_add(&d->new_env, &d->new_env_cnt,
+					&d->new_env_cap,
+					candidate->env.names[e]);
+				drift = 1;
+			}
+		}
+		for (e = 0; e < candidate->net.count; e++) {
+			if (prof_names_get(&baseline->net,
+				candidate->net.names[e]) == 0) {
+				name_add(&d->new_net, &d->new_net_cnt,
+					&d->new_net_cap,
+					candidate->net.names[e]);
+				drift = 1;
+			}
+		}
+	}
+
 	return drift;
 }
 
@@ -216,6 +249,20 @@ JSON_Value *prof_diff_to_json(const struct ProfDiff *d)
 
 	json_object_set_value(root, "path_changes", arr);
 	json_object_set_value(root, "new_functions", farr);
+	{
+		JSON_Value *eenv = json_value_init_array();
+		JSON_Value *enet = json_value_init_array();
+		size_t k;
+
+		for (k = 0; k < d->new_env_cnt; k++)
+			json_array_append_string(
+				json_value_get_array(eenv), d->new_env[k]);
+		for (k = 0; k < d->new_net_cnt; k++)
+			json_array_append_string(
+				json_value_get_array(enet), d->new_net[k]);
+		json_object_set_value(root, "new_env", eenv);
+		json_object_set_value(root, "new_net", enet);
+	}
 	json_object_set_boolean(root, "drift", any);
 	return root_val;
 }
@@ -230,5 +277,11 @@ void prof_diff_free(struct ProfDiff *d)
 	for (i = 0; i < d->new_functions_cnt; i++)
 		free(d->new_functions[i]);
 	free(d->new_functions);
+	for (i = 0; i < d->new_env_cnt; i++)
+		free(d->new_env[i]);
+	free(d->new_env);
+	for (i = 0; i < d->new_net_cnt; i++)
+		free(d->new_net[i]);
+	free(d->new_net);
 	memset(d, 0, sizeof(*d));
 }

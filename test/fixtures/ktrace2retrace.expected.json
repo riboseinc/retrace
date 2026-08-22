@@ -1,0 +1,1 @@
+[{"time":0,"pid":1234,"tid":0,"module":"ktrace","severity":"INFO","message":{"func":"open","path":"\/etc\/hosts"}},{"time":0,"pid":1234,"tid":0,"module":"ktrace","severity":"INFO","message":{"func":"open","path":"\/var\/log\/audit"}}]

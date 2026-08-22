@@ -43,6 +43,18 @@ struct ProfDiff {
 	char **new_functions;
 	size_t new_functions_cnt;
 	size_t new_functions_cap;
+
+	/* env names / net addresses present only in the candidate
+	 * (TODO.trace-profile/21): a NEW env read or a NEW address
+	 * contacted between baseline and candidate is a
+	 * supply-chain signal
+	 */
+	char **new_env;
+	size_t new_env_cnt;
+	size_t new_env_cap;
+	char **new_net;
+	size_t new_net_cnt;
+	size_t new_net_cap;
 };
 
 void prof_diff_init(struct ProfDiff *d);

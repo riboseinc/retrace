@@ -58,6 +58,80 @@ static void feed(struct Profile *p, const char *const *entries)
 	prof_finish(p);
 }
 
+
+/* -- timings (TODO.trace-profile/21) -- */
+
+static void test_timings_harvested(void)
+{
+	static const char *const e[] = {
+		"{\"message\":{\"func\":\"fopen\",\"call_duration_us\":120,\"ret_val\":1}}",
+		"{\"message\":{\"func\":\"fopen\",\"call_duration_us\":30,\"ret_val\":1}}",
+		"{\"message\":{\"func\":\"malloc\",\"call_duration_us\":8,\"ret_val\":1}}",
+		NULL
+	};
+	struct Profile p;
+
+	feed(&p, e);
+	CHECK(p.timings.count == 2);
+	CHECK(p.timings.items[0].calls == 2);
+	CHECK(p.timings.items[0].total_us == 150);
+	CHECK(p.timings.items[0].max_us == 120);
+	CHECK(prof_timing_p99(&p.timings.items[0]) == 120);
+	prof_free(&p);
+}
+
+static void test_timings_in_json(void)
+{
+	static const char *const e[] = {
+		"{\"message\":{\"func\":\"fopen\",\"call_duration_us\":50,\"ret_val\":1}}",
+		NULL
+	};
+	struct Profile p;
+	JSON_Value *v;
+	char *ser;
+
+	feed(&p, e);
+	v = prof_to_json(&p);
+	ser = json_serialize_to_string(v);
+	CHECK(strstr(ser, "\"timings\"") != NULL);
+	CHECK(strstr(ser, "\"p99_us\"") != NULL);
+	json_free_serialized_string(ser);
+	json_value_free(v);
+	prof_free(&p);
+}
+
+/* -- env/net drift in diff (TODO.trace-profile/21) -- */
+
+static void test_env_net_drift(void)
+{
+	static const char *const base[] = {
+		"{\"message\":{\"func\":\"getenv\",\"*name\":[\"HOME\"]}}",
+		"{\"message\":{\"func\":\"connect\",\"addr\":\"10.0.0.1:80\"}}",
+		NULL
+	};
+	static const char *const cand[] = {
+		"{\"message\":{\"func\":\"getenv\",\"*name\":[\"HOME\"]}}",
+		"{\"message\":{\"func\":\"getenv\",\"*name\":[\"AWS_SECRET_KEY\"]}}",
+		"{\"message\":{\"func\":\"connect\",\"addr\":\"10.0.0.1:80\"}}",
+		"{\"message\":{\"func\":\"connect\",\"addr\":\"185.1.2.3:443\"}}",
+		NULL
+	};
+	struct Profile a, b;
+	struct ProfDiff d;
+
+	feed(&a, base);
+	feed(&b, cand);
+	prof_diff_init(&d);
+	CHECK(prof_diff_compute(&a, &b, &d) == 1);
+	CHECK(d.new_env_cnt == 1);
+	CHECK(strcmp(d.new_env[0], "AWS_SECRET_KEY") == 0);
+	CHECK(d.new_net_cnt == 1);
+	CHECK(strcmp(d.new_net[0], "185.1.2.3:443") == 0);
+	prof_diff_free(&d);
+	prof_free(&a);
+	prof_free(&b);
+}
+
 /* -- drift -- */
 
 static void test_no_drift(void)
@@ -295,6 +369,9 @@ static void test_validate_unparseable(void)
 int main(void)
 {
 	printf("profile drift tests:\n");
+	TEST(timings_harvested);
+	TEST(timings_in_json);
+	TEST(env_net_drift);
 	TEST(no_drift);
 	TEST(new_path);
 	TEST(removed_path);

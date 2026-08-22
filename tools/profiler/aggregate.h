@@ -56,6 +56,29 @@ struct ProfAccesses {
 };
 
 /*
+ * Per-function call timings (TODO.trace-profile/21): harvested
+ * from call_duration_us return summaries. Samples are kept
+ * (bounded) so percentiles are real, not approximated.
+ */
+#define PROF_TIMING_SAMPLES_MAX 4096
+
+struct ProfTiming {
+	char *func;
+	size_t calls;
+	double total_us;
+	double max_us;
+	double *samples;   /* bounded; percentile input */
+	size_t sample_cnt;
+	size_t sample_cap;
+};
+
+struct ProfTimings {
+	struct ProfTiming *items;  /* sorted by func (bsearch add) */
+	size_t count;
+	size_t cap;
+};
+
+/*
  * The aggregate profile of one trace.
  */
 struct Profile {
@@ -63,11 +86,15 @@ struct Profile {
 	struct ProfNames env;         /* env var names read */
 	struct ProfNames net;         /* addresses contacted (host:port) */
 	struct ProfAccesses accesses;
+	struct ProfTimings timings;   /* per-func call durations */
 	size_t entries;               /* entries consumed */
 	size_t no_pid;                /* entries without pid identity */
 };
 
 void prof_init(struct Profile *p);
+
+/* p99 (or max when fewer than 100 samples) for one timing. */
+double prof_timing_p99(const struct ProfTiming *t);
 void prof_add_entry(JSON_Object *entry, struct Profile *p);
 /* Sort indexes for lookup; required before contains/get. */
 void prof_finish(struct Profile *p);

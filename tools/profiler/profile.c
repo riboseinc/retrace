@@ -301,6 +301,12 @@ static int diff_mode(int argc, char **argv)
 		}
 		for (k = 0; k < d.new_functions_cnt; k++)
 			printf("  + fn %s (new)\n", d.new_functions[k]);
+		for (k = 0; k < d.new_env_cnt; k++)
+			printf("  + env %s (new -- supply-chain signal)\n",
+				d.new_env[k]);
+		for (k = 0; k < d.new_net_cnt; k++)
+			printf("  + net %s (new -- supply-chain signal)\n",
+				d.new_net[k]);
 		printf("%s\n", drift ?
 			"profile-diff: DRIFT FOUND" :
 			"profile-diff: no drift");

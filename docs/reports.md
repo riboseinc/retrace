@@ -123,14 +123,21 @@ shape:
 
 ```json
 {
- "changes": [ { "path": "/var/lib/new-cache", "class_from": -1,
-                "class_to": 3, "hits_from": 0, "hits_to": 3 } ],
- "new_functions": [ "connect" ],
+ "path_changes": [ { "path": "/var/lib/new-cache",
+                     "change": "added", "hits_from": 0,
+                     "hits_to": 3 } ],
+ "new_functions": [ { "name": "connect" } ],
+ "new_env": [ "AWS_SECRET_KEY" ],
+ "new_net": [ "185.1.2.3:443" ],
  "drift": true
 }
 ```
 
-`class_from: -1` = added path; `class_to: -1` = removed.
+`change` = added / removed / class escalation;
+`new_env`/`new_net` (>= 2.23.0) are the SUPPLY-CHAIN SIGNAL --
+an env name or address the baseline never touched. The profile
+doc also carries `timings` (>= 2.23.0): top 20 functions by
+total `call_duration_us` with calls/total/max/p99.
 
 ## The jail config
 
