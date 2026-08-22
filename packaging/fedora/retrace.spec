@@ -5,7 +5,7 @@
 # Install: dnf install retrace-2.10.0-1.*.rpm
 
 Name:           retrace
-Version:        2.22.0
+Version:        2.23.0
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 

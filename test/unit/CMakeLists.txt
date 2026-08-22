@@ -1694,5 +1694,15 @@ add_test(NAME unit-test-flatpak2inside
     -DEXPECTED=${CMAKE_SOURCE_DIR}/test/fixtures/flatpak2inside.expected.json
     -P ${CMAKE_SOURCE_DIR}/test/fixtures/run_converter.cmake)
 set_tests_properties(unit-test-flatpak2inside PROPERTIES LABELS "unit")
+# ktrace converter smoke test (TODO.trace-profile/21).
+#
+add_test(NAME unit-test-ktrace2retrace
+    COMMAND ${CMAKE_COMMAND}
+    -DTOOL=$<TARGET_FILE:retrace_ktrace2retrace>
+    -DFIXTURE=${CMAKE_SOURCE_DIR}/test/fixtures/kdump.log
+    -DEXPECTED=${CMAKE_SOURCE_DIR}/test/fixtures/ktrace2retrace.expected.json
+    -P ${CMAKE_SOURCE_DIR}/test/fixtures/run_converter.cmake)
+set_tests_properties(unit-test-ktrace2retrace PROPERTIES LABELS "unit")
+
 
 

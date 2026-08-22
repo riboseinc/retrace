@@ -1,0 +1,4 @@
+  1234 NAMI  "/etc/hosts"
+  1234 CALL  open(2,0x0,0x1b6)
+  1234 NAMI  "/var/log/audit"
+  1234 RET   open 3

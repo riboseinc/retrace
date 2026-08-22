@@ -130,11 +130,120 @@ static void names_finish(struct ProfNames *n)
 	}
 }
 
+static void prof_timing_add(struct Profile *p, const char *func,
+			    double us);
+
+static int timing_dcmp(const void *a, const void *b)
+{
+	double da = *(const double *)a;
+	double db = *(const double *)b;
+
+	return da < db ? -1 : da > db ? 1 : 0;
+}
+
+double prof_timing_p99(const struct ProfTiming *t)
+{
+	if (t->sample_cnt == 0)
+		return 0;
+	{
+		double *sorted = (double *)malloc(
+			t->sample_cnt * sizeof(*sorted));
+
+		if (sorted == NULL)
+			return t->max_us;
+		memcpy(sorted, t->samples,
+			t->sample_cnt * sizeof(*sorted));
+		qsort(sorted, t->sample_cnt, sizeof(*sorted),
+			timing_dcmp);
+		{
+			size_t idx = t->sample_cnt >= 100 ?
+				t->sample_cnt - t->sample_cnt / 100 :
+				t->sample_cnt - 1;
+			double v = sorted[idx];
+
+			free(sorted);
+			return v;
+		}
+	}
+}
+
+static void prof_timing_add(struct Profile *p, const char *func,
+			    double us)
+{
+	struct ProfTiming *t = NULL;
+	size_t lo = 0, hi = p->timings.count;
+
+	/* sorted insert position (bsearch) */
+	while (lo < hi) {
+		size_t mid = lo + (hi - lo) / 2;
+		int r = strcmp(p->timings.items[mid].func, func);
+
+		if (r == 0) {
+			t = &p->timings.items[mid];
+			break;
+		}
+		if (r < 0)
+			lo = mid + 1;
+		else
+			hi = mid;
+	}
+	if (t == NULL) {
+		if (p->timings.count == p->timings.cap) {
+			size_t newcap = p->timings.cap == 0 ?
+				16 : p->timings.cap * 2;
+			struct ProfTiming *grown =
+				(struct ProfTiming *)realloc(
+					p->timings.items,
+					newcap * sizeof(*grown));
+
+			if (grown == NULL)
+				return;
+			p->timings.items = grown;
+			p->timings.cap = newcap;
+		}
+		{
+			struct ProfTiming nt;
+			size_t tail = p->timings.count - lo;
+
+			memset(&nt, 0, sizeof(nt));
+			nt.func = (char *)malloc(strlen(func) + 1);
+			if (nt.func == NULL)
+				return;
+			strcpy(nt.func, func);
+			memmove(&p->timings.items[lo + 1],
+				&p->timings.items[lo],
+				tail * sizeof(*p->timings.items));
+			p->timings.items[lo] = nt;
+			p->timings.count++;
+			t = &p->timings.items[lo];
+		}
+	}
+	t->calls++;
+	t->total_us += us;
+	if (us > t->max_us)
+		t->max_us = us;
+	if (t->sample_cnt < PROF_TIMING_SAMPLES_MAX) {
+		if (t->sample_cnt == t->sample_cap) {
+			size_t newcap = t->sample_cap == 0 ?
+				16 : t->sample_cap * 2;
+			double *grown = (double *)realloc(t->samples,
+				newcap * sizeof(*grown));
+
+			if (grown == NULL)
+				return;
+			t->samples = grown;
+			t->sample_cap = newcap;
+		}
+		t->samples[t->sample_cnt++] = us;
+	}
+}
+
 void prof_init(struct Profile *p)
 {
 	prof_names_init(&p->functions);
 	prof_names_init(&p->env);
 	prof_names_init(&p->net);
+	memset(&p->timings, 0, sizeof(p->timings));
 	p->accesses.items = NULL;
 	p->accesses.count = 0;
 	p->accesses.cap = 0;
@@ -333,8 +442,18 @@ void prof_add_entry(JSON_Object *entry, struct Profile *p)
 	 */
 	if (json_object_get_string(msg, "text") != NULL)
 		return;
-	if (json_object_has_value(msg, "call_duration_us"))
+	if (json_object_has_value(msg, "call_duration_us")) {
+		/* timings harvest (TODO.trace-profile/21): the return
+		 * summary re-states func + duration
+		 */
+		const char *tf = json_object_get_string(msg, "func");
+
+		if (tf != NULL && tf[0] != '\0')
+			prof_timing_add(p, tf,
+				json_object_get_number(msg,
+					"call_duration_us"));
 		return;
+	}
 
 	func = json_object_get_string(msg, "func");
 	detail = json_object_get_string(msg, "detail");
@@ -361,6 +480,12 @@ void prof_free(struct Profile *p)
 	prof_names_free(&p->functions);
 	prof_names_free(&p->env);
 	prof_names_free(&p->net);
+	for (i = 0; i < p->timings.count; i++) {
+		free(p->timings.items[i].func);
+		free(p->timings.items[i].samples);
+	}
+	free(p->timings.items);
+	memset(&p->timings, 0, sizeof(p->timings));
 	for (i = 0; i < p->accesses.count; i++)
 		free(p->accesses.items[i].path);
 	free(p->accesses.items);
@@ -424,6 +549,70 @@ JSON_Value *prof_to_json(const struct Profile *p)
 		json_array_append_value(json_value_get_array(arr), o);
 	}
 	json_object_set_value(root, "accesses", arr);
+
+	/* timings top-N by total (TODO.trace-profile/21) */
+	if (p->timings.count > 0) {
+		JSON_Value *tv = json_value_init_array();
+		size_t top = p->timings.count < 20 ?
+			p->timings.count : 20;
+		size_t *order = (size_t *)malloc(
+			p->timings.count * sizeof(*order));
+		size_t i, j;
+
+		if (order != NULL) {
+			for (i = 0; i < p->timings.count; i++)
+				order[i] = i;
+			/* selection sort by total desc over the top
+			 * slice only (count is small; no qsort cmp
+			 * closure available)
+			 */
+			for (i = 0; i < top; i++) {
+				size_t best = i;
+
+				for (j = i + 1; j < p->timings.count;
+					j++) {
+					if (p->timings.items[order[j]]
+					    .total_us >
+					    p->timings.items[order[best]]
+					    .total_us)
+						best = j;
+				}
+				if (best != i) {
+					size_t tmp = order[i];
+
+					order[i] = order[best];
+					order[best] = tmp;
+				}
+			}
+			for (i = 0; i < top; i++) {
+				const struct ProfTiming *t =
+					&p->timings.items[order[i]];
+				JSON_Value *o = json_value_init_object();
+
+				json_object_set_string(
+					json_value_get_object(o),
+					"func", t->func);
+				json_object_set_number(
+					json_value_get_object(o),
+					"calls", (double)t->calls);
+				json_object_set_number(
+					json_value_get_object(o),
+					"total_us", t->total_us);
+				json_object_set_number(
+					json_value_get_object(o),
+					"max_us", t->max_us);
+				json_object_set_number(
+					json_value_get_object(o),
+					"p99_us", prof_timing_p99(t));
+				json_array_append_value(
+					json_value_get_array(tv), o);
+			}
+			free(order);
+			json_object_set_value(root, "timings", tv);
+		} else {
+			json_value_free(tv);
+		}
+	}
 	return v;
 }
 
