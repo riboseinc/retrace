@@ -1,3 +1,13 @@
+retrace (2.21.0-1) unstable; urgency=medium
+
+  * Added: retrace-fuzz-report -- corpus runner with crash
+    clustering and per-cluster reproducer configs (exit 1 on
+    crashes, CI-able); RETRACE_FUZZ_SEED env makes any
+    memory_fuzz config deterministically re-drivable.
+    examples/fuzz-workbench demo included.
+
+ -- Ribose Inc <opensource@ribose.com>  Sat, 22 Aug 2026 21:00:00 +0000
+
 retrace (2.20.0-1) unstable; urgency=medium
 
   * Added: packaging-layer audit -- retrace-snap2inside and

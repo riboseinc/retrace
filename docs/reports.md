@@ -190,6 +190,38 @@ RETRACE_JSON_CONFIG=jail.json LD_PRELOAD=libretrace.so ./app     # POSIX
 set RETRACE_JSON_CONFIG=jail.json && retrace-win-run app.exe      # Windows
 ```
 
+## The fuzz report
+
+`retrace-fuzz-report` (>= 2.21.0) emits `report.json` and one
+reproducer per failure cluster:
+
+```json
+{
+ "iterations": 8,
+ "crashes": 8,
+ "assertions": 0,
+ "clusters": [
+  {
+   "id": "17626269942680772151",
+   "func": "malloc",
+   "params": 0,
+   "count": 1,
+   "seed": "5977186486321276735",
+   "kind": "crash",
+   "repro": "fuzz-repro-17626269942680772151.json"
+  }
+ ]
+}
+```
+
+id and seed are STRINGS (values exceed 2^53; JSON doubles would
+lose precision). The cluster signature is (last-called
+function, param count) -- a v1 heuristic; `func: "?"` marks a
+death before any entry flushed (unattributable, never merged
+with a named function). A reproducer is the ORIGINAL config
+plus the recorded seed: `RETRACE_FUZZ_SEED=<seed>
+LD_PRELOAD=... <cmd>` replays the exact failure sequence.
+
 ## Validation output
 
 `retrace-profile validate profile.json` checks the contract
