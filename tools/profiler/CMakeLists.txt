@@ -16,7 +16,7 @@ set(_parson_source ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 
 add_executable(retrace_profile
     profile.c aggregate.c capability.c diff.c capture.c validate.c
-    jail.c
+    jail.c harden.c
     ${CMAKE_SOURCE_DIR}/tools/correlate/match.c
     ${CMAKE_SOURCE_DIR}/tools/common/stream.c
     ${_parson_source})

@@ -1,0 +1,17 @@
+{
+    "profile": {
+        "accesses": [
+            {
+                "path": "\/home\/testuser",
+                "class": "read",
+                "hits": 1
+            }
+        ],
+        "net": [
+            "*"
+        ]
+    },
+    "notes_unmapped_interfaces": [
+        "raw-usb"
+    ]
+}

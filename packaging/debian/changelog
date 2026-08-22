@@ -1,3 +1,15 @@
+retrace (2.20.0-1) unstable; urgency=medium
+
+  * Added: packaging-layer audit -- retrace-snap2inside and
+    retrace-flatpak2inside convert declared surfaces to the
+    grading format; --inside reports DECLARED-SET VIOLATIONS.
+  * Added: retrace-profile harden -- the jail exported as a
+    docker-compose hardening fragment.
+  * Changed: --libc accepts profile docs; new
+    packaging-audit example (verified E2E).
+
+ -- Ribose Inc <opensource@ribose.com>  Sat, 22 Aug 2026 18:00:00 +0000
+
 retrace (2.19.0-1) unstable; urgency=medium
 
   * Added: jail depth -- read-only detonation (deny all
