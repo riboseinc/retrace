@@ -262,6 +262,37 @@ script and synthesizes a `NULL` (or `0`) return value. `call_real`
 must precede `memory_fuzz` for the real allocator to run on
 successful calls.
 
+#### `fuzz_str`
+
+Replaces an incoming string parameter with a token drawn from an
+AFL-style dictionary file -- content fuzzing for parsers, env
+handling, and decoders without writing a harness. Deterministic
+under the shared seed machinery (reproducer = config + seed +
+dict file).
+
+```json
+{
+  "action_name": "fuzz_str",
+  "action_params": {
+    "param_name": "filename",
+    "dict": "/path/to/dict.txt",
+    "match_str": "/etc/hosts",
+    "fuzz_seed": 42
+  }
+}
+```
+
+| Param       | Type   | Required | Notes                                        |
+|-------------|--------|----------|----------------------------------------------|
+| `param_name`| string | yes      | Must be an IN `sz` pointer param.            |
+| `dict`      | string | yes      | Dictionary path: one token per line; `#` lines and blanks skipped. 256 tokens max, 4096 bytes each. |
+| `match_str` | string | no       | Only replace when the current value matches. |
+| `fuzz_seed` | number | no       | Seeds the shared RNG (once per process; also honors `RETRACE_FUZZ_SEED`). |
+
+Place `fuzz_str` BEFORE `log_params` so the trace records the
+token the callee actually received. See
+`examples/fuzz-workbench` for the full flow.
+
 #### `incomplete_io`
 
 Truncates the return value of a read/write-like call at a

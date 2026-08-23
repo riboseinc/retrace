@@ -1,0 +1,8 @@
+# fuzz_str dictionary fixture (TODO.trace-profile/25):
+# '#' lines and blanks are skipped; everything else is a token.
+
+/etc/passwd
+../../../etc/shadow
+%s%s%s%n
+https://example.invalid/callback
+\x00\xff\xfe

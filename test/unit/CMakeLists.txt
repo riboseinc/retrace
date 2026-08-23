@@ -670,6 +670,42 @@ add_test(NAME unit-test-memory-fuzz
 set_tests_properties(unit-test-memory-fuzz PROPERTIES LABELS "unit")
 
 #
+# fuzz_str action unit tests (TODO.trace-profile/25).
+#
+add_executable(retrace_test_fuzz_str test_fuzz_str.c)
+set_target_properties(retrace_test_fuzz_str PROPERTIES
+    OUTPUT_NAME test_fuzz_str
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_fuzz_str PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_fuzz_str PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/core/actions
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_fuzz_str PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_fuzz_str PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-fuzz-str
+    COMMAND retrace_test_fuzz_str)
+set_tests_properties(unit-test-fuzz-str PROPERTIES LABELS "unit"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/test/fixtures)
+
+#
 # modify_in_param_str action unit tests (TODO.complete/14).
 #
 add_executable(retrace_test_modify_in_param_str test_modify_in_param_str.c)

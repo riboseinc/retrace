@@ -44,7 +44,7 @@ set(_core_action_sources
 	actions/delay.c actions/call_count_limit.c
 	actions/sandbox.c actions/addr_deny.c
 	actions/filter.c actions/decode_http.c actions/decode_dns.c
-	actions/capture_buffer.c)
+	actions/capture_buffer.c actions/fuzz_dict.c)
 
 set(_core_datatype_sources
 	datatypes/basic.c datatypes/uio.c datatypes/unistd.c)
