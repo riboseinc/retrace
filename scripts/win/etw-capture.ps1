@@ -114,7 +114,7 @@ if ($rows) {
         $_ | ConvertTo-Json -Compress -Depth 2
     } | Set-Content -Path $jsonl -Encoding ascii
     Write-Host ("etw-capture: {0} file events (pid {1}) -> {2}" -f `
-        @($rows | Measure-Object).Count, $targetPid, $jsonl)
+        @($rows).Count, $targetPid, $jsonl)
 } else {
     Set-Content -Path $jsonl -Value "" -Encoding ascii
     Write-Warning "etw-capture: no named file events captured for pid $targetPid."

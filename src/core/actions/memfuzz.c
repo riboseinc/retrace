@@ -79,7 +79,7 @@ static int ia_memory_fuzz
 	long random_value;
 
 	if (action_params == NULL) {
-		log_err("action_params must exists for modify_return_value_int");
+		log_err("action_params must exists for memory_fuzz");
 		return -1;
 	}
 

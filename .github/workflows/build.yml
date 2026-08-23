@@ -172,6 +172,15 @@ jobs:
           & $conv -o "$out\trace.json" "$out\etw-events.jsonl"
           Write-Host "ETW smoke rows:"
           Get-Content "$out\etw-events.jsonl" | Write-Host
+          # Machine truth for the Id<->task mapping (TODO 24):
+          # the OS's own manifest table, printed every run.
+          try {
+            $prov = Get-WinEvent -ListProvider Microsoft-Windows-Kernel-File
+            $prov.Tasks | Sort-Object Value |
+              ForEach-Object { Write-Host ("ETW manifest: id={0} task={1}" -f $_.Value, $_.Name) }
+          } catch {
+            Write-Host "ETW manifest: provider table unavailable"
+          }
           $trace = Get-Content "$out\trace.json" -Raw
           if (-not $trace.Contains("hosts")) {
             Write-Error "ETW smoke: no hosts read captured"

@@ -5,7 +5,7 @@
 # Install: dnf install retrace-2.10.0-1.*.rpm
 
 Name:           retrace
-Version:        2.29.0
+Version:        2.29.1
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,8 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Sun Aug 23 2026 Ribose Inc <opensource@ribose.com> - 2.29.1-1
+- polish: memory_fuzz error message copy-paste fix, etw-capture count fix, ETW manifest table in CI
 * Sun Aug 23 2026 Ribose Inc <opensource@ribose.com> - 2.29.0-1
 - snap2inside: personal-files/system-files plug read/write lists mapped (TODO 19 follow-up)
 * Sun Aug 23 2026 Ribose Inc <opensource@ribose.com> - 2.28.0-1
