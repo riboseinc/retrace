@@ -5,6 +5,20 @@
 # portable unit set only.
 if(RETRACE_PLATFORM_WINDOWS)
 	add_subdirectory(unit)
+
+	# Static-CRT smoke target (TODO.trace-profile/27): /MT links
+	# the CRT INTO the exe -- no ucrtbase to hook; file opens are
+	# only visible at the ntdll boundary. Built (not ctest-run):
+	# the CI step drives it through retrace-win-run with
+	# RETRACE_WIN_NTDLL=1 and asserts the capture.
+	if(MSVC AND (CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|ARM64|arm64"))
+		add_executable(retrace_static_smoke smoke/static_smoke.c)
+		set_target_properties(retrace_static_smoke PROPERTIES
+			OUTPUT_NAME retrace-static-smoke
+			MSVC_RUNTIME_LIBRARY "MultiThreaded"
+			RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/smoke")
+		target_link_libraries(retrace_static_smoke PRIVATE retrace_headers)
+	endif()
 	return()
 endif()
 

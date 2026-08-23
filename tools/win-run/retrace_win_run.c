@@ -99,12 +99,25 @@ int main(int argc, char **argv)
 	if (dll_path == NULL)
 		dll_path = "retrace.dll";
 
-	pid = retrace_win_inject_run(cmdline, dll_path);
-	if (pid == 0) {
-		fprintf(stderr,
-			"retrace-win-run: failed to launch '%s'\n",
-			cmdline);
-		return 1;
+	{
+		DWORD child_exit = (DWORD)-1;
+
+		pid = retrace_win_inject_run(cmdline, dll_path,
+			&child_exit);
+		if (pid == 0) {
+			fprintf(stderr,
+				"retrace-win-run: failed to launch '%s'\n",
+				cmdline);
+			return 1;
+		}
+		fprintf(stderr, "retrace-win-run: child exit %lu\n",
+			(unsigned long)child_exit);
+		/* exit WITH the child's code: honest propagation.
+		 * (DWORD)-1 would collide with the caller's -1
+		 * sentinel -- remap to a distinct code.
+		 */
+		if (child_exit == (DWORD)-1)
+			return 250;
+		return (int)child_exit;
 	}
-	return 0;
 }

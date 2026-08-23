@@ -1,3 +1,17 @@
+retrace (2.31.0-1) unstable; urgency=medium
+
+  * Added: static-CRT (/MT) Windows binaries are traceable and
+    jailable through the opt-in ntdll layer -- a /MT smoke
+    target in CI (true static UCRT, no ucrtbase import) proves
+    file opens captured with decoded paths, and a sandbox deny
+    at NtCreateFile blocks the real syscall. The old "static
+    binaries are not hookable" claim overstated the limit; the
+    honest split: CRT-level argument mutation is impossible for
+    static CRTs, syscall-boundary truth is not
+    (TODO.trace-profile/27).
+
+ -- Ribose Inc <opensource@ribose.com>  Mon, 24 Aug 2026 10:00:00 +0000
+
 retrace (2.30.0-1) unstable; urgency=medium
 
   * Changed: the five *2retrace converter CLIs (strace, dtrace,

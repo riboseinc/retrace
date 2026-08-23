@@ -93,7 +93,7 @@ preload_mingw_spawn(struct retrace_engine *eng,
 	 * suspend-create -> inject -> hooks+boot inside the child
 	 * -> resume.
 	 */
-	pid = retrace_win_inject_run(cmdline, dll_path);
+	pid = retrace_win_inject_run(cmdline, dll_path, NULL);
 	if (pid == 0)
 		return RETRACE_BACKEND_INTERNAL;
 	return (retrace_pid_t)pid;
