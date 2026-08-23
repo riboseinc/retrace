@@ -1,3 +1,16 @@
+retrace (2.30.0-1) unstable; urgency=medium
+
+  * Changed: the five *2retrace converter CLIs (strace, dtrace,
+    truss, ktrace, etw) now share ONE driver --
+    tools/common/converter.c (arg parse, IO, serialize, count
+    line). Each CLI wrapper is a ~25-line table (name, usage,
+    convert hook, row noun). Behavior-preserving: all five
+    outputs byte-identical on their fixtures; golden tests
+    unchanged. The next converter is a convert() plus a table
+    entry -- no new CLI code (TODO.trace-profile/26).
+
+ -- Ribose Inc <opensource@ribose.com>  Sun, 23 Aug 2026 21:30:00 +0000
+
 retrace (2.29.2-1) unstable; urgency=medium
 
   * Fixed: etw2retrace's provisional numeric Id mapping was

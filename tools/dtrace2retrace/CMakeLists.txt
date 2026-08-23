@@ -7,6 +7,7 @@
 set(_parson_source ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 
 add_executable(retrace_dtrace2retrace dtrace2retrace.c convert.c
+	${CMAKE_SOURCE_DIR}/tools/common/converter.c
 	${_parson_source})
 set_target_properties(retrace_dtrace2retrace PROPERTIES
     OUTPUT_NAME retrace-dtrace2retrace
@@ -14,6 +15,7 @@ set_target_properties(retrace_dtrace2retrace PROPERTIES
 
 target_include_directories(retrace_dtrace2retrace PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/tools/common
     ${CMAKE_SOURCE_DIR}/src/config/json
     ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
 
