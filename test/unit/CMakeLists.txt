@@ -119,17 +119,16 @@ if(RETRACE_PLATFORM_WINDOWS)
         # LLP64 pointer truncation). TIMEOUT bounds any future
         # regression loop to a fast failure, not a hung job.
         #
-        # RETRACE_WIN_DIAG=1 is empirically LOAD-BEARING on the
-        # MSVC legs: without it the logger never observes the
-        # test's RETRACE_LOGGER_* env (not even the opening
-        # bracket lands in the file) and the content assertion
-        # fails on an empty log. Root cause open (TODO 07);
-        # forcing it keeps the suite deterministic.
+        # TODO.trace-profile/07+23 closed: the "env mystery"
+        # was a measurement artifact. The logger never closes
+        # its append handle (JSON framing), so the test's reader
+        # must open with full sharing -- a FILE_SHARE_READ-only
+        # open dies with ERROR_SHARING_VIOLATION and a healthy
+        # 4 KB log READS as empty. No RETRACE_WIN_DIAG forcing.
         add_test(NAME unit-test-win-wrapper
             COMMAND retrace_test_win_wrapper)
         set_tests_properties(unit-test-win-wrapper
-            PROPERTIES LABELS "integration" TIMEOUT 120
-            ENVIRONMENT "RETRACE_WIN_DIAG=1")
+            PROPERTIES LABELS "integration" TIMEOUT 120)
     endif()
     return()
 endif()

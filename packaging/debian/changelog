@@ -1,3 +1,13 @@
+retrace (2.26.0-1) unstable; urgency=medium
+
+  * Fixed: the Windows wrapper test read its log with a
+    FILE_SHARE_READ-only open; the logger never closes its
+    append handle (JSON framing), so a healthy log read as
+    empty. The RETRACE_WIN_DIAG ctest crutch is gone -- every
+    MSVC/MinGW leg passes without it (TODO.trace-profile/07+23).
+
+ -- Ribose Inc <opensource@ribose.com>  Sun, 23 Aug 2026 12:30:00 +0000
+
 retrace (2.24.0-1) unstable; urgency=medium
 
   * Added: examples/fuzz-target -- the libFuzzer harness
