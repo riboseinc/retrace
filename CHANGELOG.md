@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.29.2] — 2026-08-23
+
+**Fixed: `etw2retrace` numeric Id table corrected from the OS's
+own manifest.**
+
+- The v2.27.0 provisional mapping mislabeled named read/write
+  events (manifest truth: **14 = Close, 15 = Read, 16 = Write**
+  — the CI manifest print caught it). No wrong rows were emitted
+  in CI flows, but real captures with named Read/Write events
+  would have mislabeled.
+- Full table now transcribed from `Get-WinEvent -ListProvider
+  Microsoft-Windows-Kernel-File` (machine truth, printed by the
+  CI smoke every run): `NameCreate→open`, `NameDelete→unlink`,
+  `Create→open`, `Read→read`, `Write→write`, `SetDelete→unlink`,
+  `Rename→rename`, `QueryInformation→stat`, `DeletePath→unlink`,
+  `RenamePath→rename`, `CreateNewFile→open`. Close/Cleanup/
+  SetInformation/DirEnum/Flush/FSCTL/OperationEnd stay skipped
+  (no name or no POSIX-shape semantics).
+- Fixture + golden extended (Id10/Id14/Id15/Id16/Id18 rows).
+
 ## [2.29.1] — 2026-08-23
 
 **Polish.**

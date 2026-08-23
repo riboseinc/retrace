@@ -39,13 +39,32 @@ static const struct {
 	 * Manifest decode is absent on some readers (CI evidence,
 	 * TODO.trace-profile/24 round 2): the capture script then
 	 * emits task "Id<N>" with the raw event Id. These numeric
-	 * mappings are the Kernel-File manifest's event ids --
-	 * pinned/verified against the CI Id histogram.
+	 * mappings are the Kernel-File manifest's task table,
+	 * transcribed from the OS's OWN provider listing
+	 * (Get-WinEvent -ListProvider, printed by the CI smoke on
+	 * every Windows leg -- machine truth, not documentation
+	 * guesswork). The v2.27.0 provisional Id14/Id15 mapping was
+	 * WRONG (14 is Close, not Read); corrected in v2.29.2.
+	 * Unmapped numeric Ids stay skipped (honest).
 	 */
-	{ "Id12", "open" },   /* CreateFile */
-	{ "Id13", NULL },     /* CloseFile */
-	{ "Id14", "read" },   /* ReadFile */
-	{ "Id15", "write" },  /* WriteFile */
+	{ "Id10", "open" },    /* NameCreate */
+	{ "Id11", "unlink" },  /* NameDelete */
+	{ "Id12", "open" },    /* Create */
+	{ "Id13", NULL },      /* Cleanup (no name) */
+	{ "Id14", NULL },      /* Close (no name) */
+	{ "Id15", "read" },    /* Read */
+	{ "Id16", "write" },   /* Write */
+	{ "Id17", NULL },      /* SetInformation */
+	{ "Id18", "unlink" },  /* SetDelete */
+	{ "Id19", "rename" },  /* Rename */
+	{ "Id20", NULL },      /* DirEnum */
+	{ "Id21", NULL },      /* Flush */
+	{ "Id22", "stat" },    /* QueryInformation */
+	{ "Id23", NULL },      /* FSCTL */
+	{ "Id24", NULL },      /* OperationEnd */
+	{ "Id26", "unlink" },  /* DeletePath */
+	{ "Id27", "rename" },  /* RenamePath */
+	{ "Id30", "open" },    /* CreateNewFile */
 	{ NULL, NULL }
 };
 
