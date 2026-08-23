@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.29.0] — 2026-08-23
+
+**Packaging audit completes: `personal-files`/`system-files`
+plugs mapped** (TODO.trace-profile/19 follow-up).
+
+- `retrace-snap2inside` now reads the top-level `plugs:` section
+  of snapcraft.yaml: plugs with `interface: personal-files` or
+  `system-files` map their author-declared `read:`/`write:`
+  path lists into accesses (`$HOME` expands to the concrete
+  home, `SNAP2INSIDE_HOME` override as before). Previously
+  these plugs were reported unmapped.
+- Honest scope, stated in the output docs: this maps the snap's
+  REQUEST; what snapd actually connects is admin policy outside
+  snapcraft.yaml. `raw-usb` & co. stay unmapped notes.
+- Golden fixture extended (personal + system plug, $HOME
+  expansion, write class); 89/89 tests.
+
 ## [2.28.0] — 2026-08-23
 
 **Dictionary-driven string fuzzing — `fuzz_str`**

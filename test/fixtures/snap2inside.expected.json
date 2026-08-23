@@ -5,6 +5,21 @@
                 "path": "\/home\/testuser",
                 "class": "read",
                 "hits": 1
+            },
+            {
+                "path": "\/home\/testuser\/.config\/demo",
+                "class": "read",
+                "hits": 1
+            },
+            {
+                "path": "\/home\/testuser\/.local\/share\/demo",
+                "class": "write",
+                "hits": 1
+            },
+            {
+                "path": "\/etc\/demo.conf",
+                "class": "read",
+                "hits": 1
             }
         ],
         "net": [

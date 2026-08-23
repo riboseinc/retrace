@@ -19,10 +19,14 @@
  *   removable-media  -> /media/, /run/media/ (read prefixes)
  *   network          -> net (connect/send/recv)
  *   network-bind     -> net (listening)
- *   personal-files / system-files / raw-usb / others: NOT
- *     mapped (their per-snap read/write lists are declared in
- *     the snap's snapd slot config, not in snapcraft.yaml) --
- *     reported as unmapped in the output notes.
+ *   personal-files / system-files: the AUTHOR-declared read/
+ *     write path lists (top-level plugs:<name>:interface with
+ *     read:/write: attributes) become read/write accesses;
+ *     $HOME expands to the concrete home (SNAP2INSIDE_HOME).
+ *     What snapd actually CONNECTS is admin policy -- this maps
+ *     the snap's request, the honest ceiling of the audit.
+ *   raw-usb / others: no path surface here -- reported as
+ *     unmapped in the output notes.
  */
 
 #include <stdio.h>
@@ -144,6 +148,148 @@ static int collect_plugs(FILE *in, char (*plugs)[32], size_t max,
 	return n > 0 ? 0 : -1;
 }
 
+/*
+ * Attribute plugs (personal-files / system-files): the named
+ * top-level plugs:<name> entries whose read:/write: lists we
+ * turn into accesses. Bounded; enough for real manifests.
+ */
+#define PF_MAX 8
+#define PF_PATHS_MAX 8
+#define PF_PATH_MAX 128
+
+struct attr_plug {
+	char name[32];
+	int is_system;                  /* system-files */
+	char read[PF_PATHS_MAX][PF_PATH_MAX];
+	size_t read_n;
+	char write[PF_PATHS_MAX][PF_PATH_MAX];
+	size_t write_n;
+};
+
+enum pf_state { PF_NONE, PF_READ, PF_WRITE };
+
+static struct attr_plug g_attr_plugs[PF_MAX];
+static size_t g_attr_plug_n;
+
+/*
+ * Scan the TOP-LEVEL plugs: section (outside apps:). Same
+ * minimal-YAML grammar as collect_plugs: named plug blocks with
+ * interface:/read:/write: attributes; list items are "- path".
+ */
+static void collect_attr_plugs(FILE *in)
+{
+	char line[512];
+	int in_plugs = 0;
+	long plugs_indent = -1;
+	int cur = -1;
+	enum pf_state st = PF_NONE;
+
+	g_attr_plug_n = 0;
+	while (fgets(line, sizeof(line), in) != NULL) {
+		char *s = line;
+		size_t len = strlen(line);
+		long indent = 0;
+
+		while (len > 0 && (line[len - 1] == '\n' ||
+				   line[len - 1] == '\r'))
+			line[--len] = '\0';
+		if (len == 0 || line[0] == '#')
+			continue;
+
+		if (s[0] != ' ' && s[0] != '\t') {
+			in_plugs = strncmp(s, "plugs:", 6) == 0;
+			plugs_indent = -1;
+			cur = -1;
+			st = PF_NONE;
+			continue;
+		}
+		if (!in_plugs)
+			continue;
+
+		while (s[indent] == ' ')
+			indent++;
+		s += indent;
+
+		if (plugs_indent < 0)
+			plugs_indent = indent;
+
+		if (indent == plugs_indent && s[0] != '-') {
+			/* a named plug block opens */
+			char *colon = strchr(s, ':');
+
+			if (colon != NULL &&
+			    g_attr_plug_n < PF_MAX) {
+				size_t l = (size_t)(colon - s);
+
+				if (l > 0 && l < 32) {
+					cur = (int)g_attr_plug_n;
+					memset(&g_attr_plugs[cur], 0,
+						sizeof(g_attr_plugs[cur]));
+					memcpy(g_attr_plugs[cur].name,
+						s, l);
+					g_attr_plugs[cur].name[l] = '\0';
+					g_attr_plug_n++;
+				} else {
+					cur = -1;
+				}
+			} else {
+				cur = -1;
+			}
+			st = PF_NONE;
+			continue;
+		}
+
+		if (cur < 0)
+			continue;
+
+		if (strncmp(s, "interface:", 10) == 0) {
+			char *v = s + 10;
+
+			while (*v == ' ')
+				v++;
+			g_attr_plugs[cur].is_system =
+				strncmp(v, "system-files", 12) == 0;
+			st = PF_NONE;
+			continue;
+		}
+		if (strncmp(s, "read:", 5) == 0) {
+			st = PF_READ;
+			continue;
+		}
+		if (strncmp(s, "write:", 6) == 0) {
+			st = PF_WRITE;
+			continue;
+		}
+		if (s[0] == '-' &&
+		    (st == PF_READ || st == PF_WRITE)) {
+			char *v = s + 1;
+			char (*dst)[PF_PATH_MAX];
+			size_t *n;
+
+			while (*v == ' ')
+				v++;
+			if (st == PF_READ) {
+				dst = g_attr_plugs[cur].read;
+				n = &g_attr_plugs[cur].read_n;
+			} else {
+				dst = g_attr_plugs[cur].write;
+				n = &g_attr_plugs[cur].write_n;
+			}
+			if (*n < PF_PATHS_MAX && *v != '\0') {
+				size_t l = strlen(v);
+
+				if (l >= PF_PATH_MAX)
+					l = PF_PATH_MAX - 1;
+				memcpy(dst[*n], v, l);
+				dst[*n][l] = '\0';
+				(*n)++;
+			}
+			continue;
+		}
+		st = PF_NONE;
+	}
+}
+
 struct iface_map {
 	const char *plug;
 	const char *path;   /* NULL = no path surface */
@@ -165,6 +311,32 @@ static const struct iface_map g_map[] = {
 	{ "network-control", NULL, 1, NULL },
 	{ NULL, NULL, 0, NULL }
 };
+
+/*
+ * One personal-files path -> one access entry. "$HOME" expands
+ * to the concrete home (same rationale as the home interface: a
+ * literal "$HOME" would never match an observed absolute path).
+ */
+static void add_attr_access(JSON_Value *accesses, const char *path,
+	const char *cls, const char *home)
+{
+	char expanded[PF_PATH_MAX + 256];
+	JSON_Value *a = json_value_init_object();
+
+	if (strncmp(path, "$HOME", 5) == 0)
+		snprintf(expanded, sizeof(expanded), "%s%s",
+			home, path + 5);
+	else
+		snprintf(expanded, sizeof(expanded), "%s", path);
+
+	json_object_set_string(json_value_get_object(a),
+		"path", expanded);
+	json_object_set_string(json_value_get_object(a),
+		"class", cls);
+	json_object_set_number(json_value_get_object(a),
+		"hits", 1);
+	json_array_append_value(json_value_get_array(accesses), a);
+}
 
 int main(int argc, char **argv)
 {
@@ -208,6 +380,8 @@ int main(int argc, char **argv)
 		perror(in_path);
 		return 2;
 	}
+	collect_attr_plugs(in);
+	rewind(in);
 	if (collect_plugs(in, plugs, 32, &count) != 0) {
 		fprintf(stderr,
 "retrace-snap2inside: no plugs found (need apps:<app>:plugs)\n");
@@ -227,6 +401,40 @@ int main(int argc, char **argv)
 	for (i = 0; i < count; i++) {
 		const struct iface_map *m = g_map;
 		int hit = 0;
+		size_t ap;
+
+		/* attribute plugs (personal-files / system-files)
+		 * map by NAME against the top-level plugs section
+		 */
+		for (ap = 0; ap < g_attr_plug_n; ap++) {
+			if (strcmp(plugs[i],
+			    g_attr_plugs[ap].name) == 0) {
+				const char *home = getenv(
+					"SNAP2INSIDE_HOME");
+				size_t k;
+
+				if (home == NULL)
+					home = getenv("HOME");
+				if (home == NULL)
+					home = "/home/";
+				hit = 1;
+				for (k = 0;
+				     k < g_attr_plugs[ap].read_n; k++) {
+					add_attr_access(accesses,
+						g_attr_plugs[ap].read[k],
+						"read", home);
+				}
+				for (k = 0;
+				     k < g_attr_plugs[ap].write_n; k++) {
+					add_attr_access(accesses,
+						g_attr_plugs[ap].write[k],
+						"write", home);
+				}
+				break;
+			}
+		}
+		if (hit)
+			continue;
 
 		for (; m->plug != NULL; m++) {
 			if (strcmp(plugs[i], m->plug) == 0) {
