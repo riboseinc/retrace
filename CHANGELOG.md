@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.30.0] — 2026-08-23
+
+**Converter-main DRY** (TODO.trace-profile/26).
+
+- The five `*2retrace` converter CLIs (strace, dtrace, truss,
+  ktrace, etw) were structural ~90-line clones. They now share
+  one driver — `tools/common/converter.c` (`converter_main`) —
+  and each CLI wrapper is a ~25-line table: name, usage text,
+  `convert()` hook, row noun. A sixth converter is a convert
+  function plus a table entry, no new CLI code (OCP).
+- Behavior-preserving: all five tool outputs byte-identical on
+  their inputs (compared pre/post refactor); CLI, exit codes,
+  and the stderr count line unchanged; golden tests untouched
+  and green (89/89).
+
 ## [2.29.2] — 2026-08-23
 
 **Fixed: `etw2retrace` numeric Id table corrected from the OS's
