@@ -147,6 +147,37 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure -C ${{ env.BUILD_TYPE }}
 
+      # ----- ETW capture smoke (Windows; TODO.trace-profile/24) -----
+      # Runners are elevated: logman + the Microsoft-Windows-Kernel-File
+      # provider give the scripted kernel-truth path. Fails loudly if the
+      # image ever blocks the provider (the golden test keeps the parser
+      # covered regardless).
+      - name: ETW capture smoke (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $out = Join-Path $env:RUNNER_TEMP "etw-smoke"
+          powershell -File scripts/win/etw-capture.ps1 `
+            -Target "$env:ComSpec" -TargetArgs "/c type C:\Windows\System32\drivers\etc\hosts" `
+            -OutDir $out
+          # Generator-dependent location (VS multi-config nests it
+          # differently than Ninja/MinGW) -- find it, don't guess.
+          $conv = Get-ChildItem -Path build -Recurse `
+            -Filter retrace-etw2retrace.exe |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $conv) {
+            Write-Error "retrace-etw2retrace.exe not built"
+          }
+          & $conv -o "$out\trace.json" "$out\etw-events.jsonl"
+          Write-Host "ETW smoke rows:"
+          Get-Content "$out\etw-events.jsonl" | Write-Host
+          $trace = Get-Content "$out\trace.json" -Raw
+          if (-not $trace.Contains("hosts")) {
+            Write-Error "ETW smoke: no hosts read captured"
+          }
+          Write-Host "ETW smoke: kernel-truth capture OK"
+
       # ----- Smoke tests (POSIX only — no LD_PRELOAD on Windows) -----
       # Best-effort: skipped if the v2 library wasn't produced.
       # The CMake target is `retrace_v2` for historical reasons but the

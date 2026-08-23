@@ -1,0 +1,11 @@
+{"time":1692800000.5,"pid":4242,"tid":8100,"task":"CreateFile","file":"C:\\work\\report.txt","detail":"DesiredAccess: GENERIC_WRITE"}
+{"time":1692800000.9,"pid":4242,"tid":8100,"task":"ReadFile","file":"C:\\Windows\\System32\\drivers\\etc\\hosts","detail":"Offset: 0"}
+{"time":1692800001.2,"pid":4242,"tid":8100,"task":"CloseFile","detail":"FileObject: 0xFFFF"}
+{"time":1692800001.5,"pid":4242,"tid":8104,"task":"WriteFile","file":"C:\\work\\report.txt","detail":"Offset: 0"}
+{"time":1692800001.9,"pid":4242,"tid":8104,"task":"FlushFile","file":"C:\\work\\report.txt"}
+{"time":1692800002.5,"pid":4242,"tid":8100,"task":"DeleteFile","file":"C:\\work\\temp.log","detail":""}
+{"time":1692800003.0,"pid":4242,"tid":8100,"task":"SetRenameInformationFile","file":"C:\\work\\report.txt","detail":"NewName: C:\\work\\final.txt"}
+not json at all
+{"time":1692800004.0,"pid":4242,"tid":8100,"task":"Id12","file":"\\Device\\HarddiskVolume3\\work\\report.txt"}
+{"time":1692800004.5,"pid":4242,"tid":8100,"task":"Id13","file":"\\Device\\HarddiskVolume3\\work\\report.txt"}
+{"time":1692800005.0,"pid":4242,"tid":8100,"task":"Id99","file":"\\Device\\HarddiskVolume3\\work\\report.txt"}

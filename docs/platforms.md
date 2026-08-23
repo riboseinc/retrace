@@ -10,7 +10,7 @@ THIS platform not do. Output shapes are documented in
 |---|---|---|---|---|
 | Linux x64/arm64 (glibc + musl/Alpine) | `LD_PRELOAD` | `retrace-profile capture --` | strace, ptrace attach | yes |
 | macOS x64/arm64 | `DYLD_INSERT_LIBRARIES` (SIP limits) | `retrace-profile capture --` | dtrace/dtruss (SIP-off) | yes |
-| Windows x64 + arm64 (MSVC + MinGW) | injected DLL (`retrace-win-run`) | `retrace-profile capture --` | procmon (manual), ntdll layer | yes |
+| Windows x64 + arm64 (MSVC + MinGW) | injected DLL (`retrace-win-run`) | `retrace-profile capture --` | ETW script (admin) or procmon CSV, ntdll layer | yes |
 | FreeBSD | `LD_PRELOAD` | `retrace-profile capture --` | truss | yes |
 | OpenBSD / NetBSD | `LD_PRELOAD` (build) | — | ktrace converter: gap | yes |
 | OHOS arm64 | preload via NDK | — | — | — |
@@ -57,11 +57,16 @@ ucrt file+env set and ws2_32 net set are default-on; the
 ntdll depth (`NtCreateFile`, `NtWriteFile`, ... — Win32-direct
 callers that never touch the CRT) is opt-in with
 `RETRACE_WIN_NTDLL=1` because hooking ntdll is what AV/EDR
-products watch. Kernel truth: capture with procmon, convert
-the CSV with `retrace-procmon2retrace`. Honest limits: the
-procmon step is manual (no scripted ETW yet), and statically-
-linked binaries are not hookable (documented punt). Breadcrumbs
-for your own debugging: `RETRACE_WIN_DIAG=1`.
+products watch. Kernel truth, two scripted paths: (1) ETW —
+from an elevated shell, `scripts/win/etw-capture.ps1 -Target
+.\app.exe` starts a Microsoft-Windows-Kernel-File trace session,
+runs the target, stops it, and extracts named file events to
+raw jsonl; convert with `retrace-etw2retrace -o kernel.json
+etw-events.jsonl`. (2) procmon — GUI capture, export CSV,
+convert with `retrace-procmon2retrace` (zero-install path, no
+admin needed). Honest limits: the ETW path needs admin, and
+statically-linked binaries are not hookable (documented punt).
+Breadcrumbs for your own debugging: `RETRACE_WIN_DIAG=1`.
 
 ## FreeBSD
 

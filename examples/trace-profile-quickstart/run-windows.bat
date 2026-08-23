@@ -42,6 +42,19 @@ set RETRACE_JSON_CONFIG=jail.json
 "%TOOLS%\retrace-win-run" app.exe "%CD%"
 set RETRACE_JSON_CONFIG=
 
+echo === 6. kernel truth via ETW (best effort; needs admin)
+rem cmd has no /dev/null: >nul silences the admin probe
+net session >nul 2>&1
+if errorlevel 1 (
+  echo skipped: ETW capture needs an elevated shell -- see docs/platforms.md
+) else (
+  powershell -NoProfile -File "%~dp0..\..\scripts\win\etw-capture.ps1" -Target "%CD%\app.exe" -OutDir etw-out
+  if errorlevel 1 goto :err
+  "%TOOLS%\retrace-etw2retrace" -o kernel.json etw-out\etw-events.jsonl
+  "%TOOLS%\retrace-profile" --libc baseline.json --kernel kernel.json -o graded.json
+  echo kernel layer graded into graded.json ^(procmon + retrace-procmon2retrace stays the zero-install path^)
+)
+
 echo === done
 exit /b 0
 :err
