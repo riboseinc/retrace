@@ -1,3 +1,14 @@
+retrace (2.27.0-1) unstable; urgency=medium
+
+  * Added: scripted Windows kernel-truth capture --
+    scripts/win/etw-capture.ps1 (logman/Kernel-File ETW session,
+    admin) + retrace-etw2retrace (pinned-shape jsonl -> trace
+    JSON, golden-file tested, CI E2E smoke on Windows legs).
+    procmon stays the zero-install path. Every platform now has
+    a scripted kernel-truth capture (TODO.trace-profile/24).
+
+ -- Ribose Inc <opensource@ribose.com>  Sun, 23 Aug 2026 16:30:00 +0000
+
 retrace (2.26.0-1) unstable; urgency=medium
 
   * Fixed: the Windows wrapper test read its log with a

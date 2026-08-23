@@ -14,7 +14,7 @@ the drift the diff must catch.
 | Linux | `./run-linux.sh [build-dir]` | strace (see recipe 34) |
 | macOS | `./run-macos.sh [build-dir]` | dtruss (SIP off) |
 | FreeBSD | `./run-freebsd.sh [build-dir]` | truss |
-| Windows | `run-windows.bat [build-dir]` (VS prompt) | procmon (manual) |
+| Windows | `run-windows.bat [build-dir]` (VS prompt) | ETW script (admin) or procmon CSV |
 
 What you should see: the diff reports `+ new-feature.dat`;
 the jailed run still prints `declared:` but the undeclared read

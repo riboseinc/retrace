@@ -1702,6 +1702,15 @@ add_test(NAME unit-test-ktrace2retrace
     -DEXPECTED=${CMAKE_SOURCE_DIR}/test/fixtures/ktrace2retrace.expected.json
     -P ${CMAKE_SOURCE_DIR}/test/fixtures/run_converter.cmake)
 set_tests_properties(unit-test-ktrace2retrace PROPERTIES LABELS "unit")
+# etw converter smoke test (TODO.trace-profile/24).
+#
+add_test(NAME unit-test-etw2retrace
+    COMMAND ${CMAKE_COMMAND}
+    -DTOOL=$<TARGET_FILE:retrace_etw2retrace>
+    -DFIXTURE=${CMAKE_SOURCE_DIR}/test/fixtures/etw-events.jsonl
+    -DEXPECTED=${CMAKE_SOURCE_DIR}/test/fixtures/etw2retrace.expected.json
+    -P ${CMAKE_SOURCE_DIR}/test/fixtures/run_converter.cmake)
+set_tests_properties(unit-test-etw2retrace PROPERTIES LABELS "unit")
 
 
 
