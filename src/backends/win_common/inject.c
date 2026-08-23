@@ -14,7 +14,8 @@
 
 #include <stddef.h>
 
-DWORD retrace_win_inject_run(const char *cmdline, const char *dll_path)
+DWORD retrace_win_inject_run(const char *cmdline, const char *dll_path,
+	DWORD *child_exit_code)
 {
 	STARTUPINFOA si;
 	PROCESS_INFORMATION pi;
@@ -83,6 +84,14 @@ DWORD retrace_win_inject_run(const char *cmdline, const char *dll_path)
 		HANDLE wait = pi.hProcess;
 
 		WaitForSingleObject(wait, INFINITE);
+		/*
+		 * Forward the child's exit code: launchers exit with
+		 * it, so a crashed child is no longer masked by
+		 * win-run's own success (TODO.trace-profile/27 round
+		 * 5 evidence: exit 0 while the child died silently).
+		 */
+		if (child_exit_code != NULL)
+			GetExitCodeProcess(wait, child_exit_code);
 		CloseHandle(wait);
 	}
 	return pi.dwProcessId;

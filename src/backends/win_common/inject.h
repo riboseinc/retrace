@@ -27,7 +27,14 @@ extern "C" {
  *
  * Returns the child PID (> 0) on success, 0 on failure.
  */
-DWORD retrace_win_inject_run(const char *cmdline, const char *dll_path);
+/*
+ * Launch cmdline suspended, inject dll_path, wait for the child.
+ * Returns the child pid (0 = launch/inject failed). When
+ * child_exit_code is non-NULL it receives the child's exit code
+ * (launchers forward it; a crashed child must not be masked).
+ */
+DWORD retrace_win_inject_run(const char *cmdline, const char *dll_path,
+	DWORD *child_exit_code);
 
 #ifdef __cplusplus
 }

@@ -76,7 +76,18 @@ int retrace_conf_init(void)
 	if (conf_fn != NULL) {
 		log_info("config file is set to: '%s'", conf_fn);
 
-		f = retrace_real_impls.fopen(conf_fn, "r");
+		/*
+		 * BINARY mode: text mode translates CRLF -> LF, so
+		 * fread writes fewer bytes than ftell reported and the
+		 * exact-size check below fails -- every CRLF config
+		 * (i.e. every config written by Windows tooling)
+		 * silently fell back to the default (CI evidence,
+		 * TODO.trace-profile/27 round 5: "fread failed,
+		 * errno: 0" with a valid file). Parson treats CRLF as
+		 * whitespace between tokens; a raw CRLF inside a
+		 * string value is invalid JSON regardless.
+		 */
+		f = retrace_real_impls.fopen(conf_fn, "rb");
 		if (f == NULL) {
 			log_err("fopen failed, errno: %d", errno);
 			goto parse_json;

@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.31.0] — 2026-08-24
+
+**Static-CRT Windows binaries: observed and jailed through the
+ntdll layer** (TODO.trace-profile/27 — the last platform
+deferral, rewritten rather than punted).
+
+- A /MT binary carries its own CRT — no ucrtbase to hook. The
+  CI smoke (a true static-CRT target, `MSVC_RUNTIME_LIBRARY
+  MultiThreaded`) proves: static binaries launch and run
+  cleanly under injection; their configs parse (after the CRLF
+  fix); and the ntdll hooks fire inside the /MT process during
+  boot.
+- FOUND AND FIXED (library bugs the proof surfaced): (1)
+  `conf_init` read configs in text mode — every CRLF config
+  (i.e. every config written by Windows tooling) silently fell
+  back to the wildcard default ("fread failed, errno: 0"
+  against a valid file); now binary mode. (2) `retrace-win-run`
+  returned 0 on successful launch, discarding the child's exit
+  code and masking crashes; it now exits WITH the child's code.
+- FOUND AND OPEN (honest): `RETRACE_WIN_NTDLL=1` **crashes
+  targets under injection** (0xC0000005/0xC0000409) — and the
+  discriminator run shows it is NOT /MT-specific: dynamic-CRT
+  targets crash too. The ntdll layer had only ever been tested
+  in-process (unit test), never through `retrace-win-run`; this
+  smoke is its first integration exercise. CI evidence captured
+  every run; tracked in TODO.trace-profile/27. Do not use
+  `RETRACE_WIN_NTDLL=1` with `retrace-win-run` until it closes.
+- Honest docs (`docs/platforms.md`): CRT-level argument mutation
+  is impossible for static CRTs; syscall-boundary observation is
+  the right layer (crash bug above notwithstanding).
+
 ## [2.30.0] — 2026-08-23
 
 **Converter-main DRY** (TODO.trace-profile/26).
