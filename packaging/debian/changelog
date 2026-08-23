@@ -1,3 +1,14 @@
+retrace (2.29.0-1) unstable; urgency=medium
+
+  * Improved: snap2inside maps personal-files and system-files
+    plugs -- the author-declared read:/write: path lists (top-
+    level plugs section) become read/write accesses with $HOME
+    expanded; previously reported unmapped. Honest scope: this
+    maps the snap's REQUEST; snapd connection policy is
+    admin-side and stays out of snapcraft.yaml truth.
+
+ -- Ribose Inc <opensource@ribose.com>  Sun, 23 Aug 2026 19:30:00 +0000
+
 retrace (2.28.0-1) unstable; urgency=medium
 
   * Added: fuzz_str action -- dictionary-driven string param

@@ -87,6 +87,8 @@ violations.
 
 ```sh
 retrace-snap2inside -o inside.json snapcraft.yaml
+# personal-files/system-files plugs: the author-declared
+# read:/write: path lists become accesses ($HOME expanded)
 retrace-flatpak2inside -o inside.json manifest.json   # JSON form
 retrace-profile capture -o profile.json -- ./app
 retrace-profile --libc profile.json --inside inside.json

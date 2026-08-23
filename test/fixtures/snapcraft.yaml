@@ -7,3 +7,17 @@ apps:
       - home
       - network
       - raw-usb
+      - dot-config-demo
+      - etc-demo
+
+plugs:
+  dot-config-demo:
+    interface: personal-files
+    read:
+      - $HOME/.config/demo
+    write:
+      - $HOME/.local/share/demo
+  etc-demo:
+    interface: system-files
+    read:
+      - /etc/demo.conf
