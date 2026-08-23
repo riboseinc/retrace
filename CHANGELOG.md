@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.28.0] — 2026-08-23
+
+**Dictionary-driven string fuzzing — `fuzz_str`**
+(TODO.trace-profile/25; the content-fuzzing deferral closes).
+
+- New action: replaces an incoming `sz` param with a token drawn
+  from an AFL-style dictionary file (one token per line, `#`
+  comments and blanks skipped; 256 tokens x 4096 bytes bounded).
+  Deterministic under the shared seed machinery — reproducer =
+  config + seed + dict. Optional `match_str` gates the
+  replacement to calls carrying a given value.
+- Seed policy extracted (`fuzz_seed_init`): a script using only
+  `fuzz_str` still seeds (param > `RETRACE_FUZZ_SEED` > time).
+- Loader split into `fuzz_dict.{c,h}` — unit-testable without
+  action machinery; 12 new tests (load semantics, pick
+  determinism, action param validation, replacement, match
+  gating, no-leak repeated calls). 89/89 total.
+- `examples/fuzz-workbench`: `paths.c` demo target + dictionary
+  section in the runner — three runs, token sequence extracted
+  from the trace logs, byte-compared (the reproducibility
+  promise, shown not claimed).
+- `docs/configuration.md`: full `fuzz_str` reference.
+
 ## [2.27.0] — 2026-08-23
 
 **Scripted Windows ETW kernel truth — the last kernel-truth gap

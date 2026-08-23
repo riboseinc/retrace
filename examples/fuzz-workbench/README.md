@@ -27,3 +27,14 @@ The pieces:
 
 Assertion mode: pass `--marker <substring>` to classify
 non-signal failures by a marker string in the trace.
+
+## Dictionary fuzzing (fuzz_str)
+
+The same runner also demos CONTENT fuzzing: `fuzz_str` replaces
+`fopen`'s `filename` with tokens from `dict.txt` (AFL-style:
+one per line, `#` comments skipped), deterministically per
+`fuzz_seed`. The demo runs the target three times and
+byte-compares the token sequence from the trace logs -- the
+reproducibility promise (reproducer = config + seed + dict).
+See `paths.c` and the dictionary section in `run-posix.sh`;
+action reference in `docs/configuration.md`.

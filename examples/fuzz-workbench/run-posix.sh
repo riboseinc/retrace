@@ -79,4 +79,48 @@ rm -rf mincorpus
 	-- ./crashy >/dev/null 2>&1 || true
 ls mincorpus 2>/dev/null || echo "(no failures -> empty corpus)"
 
+echo "=== dictionary fuzzing: fuzz_str on fopen's filename"
+
+# AFL-style dictionary: '#' lines and blanks are skipped
+cat > dict.txt <<'DICT'
+# paths a parser should survive
+/etc/passwd
+../../../etc/shadow
+%s%s%s%n
+https://example.invalid/callback
+DICT
+
+# fuzz_str BEFORE log_params: the trace records the token the
+# callee actually received (mutation happens in the wrapper)
+cat > dictfuzz.json <<'CONF'
+{"intercept_scripts":[{"func_name":"fopen","actions":[
+ {"action_name":"fuzz_str","action_params":{
+   "param_name":"filename","dict":"dict.txt","fuzz_seed":42}},
+ {"action_name":"log_params"},
+ {"action_name":"call_real"}]}]}
+CONF
+
+cc -O0 -g -o paths "$HERE/paths.c"
+
+# same seed -> same token sequence (the reproducibility promise):
+# three runs, tokens extracted from each trace log, byte-compared
+i=1
+while [ $i -le 3 ]; do
+	rm -f trace.log
+	RETRACE_JSON_CONFIG=dictfuzz.json \
+	RETRACE_LOGGER_DEF_ENA=1 RETRACE_LOGGER_DEF_STDOUT_ENA=0 \
+	RETRACE_LOGGER_DEF_FN=trace.log \
+	LD_PRELOAD="$LIB" DYLD_INSERT_LIBRARIES="$LIB" \
+	./paths /etc/hosts >/dev/null 2>&1 || true
+	grep -aoE '/etc/passwd|[.][.]/[.][.]/[.][.]/etc/shadow|%s%s%s%n|https://example[.]invalid/callback' \
+		trace.log > tokens$i.txt || : > tokens$i.txt
+	i=$((i + 1))
+done
+if cmp -s tokens1.txt tokens2.txt && cmp -s tokens2.txt tokens3.txt; then
+	echo "deterministic: same seed -> same token sequence"
+	echo "tokens: $(tr '\n' ' ' < tokens1.txt)"
+else
+	echo "UNDETERMINISTIC token sequence"
+fi
+
 echo "=== done: $WORK"
