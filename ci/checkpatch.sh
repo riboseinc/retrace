@@ -4,6 +4,29 @@ set -eu
 CHECKPATCH=$CHECKPATCH_INSTALL/checkpatch.pl
 CHECKPATCH_TYPEDEFS=$CHECKPATCH_INSTALL/typedefs.checkpatch
 
+# Local parity with CI: ci/install_functions.sh writes two config
+# files beside checkpatch.pl (const_structs.checkpatch,
+# typedefs.checkpatch). checkpatch.pl reads const_structs from ITS
+# OWN directory ($D) -- no CLI flag -- so without that file the
+# const-struct regex degenerates (empty list matches EVERY struct
+# line: pure noise). When the install lacks them (a local checkout
+# of bare checkpatch.pl), stage a full temp copy -- script +
+# spelling.txt + both config files -- and run the staged script.
+# Never write into the user's checkpatch install itself.
+if [ ! -e "$CHECKPATCH_INSTALL/const_structs.checkpatch" ] ||
+   [ ! -e "$CHECKPATCH_TYPEDEFS" ]; then
+	_stage=$(mktemp -d)
+	cp "$CHECKPATCH" "$_stage/checkpatch.pl"
+	[ -e "$CHECKPATCH_INSTALL/spelling.txt" ] \
+		&& cp "$CHECKPATCH_INSTALL/spelling.txt" "$_stage/"
+	echo "invalid.struct.name" \
+		> "$_stage/const_structs.checkpatch"
+	printf '%s\n' "JSON_Object" "JSON_Array" "JSON_Value" \
+		"JSON_Status" > "$_stage/typedefs.checkpatch"
+	CHECKPATCH=$_stage/checkpatch.pl
+	CHECKPATCH_TYPEDEFS=$_stage/typedefs.checkpatch
+fi
+
 CHECKPATCH_FLAGS=(
 	--ignore ARRAY_SIZE
 	--ignore AVOID_EXTERNS
