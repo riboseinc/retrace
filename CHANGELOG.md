@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.29.1] — 2026-08-23
+
+**Polish.**
+
+- `memory_fuzz`: missing-params error message named the wrong
+  action (copy-paste from `modify_return_value_int`).
+- `etw-capture.ps1`: the event-count line printed 1 regardless
+  of the real row count (PowerShell unroll bug).
+- ETW CI smoke now prints the OS's own Kernel-File Id↔task
+  manifest table each run — machine truth for completing the
+  converter's numeric Id mapping (the Id10 follow-up).
+
 ## [2.29.0] — 2026-08-23
 
 **Packaging audit completes: `personal-files`/`system-files`

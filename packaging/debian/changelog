@@ -1,3 +1,15 @@
+retrace (2.29.1-1) unstable; urgency=medium
+
+  * Fixed: memory_fuzz's missing-params error named the wrong
+    action (copy-paste from modify_return_value_int);
+    etw-capture.ps1 event count printed 1 regardless of the
+    real row count (PS unroll bug). The ETW CI smoke now also
+    prints the OS's own Kernel-File Id<->task manifest table
+    every run -- machine truth for completing the converter's
+    numeric mapping (TODO.trace-profile/24 Id10 follow-up).
+
+ -- Ribose Inc <opensource@ribose.com>  Sun, 23 Aug 2026 20:10:00 +0000
+
 retrace (2.29.0-1) unstable; urgency=medium
 
   * Improved: snap2inside maps personal-files and system-files
