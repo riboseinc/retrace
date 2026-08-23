@@ -1,3 +1,18 @@
+retrace (2.29.2-1) unstable; urgency=medium
+
+  * Fixed: etw2retrace's provisional numeric Id mapping was
+    wrong for named read/write events (manifest truth: 14=Close,
+    15=Read, 16=Write). Table now transcribed from the OS's own
+    provider listing (Get-WinEvent -ListProvider, printed by CI
+    every run): 10 NameCreate->open, 11 NameDelete->unlink,
+    12 Create->open, 15 Read->read, 16 Write->write,
+    18 SetDelete->unlink, 19 Rename->rename, 22
+    QueryInformation->stat, 26 DeletePath->unlink, 27
+    RenamePath->rename, 30 CreateNewFile->open. Unmapped Ids
+    stay skipped (honest). Fixture + golden extended.
+
+ -- Ribose Inc <opensource@ribose.com>  Sun, 23 Aug 2026 20:50:00 +0000
+
 retrace (2.29.1-1) unstable; urgency=medium
 
   * Fixed: memory_fuzz's missing-params error named the wrong
