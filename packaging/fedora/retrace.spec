@@ -5,7 +5,7 @@
 # Install: dnf install retrace-2.10.0-1.*.rpm
 
 Name:           retrace
-Version:        2.24.0
+Version:        2.26.0
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,8 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Sun Aug 23 2026 Ribose Inc <opensource@ribose.com> - 2.26.0-1
+- close TODO 07: the Windows env "mystery" was a reader share-mode bug; RETRACE_WIN_DIAG crutch removed
 * Sun Aug 23 2026 Ribose Inc <opensource@ribose.com> - 2.24.0-1
 - libFuzzer harness template example
 * Sat Aug 22 2026 Ribose Inc <opensource@ribose.com> - 2.21.0-1

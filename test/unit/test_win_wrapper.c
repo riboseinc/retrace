@@ -79,11 +79,19 @@ static void write_text(const char *path, const char *text)
 	fclose(f);
 }
 
-/* Read a file with Win32 (no CRT fopen -- keep the trace clean). */
+/*
+ * Read a file with Win32 (no CRT fopen -- keep the trace clean).
+ * FULL sharing: the logger never closes its append handle (JSON
+ * framing -- deinit only flushes), so a FILE_SHARE_READ-only
+ * reader dies with ERROR_SHARING_VIOLATION against that write
+ * handle and a healthy log READS as empty (the TODO 07 mystery
+ * was exactly this measurement artifact, not env visibility).
+ */
 static size_t read_all(const char *path, char *buf, size_t bufsz)
 {
-	HANDLE h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ,
-		NULL, OPEN_EXISTING, 0, NULL);
+	HANDLE h = CreateFileA(path, GENERIC_READ,
+		FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+		OPEN_EXISTING, 0, NULL);
 	DWORD got = 0;
 
 	if (h == INVALID_HANDLE_VALUE)
@@ -93,6 +101,54 @@ static size_t read_all(const char *path, char *buf, size_t bufsz)
 	CloseHandle(h);
 	buf[got] = '\0';
 	return (size_t)got;
+}
+
+/*
+ * Log-state probe (TODO.trace-profile/23, round 3): open the log
+ * FULLY shared (the logger never closes its append handle --
+ * deinit only flushes). A FILE_SHARE_READ-only open cannot
+ * coexist with that write handle: ERROR_SHARING_VIOLATION would
+ * make a healthy log READ as empty. Size + first bytes at each
+ * stage pinpoints exactly when content lands.
+ */
+static void probe_log_state(const char *tag)
+{
+	HANDLE h = CreateFileA(g_log_path, GENERIC_READ,
+		FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+		OPEN_EXISTING, 0, NULL);
+
+	if (h == INVALID_HANDLE_VALUE) {
+		printf("log-state %s: open failed err=%lu\n", tag,
+			(unsigned long)GetLastError());
+		return;
+	}
+	{
+		LARGE_INTEGER sz;
+
+		if (GetFileSizeEx(h, &sz) && sz.QuadPart > 0) {
+			char head[64];
+			DWORD got = 0;
+
+			if (ReadFile(h, head, sizeof(head) - 1, &got,
+				    NULL) &&
+			    got > 0) {
+				head[got] = '\0';
+				printf("log-state %s: size=%lld head="
+					"%.40s\n", tag,
+					(long long)sz.QuadPart, head);
+			} else {
+				printf("log-state %s: size=%lld "
+					"head unreadable\n", tag,
+					(long long)sz.QuadPart);
+			}
+		} else if (GetFileSizeEx(h, &sz)) {
+			printf("log-state %s: size=0\n", tag);
+		} else {
+			printf("log-state %s: size failed err=%lu\n",
+				tag, (unsigned long)GetLastError());
+		}
+	}
+	CloseHandle(h);
 }
 
 static void setenv_str(const char *name, const char *value)
@@ -201,38 +257,27 @@ static void test_fopen_round_trip(void)
 
 	/* give the ring flusher (non-MSVC) a beat */
 	Sleep(300);
+	probe_log_state("post-calls");
 
 	/* 5. uninstall, then verify the log captured the calls */
 	retrace_win_uninstall_hooks();
 	CHECK(retrace_win_trampoline_for("fopen") == NULL);
 
 	/*
-	 * Deterministic flush: MSVC's CRT buffers the log FILE* --
-	 * the entries only reach the file at fclose. deinit closes
-	 * the logger (banner bracket included), so read_all sees
-	 * what was actually logged.
+	 * Deterministic flush: entries are fflush'd per write and
+	 * the closing bracket lands here. NOTE: deinit does NOT
+	 * close the append handle (by design -- JSON framing), so
+	 * read_all must tolerate the concurrent write handle.
 	 */
 	retrace_logger_deinit();
+	probe_log_state("post-deinit");
 
 	n = read_all(g_log_path, log, sizeof(log));
-#ifdef _MSC_VER
-	/*
-	 * TODO.trace-profile/07 open question: on the MSVC legs the
-	 * log file stays EMPTY in this test harness (not even the
-	 * logger's opening bracket lands) although the full action
-	 * dispatch is proven by the RETRACE_WIN_DIAG trail -- real
-	 * params, lp-emit, call_real returning a real FILE*. MinGW
-	 * runs the identical code and the file fills. Warn, don't
-	 * fail, until that env-propagation mystery is solved.
-	 */
 	if (n == 0)
-		printf("WARN: MSVC log file empty (see TODO.trace-profile/07)\n");
-	else
-		CHECK(strstr(log, "fopen") != NULL);
-#else
+		printf("FAIL detail: log unreadable despite probe "
+			"above\n");
 	CHECK(n > 0);
 	CHECK(strstr(log, "fopen") != NULL);
-#endif
 
 	/* plain fopen after uninstall */
 	f = fopen(g_cfg_path, "rb");
