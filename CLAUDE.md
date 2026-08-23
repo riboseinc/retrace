@@ -54,7 +54,7 @@ ctest --test-dir build -L v2           # only v2-targeted
 
 The integration runner is generated from `test/runtests.sh.in` via `file(GENERATE)` (build-time generator expression substitution). It runs each per-feature binary under v2 via `LD_PRELOAD`/`DYLD_INSERT_LIBRARIES` and reports pass/fail counts.
 
-Examples under `examples/*/` (dns-fuzz, getenv-fuzzing, http-server-overflow, id-redirection, net-fuzzing, stringinject, unsafe-system) are self-contained demos.
+Examples under `examples/*/` are self-contained demos: the classic set (dns-fuzz, getenv-fuzzing, http-server-overflow, id-redirection, net-fuzzing, stringinject, unsafe-system) plus the security-research set (`trace-profile-quickstart` with per-platform runners, `packaging-audit`, `fuzz-workbench` incl. dictionary fuzzing, `fuzz-target` libFuzzer template).
 
 ## CI
 
@@ -76,7 +76,7 @@ GHA workflows under `.github/workflows/`:
 - **Function inventory**: per-backend `funcs_symbols.S` files are flat lists of `WRAPPER_ENTRY_*` lines covering every intercepted libc symbol — this is the canonical list of what v2 supports. Add a new function by adding a line here **and** a prototype entry below.
 - **Prototypes**: `src/core/prototypes/<header>.c` are arrays of `struct FuncPrototype` (`name`, `conv`, `type_name`, `params[]` of `struct ParamMeta`). They're installed via `retrace_func_define_prototypes(<header>)` into a linker section the engine scans at init.
 - **Engine** (`src/core/engine.c`): per-thread `struct ThreadContext` holds the prototype, real impl ptr, and parsed params. `retrace_engine_wrapper` looks up the matching `intercept_script` in the JSON config and runs its `actions` in order.
-- **Actions** (`src/core/actions/basic.c`, `memfuzz.c`): registered by name into a `__DATA,__retrace_acts` section (or ELF equivalent). Built-ins: `log_params`, `call_real`, `modify_in_param_str`, `modify_in_param_int`, `modify_in_param_arr`, `modify_return_value_int`, `memory_fuzz`. New behaviors = new action, no engine change.
+- **Actions** (`src/core/actions/*.c`): registered by name into a `__DATA,__retrace_acts` section (or ELF equivalent). Full set: `log_params`, `call_real`, `modify_in_param_str/int/arr`, `modify_return_value_int`, `memory_fuzz` (allocation failure), `fuzz_str` (dictionary-driven string mutation; dict loader in `fuzz_dict.{c,h}`; deterministic via the shared seed: `fuzz_seed` param > `RETRACE_FUZZ_SEED` env > time), `fuzzing_seed`, `incomplete_io`, `delay`, `call_count_limit`, `sandbox` (allowlist jail: `allow_paths`, `deny_classes`, `allow_env`/`deny_env`, `decoy_dir`), `addr_deny`, `filter`, `decode_http`, `decode_dns`, `capture_buffer`. New behaviors = new action, no engine change.
 - **Real-impl indirection** (`src/core/real_impls.{c,h}`): all internal libc usage inside v2 goes through `retrace_real_impls.<fn>` function pointers, resolved once at init via `dlsym(RTLD_NEXT, ...)`. This is the reentrancy guard — bypass it and you recurse.
 - **Init order matters** (`src/core/main.c` constructor): `retrace_as_init` → `retrace_real_impls_init` → `retrace_logger_init` → parson alloc hooks → `retrace_conf_init` → `retrace_loger_update_config` → `retrace_engine_init` → `retrace_funcs_init` → `retrace_datatypes_init` → `retrace_actions_init` → `retrace_as_init_late`.
 - **Config** (`src/config/json/conf.c`): if `RETRACE_JSON_CONFIG` is set, parse that file; otherwise use the hardcoded default (`log_params` + `call_real` for `func_name: "*"`). Uses `parson` (vendored in `src/config/json/parson.{c,h}`) with comment-tolerant parsing.
@@ -102,7 +102,8 @@ GHA workflows under `.github/workflows/`:
 | `src/core/main.c` | v2 library constructor — strict init order |
 | `src/core/real_impls.{c,h}` | All libc usage inside v2 must go through `retrace_real_impls.*` |
 | `src/core/prototypes/<h>.c` | Per-header prototype tables consumed by the engine |
-| `src/core/actions/{basic,memfuzz}.c` | Built-in actions; extend here for new behaviors |
+| `src/core/actions/*.c` | Built-in actions; extend here for new behaviors |
+| `tools/common/converter.c` | Shared `*2retrace` CLI driver (`converter_main` + `converter_app` table; TODO.trace-profile/26) |
 | `src/backends/registry.c` | Backend registry + `retrace_backend_select` |
 | `src/backends/preload_*/{x86_64,aarch64}/arch_spec_top.S` | Per-arch assembly trampoline |
 | `src/backends/preload_*/<arch>/funcs_symbols.S` | Per-backend function inventory |
@@ -124,6 +125,17 @@ Architecture decisions are in `docs/adr/`. Notable:
 
 ## Tools
 
-- `tools/spawn/` — concurrent-process spawner for stress-testing
-- `tools/stringinjector/` — file/string injection helper
+Kernel-truth converters (all feed `retrace-profile --kernel`; CLIs share `tools/common/converter.c` — a new converter is a `convert()` plus a table entry):
+
+- `strace2retrace` (Linux), `dtrace2retrace` (macOS dtruss), `truss2retrace` (FreeBSD), `ktrace2retrace` (OpenBSD/NetBSD kdump), `procmon2retrace` (Windows procmon CSV), `etw2retrace` (Windows ETW raw jsonl from `scripts/win/etw-capture.ps1`; the numeric Id→task table is transcribed from the OS's own `Get-WinEvent -ListProvider` listing, printed by CI every run — machine truth, not docs)
+
+Analysis/tooling:
+
+- `tools/profiler/` — `retrace-profile` capture/diff/jail/harden/validate; timings, env/net drift, `--kernel` grading, `--inside` declared-set grading
+- `tools/correlate/` — libc-vs-kernel claims grading; `tools/fuzz-report/` — crash clustering, drift oracle, minimized corpus
+- `tools/snap2inside/` + `tools/flatpak2inside/` — packaging declared-set conversion (personal-files/system-files plugs map via their inline read/write lists)
+- `tools/win-run/` — Windows launcher (CreateProcess suspended + DLL injection)
+- `tools/spawn/` — concurrent-process spawner for stress-testing; `tools/stringinjector/` — file/string injection helper
 - `rpc/` — opt-in RPC layer (built with `RETRACE_ENABLE_RPC=ON`); has templated function tables (`functions.{c,h}.template`, `handlers.c.template`, `shim.{c,h}.template`)
+
+Local CI parity: `CHECKPATCH_INSTALL=<dir> bash ci/checkpatch.sh` self-stages `const_structs`/`typedefs` config when the install lacks them; run it AFTER committing (it checks the last commit's diff).
