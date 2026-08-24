@@ -14,7 +14,13 @@ the drift the diff must catch.
 | Linux | `./run-linux.sh [build-dir]` | strace (see recipe 34) |
 | macOS | `./run-macos.sh [build-dir]` | dtruss (SIP off) |
 | FreeBSD | `./run-freebsd.sh [build-dir]` | truss |
+| OpenBSD/NetBSD | `./run-openbsd.sh [build-dir]` | ktrace/kdump |
 | Windows | `run-windows.bat [build-dir]` (VS prompt) | ETW script (admin) or procmon CSV |
+
+Note: Windows `capture` writes full profiles since v2.32.0
+(two silent failures fixed: scripted `call_real` never ran for
+>6-argument ntdll functions, and the capture launcher never
+told the child where to write its trace).
 
 What you should see: the diff reports `+ new-feature.dat`;
 the jailed run still prints `declared:` but the undeclared read

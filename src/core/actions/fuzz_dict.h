@@ -7,8 +7,16 @@
 /*
  * fuzz_dict: the dictionary behind the fuzz_str action
  * (TODO.trace-profile/25). AFL-style: one token per line; '#'
- * lines and blanks are skipped. Loading and picking are kept
- * free of action machinery so they are unit-testable directly.
+ * lines and blanks are skipped.
+ *
+ * Grammar templates (TODO.trace-profile/29): a line starting
+ * with '@' is a TEMPLATE expanded at load into a real token.
+ * '%N%' (N = 1..9) references the Nth FLAT token in file
+ * order -- templates reference only flat tokens, never other
+ * templates, so cycles are impossible by construction. An out-
+ * of-range %N% fails the whole load (author error, loud).
+ * Loading and picking are kept free of action machinery so
+ * they are unit-testable directly.
  */
 
 #ifndef RETRACE_CORE_ACTIONS_FUZZ_DICT_H_

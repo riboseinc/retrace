@@ -1,3 +1,13 @@
+retrace (2.33.0-1) unstable; urgency=medium
+
+  * Added: grammar fuzzing -- '@'-template dict lines for
+    fuzz_str (%N% substitutes the Nth flat token; no nesting,
+    cycles impossible; out-of-range refs fail the load
+    loudly). OpenBSD/NetBSD quickstart runner; cookbook
+    recipe 35 (TODO.trace-profile/29).
+
+ -- Ribose Inc <opensource@ribose.com>  Mon, 24 Aug 2026 18:00:00 +0000
+
 retrace (2.34.0-1) unstable; urgency=medium
 
   * Added: otlp-c Wave A (TODO.trace-profile/30). otlp-c
@@ -13,19 +23,15 @@ retrace (2.34.0-1) unstable; urgency=medium
 
 retrace (2.32.0-1) unstable; urgency=medium
 
-  * Fixed: the call_real action's C-level dispatch covered
-    0..6 arguments ("no known libc symbol needs more" -- true
-    until the ntdll layer). NtCreateFile takes 11 and
-    NtQueryDirectoryFile 12: scripted call_real NEVER CALLED
-    the real function and synthesized -1 -- hooked NtCreateFile
-    broke every fopen (clean failure, no crash; NtOpenFile's 6
-    params worked -- the bisect's tell). Dispatch extended to
-    0..12 with per-arity unit tests; the static-binary smoke
-    restores its FULL assertion: a static-CRT binary's file
-    activity captured with decoded paths through the ntdll
-    layer (TODO.trace-profile/28).
+  * Added: grammar fuzzing -- '@'-template dict lines for
+    fuzz_str: %N% substitutes the Nth flat token (no nesting,
+    cycles impossible; out-of-range refs fail the load loudly).
+    Flat dicts unchanged (TODO.trace-profile/29).
+  * Added: OpenBSD/NetBSD quickstart runner (ktrace/kdump
+    kernel truth) -- all five kernel-truth platforms now have a
+    runnable quickstart; cookbook recipe 35 (fuzz_str).
 
- -- Ribose Inc <opensource@ribose.com>  Mon, 24 Aug 2026 17:00:00 +0000
+ -- Ribose Inc <opensource@ribose.com>  Mon, 24 Aug 2026 15:00:00 +0000
 
 retrace (2.31.2-1) unstable; urgency=medium
 

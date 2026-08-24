@@ -50,10 +50,15 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+<<<<<<< HEAD
 * Mon Aug 24 2026 Ribose Inc <opensource@ribose.com> - 2.34.0-1
 - otlp-c Wave A: vendored client; retrace-to-otlp --endpoint protobuf export; profile export metrics
 * Mon Aug 24 2026 Ribose Inc <opensource@ribose.com> - 2.32.0-1
 - NtCreateFile fixed: call_real dispatch extended 0..6 -> 0..12 args (TODO 28)
+=======
+* Mon Aug 24 2026 Ribose Inc <opensource@ribose.com> - 2.33.0-1
+- grammar fuzzing: @-template dict lines for fuzz_str (TODO 29); OpenBSD/NetBSD quickstart runner
+>>>>>>> origin/main
 * Mon Aug 24 2026 Ribose Inc <opensource@ribose.com> - 2.31.2-1
 - diag: hook install success dump (prologue_len + bytes) for the NtCreateFile correctness hunt
 * Mon Aug 24 2026 Ribose Inc <opensource@ribose.com> - 2.31.1-1
