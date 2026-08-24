@@ -1,3 +1,14 @@
+retrace (2.31.2-1) unstable; urgency=medium
+
+  * Added: diag-gated hook-install SUCCESS dump (RETRACE_WIN_
+  DIAG=1): name, accepted prologue_len, raw target bytes per
+  installed hook -- the evidence round for the NtCreateFile
+  trampoline correctness defect (TODO.trace-profile/28). The
+  static-binary smoke already runs diag-gated, so CI captures
+  it with zero workflow changes.
+
+ -- Ribose Inc <opensource@ribose.com>  Mon, 24 Aug 2026 13:00:00 +0000
+
 retrace (2.31.1-1) unstable; urgency=medium
 
   * Added: diag-gated vectored-exception breadcrumb

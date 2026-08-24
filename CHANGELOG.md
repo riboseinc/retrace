@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.31.2] — 2026-08-24
+
+**Diag: hook-install success dump** (TODO.trace-profile/28
+evidence round).
+
+- `RETRACE_WIN_DIAG=1` now also prints every *successfully*
+  installed hook's accepted prologue length and the raw target
+  bytes (via ODS, captured by the VEH payload machinery). The
+  `NtCreateFile` correctness defect (hooked call fails, no
+  crash) becomes visible as data: what the disassembler
+  accepted vs. the stub's real shape.
+
 ## [2.31.1] — 2026-08-24
 
 **VEH fault-site breadcrumb** (TODO.trace-profile/27 follow-up;
