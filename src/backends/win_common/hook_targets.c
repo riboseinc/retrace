@@ -383,6 +383,18 @@ static void *follow_thunk_arm64(void *addr, size_t *prefix_len)
 }
 #endif
 
+/* Win32 env read (TODO.trace-profile/28): install-time diag
+ * gate -- CRT getenv may already flow through hooks installed
+ * earlier in THIS loop.
+ */
+static int diag_enabled(void)
+{
+	char buf[8];
+
+	return GetEnvironmentVariableA("RETRACE_WIN_DIAG", buf,
+		sizeof(buf)) > 0 && buf[0] == '1';
+}
+
 static int ntdll_opt_in(void)
 {
 	const char *env = getenv("RETRACE_WIN_NTDLL");
@@ -643,6 +655,25 @@ int retrace_win_install_hooks(void)
 
 
 installed:
+		if (diag_enabled()) {
+			const unsigned char *bytes = target;
+			int bi;
+
+			snprintf(msg, sizeof(msg),
+				"retrace: hooked '%s' prologue_len=%lu bytes:",
+				h->name,
+				(unsigned long)
+					retrace_hook_last_prologue_len());
+			for (bi = 0; bi < 16; bi++) {
+				char hex[8];
+
+				snprintf(hex, sizeof(hex), " %02x",
+					bytes[bi]);
+				strncat(msg, hex, sizeof(msg) -
+					strlen(msg) - 1);
+			}
+			OutputDebugStringA(msg);
+		}
 		g_installed[g_installed_count].handle = handle;
 		g_installed[g_installed_count].trampoline = trampoline;
 		g_installed[g_installed_count].name =

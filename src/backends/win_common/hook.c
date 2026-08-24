@@ -48,6 +48,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+static size_t g_last_prologue_len;
+
 #if defined(_M_ARM64) || defined(__aarch64__)
 #  define RETRACE_HOOK_ARCH_ARM64 1
 #else
@@ -307,6 +309,10 @@ retrace_hook_install_ex(void *target_addr,
 	retrace_hook_t *hook;
 	size_t patch_size = required_patch();
 	size_t prologue_len;
+	/* diag evidence (TODO.trace-profile/28): what install ACTUALLY
+	 * accepted, per hook -- prologue length + raw target bytes.
+	 */
+	g_last_prologue_len = 0;
 	retrace_hook_status_t st;
 
 	if (target_addr == NULL || wrapper_addr == NULL ||
@@ -336,6 +342,8 @@ retrace_hook_install_ex(void *target_addr,
 			return RETRACE_HOOK_UNSAFE;
 	}
 #endif
+
+	g_last_prologue_len = prologue_len;
 
 	hook = (retrace_hook_t *)HeapAlloc(GetProcessHeap(), 0, sizeof(*hook));
 	if (hook == NULL)
@@ -431,4 +439,12 @@ retrace_hook_uninstall(retrace_hook_t *hook)
 	retrace_trampoline_free(hook->trampoline);
 	HeapFree(GetProcessHeap(), 0, hook);
 	return RETRACE_HOOK_OK;
+}
+
+/* diag evidence (TODO.trace-profile/28): the prologue length the
+ * most recent install_ex ACCEPTED (0 = none/refused).
+ */
+size_t retrace_hook_last_prologue_len(void)
+{
+	return g_last_prologue_len;
 }

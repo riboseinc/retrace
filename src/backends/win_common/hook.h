@@ -115,6 +115,11 @@ retrace_hook_bookmark(void *target, size_t patch_size, void *trampoline,
 /* Minimum number of prologue bytes that must be safe-to-relocate. */
 size_t retrace_hook_required_patch_size(void);
 
+/* Diag evidence (TODO.trace-profile/28): the prologue length the
+ * most recent install ACCEPTED (0 = none/refused).
+ */
+size_t retrace_hook_last_prologue_len(void);
+
 /* Per-process hook-target table descriptor. Each entry maps a libc symbol
  * to the wrapper trampoline that should replace it. The backend (MSVC or
  * MinGW) owns the table; dllmain iterates it to install hooks at startup.

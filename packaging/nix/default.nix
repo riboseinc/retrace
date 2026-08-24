@@ -8,7 +8,7 @@
 
 stdenv.mkDerivation rec {
   pname = "retrace";
-  version = "2.31.1";
+  version = "2.31.2";
 
   src = ./.;
 
