@@ -182,9 +182,21 @@ static int ia_log_params
 				retrace_datatype_get(param->param_meta.ref_type_name);
 
 			if (ref_data_type == NULL) {
-				log_err("get_param_type() failed for %s",
+				/*
+				 * Unknown deref type (e.g. "void" on the
+				 * ntdll OUT params): skip THIS param's
+				 * deref, keep serializing the rest. The
+				 * old `break` aborted the whole loop --
+				 * NtCreateFile's entry carried ONLY
+				 * filehandle and the ntoa path (param 3)
+				 * never reached the log (TODO 28 round 7
+				 * raw-trace evidence).
+				 */
+				log_dbg("no deref type for param '%s' "
+					"(%s) -- skip deref",
+					param->param_meta.name,
 					param->param_meta.ref_type_name);
-				break;
+				goto next_param;
 			}
 			retrace_win_diag("lp-ref",
 				param->param_meta.ref_type_name, 1);
