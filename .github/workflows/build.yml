@@ -311,6 +311,17 @@ jobs:
           # call_real path WORK for the ntdll file API -- the
           # FULL original assertion returns: a static-CRT
           # binary's file activity, captured with decoded paths.
+          # evidence (TODO 28 round 5): the raw TRACE the child
+          # wrote (capture names it in its stderr line)
+          $newest = Get-ChildItem $env:TEMP -Filter "rtr*.tmp" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if ($newest) {
+            Write-Host "raw trace ($($newest.Name)):"
+            Get-Content $newest.FullName -Raw | Write-Host
+          } else {
+            Write-Host "raw trace: no rtr*.tmp found"
+          }
           $prof = ""
           if (Test-Path static-profile.json) {
             $prof = Get-Content static-profile.json -Raw
