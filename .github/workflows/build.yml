@@ -233,12 +233,27 @@ jobs:
           Get-Content (Join-Path $PWD "static-result.txt") -ErrorAction SilentlyContinue | Write-Host
           Remove-Item (Join-Path $PWD "static-result.txt") -ErrorAction SilentlyContinue
 
-          # TEST run: the ntdll layer on.
+          # TEST run: direct win-run with OUR trace path -- the
+          # raw JSON stays on disk for evidence (capture consumes
+          # its temp), then aggregate explicitly. Same product
+          # surface: injection -> hooks -> engine -> logger ->
+          # profile.
           $env:RETRACE_WIN_NTDLL = "1"
-          $mtrun = Start-Process -FilePath $profiler `
-            -ArgumentList "capture","-o","static-profile.json","--","$smoke" `
-            -Wait -PassThru -NoNewWindow
-          Write-Host "test (NTDLL=1, /MT) capture rc: $($mtrun.ExitCode)"
+          $env:RETRACE_LOGGER_DEF_ENA = "1"
+          $env:RETRACE_LOGGER_DEF_STDOUT_ENA = "0"
+          $env:RETRACE_LOGGER_DEF_FN = "$PWD\static-trace.json"
+          Remove-Item "$PWD\static-trace.json" -ErrorAction SilentlyContinue
+          $wr = Get-ChildItem -Path build -Recurse -Filter "retrace-win-run.exe" |
+            Select-Object -First 1 -ExpandProperty FullName
+          & $wr --lib "$lib" $smoke
+          Write-Host "win-run rc: $LASTEXITCODE"
+          Write-Host "RAW TRACE:"
+          Get-Content "$PWD\static-trace.json" -Raw | Write-Host
+          Remove-Item Env:RETRACE_LOGGER_DEF_ENA -ErrorAction SilentlyContinue
+          Remove-Item Env:RETRACE_LOGGER_DEF_STDOUT_ENA -ErrorAction SilentlyContinue
+          Remove-Item Env:RETRACE_LOGGER_DEF_FN -ErrorAction SilentlyContinue
+          & $profiler --libc "$PWD\static-trace.json" -o static-profile.json
+          $mtrun = @{ ExitCode = $LASTEXITCODE }
 
           # HOOK-SET BISECT (TODO 27 round 4): the no-log run
           # crashed identically -- logging is innocent. Bisect the
