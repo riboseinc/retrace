@@ -104,6 +104,28 @@ add_test(NAME integration-runtests
 set_tests_properties(integration-runtests PROPERTIES
 	LABELS "integration;v2")
 
+# otlp-c live streaming integration test (TODO.trace-profile/31).
+# Spawns the fixture HTTP server, runs a target under v2 with
+# RETRACE_OTLP_ENDPOINT, and asserts that spans arrive at the
+# server. Skipped if Python3 is not available.
+add_executable(retrace_test_otlp_live_target otlp_live_target.c)
+set_target_properties(retrace_test_otlp_live_target PROPERTIES
+	OUTPUT_NAME otlp_live_target
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test")
+
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+	add_test(NAME integration-otlp-live
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_otlp_live.py
+			$<TARGET_FILE:retrace_v2>
+			$<TARGET_FILE:retrace_test_otlp_live_target>
+			${CMAKE_SOURCE_DIR}/test/fixtures/fixture_otlp_server.py)
+	set_tests_properties(integration-otlp-live PROPERTIES
+		LABELS "integration;v2"
+		TIMEOUT 120)
+endif()
+
 # Unit tests for retrace_core internals. Links against the OBJECT
 # library so no LD_PRELOAD needed. Issue #481.
 add_subdirectory(unit)

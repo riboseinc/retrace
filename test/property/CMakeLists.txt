@@ -3,6 +3,14 @@
 # Property-based tests. Pure C, no engine state required. Each test
 # runs many iterations of a generated input against an invariant.
 # See TODO.complete/16-property-based-tests.md for the plan.
+# otlp-c live-streaming link (TODO.trace-profile/31): the target
+# only exists on POSIX builds (Windows stubs the module); empty
+# elsewhere.
+set(_otlp_lib)
+if(TARGET otlp_c)
+	list(APPEND _otlp_lib otlp_c)
+endif()
+
 
 # All property tests link against parson directly (no engine state).
 set(_parson_sources
@@ -65,6 +73,7 @@ set_target_properties(retrace_property_sockaddr PROPERTIES
 
 target_link_libraries(retrace_property_sockaddr PRIVATE
 	retrace_core
+	${_otlp_lib}
 	retrace_config_json
 	retrace_backends
 	${_property_backend_lib}
@@ -127,6 +136,7 @@ set_target_properties(retrace_property_actions PROPERTIES
 
 target_link_libraries(retrace_property_actions PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_action_backend_lib}
@@ -187,6 +197,7 @@ set_target_properties(retrace_property_resolver PROPERTIES
 
 target_link_libraries(retrace_property_resolver PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_resolver_backend_lib}
@@ -246,6 +257,7 @@ set_target_properties(retrace_property_caller_match PROPERTIES
 
 target_link_libraries(retrace_property_caller_match PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_cmatch_backend_lib}

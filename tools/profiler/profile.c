@@ -38,8 +38,10 @@
 
 #include "aggregate.h"
 
+#ifdef RETRACE_HAVE_OTLP
 #include <otlp-c/exporter.h>
 #include <otlp-c/metric.h>
+#endif
 #include "capability.h"
 #include "capture.h"
 #include "diff.h"
@@ -634,6 +636,7 @@ int main(int argc, char **argv)
 	if (argc >= 2 && strcmp(argv[1], "jail") == 0)
 		return jail_mode(argc, argv);
 	if (argc >= 2 && strcmp(argv[1], "export") == 0) {
+#ifdef RETRACE_HAVE_OTLP
 		/*
 		 * Wave A (TODO.trace-profile/30): timings as OTLP
 		 * histogram metrics (one metric per function, every
@@ -743,6 +746,16 @@ int main(int argc, char **argv)
 				tf, endpoint);
 		}
 		return 0;
+#else
+		/* MinGW: otlp-c doesn't build there yet (exporter.c
+		 * calls Win32 Sleep() without <windows.h>). The rest
+		 * of the profiler is unaffected; the export path
+		 * rides the upstream fix.
+		 */
+		fprintf(stderr,
+	"retrace-profile: export not built (otlp-c unavailable)\n");
+		return 2;
+#endif
 	}
 	if (argc >= 2 && strcmp(argv[1], "harden") == 0) {
 		const char *hp = NULL;

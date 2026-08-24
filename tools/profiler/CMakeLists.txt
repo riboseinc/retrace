@@ -25,14 +25,22 @@ set_target_properties(retrace_profile PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools")
 
 # Wave A (TODO.trace-profile/30): the export subcommand posts
-# timing metrics via the vendored otlp-c client.
-if(NOT TARGET otlp_c)
-	add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/otlp-c
-		${CMAKE_BINARY_DIR}/third_party/otlp-c)
+# timing metrics via the vendored otlp-c client. The top-level
+# CMakeLists adds otlp-c FIRST (static -- a shared otlp_c.dll
+# would kill retrace-profile.exe at load with
+# STATUS_DLL_NOT_FOUND); this fallback covers standalone use.
+# MinGW excluded: otlp-c's exporter.c doesn't build there (Win32
+# Sleep() without <windows.h>) -- export compiles out via
+# RETRACE_HAVE_OTLP.
+if(NOT MINGW)
+	if(NOT TARGET otlp_c)
+		add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/otlp-c
+			${CMAKE_BINARY_DIR}/third_party/otlp-c)
+	endif()
+	target_link_libraries(retrace_profile PRIVATE otlp_c)
+	target_compile_definitions(retrace_profile PRIVATE RETRACE_HAVE_OTLP=1)
 endif()
-target_link_libraries(retrace_profile PRIVATE otlp_c)
 target_include_directories(retrace_profile PRIVATE
-    ${CMAKE_SOURCE_DIR}/third_party/otlp-c/include
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/tools/correlate
     ${CMAKE_SOURCE_DIR}/tools/common

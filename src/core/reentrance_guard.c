@@ -37,3 +37,18 @@ void retrace_reentrance_guard_enter(struct ThreadContext *ctx,
 	ctx->arch_spec_ctx = arch_spec_ctx;
 	ctx->real_impl = real_impl;
 }
+
+/*
+ * Mark this thread's context as PERMANENTLY in-intercept (TODO
+ * 31). Subsequent wrapper entries on this thread will see
+ * active()==1 and bail (passing through to the real impl via
+ * the trampoline) -- no self-interposition recursion. Pair
+ * with a dedicated ThreadContext (allocate on the exporter
+ * thread, never freed while the thread lives).
+ */
+void retrace_reentrance_guard_enter_permanent(struct ThreadContext *ctx,
+	void *arch_spec_ctx)
+{
+	ctx->arch_spec_ctx = arch_spec_ctx;
+	ctx->real_impl = RETRANCE_GUARD_PERMANENT;
+}

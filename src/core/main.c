@@ -36,6 +36,7 @@
 #include "conf.h"
 #include "arch_spec.h"
 #include "logger.h"
+#include "otlp_live.h"
 #include "funcs.h"
 #include "actions.h"
 #include "data_types.h"
@@ -128,6 +129,19 @@ static void retrace_main(void)
 		return;
 	}
 
+	/* TODO.trace-profile/31: otlp-c live streaming. The exporter
+	 * spawns its own thread (otlp_live_thread_main) and holds the
+	 * permanent reentrance guard for it. Init must come after
+	 * logger_init (so log_err can be called from inside
+	 * otlp_live_init) and after real_impls_init (so the
+	 * rc_thread_create function pointer is populated). It is OK
+	 * to call before retrace_inited=1 -- the otlp-c side queues
+	 * spans regardless.
+	 */
+	if (retrace_otlp_live_init() != 0)
+		log_err("retrace_otlp_live_init() failed; "
+			"otlp-c live streaming disabled");
+
 	ret = retrace_as_init_late();
 	if (ret) {
 		log_err("retrace_as_init_late() failed, ret = %d", ret);
@@ -162,6 +176,7 @@ static void retrace_destructor(void)
 		retrace_call_hash_walk(hash_print_cb, stderr);
 	}
 	retrace_call_hash_deinit();
+	retrace_otlp_live_deinit();
 	retrace_logger_deinit();
 }
 #endif /* MSVC has no destructors */

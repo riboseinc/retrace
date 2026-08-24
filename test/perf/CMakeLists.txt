@@ -7,6 +7,14 @@
 # Labeled "perf" so `ctest -L perf` opts in. Not in the default
 # suite -- timings vary by host; meant for manual runs and a
 # future perf.yml workflow that compares against a baseline.
+# otlp-c live-streaming link (TODO.trace-profile/31): the target
+# only exists on POSIX builds (Windows stubs the module); empty
+# elsewhere.
+set(_otlp_lib)
+if(TARGET otlp_c)
+	list(APPEND _otlp_lib otlp_c)
+endif()
+
 
 if(RETRACE_PLATFORM_DARWIN)
 	set(_perf_arch_include
@@ -36,6 +44,7 @@ function(add_retrace_bench name source)
 
 	target_link_libraries(retrace_perf_${name} PRIVATE
 		retrace_core
+	${_otlp_lib}
 		retrace_config_json
 		retrace_backends
 		${_perf_backend_lib}

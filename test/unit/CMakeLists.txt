@@ -3,6 +3,15 @@
 # Unit tests for retrace_core registries. Link directly against the
 # retrace_core OBJECT library -- no LD_PRELOAD needed. Issue #481.
 
+# otlp-c live-streaming link (TODO.trace-profile/31): the target
+# only exists on POSIX builds (Windows stubs the module); empty
+# elsewhere.
+set(_otlp_lib)
+if(TARGET otlp_c)
+	list(APPEND _otlp_lib otlp_c)
+endif()
+
+
 # Windows (TODO.windows/04): the v2 core now builds here, and the
 # portable unit set runs on the CI legs. Everything below links
 # POSIX-only backend arch directories, so it stays gated.
@@ -18,7 +27,8 @@ if(RETRACE_PLATFORM_WINDOWS)
 
     target_link_libraries(retrace_test_logger_fmt PRIVATE
         retrace_core
-        retrace_config_json
+        ${_otlp_lib}
+    retrace_config_json
         retrace_backends
         retrace_win_common
         retrace_headers)
@@ -75,7 +85,8 @@ if(RETRACE_PLATFORM_WINDOWS)
 
     target_link_libraries(retrace_test_win_registry PRIVATE
         retrace_core
-        retrace_config_json
+        ${_otlp_lib}
+    retrace_config_json
         retrace_backends
         retrace_win_common
         retrace_headers)
@@ -103,6 +114,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 
         target_link_libraries(retrace_test_win_wrapper PRIVATE
             retrace_core
+            ${_otlp_lib}
             retrace_config_json
             retrace_backends
             retrace_win_common
@@ -170,6 +182,7 @@ set_target_properties(retrace_test_registries PROPERTIES
 
 target_link_libraries(retrace_test_registries PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -223,6 +236,7 @@ set_target_properties(retrace_test_script_resolver PROPERTIES
 
 target_link_libraries(retrace_test_script_resolver PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -259,6 +273,7 @@ set_target_properties(retrace_test_sockaddr_inspect PROPERTIES
 
 target_link_libraries(retrace_test_sockaddr_inspect PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -295,6 +310,7 @@ set_target_properties(retrace_test_addr_deny PROPERTIES
 
 target_link_libraries(retrace_test_addr_deny PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -330,6 +346,7 @@ set_target_properties(retrace_test_modify_return_value_int PROPERTIES
 
 target_link_libraries(retrace_test_modify_return_value_int PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -368,6 +385,7 @@ set_target_properties(retrace_test_call_count_limit PROPERTIES
 
 target_link_libraries(retrace_test_call_count_limit PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -406,6 +424,7 @@ set_target_properties(retrace_test_sandbox PROPERTIES
 
 target_link_libraries(retrace_test_sandbox PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -440,6 +459,7 @@ set_target_properties(retrace_test_modify_in_param_int PROPERTIES
 
 target_link_libraries(retrace_test_modify_in_param_int PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -474,6 +494,7 @@ set_target_properties(retrace_test_fuzzing_seed PROPERTIES
 
 target_link_libraries(retrace_test_fuzzing_seed PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -509,6 +530,7 @@ set_target_properties(retrace_test_delay PROPERTIES
 
 target_link_libraries(retrace_test_delay PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -543,6 +565,7 @@ set_target_properties(retrace_test_log_params PROPERTIES
 
 target_link_libraries(retrace_test_log_params PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -577,6 +600,7 @@ set_target_properties(retrace_test_call_real PROPERTIES
 
 target_link_libraries(retrace_test_call_real PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -611,6 +635,7 @@ set_target_properties(retrace_test_incomplete_io PROPERTIES
 
 target_link_libraries(retrace_test_incomplete_io PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -645,6 +670,7 @@ set_target_properties(retrace_test_memory_fuzz PROPERTIES
 
 target_link_libraries(retrace_test_memory_fuzz PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -679,6 +705,7 @@ set_target_properties(retrace_test_as_call_real PROPERTIES
 
 target_link_libraries(retrace_test_as_call_real PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -707,6 +734,7 @@ set_target_properties(retrace_test_fuzz_str PROPERTIES
 
 target_link_libraries(retrace_test_fuzz_str PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -743,6 +771,7 @@ set_target_properties(retrace_test_modify_in_param_str PROPERTIES
 
 target_link_libraries(retrace_test_modify_in_param_str PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -777,6 +806,7 @@ set_target_properties(retrace_test_reentrance_guard PROPERTIES
 
 target_link_libraries(retrace_test_reentrance_guard PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -802,6 +832,44 @@ add_test(NAME unit-test-reentrance-guard
 set_tests_properties(unit-test-reentrance-guard PROPERTIES LABELS "unit")
 
 #
+# otlp_live unit tests (TODO.trace-profile/31).
+# Verifies lifecycle, null-safety, and the no-op-when-uninitialized
+# contract. End-to-end testing (with the fixture HTTP server) lives
+# in the integration test.
+#
+add_executable(retrace_test_otlp_live test_otlp_live.c)
+set_target_properties(retrace_test_otlp_live PROPERTIES
+    OUTPUT_NAME test_otlp_live
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_otlp_live PRIVATE
+    retrace_core
+    ${_otlp_lib}
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_otlp_live PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
+    target_compile_definitions(retrace_test_otlp_live PRIVATE _GNU_SOURCE _DEFAULT_SOURCE)
+elseif(RETRACE_PLATFORM_DARWIN)
+    target_compile_definitions(retrace_test_otlp_live PRIVATE _DARWIN_C_SOURCE)
+endif()
+
+add_test(NAME unit-test-otlp-live
+    COMMAND retrace_test_otlp_live)
+set_tests_properties(unit-test-otlp-live PROPERTIES LABELS "unit")
+
+#
 # Lock-free log ring unit tests (TODO.complete/19 P0 PR A).
 # Verifies SPSC ring semantics: push/drain, wrap-around, drop-on-full,
 # text truncation, early-stop drain, NULL safety, multi-thread isolation.
@@ -813,6 +881,7 @@ set_target_properties(retrace_test_log_ring PROPERTIES
 
 target_link_libraries(retrace_test_log_ring PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -848,6 +917,7 @@ set_target_properties(retrace_test_log_flusher PROPERTIES
 
 target_link_libraries(retrace_test_log_flusher PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -883,6 +953,7 @@ set_target_properties(retrace_test_logger_fmt PROPERTIES
 
 target_link_libraries(retrace_test_logger_fmt PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -935,6 +1006,7 @@ set_target_properties(retrace_test_call_hash PROPERTIES
 
 target_link_libraries(retrace_test_call_hash PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -970,6 +1042,7 @@ set_target_properties(retrace_test_modify_in_param_arr PROPERTIES
 
 target_link_libraries(retrace_test_modify_in_param_arr PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -1005,6 +1078,7 @@ set_target_properties(retrace_test_conf PROPERTIES
 
 target_link_libraries(retrace_test_conf PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -1039,6 +1113,7 @@ set_target_properties(retrace_test_caller_match PROPERTIES
 
 target_link_libraries(retrace_test_caller_match PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -1073,6 +1148,7 @@ set_target_properties(retrace_test_caller_cache PROPERTIES
 
 target_link_libraries(retrace_test_caller_cache PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -1107,6 +1183,7 @@ set_target_properties(retrace_test_filter PROPERTIES
 
 target_link_libraries(retrace_test_filter PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -1142,6 +1219,7 @@ set_target_properties(retrace_test_decode_http PROPERTIES
 
 target_link_libraries(retrace_test_decode_http PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -1177,6 +1255,7 @@ set_target_properties(retrace_test_config_cache PROPERTIES
 
 target_link_libraries(retrace_test_config_cache PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -1212,6 +1291,7 @@ set_target_properties(retrace_test_decode_dns PROPERTIES
 
 target_link_libraries(retrace_test_decode_dns PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -1359,6 +1439,7 @@ set_target_properties(retrace_test_attach PROPERTIES
 
 target_link_libraries(retrace_test_attach PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}
@@ -1493,6 +1574,7 @@ set_target_properties(retrace_test_public_api PROPERTIES
 
 target_link_libraries(retrace_test_public_api PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_unit_backend_lib}

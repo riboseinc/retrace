@@ -1,0 +1,531 @@
+/*
+ * Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include "otlp_live.h"
+
+#include <stdatomic.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include "real_impls.h"
+#include "logger.h"
+#include "reentrance_guard.h"
+#include "engine.h"
+#include "parson.h"
+
+/* otlp-c public API. Always included -- the source file is
+ * compiled out if the build doesn't link otlp-c (see CMake).
+ */
+#include "otlp-c/exporter.h"
+#include "otlp-c/tracer.h"
+#include "otlp-c/span.h"
+#include "otlp-c/status.h"
+#include "otlp-c/allocator.h"
+
+/* Tick cadence for the live exporter thread. 100ms gives the
+ * MPSC queue a chance to drain between batches while keeping
+ * wall-clock latency to the collector well under a second.
+ */
+#define OTLP_TICK_MS 100
+
+/* Bounded flush on shutdown: don't let a stuck collector hold
+ * the destructor open. 2s matches the NtWriteFile / ntdll flush
+ * budget used elsewhere in the engine.
+ */
+#define OTLP_FLUSH_TIMEOUT_MS 2000
+
+static struct {
+	otlp_exporter_t *exporter;
+	otlp_tracer_t *tracer;
+	rc_thread_h thread;
+	struct ThreadContext ctx;
+
+	_Atomic int running;
+	_Atomic int thread_spawned;
+	_Atomic int stop_signal;
+	char endpoint[512];
+	char service_name[128];
+} g_otlp;
+
+static void *otlp_live_thread_main(void *arg);
+static void otlp_live_ensure_thread(void);
+
+/*
+ * otlp-c's allocator hooks (TODO.trace-profile/31).
+ *
+ * retrace's real_impls does not expose realloc, and a naive
+ * malloc+memcpy+free shim cannot know the OLD block size -- it
+ * would read past the end of the old allocation (heap
+ * overflow: segfaults on musl, corrupts on glibc). So all
+ * three hooks use an 8-byte size header: alloc writes it,
+ * realloc reads it to bound the copy, free skips it. Payload
+ * stays 8-byte aligned (malloc's 16 + 8), which satisfies
+ * otlp-c's void*-alignment contract.
+ *
+ * Push/pop the memcpy/free macros -- macOS's <string.h> maps
+ * memcpy to __builtin___memcpy_chk under -O and the struct
+ * field access in real_impls.memcpy would rewrite to the
+ * builtin.
+ */
+#ifdef memcpy
+#  pragma push_macro("memcpy")
+#  pragma push_macro("free")
+#  undef memcpy
+#  undef free
+#endif
+#define OTLP_ALLOC_HDR_SZ sizeof(size_t)
+
+static void *otlp_live_alloc(size_t n)
+{
+	unsigned char *blk = retrace_real_impls.malloc(
+		n + OTLP_ALLOC_HDR_SZ);
+
+	if (blk == NULL)
+		return NULL;
+	*(size_t *)blk = n;
+	return blk + OTLP_ALLOC_HDR_SZ;
+}
+
+static void otlp_live_free(void *p)
+{
+	if (p != NULL)
+		retrace_real_impls.free(
+			(unsigned char *)p - OTLP_ALLOC_HDR_SZ);
+}
+
+static void *otlp_live_realloc(void *p, size_t n)
+{
+	unsigned char *blk;
+	unsigned char *out;
+	size_t old;
+
+	if (p == NULL)
+		return otlp_live_alloc(n);
+
+	blk = (unsigned char *)p - OTLP_ALLOC_HDR_SZ;
+	old = *(size_t *)blk;
+
+	out = retrace_real_impls.malloc(n + OTLP_ALLOC_HDR_SZ);
+	if (out == NULL)
+		return NULL;
+	*(size_t *)out = n;
+	retrace_real_impls.memcpy(out + OTLP_ALLOC_HDR_SZ, p,
+		old < n ? old : n);
+	retrace_real_impls.free(blk);
+	return out + OTLP_ALLOC_HDR_SZ;
+}
+#ifdef memcpy
+#  pragma pop_macro("memcpy")
+#  pragma pop_macro("free")
+#endif
+static void otlp_live_final_stats(void);
+
+int retrace_otlp_live_init(void)
+{
+	char *env_endpoint;
+	char *env_service;
+	otlp_exporter_opts_t opts;
+
+	if (atomic_load_explicit(&g_otlp.running,
+		memory_order_relaxed) == 1) {
+		log_warn("otlp_live: already running");
+		return 0;
+	}
+
+	env_endpoint = retrace_real_impls.getenv("RETRACE_OTLP_ENDPOINT");
+	if (env_endpoint == NULL || env_endpoint[0] == '\0')
+		return 0; /* not enabled -- silent */
+
+	/* Point otlp-c's internal allocator at retrace's real
+	 * malloc/free so the library's slab/mpsc/span allocations
+	 * go through dlsym(RTLD_NEXT, ...) and not back through our
+	 * hooked libc. Without this, otlp-c's alloc paths would
+	 * re-enter the engine -- crash or infinite loop. Must be
+	 * called BEFORE any other otlp-c API.
+	 *
+	 * otlp-c's attr_vec_reserve calls otlp_realloc to grow the
+	 * attribute vector. real_impls does not expose realloc
+	 * separately, so we build a thin wrapper that routes
+	 * through the engine's safe real-malloc + memcpy + real-free.
+	 * otlp-c's attr growth is bounded (4, 8, 16, ...) so the
+	 * malloc + copy + free overhead is negligible.
+	 */
+	{
+		otlp_allocator_t alloc = {
+			.alloc = otlp_live_alloc,
+			.realloc = otlp_live_realloc,
+			.free = otlp_live_free,
+		};
+		otlp_set_allocator(&alloc);
+	}
+
+	/* Copy the env values: the otlp-c API copies them at create
+	 * time, but the g_otlp.endpoint field is also surfaced via
+	 * at-exit diagnostics -- keep our own copy for that.
+	 */
+	strncpy(g_otlp.endpoint, env_endpoint,
+		sizeof(g_otlp.endpoint) - 1);
+	g_otlp.endpoint[sizeof(g_otlp.endpoint) - 1] = '\0';
+
+	env_service = retrace_real_impls.getenv("RETRACE_OTLP_SERVICE_NAME");
+	if (env_service != NULL && env_service[0] != '\0') {
+		strncpy(g_otlp.service_name, env_service,
+			sizeof(g_otlp.service_name) - 1);
+		g_otlp.service_name[sizeof(g_otlp.service_name) - 1] = '\0';
+	} else {
+		strncpy(g_otlp.service_name, "retrace",
+			sizeof(g_otlp.service_name) - 1);
+	}
+
+	memset(&opts, 0, sizeof(opts));
+	opts.endpoint = g_otlp.endpoint;
+	opts.service_name = g_otlp.service_name;
+	opts.batch_size = 256;
+	opts.batch_ms = OTLP_TICK_MS * 2;
+	opts.flush_timeout_ms = OTLP_FLUSH_TIMEOUT_MS;
+	opts.connect_timeout_ms = 1000;
+	opts.read_timeout_ms = 5000;
+	opts.user_agent = "retrace/2.x otlp-live";
+
+	g_otlp.exporter = otlp_exporter_create(&opts);
+	if (g_otlp.exporter == NULL) {
+		log_err("otlp_live: exporter create failed for %s",
+			g_otlp.endpoint);
+		return -1;
+	}
+
+	g_otlp.tracer = otlp_tracer_create(g_otlp.service_name,
+		"retrace", "2.x");
+	if (g_otlp.tracer == NULL) {
+		log_err("otlp_live: tracer create failed");
+		otlp_exporter_free(g_otlp.exporter);
+		g_otlp.exporter = NULL;
+		return -1;
+	}
+
+	/*
+	 * The tick thread is NOT spawned here. Thread creation
+	 * inside the library constructor crashes on musl (and
+	 * OHOS/musl under QEMU) -- the same hazard the log
+	 * flusher's lazy spawn works around (TODO.complete/19).
+	 * otlp_live_ensure_thread() spawns it on the first emit,
+	 * which happens on the flusher thread well after init.
+	 */
+	memset(&g_otlp.ctx, 0, sizeof(g_otlp.ctx));
+	retrace_reentrance_guard_enter_permanent(&g_otlp.ctx, NULL);
+
+	atomic_store_explicit(&g_otlp.stop_signal, 0,
+		memory_order_relaxed);
+	atomic_store_explicit(&g_otlp.running, 1,
+		memory_order_relaxed);
+
+	log_info("otlp_live: streaming to %s as service=%s",
+		g_otlp.endpoint, g_otlp.service_name);
+	return 0;
+}
+
+/*
+ * Spawn the tick thread on first use. Called from
+ * retrace_otlp_live_emit_json (the flusher thread) so the
+ * constructor never creates threads.
+ */
+static void otlp_live_ensure_thread(void)
+{
+	int trc;
+
+	if (atomic_load_explicit(&g_otlp.thread_spawned,
+		memory_order_acquire) == 1)
+		return;
+
+	trc = retrace_real_impls.rc_thread_create(&g_otlp.thread,
+		otlp_live_thread_main, NULL);
+	if (trc != 0) {
+		log_err("otlp_live: thread create failed: %d", trc);
+		return;
+	}
+	atomic_store_explicit(&g_otlp.thread_spawned, 1,
+		memory_order_release);
+}
+
+void retrace_otlp_live_deinit(void)
+{
+	if (atomic_load_explicit(&g_otlp.running,
+		memory_order_relaxed) != 1)
+		return;
+
+	atomic_store_explicit(&g_otlp.stop_signal, 1,
+		memory_order_relaxed);
+
+	if (atomic_load_explicit(&g_otlp.thread_spawned,
+		memory_order_acquire) == 1) {
+#if defined(__APPLE__)
+		/* macOS: pthread_join from a dyld destructor can hang;
+		 * use the same spin-wait pattern as the log flusher
+		 * (TODO.complete/19). The thread is set to
+		 * short-interval tick so it polls the stop signal
+		 * within ~OTLP_TICK_MS.
+		 */
+		{
+			struct timespec poll = {.tv_sec = 0, .tv_nsec = 100000};
+			struct timespec grace = {.tv_sec = 0, .tv_nsec = 10000000};
+			int waits = 0;
+
+			while (atomic_load_explicit(&g_otlp.running,
+				memory_order_acquire) == 1 && waits < 20000) {
+				nanosleep(&poll, NULL);
+				waits++;
+			}
+			if (waits < 20000)
+				nanosleep(&grace, NULL);
+		}
+#else
+		retrace_real_impls.rc_thread_join(&g_otlp.thread);
+#endif
+	}
+
+	/* Final stats BEFORE free -- get_stats checks the running
+	 * flag, but the thread has just set it to 0, so read
+	 * directly via the exporter pointer. The exporter itself is
+	 * still valid at this point.
+	 */
+	otlp_live_final_stats();
+
+	otlp_exporter_free(g_otlp.exporter);
+	g_otlp.exporter = NULL;
+	if (g_otlp.tracer != NULL) {
+		otlp_tracer_free(g_otlp.tracer);
+		g_otlp.tracer = NULL;
+	}
+
+	atomic_store_explicit(&g_otlp.running, 0,
+		memory_order_release);
+}
+
+static void *otlp_live_thread_main(void *arg)
+{
+	struct timespec ts = {
+		.tv_sec = 0,
+		.tv_nsec = (long)OTLP_TICK_MS * 1000000L,
+	};
+
+	(void)arg;
+
+	/*
+	 * Install the permanent reentrance guard on this thread's
+	 * own context -- the otlp_exporter's own send/connect/recv
+	 * through our hooked libc MUST pass through to the real
+	 * impl. Without the permanent guard, the engine enters its
+	 * regular guard on our context, then attempts action
+	 * processing on a connect/send call -- which can call back
+	 * into the otlp-c library and deadlock or crash. Same
+	 * NtWriteFile lesson as TODO 28.
+	 */
+	{
+		extern struct ThreadContext *retrace_thread_context_get(void);
+		struct ThreadContext *ctx = retrace_thread_context_get();
+
+		if (ctx != NULL)
+			retrace_reentrance_guard_enter_permanent(ctx, NULL);
+	}
+
+	/*
+	 * Mark this thread as "logging disabled" so any log calls
+	 * the exporter or its sockets make short-circuit at the
+	 * log_json gate (no recursion).
+	 */
+	retrace_logger_disable_for_this_thread();
+
+	while (atomic_load_explicit(&g_otlp.stop_signal,
+		memory_order_relaxed) == 0) {
+		otlp_exporter_tick(g_otlp.exporter, OTLP_TICK_MS);
+		nanosleep(&ts, NULL);
+	}
+
+	/* One last tick to drain anything queued during the loop. */
+	otlp_exporter_tick(g_otlp.exporter, 0);
+	otlp_exporter_shutdown(g_otlp.exporter);
+	otlp_exporter_flush(g_otlp.exporter);
+
+	atomic_store_explicit(&g_otlp.running, 0,
+		memory_order_release);
+	return NULL;
+}
+
+int retrace_otlp_live_emit_json(const char *serialized_json)
+{
+	otlp_span_t *span;
+	JSON_Value *root;
+	JSON_Object *env;
+	JSON_Object *msg;
+	const char *func;
+	const char *module;
+	const char *severity;
+	double pid, tid;
+	otlp_status_t st;
+
+	if (serialized_json == NULL)
+		return -1;
+	if (atomic_load_explicit(&g_otlp.running,
+		memory_order_acquire) != 1)
+		return 0;
+	if (g_otlp.tracer == NULL || g_otlp.exporter == NULL)
+		return 0;
+
+	otlp_live_ensure_thread();
+
+	root = json_parse_string(serialized_json);
+	if (root == NULL)
+		return -1;
+
+	env = json_value_get_object(root);
+	if (env == NULL) {
+		json_value_free(root);
+		return -1;
+	}
+	msg = json_object_get_object(env, "message");
+	if (msg == NULL) {
+		json_value_free(root);
+		return -1;
+	}
+
+	func = json_object_get_string(msg, "func");
+	module = json_object_get_string(env, "module");
+	severity = json_object_get_string(env, "severity");
+	pid = json_object_get_number(env, "pid");
+	tid = json_object_get_number(env, "tid");
+
+	span = otlp_tracer_start_span(g_otlp.tracer,
+		func ? func : "unknown");
+	if (span == NULL) {
+		json_value_free(root);
+		return -1;
+	}
+
+	otlp_span_set_kind(span, OTLP_SPAN_KIND_INTERNAL);
+
+	if (module != NULL)
+		otlp_span_set_attribute_string(span, "retrace.module",
+			module);
+	if (severity != NULL) {
+		otlp_span_set_attribute_string(span, "retrace.severity",
+			severity);
+		if (severity[0] == 'E' || severity[0] == 'e')
+			otlp_span_set_status(span,
+				OTLP_STATUS_CODE_ERROR, severity);
+	}
+	otlp_span_set_attribute_int(span, "retrace.pid", (int64_t)pid);
+	otlp_span_set_attribute_int(span, "retrace.tid", (int64_t)tid);
+
+	/* Per-call retrace-specific fields (present when the
+	 * function uses log_params + call_real).
+	 */
+	{
+		double dur = json_object_get_number(msg, "call_duration_us");
+		double rv = json_object_get_number(msg, "ret_val");
+		const char *params = json_object_get_string(msg, "params");
+
+		if (dur != 0.0)
+			otlp_span_set_attribute_double(span,
+				"retrace.call_duration_us", dur);
+		if (rv != 0.0 || json_object_has_value(msg, "ret_val"))
+			otlp_span_set_attribute_double(span,
+				"retrace.ret_val", rv);
+		if (params != NULL)
+			otlp_span_set_attribute_string(span,
+				"retrace.params", params);
+	}
+
+	st = otlp_exporter_emit_move(g_otlp.exporter, span);
+	if (st == OTLP_ERR_BUFFER_FULL) {
+		/* Bounded failure: drop, count, never block the caller. */
+		json_value_free(root);
+		return 0;
+	}
+	if (st != OTLP_OK) {
+		otlp_span_free(span);
+		json_value_free(root);
+		return -1;
+	}
+
+	json_value_free(root);
+	return 0;
+}
+
+void retrace_otlp_live_get_stats(uint64_t *emitted, uint64_t *sent,
+				 uint64_t *dropped_full,
+				 uint64_t *dropped_err)
+{
+	otlp_exporter_stats_t stats;
+
+	if (emitted != NULL)
+		*emitted = 0;
+	if (sent != NULL)
+		*sent = 0;
+	if (dropped_full != NULL)
+		*dropped_full = 0;
+	if (dropped_err != NULL)
+		*dropped_err = 0;
+
+	/* The exporter pointer is valid as long as we have it -- do
+	 * not gate on the running flag (the thread sets it to 0
+	 * before deinit's final-stats call).
+	 */
+	if (g_otlp.exporter == NULL)
+		return;
+
+	if (otlp_exporter_get_stats(g_otlp.exporter, &stats) == OTLP_OK) {
+		if (emitted != NULL)
+			*emitted = stats.emitted;
+		if (sent != NULL)
+			*sent = stats.sent;
+		if (dropped_full != NULL)
+			*dropped_full = stats.dropped_full;
+		if (dropped_err != NULL)
+			*dropped_err = stats.dropped_err;
+	}
+}
+
+static void otlp_live_final_stats(void)
+{
+	uint64_t emitted, sent, dropped_full, dropped_err;
+
+	retrace_otlp_live_get_stats(&emitted, &sent, &dropped_full,
+		&dropped_err);
+	if (emitted == 0 && sent == 0)
+		return;
+
+	/* stderr line -- users grep for it on agent teardown. */
+	retrace_real_impls.fprintf(stderr,
+		"retrace: otlp_live: emitted=%llu sent=%llu "
+		"dropped_full=%llu dropped_err=%llu endpoint=%s\n",
+		(unsigned long long)emitted,
+		(unsigned long long)sent,
+		(unsigned long long)dropped_full,
+		(unsigned long long)dropped_err,
+		g_otlp.endpoint);
+}

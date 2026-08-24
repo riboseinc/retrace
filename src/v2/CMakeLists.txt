@@ -95,6 +95,14 @@ if(OpenSSL_FOUND)
 	list(APPEND _retrace_v2_libs OpenSSL::SSL)
 endif()
 
+# TODO.trace-profile/31: otlp-c live streaming. otlp_c is a static
+# library (forced OFF at the top level); the target does not exist
+# on Windows (otlp-c's Win32 path doesn't build under MinGW) --
+# there the core links the win_common stub instead.
+if(TARGET otlp_c)
+	list(APPEND _retrace_v2_libs otlp_c)
+endif()
+
 target_link_libraries(retrace_v2 ${_retrace_v2_libs})
 
 install(TARGETS retrace_v2

@@ -17,6 +17,7 @@ set(_core_sources
 	caller_cache.c
 	log_ring.c
 	log_flusher.c
+	otlp_live.c
 	call_hash.c
 	public_api.c
 	public_api_actions.c
@@ -60,14 +61,25 @@ endif()
 # library (built by src/v2/) can pull these in without exporting them.
 # Downstream library users (the modernization plan/05) will get a real library
 # target; for now, this object library is linked into retrace_v2.
-# MSVC has no C11 stdatomic: the lock-free ring and its flusher
-# are swapped for API stubs this slice (TODO.windows/04); the
-# logger uses its synchronous path there.
+# MSVC has no C11 stdatomic under core's flags: the lock-free
+# ring and its flusher swap for API stubs (TODO.windows/04); the
+# logger uses its synchronous path there. MinGW GCC is fine.
 if(MSVC AND NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
 	list(REMOVE_ITEM _core_sources log_ring.c log_flusher.c
 		call_hash.c)
 	list(APPEND _core_sources
 		${CMAKE_SOURCE_DIR}/src/backends/win_common/ring_stub_msvc.c)
+endif()
+
+# The otlp-c live module needs (a) the otlp_c target and (b) C11
+# stdatomic under core's flags. MSVC fails (b); MinGW/UCRT lacks
+# (a) (otlp-c doesn't build there). Stub in both cases -- live
+# streaming is silently off; the native ports ride the
+# TODO.windows track.
+if((MSVC AND NOT CMAKE_C_COMPILER_ID MATCHES "Clang") OR NOT TARGET otlp_c)
+	list(REMOVE_ITEM _core_sources otlp_live.c)
+	list(APPEND _core_sources
+		${CMAKE_SOURCE_DIR}/src/backends/win_common/otlp_live_stub.c)
 endif()
 
 add_library(retrace_core OBJECT
@@ -109,7 +121,8 @@ target_include_directories(retrace_core
 		${_retrace_arch_include}                                       # macros.h per-platform
 		${CMAKE_CURRENT_SOURCE_DIR}/prototypes
 		${CMAKE_CURRENT_SOURCE_DIR}/actions
-		${CMAKE_CURRENT_SOURCE_DIR}/datatypes)
+		${CMAKE_CURRENT_SOURCE_DIR}/datatypes
+		${CMAKE_SOURCE_DIR}/third_party/otlp-c/include)               # otlp_live.c uses otlp-c headers
 
 # Apply POSIX feature-test macros (mirror AC_USE_SYSTEM_EXTENSIONS).
 if(RETRACE_PLATFORM_LINUX OR RETRACE_PLATFORM_FREEBSD)
