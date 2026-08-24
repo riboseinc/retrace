@@ -198,6 +198,21 @@ static int ia_log_params
 					param->param_meta.ref_type_name);
 				goto next_param;
 			}
+
+			/*
+			 * The ntdll ntoa decoder (nt_decode.c) fills
+			 * the deref array with the decoded UTF-8 path,
+			 * but the log entry ALSO carries the raw
+			 * pointer string for the same key. The profile
+			 * harvester (collect_msg) walks every
+			 * path-like STRING; on Windows the pointer
+			 * string wins normalization and accesses
+			 * degrade to bare names like
+			 * "static-result.txt" (TODO 28 round 8:
+			 * ntoa deref lost the hosts path). Prefer the
+			 * DEREF value when present: emit it under the
+			 * plain param name.
+			 */
 			retrace_win_diag("lp-ref",
 				param->param_meta.ref_type_name, 1);
 
@@ -272,6 +287,29 @@ static int ia_log_params
 				"*%s", param->param_meta.name);
 
 			json_object_set_value(root_object, deref_sz, arr_val);
+
+			/*
+			 * ntoa derefs carry the decoded UTF-8 path as
+			 * element 0; ALSO store it under the PLAIN
+			 * param name (replacing the raw pointer string)
+			 * so the profile harvester collects the real
+			 * path -- the "*name" array form loses to the
+			 * pointer string in normalization (TODO 28
+			 * round 8: accesses showed bare filenames).
+			 */
+			if (param->param_meta.ref_type_name != NULL &&
+			    retrace_real_impls.strcmp(
+				param->param_meta.ref_type_name,
+				"ntoa") == 0) {
+				const char *decoded =
+					json_array_get_string(
+						json_array(arr_val), 0);
+
+				if (decoded != NULL)
+					json_object_set_string(root_object,
+						param->param_meta.name,
+						decoded);
+			}
 		}
 
 next_param:;

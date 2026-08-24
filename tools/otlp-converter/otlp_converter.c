@@ -40,6 +40,18 @@
 
 #include "parson.h"
 
+#include "otlp-c/exporter.h"
+#include "otlp-c/span.h"
+#include "otlp-c/tracer.h"
+
+/*
+ * Wave A (TODO.trace-profile/30): --endpoint URL switches from
+ * OTLP/JSON-on-stdout to REAL protobuf export through the
+ * vendored otlp-c client (POST /v1/traces, keep-alive). The
+ * stdout mode stays (pipes, tests, offline inspection).
+ */
+static const char *g_endpoint;
+
 static const char *g_trace_id = "00000000000000000000000000000001";
 
 /* Generate a 16-hex-char spanId from a counter. */
@@ -181,8 +193,92 @@ static void emit_span(FILE *out, const JSON_Object *msg,
 	json_value_free(span_val);
 }
 
-int main(void)
+/* One trace entry -> one otlp-c span (protobuf path). */
+static int emit_span_otlp(otlp_tracer_t *tracer, otlp_exporter_t *exp,
+	const JSON_Object *msg, unsigned long span_counter)
 {
+	otlp_span_t *span;
+	const char *func = json_object_get_string(msg, "func");
+	double duration_us = json_object_get_number(msg, "call_duration_us");
+	double ret_val = json_object_get_number(msg, "ret_val");
+
+	span = otlp_tracer_start_span(tracer, func ? func : "unknown");
+	if (span == NULL)
+		return -1;
+	otlp_span_set_attribute_double(span, "retrace.duration_us",
+		duration_us);
+	otlp_span_set_attribute_double(span, "retrace.ret_val", ret_val);
+	if (otlp_exporter_emit_move(exp, span) != OTLP_OK) {
+		otlp_span_free(span);
+		return -1;
+	}
+	(void)span_counter;
+	return 0;
+}
+
+int main(int argc, char **argv)
+{
+	int i;
+
+	for (i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "--endpoint") == 0 && i + 1 < argc)
+			g_endpoint = argv[++i];
+	}
+	if (g_endpoint != NULL) {
+		otlp_exporter_opts_t opts;
+		otlp_exporter_t *exp;
+		otlp_tracer_t *tracer;
+		char *buf;
+		size_t len;
+		JSON_Value *root;
+		JSON_Array *arr;
+		unsigned long counter = 0;
+		size_t k;
+
+		memset(&opts, 0, sizeof(opts));
+		opts.endpoint = g_endpoint;
+		opts.service_name = "retrace";
+		exp = otlp_exporter_create(&opts);
+		if (exp == NULL) {
+			fprintf(stderr, "retrace-to-otlp: exporter create failed\n");
+			return 2;
+		}
+		tracer = otlp_tracer_create("retrace", NULL, NULL);
+
+		buf = read_stdin(&len);
+		if (buf == NULL)
+			return 2;
+		root = json_parse_string(buf);
+		free(buf);
+		if (root == NULL) {
+			fprintf(stderr, "retrace-to-otlp: parse failed\n");
+			return 2;
+		}
+		arr = json_value_get_array(root);
+		for (k = 0; k < json_array_get_count(arr); k++) {
+			JSON_Object *entry = json_array_get_object(arr, k);
+			JSON_Object *msg = entry != NULL ?
+				json_object_get_object(entry, "message") :
+				NULL;
+
+			if (msg != NULL && is_timing_entry(msg)) {
+				if (emit_span_otlp(tracer, exp, msg,
+						   ++counter) != 0)
+					break;
+			}
+		}
+		json_value_free(root);
+
+		otlp_exporter_flush(exp);
+		otlp_exporter_shutdown(exp);
+		otlp_exporter_free(exp);
+		if (tracer != NULL)
+			otlp_tracer_free(tracer);
+		fprintf(stderr, "retrace-to-otlp: %lu spans -> %s\n",
+			counter, g_endpoint);
+		return 0;
+	}
+	{
 	char *input;
 	size_t input_len;
 	JSON_Value *root_val;
@@ -261,4 +357,5 @@ int main(void)
 		span_counter - 1);
 
 	return 0;
+	}
 }

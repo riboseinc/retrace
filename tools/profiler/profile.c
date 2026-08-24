@@ -37,6 +37,9 @@
  */
 
 #include "aggregate.h"
+
+#include <otlp-c/exporter.h>
+#include <otlp-c/metric.h>
 #include "capability.h"
 #include "capture.h"
 #include "diff.h"
@@ -630,6 +633,117 @@ int main(int argc, char **argv)
 		return capture_mode(argc, argv);
 	if (argc >= 2 && strcmp(argv[1], "jail") == 0)
 		return jail_mode(argc, argv);
+	if (argc >= 2 && strcmp(argv[1], "export") == 0) {
+		/*
+		 * Wave A (TODO.trace-profile/30): timings as OTLP
+		 * histogram metrics (one metric per function, every
+		 * real sample recorded), posted via the vendored
+		 * otlp-c client.
+		 */
+		const char *hp = NULL;
+		const char *endpoint = NULL;
+		struct ProfFeed xf;
+		otlp_exporter_t *exp;
+		otlp_exporter_opts_t opts;
+		size_t ti;
+		int xi;
+
+		for (xi = 2; xi < argc; xi++) {
+			if (strcmp(argv[xi], "--endpoint") == 0 &&
+			    xi + 1 < argc)
+				endpoint = argv[++xi];
+			else if (argv[xi][0] != '-')
+				hp = argv[xi];
+			else {
+				fprintf(stderr,
+	"Usage: retrace-profile export <profile.json> --endpoint URL\n");
+				return 2;
+			}
+		}
+		if (hp == NULL || endpoint == NULL) {
+			fprintf(stderr,
+	"Usage: retrace-profile export <profile.json> --endpoint URL\n");
+			return 2;
+		}
+		if (load_any(hp, &xf) != 0) {
+			fprintf(stderr,
+				"retrace-profile: cannot read %s\n", hp);
+			return 2;
+		}
+		memset(&opts, 0, sizeof(opts));
+		opts.endpoint = endpoint;
+		opts.service_name = "retrace";
+		exp = otlp_exporter_create(&opts);
+		if (exp == NULL) {
+			fprintf(stderr,
+		"retrace-profile export: exporter create failed\n");
+			return 2;
+		}
+		/* Honest metrics from the profile's AGGREGATES (raw
+		 * samples are not serialized): gauge per stat,
+		 * counter for calls. No fabricated distributions.
+		 */
+		for (ti = 0; ti < xf.prof.timings.count; ti++) {
+			const struct ProfTiming *t =
+				&xf.prof.timings.items[ti];
+			static const struct {
+				const char *name;
+				double v;
+			} stats[] = {
+				{ "retrace.call_p99_us",
+				  0 /* filled below */ },
+				{ "retrace.call_max_us", 0 },
+				{ "retrace.call_total_us", 0 },
+			};
+			double vals[3];
+			int st;
+
+			vals[0] = prof_timing_p99(
+				(struct ProfTiming *)(size_t)t);
+			vals[1] = t->max_us;
+			vals[2] = t->total_us;
+			for (st = 0; st < 3; st++) {
+				otlp_metric_t *m = otlp_metric_create(
+					OTLP_METRIC_GAUGE, stats[st].name,
+					"us", "per-function call stat",
+					NULL, 0);
+
+				if (m == NULL)
+					break;
+				otlp_metric_set_attribute_string(m,
+					"retrace.func", t->func);
+				otlp_metric_record(m, vals[st]);
+				otlp_exporter_emit_metric_move(exp, m);
+			}
+			{
+				otlp_metric_t *m = otlp_metric_create(
+					OTLP_METRIC_COUNTER,
+					"retrace.call_count", "1",
+					"calls per function", NULL, 0);
+
+				if (m != NULL) {
+					otlp_metric_set_attribute_string(m,
+						"retrace.func", t->func);
+					otlp_metric_record(m,
+						(double)t->calls);
+					otlp_exporter_emit_metric_move(exp,
+						m);
+				}
+			}
+		}
+		otlp_exporter_flush(exp);
+		otlp_exporter_shutdown(exp);
+		otlp_exporter_free(exp);
+		{
+			size_t tf = xf.prof.timings.count;
+
+			prof_free(&xf.prof);
+			fprintf(stderr,
+	"retrace-profile export: %zu timing functions -> %s\n",
+				tf, endpoint);
+		}
+		return 0;
+	}
 	if (argc >= 2 && strcmp(argv[1], "harden") == 0) {
 		const char *hp = NULL;
 		const char *ho = NULL;

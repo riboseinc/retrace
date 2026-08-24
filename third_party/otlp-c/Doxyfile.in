@@ -1,0 +1,69 @@
+# Doxyfile for otlp-c
+# Generate HTML API reference from the public headers.
+#   cmake --build build --target docs
+# Or directly:
+#   doxygen Doxyfile
+
+PROJECT_NAME           = otlp-c
+PROJECT_NUMBER         = @OTLP_C_VERSION@
+PROJECT_BRIEF          = "Pure-C99 OTLP/HTTP client with zero non-libc dependencies"
+
+INPUT                  = include/otlp-c/ README.md SECURITY.md CLAUDE.md \
+                         CONTRIBUTING.md CODE_OF_CONDUCT.md \
+                         docs/quickstart.md docs/deployment.md docs/otlp-spec.md \
+                         docs/architecture.md docs/cookbook.md docs/roadmap.md \
+                         docs/integration-test.md
+RECURSIVE              = YES
+
+OUTPUT_DIRECTORY       = build/docs
+
+EXTRACT_ALL            = YES
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = NO
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_MAN           = NO
+GENERATE_XML           = NO
+
+HTML_OUTPUT            = html
+USE_MATHJAX            = NO
+
+# Group doxygen-style comments; treat /** */ as detailed.
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = NO
+MULTILINE_CPP_IS_BRIEF = NO
+INHERIT_DOCS           = YES
+SEPARATE_MEMBER_PAGES  = NO
+
+# C specifics.
+OPTIMIZE_OUTPUT_FOR_C  = YES
+TYPEDEF_HIDES_STRUCT   = NO
+EXTRACT_PRIVATE        = NO
+
+# Search engine.
+SEARCHENGINE           = YES
+
+# Source browsing.
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+# Don't pull in internal headers (those are in src/).
+EXCLUDE                = src
+EXCLUDE_PATTERNS       = */internal_util.h */span_internal.h */platform.h */protobuf_encode.h */otlp_messages.h */otlp_schema.h */http_client.h */mpsc_queue.h */exporter_otel.h */arena.h
+
+# Quieter output.
+QUIET                  = NO
+WARN_IF_UNDOCUMENTED   = YES
+WARN_NO_PARAMDOC       = NO
+
+# Disable graphs (we don't have a class hierarchy).
+HAVE_DOT               = NO
+CLASS_GRAPH            = NO
+COLLABORATION_GRAPH    = NO
+INCLUDE_GRAPH          = NO
+INCLUDED_BY_GRAPH      = NO

@@ -79,6 +79,7 @@ CHECKPATCH_IGNORE=(
 	src/v2/parson.h
 	src/config/json/parson.c
 	src/config/json/parson.h
+	'third_party/*'
 	test/Makefile
 	test/http.redirect/hello.txt
 )
