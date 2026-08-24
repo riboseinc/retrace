@@ -45,6 +45,7 @@
 #include "otlp-c/tracer.h"
 #include "otlp-c/span.h"
 #include "otlp-c/status.h"
+#include "otlp-c/log.h"
 #include "otlp-c/allocator.h"
 
 /* Tick cadence for the live exporter thread. 100ms gives the
@@ -145,6 +146,57 @@ static void *otlp_live_realloc(void *p, size_t n)
 #endif
 static void otlp_live_final_stats(void);
 
+int retrace_otlp_live_emit_event(int severity, const char *event_name,
+	const struct retrace_otlp_event_attr *attrs, size_t n_attrs)
+{
+	otlp_log_record_t *lr;
+	otlp_status_t st;
+	size_t i;
+
+	if (event_name == NULL)
+		return -1;
+	if (atomic_load_explicit(&g_otlp.running,
+		memory_order_acquire) != 1)
+		return 0;
+	if (g_otlp.exporter == NULL)
+		return 0;
+
+	otlp_live_ensure_thread();
+
+	lr = otlp_log_record_create((otlp_severity_t)severity,
+		event_name);
+	if (lr == NULL)
+		return -1;
+	otlp_log_record_mark_timestamp(lr);
+	otlp_log_record_set_severity_text(lr,
+		severity >= RETRACE_OTLP_SEV_ERROR ? "ERROR" :
+		severity >= RETRACE_OTLP_SEV_WARN ? "WARN" : "INFO");
+	otlp_log_record_set_attribute_string(lr, "retrace.event",
+		event_name);
+
+	for (i = 0; i < n_attrs; i++) {
+		if (attrs[i].key == NULL)
+			continue;
+		if (attrs[i].str_val != NULL)
+			otlp_log_record_set_attribute_string(lr,
+				attrs[i].key, attrs[i].str_val);
+		else
+			otlp_log_record_set_attribute_int(lr,
+				attrs[i].key, attrs[i].int_val);
+	}
+
+	st = otlp_exporter_emit_log_move(g_otlp.exporter, lr);
+	if (st == OTLP_ERR_BUFFER_FULL) {
+		/* Bounded failure: drop, count, never block. */
+		return 0;
+	}
+	if (st != OTLP_OK) {
+		otlp_log_record_free(lr);
+		return -1;
+	}
+	return 0;
+}
+
 int retrace_otlp_live_init(void)
 {
 	char *env_endpoint;
@@ -160,6 +212,40 @@ int retrace_otlp_live_init(void)
 	env_endpoint = retrace_real_impls.getenv("RETRACE_OTLP_ENDPOINT");
 	if (env_endpoint == NULL || env_endpoint[0] == '\0')
 		return 0; /* not enabled -- silent */
+
+	/* Copy the env values: the otlp-c API copies them at create
+	 * time, but the g_otlp.endpoint field is also surfaced via
+	 * at-exit diagnostics -- keep our own copy for that.
+	 *
+	 * Path normalization: otlp-c uses the endpoint's path for
+	 * the TRACES signal (logs/metrics force /v1/logs,
+	 * /v1/metrics themselves). A bare base URL (no '/' after
+	 * scheme://host[:port]) would post spans to "/" -- otelcol
+	 * 404s there. Accept the base-URL UX users expect and append
+	 * the default path.
+	 */
+	{
+		const char *scan = env_endpoint;
+		const char *path = NULL;
+
+		/* skip scheme:// */
+		while (*scan != '\0' && *scan != ':')
+			scan++;
+		if (scan[0] == ':' && scan[1] == '/' && scan[2] == '/')
+			path = scan + 3;
+		else
+			path = env_endpoint; /* no scheme: relative? */
+		while (*path != '\0' && *path != '/')
+			path++;
+		if (*path == '\0')
+			retrace_real_impls.real_snprintf(
+				g_otlp.endpoint, sizeof(g_otlp.endpoint),
+				"%s/v1/traces", env_endpoint);
+		else
+			retrace_real_impls.real_snprintf(
+				g_otlp.endpoint, sizeof(g_otlp.endpoint),
+				"%s", env_endpoint);
+	}
 
 	/* Point otlp-c's internal allocator at retrace's real
 	 * malloc/free so the library's slab/mpsc/span allocations
@@ -183,14 +269,6 @@ int retrace_otlp_live_init(void)
 		};
 		otlp_set_allocator(&alloc);
 	}
-
-	/* Copy the env values: the otlp-c API copies them at create
-	 * time, but the g_otlp.endpoint field is also surfaced via
-	 * at-exit diagnostics -- keep our own copy for that.
-	 */
-	strncpy(g_otlp.endpoint, env_endpoint,
-		sizeof(g_otlp.endpoint) - 1);
-	g_otlp.endpoint[sizeof(g_otlp.endpoint) - 1] = '\0';
 
 	env_service = retrace_real_impls.getenv("RETRACE_OTLP_SERVICE_NAME");
 	if (env_service != NULL && env_service[0] != '\0') {
@@ -250,26 +328,31 @@ int retrace_otlp_live_init(void)
 }
 
 /*
- * Spawn the tick thread on first use. Called from
- * retrace_otlp_live_emit_json (the flusher thread) so the
- * constructor never creates threads.
+ * Spawn the tick thread on first use. Called from BOTH
+ * retrace_otlp_live_emit_json (the flusher thread) and
+ * retrace_otlp_live_emit_event (the target's engine thread --
+ * Wave C) so the constructor never creates threads. Two
+ * callers can race here; the CAS admits exactly ONE creator --
+ * a second tick thread would run otlp_exporter_tick()
+ * concurrently, which is single-thread-only (CI: the Linux
+ * jail-integration leg SEGV'd on the double-spawn race).
  */
 static void otlp_live_ensure_thread(void)
 {
+	int expected = 0;
 	int trc;
 
-	if (atomic_load_explicit(&g_otlp.thread_spawned,
-		memory_order_acquire) == 1)
+	if (!atomic_compare_exchange_strong(&g_otlp.thread_spawned,
+		&expected, 1))
 		return;
 
 	trc = retrace_real_impls.rc_thread_create(&g_otlp.thread,
 		otlp_live_thread_main, NULL);
 	if (trc != 0) {
 		log_err("otlp_live: thread create failed: %d", trc);
-		return;
+		atomic_store_explicit(&g_otlp.thread_spawned, 0,
+			memory_order_release);
 	}
-	atomic_store_explicit(&g_otlp.thread_spawned, 1,
-		memory_order_release);
 }
 
 void retrace_otlp_live_deinit(void)
@@ -336,6 +419,15 @@ static void *otlp_live_thread_main(void *arg)
 	(void)arg;
 
 	/*
+	 * Mark this thread as "logging disabled" FIRST so the
+	 * context registration below -- which goes through
+	 * rc_tss_set, an INTERPOSED pthread_setspecific -- cannot
+	 * feed log entries back into the ring it would drain (the
+	 * log flusher's ordering, TODO.complete/19).
+	 */
+	retrace_logger_disable_for_this_thread();
+
+	/*
 	 * Install the permanent reentrance guard on this thread's
 	 * own context -- the otlp_exporter's own send/connect/recv
 	 * through our hooked libc MUST pass through to the real
@@ -352,13 +444,6 @@ static void *otlp_live_thread_main(void *arg)
 		if (ctx != NULL)
 			retrace_reentrance_guard_enter_permanent(ctx, NULL);
 	}
-
-	/*
-	 * Mark this thread as "logging disabled" so any log calls
-	 * the exporter or its sockets make short-circuit at the
-	 * log_json gate (no recursion).
-	 */
-	retrace_logger_disable_for_this_thread();
 
 	while (atomic_load_explicit(&g_otlp.stop_signal,
 		memory_order_relaxed) == 0) {
@@ -513,18 +598,34 @@ void retrace_otlp_live_get_stats(uint64_t *emitted, uint64_t *sent,
 static void otlp_live_final_stats(void)
 {
 	uint64_t emitted, sent, dropped_full, dropped_err;
+	otlp_exporter_stats_t stats;
+	uint64_t logs_emitted = 0, logs_sent = 0;
 
 	retrace_otlp_live_get_stats(&emitted, &sent, &dropped_full,
 		&dropped_err);
-	if (emitted == 0 && sent == 0)
+
+	/* LOG-signal counters (TODO.trace-profile/32): security
+	 * events ride /v1/logs; surface them on the same line.
+	 */
+	if (g_otlp.exporter != NULL &&
+	    otlp_exporter_get_stats(g_otlp.exporter, &stats) == OTLP_OK) {
+		logs_emitted = stats.emitted_logs;
+		logs_sent = stats.sent_logs;
+	}
+
+	if (emitted == 0 && sent == 0 && logs_emitted == 0 &&
+	    logs_sent == 0)
 		return;
 
 	/* stderr line -- users grep for it on agent teardown. */
 	retrace_real_impls.fprintf(stderr,
 		"retrace: otlp_live: emitted=%llu sent=%llu "
+		"logs_emitted=%llu logs_sent=%llu "
 		"dropped_full=%llu dropped_err=%llu endpoint=%s\n",
 		(unsigned long long)emitted,
 		(unsigned long long)sent,
+		(unsigned long long)logs_emitted,
+		(unsigned long long)logs_sent,
 		(unsigned long long)dropped_full,
 		(unsigned long long)dropped_err,
 		g_otlp.endpoint);

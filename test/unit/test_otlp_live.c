@@ -95,6 +95,28 @@ static void test_emit_json_empty_string(void)
 	assert(retrace_otlp_live_emit_json("{}") == -1);
 }
 
+static void test_emit_event_when_uninitialized_is_noop(void)
+{
+	/* Wave C: security events are no-ops without an endpoint.
+	 * NULL event name is refused; real events return 0 without
+	 * side effects.
+	 */
+	struct retrace_otlp_event_attr attrs[2] = {
+		{ "retrace.jail.path", "/etc/shadow", 0 },
+		{ "retrace.jail.count", NULL, 3 },
+	};
+
+	assert(retrace_otlp_live_emit_event(RETRACE_OTLP_SEV_ERROR,
+		NULL, attrs, 2) == -1);
+	assert(retrace_otlp_live_emit_event(RETRACE_OTLP_SEV_ERROR,
+		"retrace.jail.denied", attrs, 2) == 0);
+	assert(retrace_otlp_live_emit_event(RETRACE_OTLP_SEV_WARN,
+		"retrace.drift.hit", NULL, 0) == 0);
+	/* NULL attr entries are skipped, not dereferenced. */
+	assert(retrace_otlp_live_emit_event(RETRACE_OTLP_SEV_INFO,
+		"retrace.fuzz.cluster", NULL, 4) == 0);
+}
+
 int main(void)
 {
 	printf("otlp_live tests:\n");
@@ -107,6 +129,7 @@ int main(void)
 	printf("  -- emit path --\n");
 	TEST(emit_when_uninitialized_is_noop);
 	TEST(emit_json_empty_string);
+	TEST(emit_event_when_uninitialized_is_noop);
 
 	printf("  -- null-safety --\n");
 	TEST(get_stats_null_args);

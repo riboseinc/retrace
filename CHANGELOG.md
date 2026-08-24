@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.36.0] — 2026-08-24
+
+**otlp-c Wave C: security events** (TODO.trace-profile/32) —
+the security workflows stop being file-only; findings stream
+into whatever OTLP pipeline the team already runs.
+
+- **Live jail denials**: a `sandbox` action denial emits an
+  OTLP LOG record (`retrace.jail.denied`, severity ERROR) the
+  moment it happens — policy violations visible in
+  Grafana/Datadog during detonations, not after. Same bounded,
+  never-blocking contract as the span pipeline (Wave B).
+- `retrace-fuzz-report --endpoint URL`: crash/assertion
+  clusters as LOG records (`retrace.fuzz.*`), campaign counters
+  as METRICS, and a WARN LOG when the drift oracle trips.
+- `retrace-profile export` now also emits kernel-grading gauges
+  (`retrace.risk.{agreed,libc_only,kernel_only}`) when the
+  profile was saved with `--kernel` — sub-libc access counts
+  per graded binary over time.
+- **Documented attribute schema** in `docs/reports.md`
+  (`retrace.jail.*`, `retrace.fuzz.*`, `retrace.drift.*`,
+  `retrace.risk.*`) — dashboards can be shared against stable
+  names.
+- Base-URL fix (Wave B follow-up): `RETRACE_OTLP_ENDPOINT` now
+  appends `/v1/traces` when no path is given — a bare
+  `http://collector:4318` previously posted spans to `/`
+  (otelcol 404). Logs/metrics always routed correctly.
+- At-exit stats line gains `logs_emitted=` / `logs_sent=`.
+- New integration test `integration-otlp-jail` (jailed run →
+  assert `/v1/logs` + `/v1/traces` POSTs); unit coverage for
+  the event API; fuzz-report/profiler exports verified
+  end-to-end against the fixture collector.
+
 ## [2.35.0] — 2026-08-24
 
 **otlp-c Wave B: live streaming from the traced process**

@@ -736,6 +736,62 @@ int main(int argc, char **argv)
 		}
 		otlp_exporter_flush(exp);
 		otlp_exporter_shutdown(exp);
+
+		/* Wave C (TODO.trace-profile/32): kernel-grading
+		 * metrics. The saved profile's top-level "risk" object
+		 * (present when the main mode ran with --kernel) carries
+		 * the agreed/libc_only/kernel_only counts -- emit them
+		 * as gauges so CI dashboards track sub-libc access
+		 * counts per graded binary. prof_from_json does not
+		 * model risk; re-read the raw JSON for it.
+		 */
+		{
+			JSON_Value *rv = json_parse_file(hp);
+
+			if (rv != NULL) {
+				JSON_Object *risk = json_object_get_object(
+					json_value_get_object(rv), "risk");
+
+				if (risk != NULL) {
+					static const char *const keys[3] = {
+						"agreed", "libc_only",
+						"kernel_only"
+					};
+					size_t ki;
+
+					for (ki = 0; ki < 3; ki++) {
+						otlp_metric_t *m;
+						char name[64];
+
+						snprintf(name,
+							sizeof(name),
+					"retrace.risk.%s",
+							keys[ki]);
+						m = otlp_metric_create(
+							OTLP_METRIC_GAUGE,
+							name, "1",
+					"kernel-grading counts",
+							NULL, 0);
+						if (m == NULL)
+							break;
+						otlp_metric_record(m,
+							json_object_get_number(
+								risk,
+								keys[ki]));
+						if (otlp_exporter_flush_metric(
+								exp, m)
+							!= OTLP_OK) {
+							fprintf(stderr,
+	"retrace-profile export: %s flush failed\n",
+								name);
+						}
+						otlp_metric_free(m);
+					}
+				}
+				json_value_free(rv);
+			}
+		}
+
 		otlp_exporter_free(exp);
 		{
 			size_t tf = xf.prof.timings.count;

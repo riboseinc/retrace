@@ -48,13 +48,17 @@
 
 #include "parson.h"
 
+#include <otlp-c/exporter.h>
+#include <otlp-c/log.h>
+#include <otlp-c/metric.h>
+
 static void usage(FILE *out)
 {
 	fprintf(out,
 "Usage: retrace-fuzz-report --config <fuzz.json> --seeds <dir>\n"
 "       [--lib <libretrace>] [--marker <substr>]\n"
 "       [--baseline <profile.json>] [-o report.json]\n"
-"       [-- cmd args...]\n"
+"       [--endpoint <otlp-url>] [-- cmd args...]\n"
 "\n"
 "Runs the target once per seed under the fuzz config; clusters\n"
 "failures; emits report.json + per-cluster repro configs.\n"
@@ -63,7 +67,11 @@ static void usage(FILE *out)
 "baseline never saw (new paths, new env reads) surfaces even\n"
 "without a crash.\n"
 "--emit-corpus <dir> writes the MINIMIZED corpus: one seed\n"
-"per failure cluster (the reproducing seeds).\n");
+"per failure cluster (the reproducing seeds).\n"
+"--endpoint pushes the findings to an OTLP collector (Wave C,\n"
+"TODO.trace-profile/32): one LOG record per cluster (schema\n"
+"retrace.fuzz.*, docs/reports.md), iteration/crash counters as\n"
+"METRICS, and a WARN LOG when the drift oracle trips.\n");
 }
 
 static unsigned long fnv1a_buf(const char *s, size_t n,
@@ -76,6 +84,125 @@ static unsigned long fnv1a_buf(const char *s, size_t n,
 		h *= 0x01000193UL;
 	}
 	return h;
+}
+
+/*
+ * OTLP export (Wave C, TODO.trace-profile/32): one LOG record
+ * per failure cluster, iteration/crash counters as METRICS, a
+ * WARN LOG when the drift oracle trips. Attribute schema is
+ * documented in docs/reports.md. Uses the synchronous
+ * flush_log/flush_metric one-shots -- a handful of POSTs for a
+ * handful of findings, no background thread needed.
+ */
+static int export_otlp(const char *endpoint,
+		       const struct FuzzReport *rep, int drifted)
+{
+	otlp_exporter_t *exp;
+	otlp_exporter_opts_t opts;
+	size_t i;
+	static const struct {
+		const char *name;
+		size_t val;
+	} counters[] = {
+		{ "retrace.fuzz.iterations", 0 },
+		{ "retrace.fuzz.crashes", 0 },
+		{ "retrace.fuzz.assertions", 0 },
+		{ "retrace.fuzz.clusters", 0 },
+	};
+	size_t vals[4];
+
+	if (endpoint == NULL)
+		return 0;
+
+	memset(&opts, 0, sizeof(opts));
+	opts.endpoint = endpoint;
+	opts.service_name = "retrace";
+	opts.flush_timeout_ms = 10000;
+	exp = otlp_exporter_create(&opts);
+	if (exp == NULL) {
+		fprintf(stderr,
+	"retrace-fuzz-report: exporter create failed for %s\n",
+			endpoint);
+		return -1;
+	}
+
+	for (i = 0; i < rep->count; i++) {
+		const struct FuzzCluster *c = &rep->clusters[i];
+		otlp_log_record_t *lr = otlp_log_record_create(
+			c->is_crash ? OTLP_SEVERITY_ERROR :
+				      OTLP_SEVERITY_WARN,
+			"retrace.fuzz.cluster");
+		char id[32], count[32], seed[32];
+
+		if (lr == NULL)
+			break;
+		snprintf(id, sizeof(id), "%lu", c->id);
+		snprintf(count, sizeof(count), "%zu", c->count);
+		snprintf(seed, sizeof(seed), "%lu", c->first_seed);
+		otlp_log_record_mark_timestamp(lr);
+		otlp_log_record_set_severity_text(lr,
+			c->is_crash ? "ERROR" : "WARN");
+		otlp_log_record_set_attribute_string(lr,
+			"retrace.event", "retrace.fuzz.cluster");
+		otlp_log_record_set_attribute_string(lr,
+			"retrace.fuzz.cluster", id);
+		otlp_log_record_set_attribute_string(lr,
+			"retrace.fuzz.func", c->func);
+		otlp_log_record_set_attribute_string(lr,
+			"retrace.fuzz.kind",
+			c->is_crash ? "crash" : "assertion");
+		otlp_log_record_set_attribute_string(lr,
+			"retrace.fuzz.iterations", count);
+		otlp_log_record_set_attribute_string(lr,
+			"retrace.fuzz.first_seed", seed);
+		if (otlp_exporter_flush_log(exp, lr) != OTLP_OK)
+			fprintf(stderr,
+	"retrace-fuzz-report: cluster %lu: OTLP log flush failed\n",
+				c->id);
+		otlp_log_record_free(lr);
+	}
+
+	vals[0] = rep->total;
+	vals[1] = rep->crashes;
+	vals[2] = rep->assertions;
+	vals[3] = rep->count;
+	for (i = 0; i < 4; i++) {
+		otlp_metric_t *m = otlp_metric_create(
+			OTLP_METRIC_COUNTER, counters[i].name, "1",
+			"fuzz campaign counters", NULL, 0);
+
+		if (m == NULL)
+			break;
+		otlp_metric_record(m, (double)vals[i]);
+		if (otlp_exporter_flush_metric(exp, m) != OTLP_OK)
+			fprintf(stderr,
+	"retrace-fuzz-report: %s: OTLP metric flush failed\n",
+				counters[i].name);
+		otlp_metric_free(m);
+	}
+
+	if (drifted) {
+		otlp_log_record_t *lr = otlp_log_record_create(
+			OTLP_SEVERITY_WARN, "retrace.drift.hit");
+
+		if (lr != NULL) {
+			otlp_log_record_mark_timestamp(lr);
+			otlp_log_record_set_severity_text(lr, "WARN");
+			otlp_log_record_set_attribute_string(lr,
+				"retrace.event", "retrace.drift.hit");
+			otlp_log_record_set_attribute_string(lr,
+				"retrace.drift.verdict",
+				"behavior the baseline never saw");
+			if (otlp_exporter_flush_log(exp, lr) != OTLP_OK)
+				fprintf(stderr,
+	"retrace-fuzz-report: drift: OTLP log flush failed\n");
+			otlp_log_record_free(lr);
+		}
+	}
+
+	otlp_exporter_shutdown(exp);
+	otlp_exporter_free(exp);
+	return 0;
 }
 
 static int cmp_str(const void *a, const void *b)
@@ -198,6 +325,7 @@ int main(int argc, char **argv)
 	const char *marker = NULL;
 	const char *baseline_path = NULL;
 	const char *emit_corpus = NULL;
+	const char *endpoint = NULL;
 	char *const *cmd = NULL;
 	int cmd_start = -1;
 	int i;
@@ -207,6 +335,7 @@ int main(int argc, char **argv)
 	JSON_Value *jv;
 	char *ser;
 	int exit_code = 0;
+	int g_drifted = 0;
 
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--config") == 0 && i + 1 < argc) {
@@ -232,6 +361,10 @@ int main(int argc, char **argv)
 		if (strcmp(argv[i], "--emit-corpus") == 0 &&
 		    i + 1 < argc) {
 			emit_corpus = argv[++i];
+			continue;
+		}
+		if (strcmp(argv[i], "--endpoint") == 0 && i + 1 < argc) {
+			endpoint = argv[++i];
 			continue;
 		}
 		if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
@@ -374,19 +507,18 @@ int main(int argc, char **argv)
 		jv = fuzz_report_to_json(&rep);
 		if (have_base) {
 			struct ProfDiff d;
-			int drifted;
 
 			prof_diff_init(&d);
-			drifted = prof_diff_compute(&base_prof,
+			g_drifted = prof_diff_compute(&base_prof,
 				&clean_prof, &d);
 			json_object_set_value(json_value_get_object(jv),
 				"drift", prof_diff_to_json(&d));
 			json_object_set_number(
 				json_value_get_object(jv), "drifted",
-				drifted);
+				g_drifted);
 			fprintf(stderr,
 "retrace-fuzz-report: drift oracle: %s\n",
-				drifted ?
+				g_drifted ?
 				"behavior the baseline never saw" :
 				"clean runs within baseline behavior");
 			prof_diff_free(&d);
@@ -493,6 +625,11 @@ int main(int argc, char **argv)
 "retrace-fuzz-report: %zu iterations, %zu crashes, %zu assertions, %zu clusters -> %s\n",
 			rep.total, rep.crashes, rep.assertions,
 			rep.count, out_path);
+		if (endpoint != NULL) {
+			export_otlp(endpoint, &rep, g_drifted);
+			fprintf(stderr,
+"retrace-fuzz-report: findings exported to %s\n", endpoint);
+		}
 		if (rep.crashes > 0)
 			exit_code = 1;
 		fuzz_report_free(&rep);

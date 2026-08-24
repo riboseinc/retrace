@@ -33,7 +33,7 @@ config; the only new variable is the endpoint URL.)
 You'll see, at process exit:
 
 ```
-retrace: otlp_live: emitted=623 sent=623 dropped_full=0 dropped_err=0 \
+retrace: otlp_live: emitted=623 sent=623 logs_emitted=1 logs_sent=1 \
   endpoint=http://localhost:4318
 ```
 
@@ -71,10 +71,12 @@ Trace ID is the same for every span in a process (per-trace
 
 ## Wire shape
 
-otlp-c posts OTLP/HTTP protobuf to `{endpoint}/v1/traces`
-(default port 4318). The endpoint you set should be the
-**base** URL — otlp-c appends `/v1/traces` itself. So set
-`http://collector:4318`, NOT `http://collector:4318/v1/traces`.
+retrace posts OTLP/HTTP protobuf to `/v1/traces` (spans),
+`/v1/logs` (security events — jail denials, see recipe on the
+attribute schema in docs/reports.md) and `/v1/metrics`. Set
+either the **base** URL (`http://collector:4318` — retrace
+appends the signal paths) or a full one; both work. Default
+OTLP port 4318.
 
 Plain HTTP only. For TLS, terminate at a local otelcol sidecar
 or set up a TLS-terminating reverse proxy in front of an

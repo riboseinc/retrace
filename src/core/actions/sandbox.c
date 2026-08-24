@@ -29,6 +29,7 @@
 #include "actions.h"
 #include "logger.h"
 #include "real_impls.h"
+#include "otlp_live.h"
 
 /*
  * sandbox -- jail file access behind an explicit policy.
@@ -218,6 +219,33 @@ static int deny(struct ThreadContext *t_ctx, const char *why,
 		const char *arg)
 {
 	log_warn("sandbox: DENIED '%s' (%s)", arg, why);
+
+	/* TODO.trace-profile/32: the denial is ALSO a live OTLP LOG
+	 * record (ERROR) so security teams watch policy violations
+	 * in their collector during detonations. Attributes follow
+	 * the documented retrace.jail.* schema (docs/reports.md).
+	 * No-op when RETRACE_OTLP_ENDPOINT is unset; bounded drop,
+	 * never blocks the denied call's return path.
+	 */
+	{
+		const char *func = t_ctx->prototype != NULL ?
+			t_ctx->prototype->name : "unknown";
+		struct retrace_otlp_event_attr ev[3];
+
+		ev[0].key = "retrace.jail.path";
+		ev[0].str_val = arg;
+		ev[0].int_val = 0;
+		ev[1].key = "retrace.jail.reason";
+		ev[1].str_val = why;
+		ev[1].int_val = 0;
+		ev[2].key = "retrace.jail.func";
+		ev[2].str_val = func;
+		ev[2].int_val = 0;
+		(void)retrace_otlp_live_emit_event(
+			RETRACE_OTLP_SEV_ERROR, "retrace.jail.denied",
+			ev, 3);
+	}
+
 	errno = EACCES;
 	t_ctx->ret_val = deny_ret(t_ctx);
 	return -1;
