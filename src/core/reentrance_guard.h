@@ -56,8 +56,19 @@
 #include "engine.h"
 
 /*
+ * Sentinel marker for "this thread is permanently in an
+ * intercept" (TODO.trace-profile/31): the otlp-c exporter
+ * thread holds the guard for its lifetime so any nested libc
+ * call from within it (e.g. send on the socket fd) sees the
+ * guard as active and bails -- no self-interposition recursion.
+ */
+#define RETRANCE_GUARD_PERMANENT ((void *)0x1)
+
+/*
  * Returns 1 if the current thread is already inside an active
  * intercept (a nested libc call from within an action), else 0.
+ * Also returns 1 when the guard is held permanently
+ * (retrance_guard_enter_permanent).
  *
  * The check is intentionally trivial -- it reads one field. The
  * value of having it as a function is semantic: callers express
@@ -77,5 +88,20 @@ int retrace_reentrance_guard_active(const struct ThreadContext *ctx);
 void retrace_reentrance_guard_enter(struct ThreadContext *ctx,
 				    void *real_impl,
 				    void *arch_spec_ctx);
+
+/*
+ * Mark the context as PERMANENTLY in-intercept (TODO 31): the
+ * guard stays active for the lifetime of the thread context.
+ * Used by threads that own the otlp-c exporter's sockets --
+ * any nested libc call (send, connect) sees the guard as
+ * active and passes through to the real impl without
+ * re-entering retrace's wrappers.
+ *
+ * Pair with a ThreadContext that's NEVER cleared (no
+ * thread_context_clear on the exporter thread). For one-shot
+ * background workers that exit, just leak the context.
+ */
+void retrace_reentrance_guard_enter_permanent(struct ThreadContext *ctx,
+					      void *arch_spec_ctx);
 
 #endif /* RETRACE_CORE_REENTRANCE_GUARD_H_ */

@@ -4,6 +4,14 @@
 # RETRACE_BUILD_FUZZERS=ON, which adds -fsanitize=fuzzer,address.
 # The resulting binaries are standalone fuzz targets (not ctest
 # entries); run them manually or wire into a fuzz.yml workflow.
+# otlp-c live-streaming link (TODO.trace-profile/31): the target
+# only exists on POSIX builds (Windows stubs the module); empty
+# elsewhere.
+set(_otlp_lib)
+if(TARGET otlp_c)
+	list(APPEND _otlp_lib otlp_c)
+endif()
+
 
 option(RETRACE_BUILD_FUZZERS "Build libFuzzer harnesses" OFF)
 
@@ -80,6 +88,7 @@ target_compile_options(fuzz_script_resolve PRIVATE ${_fuzz_compile_flags})
 target_link_options(fuzz_script_resolve PRIVATE ${_fuzz_link_flags})
 target_link_libraries(fuzz_script_resolve PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_fuzz_backend_lib}
@@ -124,6 +133,7 @@ target_compile_options(fuzz_action_run PRIVATE ${_fuzz_compile_flags})
 target_link_options(fuzz_action_run PRIVATE ${_fuzz_link_flags})
 target_link_libraries(fuzz_action_run PRIVATE
     retrace_core
+    ${_otlp_lib}
     retrace_config_json
     retrace_backends
     ${_fuzz_backend_lib}

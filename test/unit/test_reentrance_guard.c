@@ -126,6 +126,12 @@ static void test_null_real_impl_is_inactive(void)
 	assert(retrace_reentrance_guard_active(&ctx) == 0);
 }
 
+/* TODO 31: the "permanent" variant -- held by the otlp-c
+ * exporter thread for its lifetime so its send()/connect()
+ * reach the real socket implementation, not recurse.
+ */
+static void test_permanent_holds_across_calls(void);
+
 int main(void)
 {
 	printf("reentrance_guard tests:\n");
@@ -135,6 +141,7 @@ int main(void)
 	TEST(active_after_enter);
 	TEST(inactive_after_clear);
 	TEST(null_real_impl_is_inactive);
+	TEST(permanent_holds_across_calls);
 
 	printf("  -- enter() captures --\n");
 	TEST(enter_captures_real_impl);
@@ -146,4 +153,24 @@ int main(void)
 	printf("\nPass: %d, Fail: %d (of %d)\n",
 		tests_pass, tests_fail, tests_run);
 	return tests_fail == 0 ? 0 : 1;
+}
+
+/* TODO 31: the "permanent" variant -- held by the otlp-c
+ * exporter thread for its lifetime so its send()/connect()
+ * reach the real socket implementation, not recurse.
+ */
+static void test_permanent_holds_across_calls(void)
+{
+	struct ThreadContext ctx;
+	void *arch = (void *)0xbeef;
+	int i;
+
+	memset(&ctx, 0, sizeof(ctx));
+	retrace_reentrance_guard_enter_permanent(&ctx, arch);
+	assert(retrace_reentrance_guard_active(&ctx) == 1);
+	/* Subsequent wrapper entries on this thread see it active
+	 * (the permanent marker survives any clear-like teardown).
+	 */
+	for (i = 0; i < 5; i++)
+		assert(retrace_reentrance_guard_active(&ctx) == 1);
 }

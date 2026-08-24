@@ -32,6 +32,8 @@
 #include "real_impls.h"
 #include "logger.h"
 #include "log_ring.h"
+#include "reentrance_guard.h"
+#include "engine.h"
 
 /*
  * Flusher cadence. 1 ms keeps latency low while keeping CPU use
@@ -124,6 +126,34 @@ static void *flusher_main(void *arg)
 	 * at the log_json gate. See logger.c.
 	 */
 	retrace_logger_disable_for_this_thread();
+
+	/*
+	 * TODO.trace-profile/31: install the PERMANENT reentrance
+	 * guard on the flusher's own context. The flusher's libc
+	 * calls (notably otlp-c's slab allocation via
+	 * real_impls.malloc -- which itself is a dlsym that's
+	 * hooked) must pass through to the real impl. Without the
+	 * permanent guard, the engine ENTERS its regular guard on
+	 * the flusher's context, processes actions, and overwrites
+	 * the return value with thread_ctx->ret_val (a value never
+	 * set by the flusher's call) -- send/recv return -1, the
+	 * otlp-c library crashes.
+	 */
+	{
+		struct ThreadContext *ctx = NULL;
+
+		/* Force the flusher's context allocation. We don't have
+		 * direct access to the engine's thread_context_get, so
+		 * use the same lazy-init pattern by allocating one and
+		 * storing via the engine's TSS. The engine will pick it
+		 * up on the first libc call.
+		 */
+		extern struct ThreadContext *retrace_thread_context_get(void);
+
+		ctx = retrace_thread_context_get();
+		if (ctx != NULL)
+			retrace_reentrance_guard_enter_permanent(ctx, NULL);
+	}
 
 	while (atomic_load_explicit(&s->stop_signal,
 		memory_order_relaxed) == 0) {

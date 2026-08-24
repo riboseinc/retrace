@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.35.0] — 2026-08-24
+
+**otlp-c Wave B: live streaming from the traced process**
+(TODO.trace-profile/31) — `RETRACE_OTLP_ENDPOINT=URL` makes
+retrace emit OTLP spans LIVE as the wrapped calls happen.
+
+- `src/core/otlp_live.{h,c}`: a new core module that owns the
+  otlp-c exporter, a tracer, and a background thread that pumps
+  `otlp_exporter_tick()`. Per-call hook path: logger emit → MPSC
+  enqueue → exporter tick → POST to collector.
+- **Permanent reentrance guard** (`retrance_guard_enter_permanent`):
+  the otlp-c background thread and the log flusher both hold it
+  for their lifetimes, so their own libc calls (send, connect,
+  malloc) pass through to the real impl — no self-interposition
+  recursion. Same lesson as the TODO 28 NtWriteFile fix.
+- otlp-c's allocator is wired to `retrace_real_impls.{malloc,free}`
+  with a thin `malloc+memcpy+free` realloc shim, so the library's
+  internal slab/MPSC/span allocations never reach the engine.
+- New `retrance_guard_enter_permanent` API + a permanent sentinel
+  (`RETRANCE_GUARD_PERMANENT = (void *)0x1`); unit-tested in
+  `test_reentrance_guard.c` (8 tests passing).
+- **At-exit diagnostics** (`retrace: otlp_live: emitted=… sent=…
+  dropped_full=… dropped_err=…`): stderr line at process teardown
+  so users see what happened.
+- **Integration test** (`test/integration/test_otlp_live.py` +
+  `test/fixtures/fixture_otlp_server.py`): end-to-end check with
+  a stub OTLP/HTTP collector — verified locally with 623 spans
+  emitted, 623 sent, 0 drops.
+- otlp-c now built at the top level (canonical `add_subdirectory`);
+  `tools/otlp-converter/CMakeLists.txt` uses `if(NOT TARGET otlp_c)`
+  guard so the call is idempotent.
+
 ## [2.34.0] — 2026-08-24
 
 **otlp-c Wave A: real OTLP export** (TODO.trace-profile/30).

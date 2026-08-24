@@ -371,6 +371,35 @@ endif()
 # Public headers are installed from include/.
 add_subdirectory(include/retrace)
 
+# otlp-c is the live-streaming dependency (TODO.trace-profile/31)
+# and the profiler's --export backend (TODO.trace-profile/30).
+# add_subdirectory is side-effect-free by design (otlp-c guards
+# its own install/CPack layout behind top-level detection) so it
+# can be pulled in from any consumer.  tools/{profiler,
+# otlp-converter}/CMakeLists have the same `if(NOT TARGET otlp_c)`
+# guard -- this is the CANONICAL include: it must come first so
+# every later consumer sees the STATIC variant.
+#
+# Force STATIC regardless of the parent's BUILD_SHARED_LIBS:
+#   - a shared libotlp_c would add a runtime .so dependency the
+#     LD_PRELOAD path can't satisfy (OHOS CI: dlopen failed)
+#   - retrace-profile.exe linking a shared otlp_c.dll dies at
+#     load with STATUS_DLL_NOT_FOUND (no applocal deploy for it)
+#
+# MinGW/UCRT excluded: otlp-c's exporter.c calls Win32 Sleep()
+# without including <windows.h> (implicit-declaration error under
+# MinGW's stricter defaults). The profiler drops --export there;
+# rides the TODO.windows track with the rest of the port.
+if((RETRACE_BUILD_V2 OR RETRACE_PLATFORM_WINDOWS) AND NOT MINGW)
+	if(NOT TARGET otlp_c)
+		set(OTLP_C_BUILD_SHARED_BACKUP ${BUILD_SHARED_LIBS})
+		set(BUILD_SHARED_LIBS OFF)
+		add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/otlp-c
+			${CMAKE_BINARY_DIR}/third_party/otlp-c)
+		set(BUILD_SHARED_LIBS ${OTLP_C_BUILD_SHARED_BACKUP})
+	endif()
+endif()
+
 if(RETRACE_BUILD_V2)
 	add_subdirectory(src/core)
 	add_subdirectory(src/config)

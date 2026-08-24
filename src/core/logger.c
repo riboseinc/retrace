@@ -33,6 +33,7 @@
 #include "real_impls.h"
 #include "log_ring.h"
 #include "log_flusher.h"
+#include "otlp_live.h"
 
 /* Forward declarations for the lazy-spawn function. */
 static volatile int g_flusher_spawned; /* guarded by rc_cas */
@@ -318,6 +319,14 @@ static int logger_emit_entry(const struct LogEntry *entry, void *ctx)
 
 	if (entry == NULL || entry->text == NULL)
 		return 0;
+
+	/* TODO.trace-profile/31: also push to otlp-c's MPSC queue
+	 * (if the live exporter is initialized). Parses the JSON
+	 * envelope, builds a span, calls otlp_exporter_emit_move.
+	 * Lock-free and bounded -- never blocks the caller; on queue
+	 * full, otlp_live drops and counts.
+	 */
+	(void)retrace_otlp_live_emit_json(entry->text);
 
 	if (g_logger_config.stdout_ena &&
 	    retrace_real_impls.fprintf &&
