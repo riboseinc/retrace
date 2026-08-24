@@ -255,6 +255,20 @@ jobs:
               -Wait -PassThru -NoNewWindow
             Write-Host ("bisect NTDLL_LIST={0} rc: {1}" -f $hook, $bi.ExitCode)
           }
+          # TODO 28 discriminator: NtCreateFile alone with a
+          # call_real-ONLY script (no log_params = no param
+          # serialization). Pass -> serialization is the killer;
+          # fail -> the trampoline return path itself.
+          $cfgnl = Join-Path $env:RUNNER_TEMP "static-cfg-nolog.json"
+          '{"intercept_scripts":[{"func_name":"NtCreateFile","actions":[{"action_name":"call_real"}]},{"func_name":"NtOpenFile","actions":[{"action_name":"call_real"}]}]}' |
+            Set-Content -Path $cfgnl -Encoding ascii
+          $env:RETRACE_WIN_NTDLL_LIST = "NtCreateFile"
+          $env:RETRACE_JSON_CONFIG = $cfgnl
+          $nlbi = Start-Process -FilePath $profiler `
+            -ArgumentList "capture","-o","static-nlbi.json","--","$smoke" `
+            -Wait -PassThru -NoNewWindow
+          Write-Host ("bisect NTDLL_LIST=NtCreateFile NO-logging rc: {0}" -f $nlbi.ExitCode)
+          $env:RETRACE_JSON_CONFIG = $cfg
           Remove-Item Env:RETRACE_WIN_NTDLL_LIST -ErrorAction SilentlyContinue
 
           # The OS names the faulting module + offset on crash --
