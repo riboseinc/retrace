@@ -49,7 +49,15 @@ int main(void)
 		}
 		fclose(out);
 	}
-	printf("hosts open: %d\n", opened);
+	/* stdout is the LIVE evidence channel (verdict files can
+	 * go stale between runs -- TODO 28 round 4 lesson)
+	 */
+	if (opened) {
+		printf("hosts open: 1\n");
+	} else {
+		printf("hosts open: 0 errno=%d gle=%lu\n", errno,
+			(unsigned long)GetLastError());
+	}
 	if (f != NULL)
 		fclose(f);
 	return opened ? 0 : 3;

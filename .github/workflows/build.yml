@@ -259,6 +259,7 @@ jobs:
           # call_real-ONLY script (no log_params = no param
           # serialization). Pass -> serialization is the killer;
           # fail -> the trampoline return path itself.
+          Remove-Item (Join-Path $PWD "static-result.txt") -ErrorAction SilentlyContinue
           $cfgnl = Join-Path $env:RUNNER_TEMP "static-cfg-nolog.json"
           '{"intercept_scripts":[{"func_name":"NtCreateFile","actions":[{"action_name":"call_real"}]},{"func_name":"NtOpenFile","actions":[{"action_name":"call_real"}]}]}' |
             Set-Content -Path $cfgnl -Encoding ascii
