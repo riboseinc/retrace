@@ -46,6 +46,8 @@ typedef int (*action_fn_t)(struct ThreadContext *t_ctx,
 
 #define DICT_PATH "fuzz-dict.txt"
 #define DICT_TOKENS 5
+#define DICT_TMPL_PATH "fuzz-dict-templates.txt"
+#define DICT_BAD_PATH "fuzz-dict-bad.txt"
 
 static int tests_run;
 static int tests_pass;
@@ -177,6 +179,36 @@ static struct ThreadContext *build_empty_ctx(void)
 	return &ctx;
 }
 
+static void test_dict_templates(void)
+{
+	static fuzz_dict_t d;
+
+	CHECK(fuzz_dict_load(&d, DICT_TMPL_PATH) == 0);
+	/* 3 flat + 2 expanded */
+	CHECK(d.count == 5);
+	CHECK(strcmp(d.tokens[0], "%s%s%n") == 0);
+	CHECK(strcmp(d.tokens[1], "GET / HTTP/1.1") == 0);
+	CHECK(strcmp(d.tokens[2], "evil.example.com") == 0);
+	/* template: "GET %2% HTTP/1.1\r\nHost: %3%" -- the
+	 * substituted token itself starts with "GET", hence the
+	 * doubled prefix; escapes copy verbatim (dicts are
+	 * byte-level)
+	 */
+	CHECK(strcmp(d.tokens[3],
+		"GET GET / HTTP/1.1 HTTP/1.1\\r\\nHost: "
+		"evil.example.com") == 0);
+	CHECK(strcmp(d.tokens[4], "/tmp/%s%s%n") == 0);
+}
+
+static void test_dict_template_bad_ref(void)
+{
+	static fuzz_dict_t d;
+
+	/* %5% with zero flat tokens -> loud load failure */
+	CHECK(fuzz_dict_load(&d, DICT_BAD_PATH) == -1);
+	CHECK(d.count == 0);
+}
+
 static void test_action_lookup(void)
 {
 	CHECK(retrace_actions_get("fuzz_str") != NULL);
@@ -301,6 +333,8 @@ int main(void)
 	TEST(dict_load);
 	TEST(dict_load_missing);
 	TEST(dict_pick_deterministic);
+	TEST(dict_templates);
+	TEST(dict_template_bad_ref);
 	TEST(action_lookup);
 	TEST(params_null);
 	TEST(missing_param_name);

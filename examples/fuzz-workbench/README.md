@@ -33,7 +33,9 @@ non-signal failures by a marker string in the trace.
 The same runner also demos CONTENT fuzzing: `fuzz_str` replaces
 `fopen`'s `filename` with tokens from `dict.txt` (AFL-style:
 one per line, `#` comments skipped), deterministically per
-`fuzz_seed`. The demo runs the target three times and
+`fuzz_seed`. `@`-prefixed lines are grammar TEMPLATES: `%N%`
+substitutes the Nth flat token -- e.g. `@GET %2% HTTP/1.1`
+builds structured payloads from parts (docs/configuration.md). The demo runs the target three times and
 byte-compares the token sequence from the trace logs -- the
 reproducibility promise (reproducer = config + seed + dict).
 See `paths.c` and the dictionary section in `run-posix.sh`;
