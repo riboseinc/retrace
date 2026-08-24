@@ -113,6 +113,14 @@ set_target_properties(retrace_test_otlp_live_target PROPERTIES
 	OUTPUT_NAME otlp_live_target
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test")
 
+# Wave C (TODO.trace-profile/32): jail-denial target -- opens a
+# denied path (per the sandbox config the test generates) plus an
+# allowed one; the test asserts the /v1/logs denial event.
+add_executable(retrace_test_jail_otlp_target jail_otlp_target.c)
+set_target_properties(retrace_test_jail_otlp_target PROPERTIES
+	OUTPUT_NAME jail_otlp_target
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test")
+
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
 	add_test(NAME integration-otlp-live
@@ -122,6 +130,15 @@ if(Python3_Interpreter_FOUND)
 			$<TARGET_FILE:retrace_test_otlp_live_target>
 			${CMAKE_SOURCE_DIR}/test/fixtures/fixture_otlp_server.py)
 	set_tests_properties(integration-otlp-live PROPERTIES
+		LABELS "integration;v2"
+		TIMEOUT 120)
+	add_test(NAME integration-otlp-jail
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_otlp_jail.py
+			$<TARGET_FILE:retrace_v2>
+			$<TARGET_FILE:retrace_test_jail_otlp_target>
+			${CMAKE_SOURCE_DIR}/test/fixtures/fixture_otlp_server.py)
+	set_tests_properties(integration-otlp-jail PROPERTIES
 		LABELS "integration;v2"
 		TIMEOUT 120)
 endif()

@@ -26,6 +26,10 @@ if(NOT WIN32)
 		${CMAKE_SOURCE_DIR}/src/config/json
 		${CMAKE_SOURCE_DIR}/test/property/parson_stub)
 
+	# Wave C (TODO.trace-profile/32): --endpoint pushes clusters
+	# + drift findings as OTLP logs/metrics.
+	target_link_libraries(retrace_fuzz_report PRIVATE otlp_c)
+
 	install(TARGETS retrace_fuzz_report
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()

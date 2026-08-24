@@ -25,6 +25,7 @@
 #ifndef RETRACE_CORE_OTLP_LIVE_H_
 #define RETRACE_CORE_OTLP_LIVE_H_
 
+#include <stddef.h>
 #include <stdint.h>
 
 /*
@@ -63,6 +64,44 @@
 
 int retrace_otlp_live_init(void);
 void retrace_otlp_live_deinit(void);
+
+/*
+ * Security-event severities for retrace_otlp_live_emit_event
+ * (maps 1:1 onto OTLP severity numbers; kept separate so the
+ * stub and callers need no otlp-c headers).
+ */
+enum retrace_otlp_severity {
+	RETRACE_OTLP_SEV_INFO = 9,   /* OTLP_SEVERITY_INFO */
+	RETRACE_OTLP_SEV_WARN = 13,  /* OTLP_SEVERITY_WARN */
+	RETRACE_OTLP_SEV_ERROR = 17, /* OTLP_SEVERITY_ERROR */
+};
+
+/*
+ * One attribute for retrace_otlp_live_emit_event. str_val wins
+ * when non-NULL; otherwise int_val is set as an INT attribute.
+ */
+struct retrace_otlp_event_attr {
+	const char *key;
+	const char *str_val;
+	int64_t int_val;
+};
+
+/*
+ * Push one security event (TODO.trace-profile/32) as an OTLP LOG
+ * record: the jail-denial / drift / fuzz-cluster class of
+ * findings lands where alerting lives, live during detonations.
+ *
+ * `event_name` names the event (e.g. "retrace.jail.denied") and
+ * becomes an attribute plus the log body prefix. Attributes use
+ * the documented retrace.* schema (docs/reports.md).
+ *
+ * Same contract as emit_json: no-op (0) when streaming is off,
+ * bounded drop on queue-full, never blocks the caller. Safe
+ * from the engine's action path (allocations route through the
+ * real-impl allocator shim).
+ */
+int retrace_otlp_live_emit_event(int severity, const char *event_name,
+	const struct retrace_otlp_event_attr *attrs, size_t n_attrs);
 
 /*
  * Push one traced call (encoded as a JSON object string -- the

@@ -250,3 +250,66 @@ profile: 2 violations
 ```
 
 Exit 0 valid, 1 violations/unparseable, 2 usage.
+
+## OTLP export schema
+
+retrace's OpenTelemetry surfaces (live streaming, the tools'
+`--endpoint` exports) share one attribute vocabulary. Dashboards
+and alert rules can be written against these names.
+
+| Signal | Where | Producer |
+|--------|-------|----------|
+| spans  | `/v1/traces` | live streaming (`RETRACE_OTLP_ENDPOINT`, one span per traced call) |
+| logs   | `/v1/logs`   | live security events + `retrace-fuzz-report --endpoint` |
+| metrics| `/v1/metrics`| `retrace-profile export`, `retrace-fuzz-report --endpoint` |
+
+Every record carries `retrace.event` (the event name) so a
+single attribute index routes all retrace signals.
+
+### Live spans (`retrace.*` on `/v1/traces`)
+
+- `retrace.func`, `retrace.module`, `retrace.severity`
+- `retrace.pid`, `retrace.tid`
+- `retrace.call_duration_us`, `retrace.ret_val` (when the call
+  ran `call_real`)
+- `retrace.params` (the serialized parameter list)
+
+### Security events (LOG records)
+
+`retrace.jail.denied` — severity ERROR — emitted live at the
+moment a `sandbox` action denies a call (a detonation watchlist
+in the collector):
+
+- `retrace.jail.path`   — the attempted path / env name
+- `retrace.jail.reason` — `matches deny_paths`, `not in
+  allow_paths`, `write-class`, `deny_env`, `not in allow_env`
+- `retrace.jail.func`   — the intercepted function
+
+`retrace.fuzz.cluster` — severity ERROR (crash) / WARN
+(assertion) — one record per failure cluster from
+`retrace-fuzz-report --endpoint`:
+
+- `retrace.fuzz.cluster`     — the cluster's signature hash
+- `retrace.fuzz.func`        — last-called function
+- `retrace.fuzz.kind`        — `crash` | `assertion`
+- `retrace.fuzz.iterations`  — iterations landing in the cluster
+- `retrace.fuzz.first_seed`  — the reproducing seed
+
+`retrace.drift.hit` — severity WARN — the drift oracle tripped
+(supply-chain signal: behavior the baseline never saw).
+
+### Metrics (`/v1/metrics`)
+
+Campaign health (`retrace-fuzz-report --endpoint`, counters):
+`retrace.fuzz.iterations`, `retrace.fuzz.crashes`,
+`retrace.fuzz.assertions`, `retrace.fuzz.clusters`.
+
+Per-function timing gauges (`retrace-profile export`,
+`retrace.func` attribute): `retrace.call_p99_us`,
+`retrace.call_max_us`, `retrace.call_total_us`,
+`retrace.call_count`.
+
+Kernel grading (`retrace-profile export` of a profile saved
+with `--kernel`; gauges): `retrace.risk.agreed`,
+`retrace.risk.libc_only`, `retrace.risk.kernel_only` — track
+sub-libc access counts per graded binary over time.

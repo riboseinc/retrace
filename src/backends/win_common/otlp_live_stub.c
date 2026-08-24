@@ -37,6 +37,16 @@ int retrace_otlp_live_emit_json(const char *serialized_json)
 	return 0; /* no-op */
 }
 
+int retrace_otlp_live_emit_event(int severity, const char *event_name,
+	const struct retrace_otlp_event_attr *attrs, size_t n_attrs)
+{
+	(void)severity;
+	(void)event_name;
+	(void)attrs;
+	(void)n_attrs;
+	return 0; /* no-op */
+}
+
 void retrace_otlp_live_get_stats(uint64_t *emitted, uint64_t *sent,
 	uint64_t *dropped_full, uint64_t *dropped_err)
 {
