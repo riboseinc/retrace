@@ -285,7 +285,7 @@ dict file).
 | Param       | Type   | Required | Notes                                        |
 |-------------|--------|----------|----------------------------------------------|
 | `param_name`| string | yes      | Must be an IN `sz` pointer param.            |
-| `dict`      | string | yes      | Dictionary path: one token per line; `#` lines and blanks skipped. 256 tokens max, 4096 bytes each. |
+| `dict`      | string | yes      | Dictionary path: one token per line; `#` lines and blanks skipped. 256 tokens max, 4096 bytes each. `@`-prefixed lines are templates: `%N%` substitutes the Nth flat token (1-9); templates only reference flat tokens (no nesting); an out-of-range reference fails the load loudly. |
 | `match_str` | string | no       | Only replace when the current value matches. |
 | `fuzz_seed` | number | no       | Seeds the shared RNG (once per process; also honors `RETRACE_FUZZ_SEED`). |
 

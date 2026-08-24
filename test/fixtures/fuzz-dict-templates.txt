@@ -1,0 +1,5 @@
+%s%s%n
+GET / HTTP/1.1
+evil.example.com
+@GET %2% HTTP/1.1\r\nHost: %3%
+@/tmp/%1%
