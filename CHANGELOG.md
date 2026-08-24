@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.32.0] — 2026-08-24
+
+**`NtCreateFile` fixed: the `call_real` dispatch covered 0..6
+arguments** (TODO.trace-profile/28) — the static-binary smoke
+restores its full assertion.
+
+- Root cause (source-confirmed after the bisect isolated
+  `NtCreateFile`-alone): `retrace_as_call_real_dispatch`'s
+  switch ended at 6 args ("no known libc symbol needs more" —
+  true until the ntdll layer); 11-param `NtCreateFile` hit
+  `default: ret_val = -1` — the real function was never called
+  and the synthesized −1 surfaced as a clean failure. Exactly
+  the bisect signature: any script, no crash, `NtOpenFile` (6
+  params) fine.
+- Fix: dispatch extended to 0..12 (NtQueryDirectoryFile's
+  ceiling); per-arity unit tests (a 12-arg callee through
+  narrower signatures reads caller-stack garbage — the test
+  family enforces per-arity round-trips). 90/90 tests.
+- The CI smoke now ASSERTS the full original claim: a
+  static-CRT (/MT) binary's file activity, captured with
+  decoded paths through the ntdll layer.
+
 ## [2.31.2] — 2026-08-24
 
 **Diag: hook-install success dump** (TODO.trace-profile/28

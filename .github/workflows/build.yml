@@ -306,19 +306,21 @@ jobs:
           } else {
             Write-Host "static target verdict: FILE MISSING"
           }
-          # v2.31.1 assertion (TODO.trace-profile/27): after the
-          # round-4 bisect removed the write-path hooks (the logger
-          # self-recursion killer), the full ntdll set must be
-          # CRASH-FREE. NtCreateFile still breaks fopen CORRECTNESS
-          # (trampoline prologue issue, exit 3) -- TODO 28; the
-          # hosts-capture assertion returns when that lands.
-          if ($mtrun.ExitCode -eq 2) {
-            Write-Error "static smoke: ntdll set still crashes (rc 2)"
+          # v2.32.0 assertion (TODO.trace-profile/28): the
+          # dispatch fix (0..6 -> 0..12 args) makes the scripted
+          # call_real path WORK for the ntdll file API -- the
+          # FULL original assertion returns: a static-CRT
+          # binary's file activity, captured with decoded paths.
+          $prof = ""
+          if (Test-Path static-profile.json) {
+            $prof = Get-Content static-profile.json -Raw
           }
-          $ctl = Get-Content static-ctl.json -Raw
-          Write-Host "control profile (static-CRT, no ntdll):"
-          Write-Host $ctl
-          Write-Host "static smoke: ntdll set crash-free (NtCreateFile correctness = TODO 28)"
+          Write-Host "static-profile (NTDLL=1, /MT):"
+          Write-Host $prof
+          if (-not $prof.Contains("hosts")) {
+            Write-Error "static smoke: no hosts capture through the ntdll layer"
+          }
+          Write-Host "static smoke: ntdll-layer capture OK (static-CRT)"
 
       # ----- Smoke tests (POSIX only — no LD_PRELOAD on Windows) -----
       # Best-effort: skipped if the v2 library wasn't produced.
