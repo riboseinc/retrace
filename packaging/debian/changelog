@@ -1,3 +1,19 @@
+retrace (2.32.0-1) unstable; urgency=medium
+
+  * Fixed: the call_real action's C-level dispatch covered
+    0..6 arguments ("no known libc symbol needs more" -- true
+    until the ntdll layer). NtCreateFile takes 11 and
+    NtQueryDirectoryFile 12: scripted call_real NEVER CALLED
+    the real function and synthesized -1 -- hooked NtCreateFile
+    broke every fopen (clean failure, no crash; NtOpenFile's 6
+    params worked -- the bisect's tell). Dispatch extended to
+    0..12 with per-arity unit tests; the static-binary smoke
+    restores its FULL assertion: a static-CRT binary's file
+    activity captured with decoded paths through the ntdll
+    layer (TODO.trace-profile/28).
+
+ -- Ribose Inc <opensource@ribose.com>  Mon, 24 Aug 2026 17:00:00 +0000
+
 retrace (2.31.2-1) unstable; urgency=medium
 
   * Added: diag-gated hook-install SUCCESS dump (RETRACE_WIN_

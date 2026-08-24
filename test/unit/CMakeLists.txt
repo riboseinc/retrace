@@ -670,6 +670,34 @@ add_test(NAME unit-test-memory-fuzz
 set_tests_properties(unit-test-memory-fuzz PROPERTIES LABELS "unit")
 
 #
+# as_call_real_dispatch unit tests (TODO.trace-profile/28).
+#
+add_executable(retrace_test_as_call_real test_as_call_real.c)
+set_target_properties(retrace_test_as_call_real PROPERTIES
+    OUTPUT_NAME test_as_call_real
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/unit")
+
+target_link_libraries(retrace_test_as_call_real PRIVATE
+    retrace_core
+    retrace_config_json
+    retrace_backends
+    ${_unit_backend_lib}
+    retrace_preload_common
+    retrace_headers
+    ${CMAKE_DL_LIBS}
+    Threads::Threads)
+
+target_include_directories(retrace_test_as_call_real PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/backends
+    ${CMAKE_SOURCE_DIR}/src/config/json
+    ${_unit_arch_include})
+
+add_test(NAME unit-test-as-call-real
+    COMMAND retrace_test_as_call_real)
+set_tests_properties(unit-test-as-call-real PROPERTIES LABELS "unit")
+
+#
 # fuzz_str action unit tests (TODO.trace-profile/25).
 #
 add_executable(retrace_test_fuzz_str test_fuzz_str.c)

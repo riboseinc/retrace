@@ -30,8 +30,9 @@
  * version was brittle and segfaulted on modern dynamic linkers
  * (glibc >= 2.34, macOS, BSDs); plain C function pointer calls let
  * the compiler handle the ABI and work across all SysV-ABI arches
- * (x86_64, aarch64). Supports 0..6 args; the rare >6-arg case is
- * currently not implemented (no known libc symbol needs it).
+ * (x86_64, aarch64). Supports 0..12 args (the ntdll file API's
+ * ceiling is NtQueryDirectoryFile's 12); beyond that the call
+ * is refused with -1.
  */
 
 #include "real_impls.h"
@@ -102,6 +103,91 @@ intptr_t retrace_as_call_real_dispatch(const void *real_impl,
 
 		ret_val = ((fn_t)real_impl)(vals[0], vals[1], vals[2],
 					    vals[3], vals[4], vals[5]);
+		break;
+	}
+	/*
+	 * 7..12 (TODO.trace-profile/28): the ntdll file API needs
+	 * them -- NtCreateFile takes 11 args, NtQueryDirectoryFile
+	 * 12. Before this, params_cnt > 6 hit `default: -1`: the
+	 * real function was never called and the synthesized -1
+	 * surfaced as a clean failure (CI evidence: hooked
+	 * NtCreateFile broke every fopen; NtOpenFile's 6 params
+	 * worked). C still lets the compiler own the ABI: register
+	 * args then stack args per the calling convention.
+	 */
+	case 7: {
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t);
+
+		ret_val = ((fn_t)real_impl)(vals[0], vals[1], vals[2],
+					    vals[3], vals[4], vals[5],
+					    vals[6]);
+		break;
+	}
+	case 8: {
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t);
+
+		ret_val = ((fn_t)real_impl)(vals[0], vals[1], vals[2],
+					    vals[3], vals[4], vals[5],
+					    vals[6], vals[7]);
+		break;
+	}
+	case 9: {
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t);
+
+		ret_val = ((fn_t)real_impl)(vals[0], vals[1], vals[2],
+					    vals[3], vals[4], vals[5],
+					    vals[6], vals[7], vals[8]);
+		break;
+	}
+	case 10: {
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t);
+
+		ret_val = ((fn_t)real_impl)(vals[0], vals[1], vals[2],
+					    vals[3], vals[4], vals[5],
+					    vals[6], vals[7], vals[8],
+					    vals[9]);
+		break;
+	}
+	case 11: {
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t);
+
+		ret_val = ((fn_t)real_impl)(vals[0], vals[1], vals[2],
+					    vals[3], vals[4], vals[5],
+					    vals[6], vals[7], vals[8],
+					    vals[9], vals[10]);
+		break;
+	}
+	case 12: {
+		typedef intptr_t (*fn_t)(intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t,
+					 intptr_t, intptr_t);
+
+		ret_val = ((fn_t)real_impl)(vals[0], vals[1], vals[2],
+					    vals[3], vals[4], vals[5],
+					    vals[6], vals[7], vals[8],
+					    vals[9], vals[10], vals[11]);
 		break;
 	}
 	default:
