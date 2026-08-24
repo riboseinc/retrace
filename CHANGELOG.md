@@ -6,7 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.34.0] — 2026-08-24
+
+**otlp-c Wave A: real OTLP export** (TODO.trace-profile/30).
+
+- `otlp-c` vendored (`third_party/otlp-c`, BSD-3-Clause, pinned
+  v0.6.13-2-gdefcd7a; pure C99, zero non-libc deps; see
+  `THIRD_PARTY_NOTICES` and `third_party/README.md`).
+- `retrace-to-otlp --endpoint URL`: posts real OTLP **protobuf**
+  spans to a collector (otelcol/Tempo/Jaeger/Honeycomb); the
+  OTLP/JSON stdout mode stays for pipes and inspection.
+- `retrace-profile export <profile.json> --endpoint URL`: pushes
+  per-function timing stats as OTLP gauges
+  (`retrace.call_{p99,max,total}_us`) + call counters
+  (`retrace.call_count`), tagged `retrace.func` — honest
+  aggregates only, no fabricated distributions. Profile files
+  now round-trip timings (`from_json` restores them).
+
 ## [2.33.0] — 2026-08-24
+
+**Grammar fuzzing: `@`-template dict lines** (TODO.trace-
+profile/29) — plus the docs pass.
+
+- `fuzz_str` dictionaries: a line starting with `@` is a
+  TEMPLATE expanded at load; `%N%` (1-9) substitutes the Nth
+  flat token in file order. Templates reference only flat
+  tokens — no nesting, cycles impossible by construction;
+  out-of-range references fail the load loudly. Flat-dict
+  behavior unchanged. Two fixtures + two tests.
+- Quickstart: OpenBSD/NetBSD runner (`ktrace`/`kdump` kernel
+  truth) — all five kernel-truth platforms now have a runnable
+  quickstart.
+- Cookbook recipe 35 (dictionary fuzzing) joins the index.
+
+## [2.32.0] — 2026-08-24
 
 **Grammar fuzzing: `@`-template dict lines** (TODO.trace-
 profile/29) — plus the docs pass.

@@ -686,6 +686,68 @@ int prof_from_json(const JSON_Object *root, struct Profile *p)
 	p->entries = (size_t)json_object_get_number(root, "entries");
 	names_from_json(&p->functions, root, "functions");
 	names_from_json(&p->env, root, "env");
+	/*
+	 * Timings round-trip (TODO.trace-profile/30): the profile
+	 * doc carries the AGGREGATES (calls/total/max/p99 -- raw
+	 * samples are intentionally not serialized); restore them
+	 * so offline consumers (export) see the same numbers.
+	 */
+	{
+		JSON_Array *ta = json_object_get_array(root, "timings");
+
+		if (ta != NULL) {
+			size_t ti;
+
+			for (ti = 0; ti < json_array_get_count(ta);
+			     ti++) {
+				JSON_Object *to =
+					json_array_get_object(ta, ti);
+				const char *func = to != NULL ?
+					json_object_get_string(to,
+						"func") : NULL;
+				struct ProfTiming *t;
+
+				if (func == NULL)
+					continue;
+				prof_timing_add(p, func,
+					json_object_get_number(to,
+						"max_us"));
+				/* the add above created/located it;
+				 * find it again via the same bsearch
+				 */
+				{
+					size_t lo2 = 0, hi2 =
+						p->timings.count;
+
+					t = NULL;
+					while (lo2 < hi2) {
+						size_t mid = lo2 +
+							(hi2 - lo2) / 2;
+						int r = strcmp(
+							p->timings.items[mid].func,
+							func);
+
+						if (r == 0) {
+							t = &p->timings.items[mid];
+							break;
+						}
+						if (r < 0)
+							lo2 = mid + 1;
+						else
+							hi2 = mid;
+					}
+				}
+				if (t != NULL) {
+					t->calls = (size_t)
+						json_object_get_number(to,
+							"calls");
+					t->total_us =
+						json_object_get_number(to,
+							"total_us");
+				}
+			}
+		}
+	}
 	names_from_json(&p->net, root, "net");
 
 	arr = json_object_get_array(root, "accesses");
