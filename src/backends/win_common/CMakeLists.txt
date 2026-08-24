@@ -9,7 +9,8 @@ set(_win_common_sources
 	inject.c
 	trampoline_allocator.c
 	disasm_x64.c
-	disasm_arm64.c)
+	disasm_arm64.c
+	veh_diag.c)
 
 # x64 wrappers (TODO.windows/05): gas dialect for MinGW, MASM for
 # MSVC -- identical semantics.

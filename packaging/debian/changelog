@@ -1,3 +1,15 @@
+retrace (2.31.1-1) unstable; urgency=medium
+
+  * Added: diag-gated vectored-exception breadcrumb
+    (RETRACE_WIN_DIAG=1): on any exception, WriteFile the
+    exception code, faulting address, containing module +
+    offset, and the raw bytes there -- the ntdll+injection
+    crash (TODO.trace-profile/27) names its own fault site on
+    the next CI run, no debugger needed. Observes only
+    (EXCEPTION_CONTINUE_SEARCH); zero cost when ungated.
+
+ -- Ribose Inc <opensource@ribose.com>  Mon, 24 Aug 2026 11:00:00 +0000
+
 retrace (2.31.0-1) unstable; urgency=medium
 
   * Added: static-CRT (/MT) Windows binaries are traceable and

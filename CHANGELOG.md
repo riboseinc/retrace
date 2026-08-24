@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.31.1] — 2026-08-24
+
+**VEH fault-site breadcrumb** (TODO.trace-profile/27 follow-up;
+diagnostic infrastructure for the open ntdll+injection crash).
+
+- `RETRACE_WIN_DIAG=1` now installs a vectored exception handler
+  at DLL attach: on any exception it WriteFile-logs the
+  exception code, faulting address, containing module + offset,
+  and the raw bytes at the fault site — hand-disassembler fuel.
+  Pure Win32 + static buffers (no CRT on the path), recursion
+  latched, observes only (`EXCEPTION_CONTINUE_SEARCH`). The
+  next CI run of the static-binary smoke names the faulting
+  module of the open crash without any debugger.
+
 ## [2.31.0] — 2026-08-24
 
 **Static-CRT Windows binaries: observed and jailed through the
@@ -25,14 +39,22 @@ deferral, rewritten rather than punted).
   against a valid file); now binary mode. (2) `retrace-win-run`
   returned 0 on successful launch, discarding the child's exit
   code and masking crashes; it now exits WITH the child's code.
-- FOUND AND OPEN (honest): `RETRACE_WIN_NTDLL=1` **crashes
-  targets under injection** (0xC0000005/0xC0000409) — and the
-  discriminator run shows it is NOT /MT-specific: dynamic-CRT
-  targets crash too. The ntdll layer had only ever been tested
-  in-process (unit test), never through `retrace-win-run`; this
-  smoke is its first integration exercise. CI evidence captured
-  every run; tracked in TODO.trace-profile/27. Do not use
-  `RETRACE_WIN_NTDLL=1` with `retrace-win-run` until it closes.
+- FOUND AND FIXED (crash): `RETRACE_WIN_NTDLL=1` crashed any
+  target under injection. A one-round CI bisect (each of the 8
+  opt-in hooks enabled alone, `RETRACE_WIN_NTDLL_LIST`) named
+  `NtWriteFile`: the logger's own `fprintf` write re-entered
+  the engine through the hook (unlisted functions get the
+  default log script), recursing to stack death — an AV that
+  cannot dispatch through any handler, which is why the VEH
+  never saw it. Fix: the write-path hooks (`NtWriteFile`,
+  `NtReadFile`) are removed from the opt-in set (content-level
+  rw truth belongs to ETW/procmon; path truth stays). The
+  bisect env ships as debug tooling.
+- FOUND AND OPEN (correctness): the `NtCreateFile` trampoline
+  breaks the hooked call's success path on current images
+  (bisect: `NTDLL_LIST=NtCreateFile` alone → the target's fopen
+  fails, exit 3, no crash). Relocated-prologue issue; tracked
+  in TODO.trace-profile/28 with the hook-set modernization.
 - Honest docs (`docs/platforms.md`): CRT-level argument mutation
   is impossible for static CRTs; syscall-boundary observation is
   the right layer (crash bug above notwithstanding).

@@ -40,6 +40,7 @@
 #include <windows.h>
 
 #include "hook_targets.h"
+#include "veh_diag.h"
 
 /*
  * The list of functions to hook is provided by the backend via an
@@ -65,6 +66,11 @@ DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	switch (fdwReason) {
 	case DLL_PROCESS_ATTACH:
 		DisableThreadLibraryCalls(hinstDLL);
+		/*
+		 * Fault-site observer FIRST (TODO.trace-profile/27):
+		 * diag-gated, observes-only; sees everything below.
+		 */
+		retrace_win_veh_init();
 		/*
 		 * Hooks FIRST, boot second: real-impl resolution runs
 		 * during boot and a hooked name must resolve to its

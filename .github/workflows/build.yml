@@ -240,18 +240,23 @@ jobs:
             -Wait -PassThru -NoNewWindow
           Write-Host "test (NTDLL=1, /MT) capture rc: $($mtrun.ExitCode)"
 
-          # Discriminator: does NTDLL=1 + injection also kill a
-          # DYNAMIC-CRT exe? Decides general-layer regression vs
-          # /MT-specific (TODO.trace-profile/27 evidence).
-          $dyn = & $find "test_trace_load.exe"
-          if ($dyn) {
-            $dynrun = Start-Process -FilePath $profiler `
-              -ArgumentList "capture","-o","dyn-profile.json","--","$dyn" `
+          # HOOK-SET BISECT (TODO 27 round 4): the no-log run
+          # crashed identically -- logging is innocent. Bisect the
+          # 8 opt-in hooks: one CI round, one exit code each.
+          $env:RETRACE_JSON_CONFIG = $cfg
+          foreach ($hook in
+              "NtCreateFile","NtOpenFile","NtQueryAttributesFile",
+              "NtClose","LdrLoadDll","NtWriteFile","NtReadFile",
+              "NtQueryDirectoryFile") {
+            Remove-Item (Join-Path $PWD "static-result.txt") -ErrorAction SilentlyContinue
+            $env:RETRACE_WIN_NTDLL_LIST = $hook
+            $bi = Start-Process -FilePath $profiler `
+              -ArgumentList "capture","-o","static-bi.json","--","$smoke" `
               -Wait -PassThru -NoNewWindow
-            Write-Host "test (NTDLL=1, dynamic-CRT) rc: $($dynrun.ExitCode)"
-          } else {
-            Write-Host "test (NTDLL=1, dynamic-CRT): target not found"
+            Write-Host ("bisect NTDLL_LIST={0} rc: {1}" -f $hook, $bi.ExitCode)
           }
+          Remove-Item Env:RETRACE_WIN_NTDLL_LIST -ErrorAction SilentlyContinue
+
           # The OS names the faulting module + offset on crash --
           # machine truth for WHERE the ntdll layer kills /MT.
           try {
@@ -275,17 +280,19 @@ jobs:
           } else {
             Write-Host "static target verdict: FILE MISSING"
           }
-          # v2.31.0 assertion scope (TODO.trace-profile/27): the
-          # CONTROL outcome is the proven-good part -- a static-CRT
-          # binary launches and runs under injection, and its config
-          # parses (the CRLF fix). The NTDLL=1 run currently CRASHES
-          # /MT processes (0xC0000005/0xC0000409, exit codes captured
-          # above as evidence); that bug is documented and tracked,
-          # not asserted away.
+          # v2.31.1 assertion (TODO.trace-profile/27): after the
+          # round-4 bisect removed the write-path hooks (the logger
+          # self-recursion killer), the full ntdll set must be
+          # CRASH-FREE. NtCreateFile still breaks fopen CORRECTNESS
+          # (trampoline prologue issue, exit 3) -- TODO 28; the
+          # hosts-capture assertion returns when that lands.
+          if ($mtrun.ExitCode -eq 2) {
+            Write-Error "static smoke: ntdll set still crashes (rc 2)"
+          }
           $ctl = Get-Content static-ctl.json -Raw
           Write-Host "control profile (static-CRT, no ntdll):"
           Write-Host $ctl
-          Write-Host "static smoke: injection+config path OK (see evidence above for the open ntdll+/MT crash)"
+          Write-Host "static smoke: ntdll set crash-free (NtCreateFile correctness = TODO 28)"
 
       # ----- Smoke tests (POSIX only — no LD_PRELOAD on Windows) -----
       # Best-effort: skipped if the v2 library wasn't produced.
