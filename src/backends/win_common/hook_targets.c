@@ -194,10 +194,19 @@ static const struct win_hook g_hook_table[] = {
 	{ "NtClose", NULL, "ntdll.dll", retrace_wrap_NtClose, 1 },
 	{ "LdrLoadDll", NULL, "ntdll.dll",
 		retrace_wrap_LdrLoadDll, 1 },
-	{ "NtWriteFile", NULL, "ntdll.dll",
-		retrace_wrap_NtWriteFile, 1 },
-	{ "NtReadFile", NULL, "ntdll.dll",
-		retrace_wrap_NtReadFile, 1 },
+	/*
+	 * NtWriteFile/NtReadFile REMOVED (TODO.trace-profile/27
+	 * round 4 bisect): hooking NtWriteFile alone crashes ANY
+	 * target under injection -- the logger's own fprintf write
+	 * re-enters the engine through the hook (unlisted functions
+	 * get the default log_params script), recursing until the
+	 * stack dies with an AV that cannot dispatch through any
+	 * handler. Content-level read/write truth belongs to ETW /
+	 * procmon; the path-truth hooks (create/open/query) carry
+	 * the grading value. TODO 28 revisits with a guard-proof
+	 * logger write path if syscall-level rw truth is ever
+	 * needed.
+	 */
 	{ "NtQueryDirectoryFile", NULL, "ntdll.dll",
 		retrace_wrap_NtQueryDirectoryFile, 1 },
 };
@@ -382,6 +391,37 @@ static int ntdll_opt_in(void)
 }
 
 /*
+ * Debug/bisect subset selector (TODO.trace-profile/27): when
+ * RETRACE_WIN_NTDLL_LIST="NtCreateFile,NtClose" is set, only
+ * the listed opt-in hooks install. Finds the killer hook in one
+ * CI round. Plain Win32 env read -- getenv here runs BEFORE any
+ * hook exists, and this TU's installer uses CRT freely.
+ */
+static int ntdll_listed(const char *name)
+{
+	char buf[256];
+	DWORD n = GetEnvironmentVariableA("RETRACE_WIN_NTDLL_LIST",
+		buf, sizeof(buf));
+	const char *p;
+
+	if (n == 0 || n >= sizeof(buf))
+		return 1; /* unset/oversized: no filtering */
+	p = buf;
+	while (*p != '\0') {
+		const char *e = p;
+		size_t len;
+
+		while (*e != '\0' && *e != ',')
+			e++;
+		len = (size_t)(e - p);
+		if (strlen(name) == len && strncmp(p, name, len) == 0)
+			return 1;
+		p = (*e == ',') ? e + 1 : e;
+	}
+	return 0;
+}
+
+/*
  * CRT exports are thin thunks: ucrtbase!fopen is
  * "mov r8d, 0x40; jmp __common_fopen" -- the tail jump makes the
  * thunk itself unhookable (relocation-unsafe prologue), but the
@@ -488,7 +528,7 @@ int retrace_win_install_hooks(void)
 		retrace_hook_status_t st;
 		char msg[128];
 
-		if (h->opt_in && !opt_in)
+		if (h->opt_in && (!opt_in || !ntdll_listed(h->name)))
 			continue;
 
 		mod = GetModuleHandleA(h->module);

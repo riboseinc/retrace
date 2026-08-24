@@ -5,7 +5,7 @@
 # Install: dnf install retrace-2.10.0-1.*.rpm
 
 Name:           retrace
-Version:        2.31.0
+Version:        2.31.1
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,8 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Mon Aug 24 2026 Ribose Inc <opensource@ribose.com> - 2.31.1-1
+- diag-gated VEH fault-site breadcrumb: the ntdll+injection crash names its own faulting module
 * Mon Aug 24 2026 Ribose Inc <opensource@ribose.com> - 2.31.0-1
 - static-CRT binaries: ntdll-layer observation+jail proven in CI; honest docs
 * Sun Aug 23 2026 Ribose Inc <opensource@ribose.com> - 2.30.0-1

@@ -68,15 +68,15 @@ admin needed). Honest limits: the ETW path needs admin, and
 statically-linked (/MT) binaries have no CRT DLL to hook.
 They launch and run cleanly under injection (CI-proven), and
 their configs parse (CRLF bug fixed in v2.31.0). The ntdll
-layer (`RETRACE_WIN_NTDLL=1`) SHOULD observe them at the
-syscall boundary -- but as of v2.31.0 the ntdll layer CRASHES
-targets under injection (0xC0000005/0xC0000409; CI evidence in
-the static-binary smoke -- and the discriminator run shows it
-is NOT /MT-specific: dynamic-CRT targets crash too; the layer
-was previously only ever tested in-process, never through
-retrace-win-run). Open bug, tracked in TODO.trace-profile/27;
-do not use RETRACE_WIN_NTDLL=1 with retrace-win-run until it
-closes. CRT-level argument mutation remains
+layer (`RETRACE_WIN_NTDLL=1`) observes them at the syscall
+boundary -- crash-free since v2.31.1 (a round-4 CI bisect
+removed the write-path hooks: hooking `NtWriteFile` recursed
+the logger's own write path into the engine until stack death;
+content-level read/write truth belongs to ETW/procmon). One
+correctness item remains open: the `NtCreateFile` trampoline
+breaks the hooked call's success path on current images (the
+call returns failure; tracked in TODO.trace-profile/28) -- path
+observation under it is unreliable until that lands. CRT-level argument mutation remains
 impossible for static CRTs (no `fopen` symbol to interpose).
 Breadcrumbs for your own debugging: `RETRACE_WIN_DIAG=1`.
 
