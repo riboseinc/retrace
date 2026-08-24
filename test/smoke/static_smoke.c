@@ -17,7 +17,9 @@
  * CI smoke needs ground truth about whether main ran at all.
  */
 
+#include <errno.h>
 #include <stdio.h>
+#include <windows.h>
 
 int main(void)
 {
@@ -38,7 +40,13 @@ int main(void)
 	opened = f != NULL;
 
 	if (out != NULL) {
-		fprintf(out, "hosts open: %d\n", opened);
+		if (opened) {
+			fprintf(out, "hosts open: 1\n");
+		} else {
+			/* evidence: WHY did it fail (TODO 28) */
+			fprintf(out, "hosts open: 0 errno=%d gle=%lu\n",
+				errno, (unsigned long)GetLastError());
+		}
 		fclose(out);
 	}
 	printf("hosts open: %d\n", opened);

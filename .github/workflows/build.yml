@@ -262,12 +262,23 @@ jobs:
           $cfgnl = Join-Path $env:RUNNER_TEMP "static-cfg-nolog.json"
           '{"intercept_scripts":[{"func_name":"NtCreateFile","actions":[{"action_name":"call_real"}]},{"func_name":"NtOpenFile","actions":[{"action_name":"call_real"}]}]}' |
             Set-Content -Path $cfgnl -Encoding ascii
+          # param-shape control: NtOpenFile (6 params) vs
+          # NtCreateFile (11 params + OUT IO_STATUS_BLOCK)
+          $env:RETRACE_WIN_NTDLL_LIST = "NtOpenFile"
+          $env:RETRACE_JSON_CONFIG = $cfgnl
+          $ofbi = Start-Process -FilePath $profiler `
+            -ArgumentList "capture","-o","static-ofbi.json","--","$smoke" `
+            -Wait -PassThru -NoNewWindow
+          Write-Host ("bisect NTDLL_LIST=NtOpenFile NO-logging rc: {0}" -f $ofbi.ExitCode)
           $env:RETRACE_WIN_NTDLL_LIST = "NtCreateFile"
           $env:RETRACE_JSON_CONFIG = $cfgnl
           $nlbi = Start-Process -FilePath $profiler `
             -ArgumentList "capture","-o","static-nlbi.json","--","$smoke" `
             -Wait -PassThru -NoNewWindow
           Write-Host ("bisect NTDLL_LIST=NtCreateFile NO-logging rc: {0}" -f $nlbi.ExitCode)
+          Write-Host "NtCreateFile no-log verdict:"
+          Get-Content (Join-Path $PWD "static-result.txt") -ErrorAction SilentlyContinue | Write-Host
+          Remove-Item (Join-Path $PWD "static-result.txt") -ErrorAction SilentlyContinue
           $env:RETRACE_JSON_CONFIG = $cfg
           Remove-Item Env:RETRACE_WIN_NTDLL_LIST -ErrorAction SilentlyContinue
 
