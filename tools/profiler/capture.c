@@ -219,7 +219,19 @@ int prof_capture_run(char *const argv[], const char *lib,
 	for (i = 0; argv[i] != NULL && off < sizeof(cmd) - 4; i++)
 		off += (size_t)snprintf(cmd + off, sizeof(cmd) - off,
 			" \"%s\"", argv[i]);
-	(void)trace_path; /* flows via RETRACE_LOGGER_DEF_FN env */
+	/*
+	 * The child inherits THIS environment (CreateProcessA with
+	 * NULL lpEnvironment) -- the logger vars must be set HERE,
+	 * mirroring the POSIX pre-exec block. The old
+	 * `(void)trace_path` claimed they "flow via env" but
+	 * nothing on the Windows path ever SET them: every Windows
+	 * capture aggregated an empty temp file (TODO 28 round 5
+	 * root cause; found by reading capture.c against the
+	 * round-5 raw-trace evidence).
+	 */
+	_putenv_s("RETRACE_LOGGER_DEF_ENA", "1");
+	_putenv_s("RETRACE_LOGGER_DEF_STDOUT_ENA", "0");
+	_putenv_s("RETRACE_LOGGER_DEF_FN", trace_path);
 
 	ZeroMemory(&si, sizeof(si));
 	si.cb = sizeof(si);
