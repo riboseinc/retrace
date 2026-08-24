@@ -24,7 +24,15 @@ set_target_properties(retrace_profile PROPERTIES
     OUTPUT_NAME retrace-profile
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools")
 
+# Wave A (TODO.trace-profile/30): the export subcommand posts
+# timing metrics via the vendored otlp-c client.
+if(NOT TARGET otlp_c)
+	add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/otlp-c
+		${CMAKE_BINARY_DIR}/third_party/otlp-c)
+endif()
+target_link_libraries(retrace_profile PRIVATE otlp_c)
 target_include_directories(retrace_profile PRIVATE
+    ${CMAKE_SOURCE_DIR}/third_party/otlp-c/include
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/tools/correlate
     ${CMAKE_SOURCE_DIR}/tools/common

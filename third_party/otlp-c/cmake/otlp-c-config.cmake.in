@@ -1,0 +1,7 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/otlp-c-targets.cmake")
+
+set(otlp-c_VERSION "@OTLP_C_VERSION_STRING@")
+
+check_required_components(otlp-c)

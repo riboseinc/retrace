@@ -18,3 +18,15 @@ target_include_directories(retrace_to_otlp PRIVATE
 # links standalone (same pattern as test/property/parson_stub/).
 target_include_directories(retrace_to_otlp PRIVATE
     ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
+# Wave A (TODO.trace-profile/30): the vendored otlp-c client --
+# --endpoint posts real protobuf to a collector. add_subdirectory
+# is side-effect-free by design (otlp-c's CMakeLists guards its
+# install/CPack layout behind top-level detection).
+if(NOT TARGET otlp-c)
+	add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/otlp-c
+		${CMAKE_BINARY_DIR}/third_party/otlp-c)
+endif()
+target_link_libraries(retrace_to_otlp PRIVATE otlp_c)
+target_include_directories(retrace_to_otlp PRIVATE
+    ${CMAKE_SOURCE_DIR}/third_party/otlp-c/include)

@@ -5,7 +5,7 @@
 # Install: dnf install retrace-2.10.0-1.*.rpm
 
 Name:           retrace
-Version:        2.32.0
+Version:        2.34.0
 Release:        1%{?dist}
 Summary:        Userspace libc interceptor for security discovery
 
@@ -50,6 +50,8 @@ action, OTLP/JSON export, and a Python config builder.
 %{_includedir}/retrace/
 
 %changelog
+* Mon Aug 24 2026 Ribose Inc <opensource@ribose.com> - 2.34.0-1
+- otlp-c Wave A: vendored client; retrace-to-otlp --endpoint protobuf export; profile export metrics
 * Mon Aug 24 2026 Ribose Inc <opensource@ribose.com> - 2.32.0-1
 - NtCreateFile fixed: call_real dispatch extended 0..6 -> 0..12 args (TODO 28)
 * Mon Aug 24 2026 Ribose Inc <opensource@ribose.com> - 2.31.2-1

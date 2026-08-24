@@ -1,3 +1,16 @@
+retrace (2.34.0-1) unstable; urgency=medium
+
+  * Added: otlp-c Wave A (TODO.trace-profile/30). otlp-c
+    vendored (third_party/otlp-c, BSD-3-Clause, pinned
+    v0.6.13-2-gdefcd7a). retrace-to-otlp --endpoint URL posts
+    real OTLP protobuf spans to a collector (stdout JSON mode
+    kept). retrace-profile export <profile.json> --endpoint
+    URL pushes honest per-function timing stats as OTLP gauges
+    + call counters; the timings round-trip through profile
+    files is fixed (from_json now restores them).
+
+ -- Ribose Inc <opensource@ribose.com>  Mon, 24 Aug 2026 19:00:00 +0000
+
 retrace (2.32.0-1) unstable; urgency=medium
 
   * Fixed: the call_real action's C-level dispatch covered
