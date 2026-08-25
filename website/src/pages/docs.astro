@@ -1,0 +1,188 @@
+---
+// Docs — how to use retrace: install, quickstart, config, actions,
+// streaming, jail, kernel truth. The deep reference stays in the repo.
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+const actions = [
+  ["log_params", "Serialize the call's parameters (one-level derefs) to the trace."],
+  ["call_real", "Invoke the real implementation and time it."],
+  ["modify_in_param_str/int/arr", "Rewrite arguments before the real call."],
+  ["modify_return_value_int", "Fabricate the return value."],
+  ["memory_fuzz", "Fail allocations at a rate, deterministically seeded."],
+  ["fuzz_str", "Dictionary/grammar mutation of string params (@-templates, %1..%9)."],
+  ["incomplete_io", "Short reads/writes — partial I/O injection."],
+  ["delay", "Latency injection per call."],
+  ["call_count_limit", "Resource exhaustion: N calls then fail."],
+  ["sandbox", "The jail: allow_paths/deny_paths, deny_classes, env lists, decoy_dir."],
+  ["addr_deny", "Deny specific address families/ports at connect."],
+  ["filter", "Conditional script routing."],
+  ["decode_http / decode_dns", "Protocol decode into the trace."],
+  ["capture_buffer", "Capture I/O payloads for replay."],
+];
+const cfgSnippet = `{ "intercept_scripts": [
+  { "func_name": "open", "actions": [
+    { "action_name": "log_params" },
+    { "action_name": "call_real" } ] } ] }`;
+---
+
+---
+
+<Layout title="Docs — using retrace" description="Install, five-minute quickstart, config anatomy, the action set, OTLP streaming, jail flow, and kernel-truth grading.">
+  <Nav />
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">DOCS</p>
+        <h1>Using retrace.</h1>
+        <p class="lede">
+          Everything to go from zero to a jailed, streaming, graded run. The
+          full reference lives in the repo's <code>docs/</code> — this page is
+          the path through it.
+        </p>
+      </div>
+    </section>
+
+    <section class="sec" id="install">
+      <div class="wrap">
+        <h2>1 · Install</h2>
+        <div class="cols">
+          <div>
+            <h3>From source (canonical)</h3>
+            <pre class="cmd">git clone https://github.com/riboseinc/retrace
+cd retrace
+cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure</pre>
+          </div>
+          <div>
+            <h3>Prebuilt</h3>
+            <pre class="cmd"># release artifacts: .so / .dylib / .dll per platform
+# install.sh detects OS + arch
+curl -fsSL https://github.com/riboseinc/retrace/releases |
+  sh -s -- download</pre>
+            <p>Thirteen platforms: Linux (glibc + musl) x64/arm64, macOS Intel + Apple Silicon, FreeBSD/OpenBSD/NetBSD, Windows MSVC + MinGW x64/arm64, Android, OHOS.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="quickstart">
+      <div class="wrap">
+        <h2>2 · Five-minute quickstart</h2>
+        <pre class="cmd"><span class="c"># one env var per platform — the library does the rest</span>
+LD_PRELOAD=build/src/v2/libretrace.so /bin/ls          <span class="c"># Linux/BSD</span>
+DYLD_INSERT_LIBRARIES=build/src/v2/libretrace.dylib /bin/id  <span class="c"># macOS</span>
+retrace-win-run --dll retrace.dll -- target.exe        <span class="c"># Windows</span>
+
+<span class="c"># now with a config: log + call_real on selected functions</span>
+cat > trace.json &lt;&lt;'EOF'
+${cfgSnippet}
+EOF
+RETRACE_JSON_CONFIG=trace.json LD_PRELOAD=build/src/v2/libretrace.so ./tool</pre>
+        <p class="tip">macOS SIP blocks injection into system binaries — <code>csrutil disable</code> in Recovery, or copy the binary somewhere non-protected first.</p>
+      </div>
+    </section>
+
+    <section class="sec" id="config">
+      <div class="wrap">
+        <h2>3 · Config anatomy</h2>
+        <pre class="cmd">{`{ "intercept_scripts": [
+  { "func_name": "getenv",          // exact name, or "sqlite3_*"
+    "actions": [
+      { "action_name": "fuzz_str",
+        "action_params": { "dict": "env.dict", "fuzz_seed": 42 } },
+      { "action_name": "call_real" } ] } ] }`}</pre>
+        <p>Comments are tolerated (parson's comment mode). Without a config you
+        get the default: <code>log_params + call_real</code> for every
+        intercepted function. Validate any config with
+        <code>retrace-profile validate</code> or the on-site validator below.</p>
+      </div>
+    </section>
+
+    <section class="sec" id="actions">
+      <div class="wrap">
+        <h2>4 · The action set</h2>
+        <div class="table">
+          {actions.map(([n, d]) => (
+            <div class="row">
+              <code>{n}</code>
+              <span>{d}</span>
+            </div>
+          ))}
+        </div>
+        <p class="tip">New behaviors are new actions — composable in any order, per script, per function.</p>
+      </div>
+    </section>
+
+    <section class="sec" id="streaming">
+      <div class="wrap">
+        <h2>5 · Live OTLP streaming</h2>
+        <pre class="cmd">RETRACE_OTLP_ENDPOINT=http://collector:4318 \
+RETRACE_LOGGER_DEF_ENA=1 RETRACE_LOGGER_DEF_STDOUT_ENA=0 \
+LD_PRELOAD=build/src/v2/libretrace.so ./service</pre>
+        <p>Spans per call on <code>/v1/traces</code>, jail denials and security
+        events on <code>/v1/logs</code>, campaign/grading metrics on
+        <code>/v1/metrics</code>. At exit: one stderr line with
+        emitted/sent/dropped counters. Schema:
+        <a href="https://github.com/riboseinc/retrace/blob/main/docs/reports.md">docs/reports.md</a>.</p>
+      </div>
+    </section>
+
+    <section class="sec" id="jail">
+      <div class="wrap">
+        <h2>6 · Observe → jail → harden</h2>
+        <pre class="cmd">retrace-profile capture -o p.json -- ./tool      <span class="c"># 1. observe</span>
+retrace-profile --libc p.json --kernel k.json    <span class="c"># 2. grade vs kernel truth</span>
+retrace-profile jail p.json -o jail.json         <span class="c"># 3. emit the jail config</span>
+retrace run --config jail.json -- ./tool         <span class="c"># 4. run confined</span>
+retrace-profile harden p.json -o strict.json     <span class="c"># 5. deny-by-default</span></pre>
+      </div>
+    </section>
+
+    <section class="sec last" id="deep">
+      <div class="wrap">
+        <h2>7 · Going deeper</h2>
+        <ul class="links">
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md">The cookbook</a> — 36 recipes, each one workflow</li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/reports.md">Output shapes</a> — trace, profile, risk, drift, jail, OTLP schema</li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/platforms.md">Platforms</a> — per-OS realities (SIP, ntdll, static CRTs)</li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/development.md">Development</a> — build, tests, adding actions and backends</li>
+          <li><a href="https://github.com/riboseinc/retrace/tree/main/docs/adr">ADRs</a> — the decision record</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  .hero { padding: 96px 0 40px; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .22em; color: var(--color-dim); margin-bottom: 14px; }
+  h1 { font-size: clamp(30px, 5vw, 46px); letter-spacing: -0.02em; margin: 0 0 14px; }
+  .lede { color: var(--color-dim); max-width: 640px; font-size: 16px; line-height: 1.6; }
+  .lede code { font-family: var(--font-mono); font-size: 13px; color: var(--color-text); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 3px; }
+  .sec { padding: 44px 0; border-top: 1px solid rgba(255,255,255,.05); scroll-margin-top: 80px; }
+  .sec.last { padding-bottom: 80px; }
+  h2 { font-size: 22px; margin: 0 0 18px; letter-spacing: -0.01em; }
+  h3 { font-size: 14px; margin: 0 0 10px; color: var(--color-text); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+  .cmd { background: rgba(7,9,13,.75); border: 1px solid rgba(255,255,255,.07); border-radius: 8px; padding: 14px 16px; font-family: var(--font-mono); font-size: 12px; color: var(--color-text); overflow-x: auto; line-height: 1.65; margin: 0 0 12px; }
+  .cmd .c { color: var(--color-dim); }
+  p { color: var(--color-dim); font-size: 13.5px; line-height: 1.65; }
+  p code, .tip code { font-family: var(--font-mono); font-size: 12px; color: var(--color-text); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 3px; }
+  a { color: var(--color-see); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .tip { border-left: 2px solid rgba(242,180,65,.4); padding-left: 14px; margin-top: 14px; }
+  .table { border: 1px solid rgba(255,255,255,.07); border-radius: 10px; overflow: hidden; }
+  .row { display: grid; grid-template-columns: 240px 1fr; gap: 14px; padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,.05); align-items: baseline; }
+  .row:last-child { border-bottom: none; }
+  .row code { font-family: var(--font-mono); font-size: 11.5px; color: var(--color-see); }
+  .row span { color: var(--color-dim); font-size: 12.5px; line-height: 1.5; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr; gap: 3px; } }
+  .links { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  .links a { font-family: var(--font-mono); font-size: 13px; }
+</style>
