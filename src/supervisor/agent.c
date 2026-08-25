@@ -71,19 +71,41 @@ struct agent_state {
 
 static struct agent_state g_agent;
 static void *agent_thread_main(void *arg);
+static void agent_atfork_prepare(void);
+static void agent_atfork_parent(void);
+static void agent_atfork_child(void);
 
 /*
- * The REAL setenv / pthread_atfork, resolved like real_impls
- * does -- dlsym(RTLD_NEXT), NOT the as_get_real_safe table: that
- * table only knows WRAPPED symbols (Linux's dlopen_guard), and
- * setenv/pthread_atfork are not wrapped. Resolving via the table
- * returned NULL and aborted boot (-40, the CI SEGV); calling the
- * interposed pthread_atfork would dispatch the engine from the
- * constructor.
+ * Resolution rules (the Linux CI SEGV lesson):
+ *   - pthread_atfork IS wrapped -> the as_get_real_safe table
+ *     resolves its REAL pointer (no engine dispatch, callable
+ *     from the constructor).
+ *   - setenv is NOT wrapped -> the table returns NULL for it;
+ *     retrace_real_impls.dlsym is NULL at agent-init time on
+ *     Linux (dlopen_guard owns dlsym interposition), so setenv
+ *     resolves LAZILY on the agent thread, where dlsym is live.
+ *     Until then the token stamp is skipped -- inheritance only
+ *     works for processes that connect, which is exactly the
+ *     eager/lazy spawn population anyway.
  */
 static int (*g_real_setenv)(const char *, const char *, int);
 static int (*g_real_atfork)(void (*)(void), void (*)(void),
 	void (*)(void));
+
+static void resolve_reals(void)
+{
+	if (retrace_real_impls.dlsym == NULL)
+		return;
+	if (g_real_setenv == NULL)
+		g_real_setenv = (int (*)(const char *, const char *,
+			int))retrace_real_impls.dlsym(RTLD_NEXT,
+				"setenv");
+	if (g_real_atfork == NULL)
+		g_real_atfork = (int (*)(void (*)(void),
+			void (*)(void), void (*)(void)))
+			retrace_real_impls.dlsym(RTLD_NEXT,
+				"pthread_atfork");
+}
 
 /* ---------- producer side (any thread) ---------- */
 
@@ -579,6 +601,19 @@ static void *agent_thread_main(void *arg)
 				NULL);
 	}
 
+	/*
+	 * Resolve + register here, not in the constructor: dlsym is
+	 * live on this thread, and calling it at init crashed every
+	 * Linux boot (the member is NULL there until dlopen_guard
+	 * finishes). A fork before the agent's first spawn misses
+	 * atfork registration -- that child degrades to the
+	 * pre-slice-5 behavior.
+	 */
+	resolve_reals();
+	if (g_real_atfork != NULL)
+		g_real_atfork(agent_atfork_prepare,
+			agent_atfork_parent, agent_atfork_child);
+
 	while (!atomic_load(&g_agent.stop)) {
 		if (!g_agent.connected) {
 			if (try_connect() == 0) {
@@ -745,11 +780,6 @@ int retrace_agent_init(void)
 
 	memset(&g_agent, 0, sizeof(g_agent));
 	pthread_mutex_init(&g_agent.mu, NULL);
-	g_real_setenv = (int (*)(const char *, const char *, int))
-		retrace_real_impls.dlsym(RTLD_NEXT, "setenv");
-	g_real_atfork = (int (*)(void (*)(void), void (*)(void),
-		void (*)(void)))
-		retrace_real_impls.dlsym(RTLD_NEXT, "pthread_atfork");
 
 	env = retrace_real_impls.getenv("RETRACE_SUPERVISOR");
 	if (env == NULL || env[0] != '1')
@@ -775,12 +805,6 @@ int retrace_agent_init(void)
 	env = retrace_real_impls.getenv("RETRACE_SUPERVISOR_EAGER");
 	if (env != NULL && env[0] == '1')
 		(void)spawn_agent_thread();
-	if (g_real_atfork != NULL)
-		g_real_atfork(agent_atfork_prepare,
-			agent_atfork_parent, agent_atfork_child);
-	else
-		log_warn("agent: no real pthread_atfork; "
-			"fork children will not re-register");
 	log_info("retrace_agent: armed, supervisor %s",
 		g_agent.sock_path);
 	return 0;
