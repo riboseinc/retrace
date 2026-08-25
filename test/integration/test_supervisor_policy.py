@@ -42,15 +42,27 @@ def wait_sock(path, deadline=5.0):
     return False
 
 
-def start_daemon(daemon, sock, journal, policy_file):
+def start_daemon(daemon, sock, journal, policy_file, log_path):
+    log_f = open(log_path, "w")
     d = subprocess.Popen(
         [daemon, "--sock", sock, "--journal", journal,
          "--policy", policy_file],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        stdout=log_f, stderr=subprocess.STDOUT)
+    log_f.close()
     if not wait_sock(sock):
         d.kill()
         return None
     return d
+
+
+def dump_daemon(log_path, tag):
+    try:
+        with open(log_path) as f:
+            tail = f.read().splitlines()[-12:]
+        for ln in tail:
+            print(f"  {tag}: {ln[:200]}", file=sys.stderr)
+    except OSError:
+        print(f"  {tag}: (no daemon log)", file=sys.stderr)
 
 
 def stop_daemon(d, sock):
@@ -155,6 +167,9 @@ def main():
     sock = os.path.join(work, "agent.sock")
     journal = os.path.join(work, "journal.jsonl")
     out_path = os.path.join(work, "target.out")
+    dlog1 = os.path.join(work, "d1.log")
+    dlog2 = os.path.join(work, "d2.log")
+    dlog3 = os.path.join(work, "d3.log")
     creatable_dir = tempfile.mkdtemp(prefix="sup-pol-files-")
 
     # a permissive boot config: opens pass through untouched
@@ -191,7 +206,7 @@ def main():
     # ---- phase 1: live tightening -----------------------------
     # daemon first: the eager agent connects on its first try
     # (the reconnect path is exercised by the later restarts)
-    d1 = start_daemon(daemon, sock, journal, pol1)
+    d1 = start_daemon(daemon, sock, journal, pol1, dlog1)
     if d1 is None:
         print("FAIL: daemon never listened (phase 1)", file=sys.stderr)
         return 1
@@ -231,7 +246,7 @@ def main():
     # is the kernel truth: the real open(O_CREAT) never runs
     # again, so the creatable directory goes quiet.
     stop_daemon(d1, sock)
-    d2 = start_daemon(daemon, sock, journal, pol2)
+    d2 = start_daemon(daemon, sock, journal, pol2, dlog2)
     if d2 is None:
         proc.kill()
         print("FAIL: daemon never listened (phase 2)", file=sys.stderr)
@@ -243,6 +258,7 @@ def main():
         proc.kill()
         print("FAIL: freeze never landed (files kept appearing)",
               file=sys.stderr)
+        dump_daemon(dlog2, "d2")
         print(f"  last stdout: {last_status(out_path)}",
               file=sys.stderr)
         print(f"  files: {sorted(os.listdir(creatable_dir))}",
@@ -277,7 +293,7 @@ def main():
 
     # ---- phase 3: epoch replay refused ------------------------
     stop_daemon(d2, sock)
-    d3 = start_daemon(daemon, sock, journal, pol3)
+    d3 = start_daemon(daemon, sock, journal, pol3, dlog3)
     if d3 is None:
         proc.kill()
         print("FAIL: daemon never listened (phase 3)", file=sys.stderr)
@@ -302,6 +318,13 @@ def main():
     if replay_ack is None:
         print("FAIL: no refusal ACK for the replayed epoch",
               file=sys.stderr)
+        dump_daemon(dlog3, "d3")
+        print(f"  target alive: {proc.poll() is None} "
+              f"(rc={proc.returncode})", file=sys.stderr)
+        print(f"  last stdout: {last_status(out_path)}",
+              file=sys.stderr)
+        for rec in journal_records(journal)[-6:]:
+            print(f"  journal: {str(rec)[:200]}", file=sys.stderr)
         return 1
     if replay_ack.get("policy_epoch") != 2:
         print(f"FAIL: refusal kept wrong epoch: {replay_ack}",
