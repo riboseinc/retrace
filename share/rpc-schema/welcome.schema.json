@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "retrace-rpc-welcome.json",
+  "title": "retrace control protocol: WELCOME",
+  "type": "object",
+  "required": [
+    "agent_id",
+    "heartbeat_ms",
+    "policy_epoch"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "policy_epoch": {
+      "type": "integer"
+    },
+    "heartbeat_ms": {
+      "type": "integer"
+    },
+    "policy_blob": {
+      "type": "string"
+    },
+    "policy_sig": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

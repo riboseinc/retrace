@@ -147,6 +147,10 @@ endif()
 # library so no LD_PRELOAD needed. Issue #481.
 add_subdirectory(unit)
 
+# Conformance suites: wire protocols whose artifacts must derive
+# from a single source (TODO.supervisor/01+11).
+add_subdirectory(conformance)
+
 # Property-based tests for the third-party surfaces (parson, etc.).
 # Pure C, no engine state. See TODO.complete/16-property-based-tests.md.
 add_subdirectory(property)

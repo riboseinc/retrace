@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "retrace-rpc-heartbeat.json",
+  "title": "retrace control protocol: HEARTBEAT",
+  "type": "object",
+  "required": [
+    "agent_id",
+    "seq"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "seq": {
+      "type": "integer"
+    },
+    "rss_kb": {
+      "type": "integer"
+    },
+    "queue_depth": {
+      "type": "integer"
+    }
+  },
+  "additionalProperties": true
+}

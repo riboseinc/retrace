@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "retrace-rpc-ring_data.json",
+  "title": "retrace control protocol: RING_DATA",
+  "type": "object",
+  "required": [
+    "agent_id",
+    "bytes_b64",
+    "chunk_idx",
+    "chunks",
+    "req_id"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "req_id": {
+      "type": "string"
+    },
+    "chunk_idx": {
+      "type": "integer"
+    },
+    "chunks": {
+      "type": "integer"
+    },
+    "bytes_b64": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

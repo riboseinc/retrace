@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "retrace-rpc-hello.json",
+  "title": "retrace control protocol: HELLO",
+  "type": "object",
+  "required": [
+    "boot_id",
+    "cmdline",
+    "pid",
+    "ppid",
+    "retrace_version",
+    "session_token"
+  ],
+  "properties": {
+    "session_token": {
+      "type": "string"
+    },
+    "pid": {
+      "type": "integer"
+    },
+    "ppid": {
+      "type": "integer"
+    },
+    "boot_id": {
+      "type": "string"
+    },
+    "cmdline": {
+      "type": "string"
+    },
+    "retrace_version": {
+      "type": "string"
+    },
+    "arch": {
+      "type": "string"
+    },
+    "agent_capabilities": {
+      "type": "array"
+    }
+  },
+  "additionalProperties": true
+}

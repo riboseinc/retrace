@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "retrace-rpc-bye.json",
+  "title": "retrace control protocol: BYE",
+  "type": "object",
+  "required": [
+    "agent_id"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}
