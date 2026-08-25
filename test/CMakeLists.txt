@@ -165,6 +165,23 @@ if(Python3_Interpreter_FOUND)
 	set_tests_properties(integration-supervisor-agent PROPERTIES
 		LABELS "integration"
 		TIMEOUT 60)
+
+	# Policy distribution (TODO.supervisor/05): live tightening
+	# (deny), freeze, and epoch-replay refusal across daemon
+	# restarts against one running target.
+	add_executable(retrace_test_policy_target policy_target.c)
+	set_target_properties(retrace_test_policy_target PROPERTIES
+		OUTPUT_NAME policy_target
+		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test")
+	add_test(NAME integration-supervisor-policy
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_supervisor_policy.py
+			$<TARGET_FILE:retrace_retraced>
+			$<TARGET_FILE:retrace_v2>
+			$<TARGET_FILE:retrace_test_policy_target>)
+	set_tests_properties(integration-supervisor-policy PROPERTIES
+		LABELS "integration"
+		TIMEOUT 120)
 endif()
 
 # Unit tests for retrace_core internals. Links against the OBJECT

@@ -16,6 +16,9 @@
 #include "reentrance_guard.h"
 #include "engine.h"
 #include "thread_context.h"
+#include "config_cache.h"
+#include "conf.h"
+#include "parson.h"
 #include "protocol.h"
 
 #ifndef _WIN32
@@ -53,12 +56,15 @@ struct agent_state {
 	uint64_t dropped;
 
 	_Atomic uint64_t seq;
+	uint64_t policy_epoch;
 
 	_Atomic int thread_spawned;
 	_Atomic int thread_done;
 	_Atomic int stop;
 	int fd;		/* agent thread only */
 	int connected;	/* agent thread only */
+	uint8_t rbuf[RETRACE_RPC_HEADER_SZ + 4096];	/* agent thread */
+	size_t rfill;	/* agent thread only */
 	rc_thread_h tid;
 };
 
@@ -96,6 +102,26 @@ static char *queue_pop(void)
 	g_agent.q_count--;
 	pthread_mutex_unlock(&g_agent.mu);
 	return item;
+}
+
+/*
+ * ONE spawner (CAS): the first need boots the thread -- never
+ * the constructor (the musl hazard). Returns 0 if the thread is
+ * running or was started by this call.
+ */
+static int spawn_agent_thread(void)
+{
+	int expected = 0;
+
+	if (atomic_compare_exchange_strong(&g_agent.thread_spawned,
+		&expected, 1)) {
+		if (retrace_real_impls.rc_thread_create(&g_agent.tid,
+			agent_thread_main, NULL) != 0) {
+			atomic_store(&g_agent.thread_spawned, 0);
+			return -1;
+		}
+	}
+	return 0;
 }
 
 /* JSON string escape (paths may contain quotes); caller frees */
@@ -196,7 +222,6 @@ int retrace_agent_emit_event(const char *name,
 	const char *const *kv, size_t n_kv)
 {
 	char *payload;
-	int expected = 0;
 
 	if (name == NULL)
 		return -1;
@@ -210,17 +235,8 @@ int retrace_agent_emit_event(const char *name,
 		return -1;
 	queue_push(payload);
 
-	/* ONE spawner (CAS): the first event boots the thread --
-	 * never the constructor (the musl hazard)
-	 */
-	if (atomic_compare_exchange_strong(&g_agent.thread_spawned,
-		&expected, 1)) {
-		if (retrace_real_impls.rc_thread_create(&g_agent.tid,
-			agent_thread_main, NULL) != 0) {
-			atomic_store(&g_agent.thread_spawned, 0);
-			return -1;
-		}
-	}
+	if (spawn_agent_thread() != 0)
+		return -1;
 	return 0;
 }
 
@@ -249,6 +265,7 @@ static void drop_connection(void)
 		close(g_agent.fd);
 	g_agent.fd = -1;
 	g_agent.connected = 0;
+	g_agent.rfill = 0;
 }
 
 /* Stop-aware sleep: exit waits must never ride out a long backoff */
@@ -262,8 +279,105 @@ static void nap(long ms)
 	}
 }
 
+static void set_reason(char *dst, size_t cap, const char *msg)
+{
+	if (dst == NULL || cap == 0)
+		return;
+	snprintf(dst, cap, "%s", msg);
+}
+
+/*
+ * Apply a supervisor policy (TODO.supervisor/05). The payload
+ * is the daemon's policy file verbatim: a "policy" header plus
+ * a full retrace config. Fail-closed acceptance: the header
+ * must carry a strictly-greater epoch (replay protection) and
+ * must not be expired; anything else keeps the ACTIVE policy.
+ *
+ * The swap itself gives every individual CALL a consistent
+ * view: a dispatch resolves its script object once, from one
+ * tree. Old trees are never freed -- in-flight dispatches and
+ * the name cache hold raw pointers into them; policies are
+ * small and swaps are rare, so retention is the bounded price
+ * of lock-free readers on the dispatch path.
+ */
+int retrace_agent_policy_apply(const char *payload_json,
+	char *reason_out, size_t reason_cap)
+{
+	JSON_Value *v;
+	JSON_Object *root, *pol;
+	double epoch, expires;
+
+	if (reason_out != NULL && reason_cap > 0)
+		reason_out[0] = '\0';
+	if (payload_json == NULL) {
+		set_reason(reason_out, reason_cap, "null payload");
+		return -1;
+	}
+
+	v = json_parse_string(payload_json);
+	if (v == NULL) {
+		set_reason(reason_out, reason_cap, "malformed json");
+		return -1;
+	}
+	root = json_value_get_object(v);
+	pol = root != NULL ? json_object_get_object(root, "policy") : NULL;
+	if (pol == NULL) {
+		json_value_free(v);
+		set_reason(reason_out, reason_cap, "no policy header");
+		return -1;
+	}
+
+	epoch = json_object_get_number(pol, "epoch");
+	expires = json_object_get_number(pol, "expires");
+	if (epoch < 1.0) {
+		json_value_free(v);
+		set_reason(reason_out, reason_cap, "policy.epoch missing");
+		return -1;
+	}
+	if ((uint64_t)epoch <= g_agent.policy_epoch) {
+		json_value_free(v);
+		set_reason(reason_out, reason_cap,
+			"epoch regression refused");
+		return -1;
+	}
+	if (expires > 0.0 && (time_t)expires <= time(NULL)) {
+		json_value_free(v);
+		set_reason(reason_out, reason_cap, "policy expired");
+		return -1;
+	}
+	if (json_object_get_array(root, "intercept_scripts") == NULL) {
+		json_value_free(v);
+		set_reason(reason_out, reason_cap, "no intercept_scripts");
+		return -1;
+	}
+
+	if (retrace_config_cache_build(root) != 0) {
+		json_value_free(v);
+		set_reason(reason_out, reason_cap, "cache rebuild failed");
+		return -1;
+	}
+	retrace_conf = root;
+	g_agent.policy_epoch = (uint64_t)epoch;
+	return 0;
+}
+
+static void send_policy_ack(int applied, const char *reason)
+{
+	char ack[320];
+
+	snprintf(ack, sizeof(ack),
+		"{\"agent_id\":\"%s\",\"policy_epoch\":%llu,"
+		"\"applied\":%s,\"reason\":\"%s\"}",
+		g_agent.agent_id,
+		(unsigned long long)g_agent.policy_epoch,
+		applied ? "true" : "false",
+		applied ? "" : (reason[0] != '\0' ? reason : "refused"));
+	send_frame(RETRACE_RPC_MSG_POLICY_ACK, ack);
+}
+
 /* Daemon frames: WELCOME captures the minted agent_id (later
- * sends cite it); PING -> PONG; unknown types skip by length.
+ * sends cite it); POLICY_SET applies a pushed policy; PING ->
+ * PONG; unknown types skip by length.
  */
 static void handle_frame(const uint8_t *buf, size_t len)
 {
@@ -296,6 +410,24 @@ static void handle_frame(const uint8_t *buf, size_t len)
 			memcpy(g_agent.agent_id, s, n);
 			g_agent.agent_id[n] = '\0';
 		}
+	} else if (fr.type == RETRACE_RPC_MSG_POLICY_SET && len >=
+		   RETRACE_RPC_HEADER_SZ + fr.length) {
+		char payload[4096];
+		char reason[96];
+		size_t plen = fr.length < sizeof(payload) - 1 ?
+			fr.length : sizeof(payload) - 1;
+
+		memcpy(payload, buf + RETRACE_RPC_HEADER_SZ, plen);
+		payload[plen] = '\0';
+		reason[0] = '\0';
+		if (retrace_agent_policy_apply(payload, reason,
+				sizeof(reason)) == 0)
+			log_info("agent: policy epoch %llu applied",
+				(unsigned long long)
+					g_agent.policy_epoch);
+		else
+			log_info("agent: policy refused: %s", reason);
+		send_policy_ack(reason[0] == '\0', reason);
 	} else if (fr.type == RETRACE_RPC_MSG_PING) {
 		send_frame(RETRACE_RPC_MSG_PING, "{}");
 	}
@@ -390,20 +522,52 @@ static void *agent_thread_main(void *arg)
 		{
 			fd_set rfds;
 			struct timeval tv = {0, 200000};
-			uint8_t buf[RETRACE_RPC_HEADER_SZ + 2048];
 
 			FD_ZERO(&rfds);
 			FD_SET(g_agent.fd, &rfds);
 			if (select(g_agent.fd + 1, &rfds, NULL, NULL,
 				&tv) > 0) {
-				ssize_t n = read(g_agent.fd, buf,
-					sizeof(buf));
+				ssize_t n = read(g_agent.fd,
+					g_agent.rbuf + g_agent.rfill,
+					sizeof(g_agent.rbuf) -
+						g_agent.rfill);
 
 				if (n <= 0) {
 					drop_connection();
 					continue;
 				}
-				handle_frame(buf, (size_t)n);
+				g_agent.rfill += (size_t)n;
+				/* stream framing: a frame may arrive in
+				 * pieces (the daemon mirrors this)
+				 */
+				while (g_agent.rfill >=
+				       RETRACE_RPC_HEADER_SZ) {
+					struct retrace_rpc_frame fr;
+
+					if (retrace_rpc_frame_decode(
+						    g_agent.rbuf,
+						    g_agent.rfill,
+						    &fr) != 0) {
+						g_agent.rfill = 0;
+						break;
+					}
+					if (g_agent.rfill <
+					    RETRACE_RPC_HEADER_SZ +
+						    fr.length)
+						break;
+					handle_frame(g_agent.rbuf,
+						g_agent.rfill);
+					memmove(g_agent.rbuf,
+						g_agent.rbuf +
+							RETRACE_RPC_HEADER_SZ +
+							fr.length,
+						g_agent.rfill -
+						(RETRACE_RPC_HEADER_SZ +
+							fr.length));
+					g_agent.rfill -=
+						RETRACE_RPC_HEADER_SZ +
+						fr.length;
+				}
 			}
 		}
 
@@ -469,6 +633,16 @@ int retrace_agent_init(void)
 	snprintf(g_agent.agent_id, sizeof(g_agent.agent_id),
 		"pending");
 	g_agent.armed = 1;
+	/*
+	 * EAGER mode (TODO.supervisor/05): connect at boot
+	 * instead of on the first event. A policy agent must be
+	 * reachable for PUSHES, and before the first denial there
+	 * is no event to trigger the lazy spawn. Explicit opt-in --
+	 * the musl constructor hazard keeps lazy the default.
+	 */
+	env = retrace_real_impls.getenv("RETRACE_SUPERVISOR_EAGER");
+	if (env != NULL && env[0] == '1')
+		(void)spawn_agent_thread();
 	log_info("retrace_agent: armed, supervisor %s",
 		g_agent.sock_path);
 	return 0;
@@ -522,6 +696,15 @@ int retrace_agent_emit_event(const char *name,
 	(void)kv;
 	(void)n_kv;
 	return 0;
+}
+
+int retrace_agent_policy_apply(const char *payload_json,
+	char *reason_out, size_t reason_cap)
+{
+	(void)payload_json;
+	if (reason_out != NULL && reason_cap > 0)
+		reason_out[0] = '\0';
+	return -1;
 }
 
 #endif

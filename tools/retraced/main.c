@@ -42,8 +42,76 @@
 #define MAX_AGENTS 128
 #define HB_TIMEOUT_MS 15000
 #define SWEEP_INTERVAL_MS 1000
+#define POLICY_MAX_BYTES 4000	/* the agent's inbound budget */
 
 static volatile sig_atomic_t g_stop;
+
+/* The active policy (TODO.supervisor/05): the file contents
+ * verbatim (header + a full retrace config) plus its epoch.
+ * Pushed to every agent on registration; POLICY_ACKs update
+ * the registry's per-agent epoch.
+ */
+static char *g_policy_blob;
+static long g_policy_epoch;
+
+static int load_policy(const char *path)
+{
+	FILE *f;
+	long sz;
+	JSON_Value *v;
+	JSON_Object *root, *pol;
+	double epoch;
+
+	f = fopen(path, "rb");
+	if (f == NULL) {
+		fprintf(stderr, "retraced: cannot open policy %s\n",
+			path);
+		return -1;
+	}
+	fseek(f, 0, SEEK_END);
+	sz = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	if (sz <= 0 || sz > POLICY_MAX_BYTES) {
+		fprintf(stderr,
+			"retraced: policy %s bad size %ld (max %d)\n",
+			path, sz, POLICY_MAX_BYTES);
+		fclose(f);
+		return -1;
+	}
+	g_policy_blob = malloc((size_t)sz + 1);
+	if (g_policy_blob == NULL) {
+		fclose(f);
+		return -1;
+	}
+	if (fread(g_policy_blob, 1, (size_t)sz, f) != (size_t)sz) {
+		fprintf(stderr, "retraced: policy %s read failed\n",
+			path);
+		free(g_policy_blob);
+		g_policy_blob = NULL;
+		fclose(f);
+		return -1;
+	}
+	fclose(f);
+	g_policy_blob[sz] = '\0';
+
+	v = json_parse_string(g_policy_blob);
+	root = v != NULL ? json_value_get_object(v) : NULL;
+	pol = root != NULL ? json_object_get_object(root, "policy") : NULL;
+	epoch = pol != NULL ? json_object_get_number(pol, "epoch") : 0.0;
+	if (epoch < 1.0) {
+		fprintf(stderr,
+			"retraced: policy %s: policy.epoch >= 1 required\n",
+			path);
+		json_value_free(v);
+		free(g_policy_blob);
+		g_policy_blob = NULL;
+		return -1;
+	}
+	g_policy_epoch = (long)epoch;
+	json_value_free(v);
+	printf("retraced: policy loaded: epoch %ld\n", g_policy_epoch);
+	return 0;
+}
 
 static void on_signal(int sig)
 {
@@ -69,16 +137,18 @@ struct conn {
 
 static int write_frame(int fd, uint16_t type, const char *payload)
 {
-	uint8_t out[RETRACE_RPC_HEADER_SZ + 1024];
 	size_t plen = payload != NULL ? strlen(payload) : 0;
+	uint8_t *out = malloc(RETRACE_RPC_HEADER_SZ + plen);
+	int rc;
 
-	if (plen > 1024)
-		plen = 1024;
-	if (retrace_rpc_frame_encode(out, sizeof(out),
-		RETRACE_RPC_VERSION, type, payload,
-		(uint32_t)plen) != 0)
+	if (out == NULL)
 		return -1;
-	return (int)write(fd, out, RETRACE_RPC_HEADER_SZ + plen);
+	rc = retrace_rpc_frame_encode(out, RETRACE_RPC_HEADER_SZ + plen,
+		RETRACE_RPC_VERSION, type, payload, (uint32_t)plen);
+	if (rc == 0)
+		rc = (int)write(fd, out, RETRACE_RPC_HEADER_SZ + plen);
+	free(out);
+	return rc;
 }
 
 /* Extract a string field ("" when absent -- schema-optional). */
@@ -136,9 +206,17 @@ static void handle_agent_frame(struct conn *c,
 		c->helloed = 1;
 		e->last_hb_ms = now_ms();
 		snprintf(welcome, sizeof(welcome),
-			"{\"agent_id\":\"%s\",\"policy_epoch\":0,\"heartbeat_ms\":1000}",
-			e->id);
+			"{\"agent_id\":\"%s\",\"policy_epoch\":%ld,\"heartbeat_ms\":1000}",
+			e->id, g_policy_epoch);
 		write_frame(c->fd, RETRACE_RPC_MSG_WELCOME, welcome);
+		/* the policy rides every registration: an agent
+		 * that re-HELLOs after a daemon restart gets the
+		 * current epoch again (and refuses it if it
+		 * already holds a newer one)
+		 */
+		if (g_policy_blob != NULL)
+			write_frame(c->fd, RETRACE_RPC_MSG_POLICY_SET,
+				g_policy_blob);
 		printf("retraced: agent %s (pid %ld) registered\n",
 			e->id, pid);
 		break;
@@ -204,6 +282,7 @@ int main(int argc, char **argv)
 {
 	const char *sock_path = "/tmp/retraced.agent.sock";
 	const char *journal_path = "retraced-journal.jsonl";
+	const char *policy_path = NULL;
 	struct retraced_registry reg;
 	struct retraced_journal jr;
 	struct conn *conns;
@@ -219,9 +298,17 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[i], "--journal") == 0 &&
 			 i + 1 < argc)
 			journal_path = argv[++i];
+		else if (strcmp(argv[i], "--policy") == 0 &&
+			 i + 1 < argc)
+			policy_path = argv[++i];
 		else {
 			fprintf(stderr,
-				"Usage: retraced [--sock <path>] [--journal <path>]\n");
+				"Usage: retraced [--sock <path>] [--journal <path>]\n"
+				"                 [--policy <file>]\n"
+				"  --policy: a policy file (header + full\n"
+				"    retrace config) pushed to every agent\n"
+				"    at registration; POLICY_ACKs are\n"
+				"    journaled\n");
 			return 2;
 		}
 	}
@@ -251,6 +338,9 @@ int main(int argc, char **argv)
 		else
 			printf("retraced: no prior journal (fresh boot)\n");
 	}
+
+	if (policy_path != NULL && load_policy(policy_path) != 0)
+		return 1;
 
 	/* 1 MiB frame buffer per agent -- the heap, not the
 	 * stack: 128 x (cap + header) overflows any main frame

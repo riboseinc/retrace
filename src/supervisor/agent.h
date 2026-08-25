@@ -48,4 +48,28 @@ void retrace_agent_deinit(void);
 int retrace_agent_emit_event(const char *name,
 	const char *const *kv, size_t n_kv);
 
+/*
+ * Apply a supervisor policy (TODO.supervisor/05): validate the
+ * POLICY_SET payload (a policy header + a full retrace config),
+ * swap it in as the ACTIVE config, and record its epoch.
+ *
+ * Payload shape (the daemon ships the policy file verbatim):
+ *   {"policy": {"epoch": N, "expires": T|0},
+ *    "intercept_scripts": [ ... retrace config ... ]}
+ *
+ * Fail-closed acceptance rules:
+ *   - parses as JSON, carries a policy object and scripts;
+ *   - epoch is strictly greater than the applied one (replay
+ *     protection -- an old epoch is refused even if the daemon
+ *     repeats it);
+ *   - expires == 0 (never) or in the future.
+ * A refused policy changes nothing; the caller reports it via
+ * POLICY_ACK so the daemon's audit trail shows the refusal.
+ *
+ * Returns 0 applied, -1 refused (reason copied into reason_out
+ * when non-NULL). Also callable directly (unit tests).
+ */
+int retrace_agent_policy_apply(const char *payload_json,
+	char *reason_out, size_t reason_cap);
+
 #endif /* RETRACE_SUPERVISOR_AGENT_H_ */
