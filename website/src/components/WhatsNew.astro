@@ -5,52 +5,52 @@
 
 const shipped = [
   {
-    title: "Quick CLI subcommands",
-    detail: "trace, mock, fuzz, slow, pp, html, list-actions, list-functions, validate. JSON config no longer required for the 90% case.",
-    accent: "control",
-    tag: "v2.1.0",
-  },
-  {
-    title: "Built-in HTML trace viewer",
-    detail: "retrace trace --html produces an interactive self-contained page. No Python, no git clone, no server. Summary cards + filterable call table.",
+    title: "Live OTLP streaming",
+    detail: "RETRACE_OTLP_ENDPOINT streams OpenTelemetry spans live from inside the traced process -- one env var, no batch pipeline. Spans, security events, and metrics land in Grafana/Jaeger/otelcol as calls happen.",
     accent: "see",
-    tag: "v2.1.0",
+    tag: "v2.35-36",
   },
   {
-    title: "Docker integration",
-    detail: "Pre-built image at ghcr.io/riboseinc/retrace:latest. One-line RUN curl in any Dockerfile. Same JSON config across all 13 platforms.",
+    title: "Security events over OTLP",
+    detail: "Jail denials, fuzz crash clusters, and drift-oracle hits emit as OTLP log records with a documented schema -- policy violations watchable live during detonations.",
+    accent: "break",
+    tag: "v2.36.0",
+  },
+  {
+    title: "Static-CRT Windows binaries",
+    detail: "/MT binaries carry their own CRT -- no ucrtbase to hook. Their file access is now observed and jailed through the ntdll layer, proven by a true static-CRT CI smoke.",
     accent: "control",
-    tag: "v2.1.0",
+    tag: "v2.31.0",
   },
   {
-    title: "Binary releases",
-    detail: "Pre-built .so/.dylib/.dll for 8 platforms. install.sh detects OS + arch and picks the right one. Stable URLs for Dockerfiles.",
+    title: "ETW kernel-truth capture",
+    detail: "Raw ETW events captured on CI runners and converted with the OS's own provider manifests -- the numeric Id-to-task table is transcribed from Get-WinEvent, not docs.",
     accent: "see",
-    tag: "v2.1.0",
+    tag: "v2.27.0",
   },
   {
-    title: "Three new actions",
-    detail: "delay (latency injection), call_count_limit (resource exhaustion), sandbox (runtime path deny-list). 12 total — fully composable.",
-    accent: "break",
-    tag: "v2.1.0",
-  },
-  {
-    title: "Android support",
-    detail: "Cross-compile via NDK for arm64 + x86_64. wrap.sh for debuggable apps, Magisk Zygisk for production. Same JSON config.",
+    title: "Kernel-truth converters",
+    detail: "strace, dtrace, truss, ktrace, procmon, and ETW traces all convert to the retrace shape -- five platforms of kernel-layer ground truth for grading libc claims.",
     accent: "control",
-    tag: "v2.1.0",
+    tag: "v2.7-34",
   },
   {
-    title: "macOS Intel + Apple Silicon fixed",
-    detail: "Section-walk bug on Intel (getsectiondata recursion) and FP varargs on both arches. Both production-ready now.",
+    title: "Fuzzing workbench",
+    detail: "Crash clustering, minimized corpora, per-cluster reproducers, a drift oracle (behavior the baseline never saw), and dictionary grammar templates -- one command, one report.",
     accent: "break",
-    tag: "v2.1.0",
+    tag: "v2.29-33",
   },
   {
-    title: "Engine MECE refactor",
-    detail: "Thread context, script resolver, action runner extracted from monolithic engine. Adding new behaviors no longer requires engine changes.",
+    title: "Live jail + hardening",
+    detail: "retrace-profile jail emits a ready-to-run sandbox config; the sandbox action enforces it at runtime with deny/allow lists, decoy dirs, and env visibility.",
     accent: "control",
-    tag: "v2.1.0",
+    tag: "v2.10+",
+  },
+  {
+    title: "Deepening pass: inventory conformance",
+    detail: "Every backend's function inventory is now conformance-tested against the shared list -- the class of 'silently missing 28 functions on one arch' bug is a red check, not a coverage hole.",
+    accent: "see",
+    tag: "v2.37.0",
   },
 ];
 
@@ -116,8 +116,8 @@ const stats = [
 
     <div class="shipped-block">
       <header class="block-head reveal">
-        <div class="block-tag accent-control">SHIPPED IN v2.1.0</div>
-        <h3>Eight features that materially changed what retrace can do.</h3>
+        <div class="block-tag accent-control">SHIPPED: v2.7 - v2.37</div>
+        <h3>Thirty-seven releases in -- the recent arc that made retrace a cross-platform security instrument.</h3>
       </header>
       <div class="shipped-grid">
         {

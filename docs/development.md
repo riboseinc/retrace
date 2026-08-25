@@ -257,7 +257,10 @@ current module chains):
 3. **Standalone test.** Add `test/unit/test_<module>.c` linking
    only the module (+ parson via the `parson_stub` include if it
    parses JSON), following the `TEST`/`CHECK` conventions above.
-   Copy the CMake block from an existing tool test.
+   Register it with ONE line in `test/unit/CMakeLists.txt`:
+   `retrace_add_unit_test(<module> STANDALONE EXTRA_SOURCES ...)`
+   (the engine-linked shape drops `STANDALONE`). The
+   conformance test keeps the backend inventories honest.
 
 This pattern is why the audit and diff tools could be tested (and
 why testing them found seven real bugs): small pure files make
