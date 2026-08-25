@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "retrace-rpc-event.json",
+  "title": "retrace control protocol: EVENT",
+  "type": "object",
+  "required": [
+    "agent_id",
+    "attrs",
+    "name",
+    "seq",
+    "ts"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "seq": {
+      "type": "integer"
+    },
+    "ts": {
+      "type": "integer"
+    },
+    "name": {
+      "type": "string"
+    },
+    "attrs": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

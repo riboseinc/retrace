@@ -379,6 +379,15 @@ retrace_add_unit_test(reentrance_guard)
 retrace_add_unit_test(otlp_live)
 retrace_add_unit_test(otlp_allocator)
 
+# The control-protocol frame codec (TODO.supervisor/01): pinned
+# byte-exact to the conformance suite's goldens (the SSOT is
+# protocol.h's message table). STANDALONE -- no engine linkage.
+retrace_add_unit_test(rpc_frame
+    STANDALONE
+    EXTRA_LIBS retrace_supervisor_proto)
+set_tests_properties(unit-test-rpc-frame PROPERTIES
+    ENVIRONMENT "RETRACE_RPC_GOLDEN_DIR=${CMAKE_SOURCE_DIR}/share/rpc-schema/golden")
+
 #
 # Lock-free log ring unit tests (TODO.complete/19 P0 PR A).
 # Verifies SPSC ring semantics: push/drain, wrap-around, drop-on-full,

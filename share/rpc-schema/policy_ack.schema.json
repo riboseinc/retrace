@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "retrace-rpc-policy_ack.json",
+  "title": "retrace control protocol: POLICY_ACK",
+  "type": "object",
+  "required": [
+    "agent_id",
+    "policy_epoch"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "policy_epoch": {
+      "type": "integer"
+    },
+    "applied_ms": {
+      "type": "integer"
+    },
+    "policy.unsigned": {
+      "type": "boolean"
+    },
+    "failed": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

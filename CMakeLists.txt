@@ -404,6 +404,7 @@ if(RETRACE_BUILD_V2)
 	add_subdirectory(src/core)
 	add_subdirectory(src/config)
 	add_subdirectory(src/backends)
+	add_subdirectory(src/supervisor)
 	add_subdirectory(src/v2)
 elseif(RETRACE_PLATFORM_WINDOWS)
 	# Windows: the v2 core (TODO.windows/04) + the inline-hooking

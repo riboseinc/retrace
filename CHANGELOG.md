@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.38.0] — 2026-08-25
+
+**retraced arc, slice 1: the control protocol**
+(TODO.supervisor/01 + 11). The formally-defined wire protocol
+between agents, the retraced daemon, and controllers.
+
+- `src/supervisor/protocol.{h,c}`: RTRD framing (magic +
+  version + type + 1 MiB-capped length, little-endian) and the
+  frozen v1 message table (10 messages: HELLO/HEARTBEAT/
+  POLICY_ACK/EVENT/RING_DATA/BYE agent→daemon; WELCOME/
+  POLICY_SET/CMD/PING daemon→agent) as an X-macro — the single
+  source of truth.
+- **SSOT enforced by construction**: the conformance suite
+  (test/conformance/) PARSES the header and derives the JSON
+  Schemas (share/rpc-schema/*.json) and byte-exact wire goldens
+  (golden/*.bin); the C frame test asserts the C encoder is
+  byte-equal to the same goldens. Two implementations, one
+  artifact set; drift in either direction is a red test
+  (proven by sabotage: a renamed or re-id'd message fails CI).
+- Receiver rules tested C-side: truncation at every header
+  offset, wrong magic, oversize-length rejection without
+  allocation, unknown-type forward-skip (compatibility rule).
+- No engine linkage: the protocol module is a standalone
+  static library consumed by the daemon, agent, and ctl (the
+  next slices).
+
 ## [2.37.0] — 2026-08-25
 
 **The architecture-deepening release.** Four refactors that turn

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "retrace-rpc-ping.json",
+  "title": "retrace control protocol: PING",
+  "type": "object",
+  "required": [],
+  "properties": {},
+  "additionalProperties": true
+}
