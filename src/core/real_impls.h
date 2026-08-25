@@ -82,6 +82,15 @@ struct RetraceRealImpls {
 	int (*rc_thread_create)(rc_thread_h *thread,
 			    void *(*start_routine)(void *), void *arg);
 	int (*rc_thread_join)(rc_thread_h *thread);
+	/* the supervisor agent's socket plane: resolved at init so
+	 * the agent thread NEVER dispatches (concurrent dlsym-per-
+	 * dispatch from two threads crashed ld.so on Linux CI)
+	 */
+	int (*rc_socket)(int domain, int type, int protocol);
+	int (*rc_connect)(int fd, const void *addr, unsigned int len);
+	long (*rc_send)(int fd, const void *buf, size_t len, int flags);
+	long (*rc_read)(int fd, void *buf, size_t len);
+	int (*rc_close)(int fd);
 
 	void *(*malloc)(size_t size);
 	void (*free)(void *ptr);
