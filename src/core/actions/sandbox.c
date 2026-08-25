@@ -30,6 +30,7 @@
 #include "logger.h"
 #include "real_impls.h"
 #include "otlp_live.h"
+#include "agent.h"
 
 /*
  * sandbox -- jail file access behind an explicit policy.
@@ -244,6 +245,21 @@ static int deny(struct ThreadContext *t_ctx, const char *why,
 		(void)retrace_otlp_live_emit_event(
 			RETRACE_OTLP_SEV_ERROR, "retrace.jail.denied",
 			ev, 3);
+
+		/* The supervisor agent's fan-out (TODO.supervisor/03):
+		 * same event, the control-bus subscriber. String pairs
+		 * (the wire shape is the protocol's attrs object).
+		 */
+		{
+			const char *kv[6] = {
+				"retrace.jail.path", arg,
+				"retrace.jail.reason", why,
+				"retrace.jail.func", func,
+			};
+
+			(void)retrace_agent_emit_event(
+				"retrace.jail.denied", kv, 3);
+		}
 	}
 
 	errno = EACCES;

@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.39.0] — 2026-08-25
+
+**retraced slice 3: the in-process control agent**
+(TODO.supervisor/03). `RETRACE_SUPERVISOR=1` (plus optional
+`RETRACE_SUPERVISOR_SOCK`) arms an agent inside the traced
+process: the THIRD permanent-guard background thread, connecting
+to the retraced daemon over the plan-01 protocol.
+
+- `src/supervisor/agent.{h,c}`: HELLO at attach (the daemon
+  mints the id), HEARTBEATs carrying the event sequence,
+  complete EVENT payloads per the protocol schema, PING
+  responder, jittered backoff 0.5s→30s on daemon loss.
+- **All the Wave B/C laws**: enqueue-only producers (bounded
+  256-slot queue, drop-with-count, never blocks a denied call),
+  one CAS spawner (lazy on first event, never the constructor),
+  logging-off-then-guard ordering on the thread, fail-open
+  liveness (daemon absent changes nothing for the target),
+  bounded 2s deinit flush so short-lived targets still deliver.
+- The sandbox's `deny()` fans the denial out to both event
+  subscribers: the OTLP live streamer (Wave C) and now the
+  agent — symmetric calls at one site, no logger text-sniffing.
+- Unarmed by default: byte-for-byte the old library when the
+  env is unset (98/98 ctest unchanged — the zero-delta gate).
+- E2E `integration-supervisor-agent`: phase 1 denial lands in
+  the daemon journal with full schema + minted attribution;
+  phase 2 kills the daemon mid-flight and proves the target
+  unchanged.
+
 ## [2.38.0] — 2026-08-25
 
 **retraced arc, slice 1: the control protocol**

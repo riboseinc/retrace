@@ -152,6 +152,19 @@ if(Python3_Interpreter_FOUND)
 	set_tests_properties(integration-retraced-daemon PROPERTIES
 		LABELS "integration"
 		TIMEOUT 60)
+
+	# The in-process agent against the live daemon
+	# (TODO.supervisor/03): denial delivery + schema +
+	# attribution, then daemon-absent fail-open liveness.
+	add_test(NAME integration-supervisor-agent
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_supervisor_agent.py
+			$<TARGET_FILE:retrace_retraced>
+			$<TARGET_FILE:retrace_v2>
+			$<TARGET_FILE:retrace_test_jail_otlp_target>)
+	set_tests_properties(integration-supervisor-agent PROPERTIES
+		LABELS "integration"
+		TIMEOUT 60)
 endif()
 
 # Unit tests for retrace_core internals. Links against the OBJECT

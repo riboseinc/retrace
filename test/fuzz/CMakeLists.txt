@@ -88,6 +88,8 @@ target_compile_options(fuzz_script_resolve PRIVATE ${_fuzz_compile_flags})
 target_link_options(fuzz_script_resolve PRIVATE ${_fuzz_link_flags})
 target_link_libraries(fuzz_script_resolve PRIVATE
     retrace_core
+    retrace_supervisor_agent
+    retrace_supervisor_proto
     ${_otlp_lib}
     retrace_config_json
     retrace_backends
@@ -133,6 +135,8 @@ target_compile_options(fuzz_action_run PRIVATE ${_fuzz_compile_flags})
 target_link_options(fuzz_action_run PRIVATE ${_fuzz_link_flags})
 target_link_libraries(fuzz_action_run PRIVATE
     retrace_core
+    retrace_supervisor_agent
+    retrace_supervisor_proto
     ${_otlp_lib}
     retrace_config_json
     retrace_backends
