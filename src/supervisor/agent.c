@@ -290,9 +290,11 @@ int retrace_agent_emit_event(const char *name,
 static int sock_write(const void *buf, size_t len)
 {
 #ifdef MSG_NOSIGNAL
-	return (int)send(g_agent.fd, buf, len, MSG_NOSIGNAL);
+	return (int)retrace_real_impls.rc_send(g_agent.fd, buf, len,
+		MSG_NOSIGNAL);
 #else
-	return (int)send(g_agent.fd, buf, len, 0);
+	return (int)retrace_real_impls.rc_send(g_agent.fd, buf, len,
+		0);
 #endif
 }
 
@@ -315,7 +317,7 @@ static int send_frame(uint16_t type, const char *payload)
 static void drop_connection(void)
 {
 	if (g_agent.fd >= 0)
-		close(g_agent.fd);
+		retrace_real_impls.rc_close(g_agent.fd);
 	g_agent.fd = -1;
 	g_agent.connected = 0;
 	g_agent.rfill = 0;
@@ -526,7 +528,8 @@ static void handle_frame(const uint8_t *buf, size_t len)
 static int try_connect(void)
 {
 	struct sockaddr_un sa;
-	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	int fd = retrace_real_impls.rc_socket(AF_UNIX, SOCK_STREAM,
+		0);
 
 	if (fd < 0)
 		return -1;
@@ -542,8 +545,10 @@ static int try_connect(void)
 	sa.sun_family = AF_UNIX;
 	strncpy(sa.sun_path, g_agent.sock_path,
 		sizeof(sa.sun_path) - 1);
-	if (connect(fd, (struct sockaddr *)&sa, sizeof(sa)) != 0) {
-		close(fd);
+	if (retrace_real_impls.rc_connect(fd,
+		    (struct sockaddr *)&sa, (unsigned int)sizeof(sa))
+		    != 0) {
+		retrace_real_impls.rc_close(fd);
 		return -1;
 	}
 	g_agent.fd = fd;
@@ -588,11 +593,24 @@ static void *agent_thread_main(void *arg)
 
 	(void)arg;
 
-	/* Logging off FIRST, then the permanent guard (the v2.36
-	 * ordering law): the guard's TSS registration itself goes
-	 * through an interposed pthread_setspecific.
+	/*
+	 * Settle past the process's init-adjacent phase (the gdb
+	 * backtrace of the Linux CI SEGV: this thread's very first
+	 * interposed dispatch crashed at engine entry while the
+	 * main thread sat on the loader lock). poll() is NOT in the
+	 * wrapped inventory -- a direct syscall, no dispatch. This
+	 * mirrors how the otlp tick thread always survived (its
+	 * first connect sleeps ~1s).
 	 */
-	retrace_logger_disable_for_this_thread();
+	poll(NULL, 0, 250);
+
+	/*
+	 * Guard FIRST, then logging off: the TSS registration uses
+	 * the REAL rc_tss_* calls (no dispatch), and the guard must
+	 * own every libc call this thread makes -- the previous
+	 * order let logger-disable's internals dispatch free()
+	 * unguarded.
+	 */
 	{
 		struct ThreadContext *ctx = retrace_thread_context_get();
 
@@ -600,6 +618,7 @@ static void *agent_thread_main(void *arg)
 			retrace_reentrance_guard_enter_permanent(ctx,
 				NULL);
 	}
+	retrace_logger_disable_for_this_thread();
 
 	/*
 	 * Resolve + register here, not in the constructor: dlsym is
@@ -646,7 +665,8 @@ static void *agent_thread_main(void *arg)
 
 			if (poll(&pfd, 1, 200) > 0 &&
 			    (pfd.revents & (POLLIN | POLLHUP))) {
-				ssize_t n = read(g_agent.fd,
+				ssize_t n = retrace_real_impls.rc_read(
+					g_agent.fd,
 					g_agent.rbuf + g_agent.rfill,
 					sizeof(g_agent.rbuf) -
 						g_agent.rfill);
@@ -726,7 +746,7 @@ static void *agent_thread_main(void *arg)
 		send_frame(RETRACE_RPC_MSG_BYE, bye);
 	}
 	if (g_agent.fd >= 0)
-		close(g_agent.fd);
+		retrace_real_impls.rc_close(g_agent.fd);
 	atomic_store(&g_agent.thread_done, 1);
 	return NULL;
 }
@@ -753,7 +773,7 @@ static void agent_atfork_parent(void)
 static void agent_atfork_child(void)
 {
 	if (g_agent.fd >= 0) {
-		close(g_agent.fd);
+		retrace_real_impls.rc_close(g_agent.fd);
 		g_agent.fd = -1;
 	}
 	g_agent.connected = 0;

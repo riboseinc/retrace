@@ -265,6 +265,31 @@ int retrace_real_impls_init(void)
 	if (retrace_real_impls.real_vsnprintf == NULL)
 		return -32;
 
+	/* the agent's socket plane (resolved HERE, single-threaded:
+	 * glibc-private _dl_sym is not thread-safe against a second
+	 * dispatching thread -- the Linux CI SEGV)
+	 */
+	retrace_real_impls.rc_socket =
+		retrace_as_get_real_safe("socket");
+	if (retrace_real_impls.rc_socket == NULL)
+		return -41;
+	retrace_real_impls.rc_connect =
+		retrace_as_get_real_safe("connect");
+	if (retrace_real_impls.rc_connect == NULL)
+		return -42;
+	retrace_real_impls.rc_send =
+		retrace_as_get_real_safe("send");
+	if (retrace_real_impls.rc_send == NULL)
+		return -43;
+	retrace_real_impls.rc_read =
+		retrace_as_get_real_safe("read");
+	if (retrace_real_impls.rc_read == NULL)
+		return -44;
+	retrace_real_impls.rc_close =
+		retrace_as_get_real_safe("close");
+	if (retrace_real_impls.rc_close == NULL)
+		return -45;
+
 	retrace_real_impls.time =
 		retrace_as_get_real_safe("time");
 	if (retrace_real_impls.time == NULL)
