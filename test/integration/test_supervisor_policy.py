@@ -79,6 +79,23 @@ def dump_target_err(err_path):
         print("  target-stderr: (none captured)", file=sys.stderr)
 
 
+def dump_target_fds(proc):
+    """fd count on Linux -- an fd leak pushing the agent socket
+    toward FD_SETSIZE was the select() abort mechanism"""
+    fddir = f"/proc/{proc.pid}/fd"
+    try:
+        fds = os.listdir(fddir)
+        print(f"  target-fds: {len(fds)} open", file=sys.stderr)
+        for fd in fds[:8]:
+            try:
+                link = os.readlink(os.path.join(fddir, fd))
+                print(f"    {fd} -> {link[:120]}", file=sys.stderr)
+            except OSError:
+                pass
+    except OSError:
+        pass
+
+
 def stop_daemon(d, sock):
     if d is None:
         return
@@ -286,6 +303,8 @@ def main():
               f"{proc.poll()})", file=sys.stderr)
         dump_daemon(dlog2, "d2")
         dump_target_err(err_path)
+        dump_target_fds(proc)
+
         print(f"  last stdout: {last_status(out_path)}",
               file=sys.stderr)
         print(f"  files: {sorted(os.listdir(creatable_dir))}",
@@ -351,6 +370,7 @@ def main():
         print(f"  target alive: {proc.poll() is None} "
               f"(rc={proc.returncode})", file=sys.stderr)
         dump_target_err(err_path)
+        dump_target_fds(proc)
         print(f"  last stdout: {last_status(out_path)}",
               file=sys.stderr)
         for rec in journal_records(journal)[-6:]:

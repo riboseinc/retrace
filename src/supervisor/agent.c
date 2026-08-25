@@ -22,8 +22,8 @@
 #include "protocol.h"
 
 #ifndef _WIN32
+#include <poll.h>
 #include <stdatomic.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -545,13 +545,18 @@ static void *agent_thread_main(void *arg)
 		drain_queue();
 
 		{
-			fd_set rfds;
-			struct timeval tv = {0, 200000};
+			/* poll, not select: an fd at or beyond
+			 * FD_SETSIZE (1024) makes FD_SET a fortified
+			 * abort (__fdelt_chk -- found on glibc 2.35
+			 * arm CI) and silently corrupts the fd_set
+			 * everywhere else. poll has no ceiling; the
+			 * daemon loop uses it for the same reason.
+			 */
+			struct pollfd pfd = {.fd = g_agent.fd,
+				.events = POLLIN};
 
-			FD_ZERO(&rfds);
-			FD_SET(g_agent.fd, &rfds);
-			if (select(g_agent.fd + 1, &rfds, NULL, NULL,
-				&tv) > 0) {
+			if (poll(&pfd, 1, 200) > 0 &&
+			    (pfd.revents & (POLLIN | POLLHUP))) {
 				ssize_t n = read(g_agent.fd,
 					g_agent.rbuf + g_agent.rfill,
 					sizeof(g_agent.rbuf) -
