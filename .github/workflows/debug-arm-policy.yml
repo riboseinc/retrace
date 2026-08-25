@@ -1,0 +1,49 @@
+name: debug-arm-policy (temporary)
+# Temporary diagnostics: ASAN build of the policy E2E on arm64.
+# Delete before merge.
+on:
+  push:
+    branches: [supervisor/05-policy]
+
+jobs:
+  asan-policy-e2e:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc libcmocka-dev python3
+      - name: build (ASAN)
+        run: |
+          cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON \
+            -DRETRACE_BUILD_EXAMPLES=OFF -DRETRACE_ENABLE_ASAN=ON \
+            -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build -j 4
+      - name: run the policy E2E under ASAN
+        run: |
+          python3 test/integration/test_supervisor_policy.py \
+            build/tools/retraced/retraced \
+            build/src/v2/libretrace.so \
+            build/test/policy_target || true
+        env:
+          ASAN_OPTIONS: abort_on_error=0:detect_leaks=0:log_path=asan
+      - name: collect ASAN reports
+        if: always()
+        run: |
+          for f in asan.*; do
+            [ -f "$f" ] && cat "$f"
+          done || true
+          ls -la
+      - name: rerun under plain glibc fortify for the banner
+        if: always()
+        run: |
+          cmake -B buildf -G Ninja -DRETRACE_BUILD_TESTS=ON \
+            -DRETRACE_BUILD_EXAMPLES=OFF \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-O1 -D_FORTIFY_SOURCE=2 -g"
+          cmake --build buildf -j 4
+          python3 test/integration/test_supervisor_policy.py \
+            buildf/tools/retraced/retraced \
+            buildf/src/v2/libretrace.so \
+            buildf/test/policy_target || true
