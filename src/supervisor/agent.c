@@ -774,6 +774,8 @@ static void agent_atfork_child(void)
 	pthread_mutex_unlock(&g_agent.mu);
 }
 
+static int g_eager_wanted;
+
 int retrace_agent_init(void)
 {
 	char *env;
@@ -796,18 +798,25 @@ int retrace_agent_init(void)
 		"pending");
 	g_agent.armed = 1;
 	/*
-	 * EAGER mode (TODO.supervisor/05): connect at boot
-	 * instead of on the first event. A policy agent must be
-	 * reachable for PUSHES, and before the first denial there
-	 * is no event to trigger the lazy spawn. Explicit opt-in --
-	 * the musl constructor hazard keeps lazy the default.
+	 * EAGER mode (TODO.supervisor/05): connect at boot instead
+	 * of on the first event -- a policy agent must be reachable
+	 * for PUSHES before any denial. The spawn is DEFERRED to
+	 * retrace_agent_post_boot(): a thread spawned mid-constructor
+	 * dispatches interposed calls (socket on Linux) through a
+	 * half-initialized engine and crashes the boot.
 	 */
 	env = retrace_real_impls.getenv("RETRACE_SUPERVISOR_EAGER");
-	if (env != NULL && env[0] == '1')
-		(void)spawn_agent_thread();
+	g_eager_wanted = env != NULL && env[0] == '1';
 	log_info("retrace_agent: armed, supervisor %s",
 		g_agent.sock_path);
 	return 0;
+}
+
+void retrace_agent_post_boot(void)
+{
+	if (!g_agent.armed || !g_eager_wanted)
+		return;
+	(void)spawn_agent_thread();
 }
 
 void retrace_agent_deinit(void)
@@ -845,6 +854,10 @@ void retrace_agent_deinit(void)
 int retrace_agent_init(void)
 {
 	return 0;
+}
+
+void retrace_agent_post_boot(void)
+{
 }
 
 void retrace_agent_deinit(void)
