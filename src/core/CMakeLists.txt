@@ -17,6 +17,7 @@ set(_core_sources
 	caller_cache.c
 	log_ring.c
 	log_flusher.c
+	otlp_allocator.c
 	otlp_live.c
 	call_hash.c
 	public_api.c
@@ -71,13 +72,13 @@ if(MSVC AND NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
 		${CMAKE_SOURCE_DIR}/src/backends/win_common/ring_stub_msvc.c)
 endif()
 
-# The otlp-c live module needs (a) the otlp_c target and (b) C11
+# The otlp-c modules need (a) the otlp_c target and (b) C11
 # stdatomic under core's flags. MSVC fails (b); MinGW/UCRT lacks
-# (a) (otlp-c doesn't build there). Stub in both cases -- live
-# streaming is silently off; the native ports ride the
-# TODO.windows track.
+# (a) (otlp-c doesn't build there). Stub otlp_live and drop the
+# allocator module in both cases -- live streaming is silently
+# off; the native ports ride the TODO.windows track.
 if((MSVC AND NOT CMAKE_C_COMPILER_ID MATCHES "Clang") OR NOT TARGET otlp_c)
-	list(REMOVE_ITEM _core_sources otlp_live.c)
+	list(REMOVE_ITEM _core_sources otlp_live.c otlp_allocator.c)
 	list(APPEND _core_sources
 		${CMAKE_SOURCE_DIR}/src/backends/win_common/otlp_live_stub.c)
 endif()

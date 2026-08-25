@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.37.0] — 2026-08-25
+
+**The architecture-deepening release.** Four refactors that turn
+shallow modules into deep ones (each judged by the deletion
+test; report on file):
+
+- **One-line unit-test registration**
+  (`retrace_add_unit_test`): the 40×20-line boilerplate in
+  `test/unit/CMakeLists.txt` collapsed from 1,862 to ~700
+  lines. The next cross-cutting link/flag change is one edit,
+  not forty; the next test is one line.
+- **Function-inventory conformance** (new
+  `unit-test-inventory-conformance`): every backend's
+  `funcs_symbols.S` is preprocessed with the build's own
+  platform defines and diffed against the shared
+  `funcs_symbols.def`. The v2.36.0 incident class (linux-aarch64
+  silently missing 28 functions incl. the socket family) is now
+  a red CI check — proven by replaying the v2.35.0 drift
+  against the test.
+- **The otlp allocator is its own module**
+  (`src/core/otlp_allocator.{c,h}`): the size-header shim
+  (the musl heap-overflow lesson) extracted from otlp_live with
+  its own 7-case unit suite; the supervisor-agent arc reuses it
+  as-is.
+- **A log-sink seam in the logger**
+  (`retrace_log_sink_register`): the flusher's emit path no
+  longer hard-codes OTLP; feature modules subscribe (the live
+  streamer is the first, the planned supervisor agent the
+  next). Verified zero-delta through the live-streaming
+  integration tests.
+- Website What's-New unfrozen: the v2.7–v2.37 arc (OTLP waves,
+  static-CRT Windows, ETW, fuzz workbench, jail) documented.
+
 ## [2.36.0] — 2026-08-24
 
 **otlp-c Wave C: security events** (TODO.trace-profile/32) —

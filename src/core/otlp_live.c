@@ -34,9 +34,11 @@
 
 #include "real_impls.h"
 #include "logger.h"
+#include "log_ring.h"
 #include "reentrance_guard.h"
 #include "engine.h"
 #include "parson.h"
+#include "otlp_allocator.h"
 
 /* otlp-c public API. Always included -- the source file is
  * compiled out if the build doesn't link otlp-c (see CMake).
@@ -75,75 +77,8 @@ static struct {
 
 static void *otlp_live_thread_main(void *arg);
 static void otlp_live_ensure_thread(void);
+static int otlp_live_sink(const struct LogEntry *entry, void *ctx);
 
-/*
- * otlp-c's allocator hooks (TODO.trace-profile/31).
- *
- * retrace's real_impls does not expose realloc, and a naive
- * malloc+memcpy+free shim cannot know the OLD block size -- it
- * would read past the end of the old allocation (heap
- * overflow: segfaults on musl, corrupts on glibc). So all
- * three hooks use an 8-byte size header: alloc writes it,
- * realloc reads it to bound the copy, free skips it. Payload
- * stays 8-byte aligned (malloc's 16 + 8), which satisfies
- * otlp-c's void*-alignment contract.
- *
- * Push/pop the memcpy/free macros -- macOS's <string.h> maps
- * memcpy to __builtin___memcpy_chk under -O and the struct
- * field access in real_impls.memcpy would rewrite to the
- * builtin.
- */
-#ifdef memcpy
-#  pragma push_macro("memcpy")
-#  pragma push_macro("free")
-#  undef memcpy
-#  undef free
-#endif
-#define OTLP_ALLOC_HDR_SZ sizeof(size_t)
-
-static void *otlp_live_alloc(size_t n)
-{
-	unsigned char *blk = retrace_real_impls.malloc(
-		n + OTLP_ALLOC_HDR_SZ);
-
-	if (blk == NULL)
-		return NULL;
-	*(size_t *)blk = n;
-	return blk + OTLP_ALLOC_HDR_SZ;
-}
-
-static void otlp_live_free(void *p)
-{
-	if (p != NULL)
-		retrace_real_impls.free(
-			(unsigned char *)p - OTLP_ALLOC_HDR_SZ);
-}
-
-static void *otlp_live_realloc(void *p, size_t n)
-{
-	unsigned char *blk;
-	unsigned char *out;
-	size_t old;
-
-	if (p == NULL)
-		return otlp_live_alloc(n);
-
-	blk = (unsigned char *)p - OTLP_ALLOC_HDR_SZ;
-	old = *(size_t *)blk;
-
-	out = retrace_real_impls.malloc(n + OTLP_ALLOC_HDR_SZ);
-	if (out == NULL)
-		return NULL;
-	*(size_t *)out = n;
-	retrace_real_impls.memcpy(out + OTLP_ALLOC_HDR_SZ, p,
-		old < n ? old : n);
-	retrace_real_impls.free(blk);
-	return out + OTLP_ALLOC_HDR_SZ;
-}
-#ifdef memcpy
-#  pragma pop_macro("memcpy")
-#  pragma pop_macro("free")
-#endif
 static void otlp_live_final_stats(void);
 
 int retrace_otlp_live_emit_event(int severity, const char *event_name,
@@ -248,27 +183,14 @@ int retrace_otlp_live_init(void)
 	}
 
 	/* Point otlp-c's internal allocator at retrace's real
-	 * malloc/free so the library's slab/mpsc/span allocations
-	 * go through dlsym(RTLD_NEXT, ...) and not back through our
-	 * hooked libc. Without this, otlp-c's alloc paths would
-	 * re-enter the engine -- crash or infinite loop. Must be
-	 * called BEFORE any other otlp-c API.
-	 *
-	 * otlp-c's attr_vec_reserve calls otlp_realloc to grow the
-	 * attribute vector. real_impls does not expose realloc
-	 * separately, so we build a thin wrapper that routes
-	 * through the engine's safe real-malloc + memcpy + real-free.
-	 * otlp-c's attr growth is bounded (4, 8, 16, ...) so the
-	 * malloc + copy + free overhead is negligible.
+	 * malloc/free (via the size-header shim in otlp_allocator.c)
+	 * so the library's slab/mpsc/span allocations go through
+	 * dlsym(RTLD_NEXT, ...) and not back through our hooked
+	 * libc. Without this, otlp-c's alloc paths would re-enter
+	 * the engine -- crash or infinite loop. Must be called
+	 * BEFORE any other otlp-c API.
 	 */
-	{
-		otlp_allocator_t alloc = {
-			.alloc = otlp_live_alloc,
-			.realloc = otlp_live_realloc,
-			.free = otlp_live_free,
-		};
-		otlp_set_allocator(&alloc);
-	}
+	retrace_otlp_allocator_install();
 
 	env_service = retrace_real_impls.getenv("RETRACE_OTLP_SERVICE_NAME");
 	if (env_service != NULL && env_service[0] != '\0') {
@@ -322,9 +244,34 @@ int retrace_otlp_live_init(void)
 	atomic_store_explicit(&g_otlp.running, 1,
 		memory_order_relaxed);
 
+	/* Subscribe to the logger's sink seam (the architecture
+	 * deepening): the flusher hands every drained entry to
+	 * otlp_live_sink, which builds and enqueues the span. The
+	 * sink checks the running flag, so deinit needs no
+	 * unregister -- a full-slot failure just means no live
+	 * streaming (logged loudly).
+	 */
+	if (retrace_log_sink_register(otlp_live_sink, NULL) < 0)
+		log_err("otlp_live: log sink registry full; "
+			"live span streaming disabled");
+
 	log_info("otlp_live: streaming to %s as service=%s",
 		g_otlp.endpoint, g_otlp.service_name);
 	return 0;
+}
+
+/*
+ * The logger-sink face of the live streamer: parse the entry's
+ * JSON envelope, build the span, enqueue. Runs on the flusher
+ * thread; every check mirrors the old in-logger call.
+ */
+static int otlp_live_sink(const struct LogEntry *entry, void *ctx)
+{
+	(void)ctx;
+
+	if (entry == NULL || entry->text == NULL)
+		return 0;
+	return retrace_otlp_live_emit_json(entry->text);
 }
 
 /*

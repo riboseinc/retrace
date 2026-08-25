@@ -27,6 +27,23 @@
 
 #include "parson.h"
 
+/* The log-sink seam: feature modules subscribe to the entry
+ * stream the logger's flusher drains (stdout/file are built-in;
+ * the OTLP live streamer and the planned supervisor agent are
+ * subscribers). Sinks run on the flusher thread only and MUST
+ * be bounded and non-blocking. Returns the slot index, or -1
+ * when NULL or the fixed capacity is exhausted. The LogEntry
+ * shape (log_ring.h): ts_ms, module, sev, text.
+ */
+#define RETRACE_LOG_SINKS_MAX 4
+
+struct LogEntry;
+
+typedef int (*retrace_log_sink_fn)(const struct LogEntry *entry,
+	void *ctx);
+
+int retrace_log_sink_register(retrace_log_sink_fn fn, void *ctx);
+
 enum Modules {
 	ACTIONS,
 	CONF,
