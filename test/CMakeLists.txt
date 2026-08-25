@@ -141,6 +141,17 @@ if(Python3_Interpreter_FOUND)
 	set_tests_properties(integration-otlp-jail PROPERTIES
 		LABELS "integration;v2"
 		TIMEOUT 120)
+
+	# retraced daemon smoke (TODO.supervisor/02): a stub agent
+	# drives HELLO/HEARTBEAT/EVENT/POLICY_ACK/PING/BYE; asserts
+	# the journal chain, reboot replay, and tamper refusal.
+	add_test(NAME integration-retraced-daemon
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_retraced_daemon.py
+			$<TARGET_FILE:retrace_retraced>)
+	set_tests_properties(integration-retraced-daemon PROPERTIES
+		LABELS "integration"
+		TIMEOUT 60)
 endif()
 
 # Unit tests for retrace_core internals. Links against the OBJECT
