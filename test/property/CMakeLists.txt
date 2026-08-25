@@ -73,6 +73,8 @@ set_target_properties(retrace_property_sockaddr PROPERTIES
 
 target_link_libraries(retrace_property_sockaddr PRIVATE
 	retrace_core
+	retrace_supervisor_agent
+	retrace_supervisor_proto
 	${_otlp_lib}
 	retrace_config_json
 	retrace_backends
@@ -136,6 +138,8 @@ set_target_properties(retrace_property_actions PROPERTIES
 
 target_link_libraries(retrace_property_actions PRIVATE
     retrace_core
+    retrace_supervisor_agent
+    retrace_supervisor_proto
     ${_otlp_lib}
     retrace_config_json
     retrace_backends
@@ -197,6 +201,8 @@ set_target_properties(retrace_property_resolver PROPERTIES
 
 target_link_libraries(retrace_property_resolver PRIVATE
     retrace_core
+    retrace_supervisor_agent
+    retrace_supervisor_proto
     ${_otlp_lib}
     retrace_config_json
     retrace_backends
@@ -257,6 +263,8 @@ set_target_properties(retrace_property_caller_match PROPERTIES
 
 target_link_libraries(retrace_property_caller_match PRIVATE
     retrace_core
+    retrace_supervisor_agent
+    retrace_supervisor_proto
     ${_otlp_lib}
     retrace_config_json
     retrace_backends

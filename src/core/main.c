@@ -37,6 +37,7 @@
 #include "arch_spec.h"
 #include "logger.h"
 #include "otlp_live.h"
+#include "agent.h"
 #include "funcs.h"
 #include "actions.h"
 #include "data_types.h"
@@ -142,6 +143,14 @@ static void retrace_main(void)
 		log_err("retrace_otlp_live_init() failed; "
 			"otlp-c live streaming disabled");
 
+	/* TODO.supervisor/03: the in-process control agent. Same
+	 * rules as otlp_live: env-gated, no-op when unarmed, lazy
+	 * thread (never spawned here), fail-open liveness.
+	 */
+	if (retrace_agent_init() != 0)
+		log_err("retrace_agent_init() failed; "
+			"supervisor agent disabled");
+
 	ret = retrace_as_init_late();
 	if (ret) {
 		log_err("retrace_as_init_late() failed, ret = %d", ret);
@@ -177,6 +186,7 @@ static void retrace_destructor(void)
 	}
 	retrace_call_hash_deinit();
 	retrace_otlp_live_deinit();
+	retrace_agent_deinit();
 	retrace_logger_deinit();
 }
 #endif /* MSVC has no destructors */

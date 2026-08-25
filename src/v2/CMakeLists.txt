@@ -103,6 +103,14 @@ if(TARGET otlp_c)
 	list(APPEND _retrace_v2_libs otlp_c)
 endif()
 
+# The supervisor protocol + agent (TODO.supervisor): main.c's
+# boot hook references the agent; the agent references the
+# protocol. Both are pure C (protocol) / self-stubbed
+# (agent on WIN32) so every platform links them.
+list(APPEND _retrace_v2_libs
+	retrace_supervisor_agent
+	retrace_supervisor_proto)
+
 target_link_libraries(retrace_v2 ${_retrace_v2_libs})
 
 install(TARGETS retrace_v2

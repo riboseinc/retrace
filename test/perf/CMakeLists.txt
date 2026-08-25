@@ -44,6 +44,8 @@ function(add_retrace_bench name source)
 
 	target_link_libraries(retrace_perf_${name} PRIVATE
 		retrace_core
+		retrace_supervisor_agent
+		retrace_supervisor_proto
 	${_otlp_lib}
 		retrace_config_json
 		retrace_backends

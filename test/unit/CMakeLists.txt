@@ -231,6 +231,8 @@ function(retrace_add_unit_test name)
             ${T_EXTRA_INCLUDES})
         target_link_libraries(retrace_test_${name} PRIVATE
             retrace_core
+            retrace_supervisor_agent
+            retrace_supervisor_proto
             ${_otlp_lib}
             retrace_config_json
             retrace_backends
