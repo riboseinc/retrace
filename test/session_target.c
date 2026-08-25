@@ -71,13 +71,13 @@ static const char *preload_var(void)
 int main(int argc, char **argv)
 {
 	if (argc > 1 && strcmp(argv[1], "--leaf") == 0) {
-		printf("leaf denied=%d\n", probe_denied());
+		printf("stage:leaf denied=%d\n", probe_denied());
 		fflush(stdout);
 		sleep(1);
 		return 0;
 	}
 
-	printf("root denied=%d\n", probe_denied());
+	printf("stage:root denied=%d\n", probe_denied());
 	fflush(stdout);
 	/* let the root's agent connect and stamp RETRACE_SESSION
 	 * before forking (children inherit the env at fork)
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 		pid_t c = fork();
 
 		if (c == 0) {
-			printf("fork-child denied=%d\n", probe_denied());
+			printf("stage:fork-child denied=%d\n", probe_denied());
 			fflush(stdout);
 			sleep(1);
 			_exit(0);
@@ -100,8 +100,25 @@ int main(int argc, char **argv)
 		pid_t c = fork();
 
 		if (c == 0) {
-			setenv("RETRACE_SESSION", "", 1);
-			execl(argv[0], argv[0], "--leaf", NULL);
+			/* scrub via env(1), not setenv(): setenv
+			 * reallocs the environ -- an allocator call in
+			 * a fork child of a multithreaded process can
+			 * abort on locks held by missing threads. The
+			 * preload must be re-asserted explicitly: the
+			 * hop through env(1) can drop it (macOS SIP
+			 * scrubbing) -- an untraced leaf registers no
+			 * agent and the scrub is never observed
+			 */
+			char assign[4096];
+			const char *pre = getenv(preload_var());
+
+			if (pre == NULL)
+				pre = "";
+			snprintf(assign, sizeof(assign), "%s=%s",
+				preload_var(), pre);
+			execl("/usr/bin/env", "env", "-u",
+				"RETRACE_SESSION", assign, argv[0],
+				"--leaf", NULL);
 			_exit(1);
 		}
 		waitpid(c, NULL, 0);
