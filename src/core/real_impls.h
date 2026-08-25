@@ -82,6 +82,8 @@ struct RetraceRealImpls {
 	int (*rc_thread_create)(rc_thread_h *thread,
 			    void *(*start_routine)(void *), void *arg);
 	int (*rc_thread_join)(rc_thread_h *thread);
+	int (*rc_setenv)(const char *name, const char *value,
+		int overwrite);
 
 	void *(*malloc)(size_t size);
 	void (*free)(void *ptr);

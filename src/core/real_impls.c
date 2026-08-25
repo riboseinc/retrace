@@ -260,6 +260,15 @@ int retrace_real_impls_init(void)
 	if (retrace_real_impls.rc_thread_join == NULL)
 		return -31;
 
+	/* the session token stamp (TODO.supervisor/04): the REAL
+	 * setenv so the env-jail policies cannot sever session
+	 * inheritance -- supervisor plumbing, not target behavior
+	 */
+	retrace_real_impls.rc_setenv =
+		retrace_as_get_real_safe("setenv");
+	if (retrace_real_impls.rc_setenv == NULL)
+		return -40;
+
 	retrace_real_impls.real_vsnprintf =
 		retrace_as_get_real_safe("vsnprintf");
 	if (retrace_real_impls.real_vsnprintf == NULL)
