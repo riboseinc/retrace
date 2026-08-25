@@ -74,18 +74,30 @@ def main():
     work = tempfile.mkdtemp(prefix="sup-agent-")
     sock = os.path.join(work, "agent.sock")
     journal = os.path.join(work, "journal.jsonl")
+    dlog_path = os.path.join(work, "daemon.log")
     denied_f = tempfile.NamedTemporaryFile(
         prefix="sup-denied-", delete=False)
     denied_f.close()
     denied = denied_f.name
 
+    def dump_daemon_log():
+        try:
+            with open(dlog_path) as f:
+                tail = f.read().splitlines()[-12:]
+            for ln in tail:
+                print(f"  daemon: {ln[:200]}", file=sys.stderr)
+        except OSError:
+            print("  daemon: (no output captured)", file=sys.stderr)
+
     # ---- phase 1: delivery ------------------------------------
+    dlog = open(dlog_path, "w")
     d = subprocess.Popen(
         [daemon, "--sock", sock, "--journal", journal],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        stdout=dlog, stderr=subprocess.STDOUT)
     if not wait_sock(sock):
         d.kill()
         print("FAIL: daemon never listened", file=sys.stderr)
+        dump_daemon_log()
         return 1
 
     try:
@@ -93,11 +105,13 @@ def main():
     except subprocess.TimeoutExpired:
         d.kill()
         print("FAIL: target timed out", file=sys.stderr)
+        dump_daemon_log()
         return 1
     if proc.returncode != 0:
         d.kill()
         print(f"FAIL: target rc={proc.returncode} "
               f"err={proc.stderr[:200]!r}", file=sys.stderr)
+        dump_daemon_log()
         return 1
 
     # give the agent's deinit flush a moment, then stop the daemon
@@ -107,9 +121,17 @@ def main():
         d.wait(timeout=5)
     except subprocess.TimeoutExpired:
         d.kill()
+    dlog.close()
 
-    with open(journal) as f:
-        lines = [ln for ln in f.read().splitlines() if ln.strip()]
+    try:
+        with open(journal) as f:
+            lines = [ln for ln in f.read().splitlines() if ln.strip()]
+    except FileNotFoundError:
+        print("FAIL: daemon wrote no journal at all "
+              "(no EVENT delivered)", file=sys.stderr)
+        dump_daemon_log()
+        print(f"  target stdout: {proc.stdout[:200]!r}", file=sys.stderr)
+        return 1
     hits = []
     for ln in lines:
         try:
@@ -124,6 +146,7 @@ def main():
               file=sys.stderr)
         for ln in lines[:4]:
             print(f"  {ln[:160]}", file=sys.stderr)
+        dump_daemon_log()
         return 1
     agent, ev = hits[0]
     attrs = ev.get("attrs", {})
