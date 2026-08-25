@@ -321,6 +321,14 @@ retrace_add_unit_test(call_count_limit
 retrace_add_unit_test(sandbox)
 
 #
+# Policy acceptance gates (TODO.supervisor/05): the agent's
+# validator against malformed / regressing / expired payloads,
+# plus the applied swap (cache rebuilt from the new tree).
+# Boots the core so the config cache is live.
+#
+retrace_add_unit_test(agent_policy)
+
+#
 # modify_in_param_int action unit tests (TODO.complete/14).
 #
 retrace_add_unit_test(modify_in_param_int)
