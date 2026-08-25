@@ -46,6 +46,9 @@ elseif(RETRACE_PLATFORM_DARWIN)
 elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
 	set(_agent_arch_include
 		${CMAKE_SOURCE_DIR}/src/backends/preload_bsd/x86_64)
+elseif(RETRACE_PLATFORM_WINDOWS)
+	set(_agent_arch_include
+		${CMAKE_SOURCE_DIR}/src/backends/win_common)
 endif()
 
 target_include_directories(retrace_supervisor_agent PRIVATE
