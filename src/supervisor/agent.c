@@ -242,6 +242,24 @@ int retrace_agent_emit_event(const char *name,
 
 /* ---------- consumer side (the agent thread) ---------- */
 
+/*
+ * Signal-free socket write: a supervisor death mid-write must
+ * surface as an ERROR RETURN, never as SIGPIPE -- the default
+ * disposition would kill the target, the exact catastrophe
+ * fail-open liveness exists to prevent (found on CI: the target
+ * died rc=-13 at a daemon restart). Linux/BSD: MSG_NOSIGNAL;
+ * macOS: SO_NOSIGPIPE on the socket (set at connect); Windows:
+ * no SIGPIPE concept.
+ */
+static int sock_write(const void *buf, size_t len)
+{
+#ifdef MSG_NOSIGNAL
+	return (int)send(g_agent.fd, buf, len, MSG_NOSIGNAL);
+#else
+	return (int)send(g_agent.fd, buf, len, 0);
+#endif
+}
+
 static int send_frame(uint16_t type, const char *payload)
 {
 	uint8_t out[RETRACE_RPC_HEADER_SZ + 2048];
@@ -253,8 +271,7 @@ static int send_frame(uint16_t type, const char *payload)
 		RETRACE_RPC_VERSION, type, payload,
 		(uint32_t)plen) != 0)
 		return -1;
-	if (write(g_agent.fd, out,
-		RETRACE_RPC_HEADER_SZ + plen) <= 0)
+	if (sock_write(out, RETRACE_RPC_HEADER_SZ + plen) <= 0)
 		return -1;
 	return 0;
 }
@@ -440,6 +457,14 @@ static int try_connect(void)
 
 	if (fd < 0)
 		return -1;
+#ifdef SO_NOSIGPIPE
+	{
+		int one = 1;
+
+		(void)setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE,
+			&one, sizeof(one));
+	}
+#endif
 	memset(&sa, 0, sizeof(sa));
 	sa.sun_family = AF_UNIX;
 	strncpy(sa.sun_path, g_agent.sock_path,
