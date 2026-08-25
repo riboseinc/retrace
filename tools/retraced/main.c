@@ -232,16 +232,25 @@ int main(int argc, char **argv)
 
 	retraced_registry_init(&reg);
 	retraced_journal_open(&jr, journal_path);
-	if (retraced_journal_replay(&jr, &reg) == 0)
-		printf("retraced: journal replayed: %llu events, chain ok\n",
-			(unsigned long long)jr.replay_events);
-	else if (jr.chain_broken_at >= 0) {
-		fprintf(stderr,
-			"retraced: journal chain broken at line %d; refusing to start (fail-closed)\n",
-			jr.chain_broken_at);
-		return 1;
-	} else
-		printf("retraced: no prior journal (fresh boot)\n");
+	{
+		int rc = retraced_journal_replay(&jr, &reg);
+
+		/* replay POPULATES chain_broken_at -- the check must
+		 * follow it; the early return precedes any else
+		 * (checkpatch) without changing the order
+		 */
+		if (jr.chain_broken_at >= 0) {
+			fprintf(stderr,
+				"retraced: journal chain broken at line %d; refusing to start (fail-closed)\n",
+				jr.chain_broken_at);
+			return 1;
+		}
+		if (rc == 0)
+			printf("retraced: journal replayed: %llu events, chain ok\n",
+				(unsigned long long)jr.replay_events);
+		else
+			printf("retraced: no prior journal (fresh boot)\n");
+	}
 
 	/* 1 MiB frame buffer per agent -- the heap, not the
 	 * stack: 128 x (cap + header) overflows any main frame

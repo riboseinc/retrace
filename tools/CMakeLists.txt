@@ -19,5 +19,10 @@ add_subdirectory(flatpak2inside)
 add_subdirectory(ktrace2retrace)
 add_subdirectory(etw2retrace)
 add_subdirectory(fuzz-report)
-add_subdirectory(retraced)
+
+# retraced is POSIX-only until plan 12 (named-pipe transport);
+# the same gate fuzz-report uses.
+if(NOT WIN32)
+	add_subdirectory(retraced)
+endif()
 add_subdirectory(profiler)
