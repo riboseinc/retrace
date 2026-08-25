@@ -112,16 +112,22 @@ def main():
         env["DYLD_INSERT_LIBRARIES"] = lib
     else:
         env["LD_PRELOAD"] = lib
-    with open(out_path, "w") as out_f:
+    err_path = os.path.join(work, "target.err")
+    with open(out_path, "w") as out_f, open(err_path, "w") as err_f:
         proc = subprocess.run([target], env=env, stdout=out_f,
-                              stderr=subprocess.DEVNULL,
-                              timeout=60)
+                              stderr=err_f, timeout=60)
     if proc.returncode != 0:
         d.kill()
         print(f"FAIL: target rc={proc.returncode}", file=sys.stderr)
         try:
             with open(out_path) as f:
-                print(f"  out: {f.read()[:300]!r}", file=sys.stderr)
+                print(f"  out: {f.read()[-400:]!r}", file=sys.stderr)
+        except OSError:
+            pass
+        try:
+            with open(err_path) as f:
+                for ln in f.read().splitlines()[-8:]:
+                    print(f"  err: {ln[:200]}", file=sys.stderr)
         except OSError:
             pass
         return 1

@@ -732,8 +732,10 @@ static void agent_atfork_child(void)
 	atomic_store(&g_agent.thread_spawned, 0);
 	atomic_store(&g_agent.thread_done, 0);
 	atomic_store(&g_agent.stop, 0);
-	snprintf(g_agent.agent_id, sizeof(g_agent.agent_id),
-		"pending");
+	/* memcpy, not snprintf: no dispatch, no allocator -- this
+	 * runs between fork() and the child's first safe breath
+	 */
+	memcpy(g_agent.agent_id, "pending", sizeof("pending"));
 	pthread_mutex_unlock(&g_agent.mu);
 }
 
