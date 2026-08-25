@@ -248,11 +248,21 @@ def main():
         print(f"  files: {sorted(os.listdir(creatable_dir))}",
               file=sys.stderr)
         return 1
-    st = last_status(out_path)
-    if st is None or int(st.get("creatable", -1)) < 0:
+    # pre-freeze health: the target created real files before the
+    # freeze (platform note: whether stdout goes silent under a
+    # wildcard freeze depends on the backend's printf inventory --
+    # glibc's internal flush path is not interposable -- so the
+    # FILE TRUTH above is the freeze proof, not the last line)
+    with open(out_path) as f:
+        lines = [ln for ln in f.read().splitlines()
+                 if ln.startswith("iter=")]
+    healthy = [ln for ln in lines if " creatable=" in ln and
+               not ln.rstrip().endswith("creatable=-1")]
+    if not healthy:
         stop_daemon(d2, sock)
         proc.kill()
-        print(f"FAIL: pre-freeze line wrong: {st}", file=sys.stderr)
+        print("FAIL: no pre-freeze creatable success in stdout",
+              file=sys.stderr)
         return 1
     files = set(os.listdir(creatable_dir))
     time.sleep(1.5)
@@ -273,7 +283,10 @@ def main():
         print("FAIL: daemon never listened (phase 3)", file=sys.stderr)
         return 1
     replay_ack = None
-    end = time.time() + 10
+    # the agent reconnects on its backoff ladder (0.5s doubling);
+    # a slow runner can take two or three rungs past the daemon
+    # boot before the refusal ACK lands
+    end = time.time() + 25
     while time.time() < end:
         recs = acks(journal_records(journal))
         for a in recs:
