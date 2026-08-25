@@ -34,9 +34,11 @@ enum agent_state {
 struct agent_entry {
 	char id[RETRACED_AGENT_ID_MAX];
 	char session[RETRACED_SESSION_MAX];
+	char parent_id[RETRACED_AGENT_ID_MAX];
 	char cmdline[RETRACED_CMDLINE_MAX];
 	long pid;
 	long ppid;
+	int parent_hole;	/* ppid known, no traced agent there */
 	uint64_t policy_epoch;
 	uint64_t last_seq;
 	long last_hb_ms;
@@ -64,6 +66,24 @@ struct agent_entry *retraced_registry_hello(
 
 struct agent_entry *retraced_registry_find(
 	struct retraced_registry *r, const char *agent_id);
+
+/*
+ * Mint a fresh 128-bit session token (hex). The daemon mints at
+ * first HELLO; controller-supplied tokens (plan 08) arrive the
+ * same way through the HELLO payload.
+ */
+void retraced_registry_mint_session(
+	char out[RETRACED_SESSION_MAX]);
+
+/*
+ * Stitch the tree edge: resolve e->ppid against registered
+ * agents. Returns the parent entry, or NULL when the ppid is not
+ * a traced agent -- recorded as a HOLE (an untraced intermediate:
+ * a shell, an env-scrubbed exec hop; the root's own parent is
+ * that too, honestly). Idempotent per entry.
+ */
+struct agent_entry *retraced_registry_link_parent(
+	struct retraced_registry *r, struct agent_entry *e);
 
 /* Mark gone (BYE); absent id is a no-op (idempotent). */
 void retraced_registry_bye(struct retraced_registry *r,

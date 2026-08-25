@@ -351,7 +351,15 @@ int retrace_agent_policy_apply(const char *payload_json,
 		set_reason(reason_out, reason_cap, "policy.epoch missing");
 		return -1;
 	}
-	if ((uint64_t)epoch <= g_agent.policy_epoch) {
+	if ((uint64_t)epoch == g_agent.policy_epoch) {
+		/* re-delivery of the HELD epoch (daemon restart, fork
+		 * child re-registration): idempotent -- the policy
+		 * is already in force, the ACK says so
+		 */
+		json_value_free(v);
+		return 0;
+	}
+	if ((uint64_t)epoch < g_agent.policy_epoch) {
 		json_value_free(v);
 		set_reason(reason_out, reason_cap,
 			"epoch regression refused");
@@ -392,9 +400,38 @@ static void send_policy_ack(int applied, const char *reason)
 	send_frame(RETRACE_RPC_MSG_POLICY_ACK, ack);
 }
 
+/*
+ * Pull a \"key\":\"value\" string out of a small JSON payload
+ * (WELCOME-grade; no nesting in that schema).
+ */
+static void jscan_str(const char *payload, const char *key,
+	char *dst, size_t cap)
+{
+	char tag[48];
+	const char *s;
+	char *e;
+	size_t n = 0;
+
+	snprintf(tag, sizeof(tag), "\"%s\":\"", key);
+	s = strstr(payload, tag);
+	dst[0] = '\0';
+	if (s == NULL)
+		return;
+	s += strlen(tag);
+	e = strchr(s, '"');
+	if (e == NULL)
+		return;
+	n = (size_t)(e - s) < cap - 1 ? (size_t)(e - s) : cap - 1;
+	memcpy(dst, s, n);
+	dst[n] = '\0';
+}
+
 /* Daemon frames: WELCOME captures the minted agent_id (later
- * sends cite it); POLICY_SET applies a pushed policy; PING ->
- * PONG; unknown types skip by length.
+ * sends cite it) and the SESSION TOKEN -- stamped into the env
+ * with the REAL setenv so exec'd children inherit it (supervisor
+ * plumbing, deliberately out of reach of env-jail policies);
+ * POLICY_SET applies a pushed policy; PING -> PONG; unknown
+ * types skip by length.
  */
 static void handle_frame(const uint8_t *buf, size_t len)
 {
@@ -405,27 +442,28 @@ static void handle_frame(const uint8_t *buf, size_t len)
 	if (fr.type == RETRACE_RPC_MSG_WELCOME && len >=
 	    RETRACE_RPC_HEADER_SZ + fr.length) {
 		char payload[512];
-		const char *tag = "\"agent_id\":\"";
-		const char *s;
 		size_t plen = fr.length < sizeof(payload) - 1 ?
 			fr.length : sizeof(payload) - 1;
 
 		memcpy(payload, buf + RETRACE_RPC_HEADER_SZ, plen);
 		payload[plen] = '\0';
-		s = strstr(payload, tag);
-		if (s != NULL) {
-			char *e;
-			size_t n = 0;
+		jscan_str(payload, "agent_id", g_agent.agent_id,
+			sizeof(g_agent.agent_id));
+		{
+			char token[80];
+			const char *cur = retrace_real_impls.getenv(
+				"RETRACE_SESSION");
 
-			s += strlen(tag);
-			e = strchr(s, '"');
-			if (e != NULL)
-				n = (size_t)(e - s) <
-					sizeof(g_agent.agent_id) - 1 ?
-					(size_t)(e - s) :
-					sizeof(g_agent.agent_id) - 1;
-			memcpy(g_agent.agent_id, s, n);
-			g_agent.agent_id[n] = '\0';
+			jscan_str(payload, "session_token", token,
+				sizeof(token));
+			if (token[0] != '\0' &&
+			    (cur == NULL || cur[0] == '\0' ||
+			     strcmp(cur, token) != 0)) {
+				retrace_real_impls.rc_setenv(
+					"RETRACE_SESSION", token, 1);
+				log_info("agent: joined session %s",
+					token);
+			}
 		}
 	} else if (fr.type == RETRACE_RPC_MSG_POLICY_SET && len >=
 		   RETRACE_RPC_HEADER_SZ + fr.length) {
@@ -477,11 +515,14 @@ static int try_connect(void)
 
 	{
 		char hello[512];
+		const char *sess = retrace_real_impls.getenv(
+			"RETRACE_SESSION");
 
 		snprintf(hello, sizeof(hello),
-			"{\"session_token\":\"\",\"pid\":%ld,"
+			"{\"session_token\":\"%s\",\"pid\":%ld,"
 			"\"ppid\":%ld,\"boot_id\":\"proc\","
 			"\"cmdline\":\"\",\"retrace_version\":\"agent\"}",
+			sess != NULL ? sess : "",
 			(long)getpid(), (long)getppid());
 		if (send_frame(RETRACE_RPC_MSG_HELLO, hello) != 0) {
 			drop_connection();
@@ -642,6 +683,46 @@ static void *agent_thread_main(void *arg)
 	return NULL;
 }
 
+/*
+ * Fork children (TODO.supervisor/04): the child inherits HALF an
+ * agent -- no agent thread (only the forking thread survives),
+ * a socket shared with the parent's connection, and the parent's
+ * in-flight queue. Reset to a bootable state; the next emit (a
+ * jail denial is the natural beacon) respawns and re-HELLOs.
+ * policy_epoch SURVIVES: the engine's active config rode in the
+ * image, so a re-pushed equal epoch ACKs idempotently.
+ */
+static void agent_atfork_prepare(void)
+{
+	pthread_mutex_lock(&g_agent.mu);
+}
+
+static void agent_atfork_parent(void)
+{
+	pthread_mutex_unlock(&g_agent.mu);
+}
+
+static void agent_atfork_child(void)
+{
+	char *item;
+
+	if (g_agent.fd >= 0) {
+		close(g_agent.fd);
+		g_agent.fd = -1;
+	}
+	g_agent.connected = 0;
+	g_agent.rfill = 0;
+	while (g_agent.q_count > 0 &&
+	       (item = queue_pop()) != NULL)
+		free(item);
+	atomic_store(&g_agent.thread_spawned, 0);
+	atomic_store(&g_agent.thread_done, 0);
+	atomic_store(&g_agent.stop, 0);
+	snprintf(g_agent.agent_id, sizeof(g_agent.agent_id),
+		"pending");
+	pthread_mutex_unlock(&g_agent.mu);
+}
+
 int retrace_agent_init(void)
 {
 	char *env;
@@ -673,6 +754,8 @@ int retrace_agent_init(void)
 	env = retrace_real_impls.getenv("RETRACE_SUPERVISOR_EAGER");
 	if (env != NULL && env[0] == '1')
 		(void)spawn_agent_thread();
+	pthread_atfork(agent_atfork_prepare, agent_atfork_parent,
+		agent_atfork_child);
 	log_info("retrace_agent: armed, supervisor %s",
 		g_agent.sock_path);
 	return 0;

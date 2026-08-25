@@ -8,12 +8,59 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 #include "parson.h"
 
 void retraced_registry_init(struct retraced_registry *r)
 {
 	memset(r, 0, sizeof(*r));
+}
+
+void retraced_registry_mint_session(
+	char out[RETRACED_SESSION_MAX])
+{
+	static const char hex[] = "0123456789abcdef";
+	unsigned char raw[16];
+	size_t i;
+	FILE *f;
+
+	memset(raw, 0, sizeof(raw));
+	f = fopen("/dev/urandom", "rb");
+	if (f != NULL) {
+		if (fread(raw, 1, sizeof(raw), f) != sizeof(raw))
+			memset(raw, 0, sizeof(raw)); /* caller fallback */
+		fclose(f);
+	}
+	for (i = 0; i < sizeof(raw); i++) {
+		if (raw[i] == 0 && i == 0)
+			raw[i] = (unsigned char)(time(NULL) ^ getpid());
+		out[2 * i] = hex[raw[i] >> 4];
+		out[2 * i + 1] = hex[raw[i] & 0xf];
+	}
+	out[2 * sizeof(raw)] = '\0';
+}
+
+struct agent_entry *retraced_registry_link_parent(
+	struct retraced_registry *r, struct agent_entry *e)
+{
+	size_t i;
+
+	if (e->parent_id[0] != '\0' || e->parent_hole)
+		return retraced_registry_find(r, e->parent_id);
+	for (i = 0; i < r->count; i++) {
+		struct agent_entry *cand = &r->agents[i];
+
+		if (cand != e && cand->pid == e->ppid &&
+		    cand->state != AGENT_GONE) {
+			snprintf(e->parent_id,
+				sizeof(e->parent_id), "%s", cand->id);
+			return cand;
+		}
+	}
+	e->parent_hole = e->ppid > 1 ? 1 : 0;
+	return NULL;
 }
 
 struct agent_entry *retraced_registry_find(
@@ -59,6 +106,8 @@ struct agent_entry *retraced_registry_hello(
 	snprintf(e->id, sizeof(e->id), "%s", agent_id_in);
 	e->pid = pid;
 	e->ppid = ppid;
+	e->parent_id[0] = '\0';
+	e->parent_hole = 0;
 	snprintf(e->session, sizeof(e->session), "%s",
 		session != NULL ? session : "");
 	snprintf(e->cmdline, sizeof(e->cmdline), "%s",
@@ -128,6 +177,10 @@ struct json_value_t *retraced_registry_to_json(
 
 		json_object_set_string(o, "id", e->id);
 		json_object_set_string(o, "session", e->session);
+		json_object_set_string(o, "parent",
+			e->parent_id[0] != '\0' ? e->parent_id : NULL);
+		json_object_set_number(o, "parent_hole",
+			(double)e->parent_hole);
 		json_object_set_string(o, "cmdline", e->cmdline);
 		json_object_set_number(o, "pid", (double)e->pid);
 		json_object_set_number(o, "ppid", (double)e->ppid);

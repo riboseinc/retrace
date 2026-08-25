@@ -205,9 +205,45 @@ static void handle_agent_frame(struct conn *c,
 			e->id);
 		c->helloed = 1;
 		e->last_hb_ms = now_ms();
+
+		/*
+		 * Sessions (TODO.supervisor/04): stitch the tree
+		 * edge, then resolve the session. A tokenless
+		 * child of a session'd agent lost the token in
+		 * transit (an env scrub) -- inherit the parent's
+		 * session and SAY so; otherwise mint (the first
+		 * agent of a detonation) or accept the inherited
+		 * token verbatim.
+		 */
+		{
+			struct agent_entry *parent =
+				retraced_registry_link_parent(reg, e);
+			char ev[256];
+
+			if (e->session[0] == '\0' && parent != NULL &&
+			    parent->session[0] != '\0') {
+				snprintf(e->session,
+					sizeof(e->session), "%s",
+					parent->session);
+				snprintf(ev, sizeof(ev),
+					"{\"name\":\"retrace.session.scrubbed\",\"agent\":\"%s\",\"session\":\"%s\"}",
+					e->id, e->session);
+				retraced_journal_event(jr,
+					(long)time(NULL), "daemon", 0, ev);
+			} else if (e->session[0] == '\0') {
+				retraced_registry_mint_session(
+					e->session);
+				snprintf(ev, sizeof(ev),
+					"{\"name\":\"retrace.session.minted\",\"agent\":\"%s\",\"session\":\"%s\"}",
+					e->id, e->session);
+				retraced_journal_event(jr,
+					(long)time(NULL), "daemon", 0, ev);
+			}
+		}
+
 		snprintf(welcome, sizeof(welcome),
-			"{\"agent_id\":\"%s\",\"policy_epoch\":%ld,\"heartbeat_ms\":1000}",
-			e->id, g_policy_epoch);
+			"{\"agent_id\":\"%s\",\"session_token\":\"%s\",\"policy_epoch\":%ld,\"heartbeat_ms\":1000}",
+			e->id, e->session, g_policy_epoch);
 		write_frame(c->fd, RETRACE_RPC_MSG_WELCOME, welcome);
 		/* the policy rides every registration: an agent
 		 * that re-HELLOs after a daemon restart gets the

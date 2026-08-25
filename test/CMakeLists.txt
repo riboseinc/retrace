@@ -173,6 +173,22 @@ if(Python3_Interpreter_FOUND)
 	set_target_properties(retrace_test_policy_target PROPERTIES
 		OUTPUT_NAME policy_target
 		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test")
+	# Sessions/tree stitching (TODO.supervisor/04): one session
+	# across fork + exec-through-hole + env-scrubbed children.
+	add_executable(retrace_test_session_target session_target.c)
+	set_target_properties(retrace_test_session_target PROPERTIES
+		OUTPUT_NAME session_target
+		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test")
+	add_test(NAME integration-supervisor-session
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_supervisor_session.py
+			$<TARGET_FILE:retrace_retraced>
+			$<TARGET_FILE:retrace_v2>
+			$<TARGET_FILE:retrace_test_session_target>)
+	set_tests_properties(integration-supervisor-session PROPERTIES
+		LABELS "integration"
+		TIMEOUT 90)
+
 	add_test(NAME integration-supervisor-policy
 		COMMAND ${Python3_EXECUTABLE}
 			${CMAKE_SOURCE_DIR}/test/integration/test_supervisor_policy.py
