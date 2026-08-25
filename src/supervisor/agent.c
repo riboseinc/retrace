@@ -6,15 +6,10 @@
 
 #include "agent.h"
 
-#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/select.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <time.h>
-#include <unistd.h>
 
 #include "logger.h"
 #include "real_impls.h"
@@ -24,6 +19,11 @@
 #include "protocol.h"
 
 #ifndef _WIN32
+#include <stdatomic.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
 #include <pthread.h>
 
 /*
@@ -251,6 +251,17 @@ static void drop_connection(void)
 	g_agent.connected = 0;
 }
 
+/* Stop-aware sleep: exit waits must never ride out a long backoff */
+static void nap(long ms)
+{
+	while (ms > 0 && !atomic_load(&g_agent.stop)) {
+		struct timespec w = {.tv_sec = 0, .tv_nsec = 50000000};
+
+		nanosleep(&w, NULL);
+		ms -= 50;
+	}
+}
+
 /* Daemon frames: WELCOME captures the minted agent_id (later
  * sends cite it); PING -> PONG; unknown types skip by length.
  */
@@ -366,12 +377,7 @@ static void *agent_thread_main(void *arg)
 				/* FAIL-OPEN LIVENESS: back off and
 				 * retry -- never die, never unhook
 				 */
-				struct timespec wait = {
-					.tv_sec = backoff_ms / 1000,
-					.tv_nsec = (backoff_ms % 1000) *
-						1000000};
-
-				nanosleep(&wait, NULL);
+				nap(backoff_ms);
 				backoff_ms *= 2;
 				if (backoff_ms > AGENT_BACKOFF_MAX_MS)
 					backoff_ms = AGENT_BACKOFF_MAX_MS;
@@ -415,10 +421,18 @@ static void *agent_thread_main(void *arg)
 		nanosleep(&beat, NULL);
 	}
 
-	/* Bounded final drain: short-lived targets must deliver
+	/* Bounded final flush: short-lived targets must deliver
 	 * (the daemon is alive; the queue is bounded; the socket
-	 * flushes synchronously -- the budget guards a stuck peer)
+	 * flushes synchronously -- the budget guards a stuck peer).
+	 * Stop may arrive BEFORE the first loop iteration ever ran
+	 * (the target exits before the thread is scheduled -- the
+	 * linux-arm64 CI race), so the drain may have to open the
+	 * connection itself. A UDS connect is immediate, absent or
+	 * refused peers fail instantly: the attempt is inherently
+	 * bounded.
 	 */
+	if (!g_agent.connected && try_connect() == 0)
+		g_agent.connected = 1;
 	if (g_agent.connected)
 		drain_queue();
 	if (g_agent.connected) {

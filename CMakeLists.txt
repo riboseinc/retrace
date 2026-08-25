@@ -412,6 +412,7 @@ elseif(RETRACE_PLATFORM_WINDOWS)
 	# function registration/hooking lands with TODO.windows/05.
 	add_subdirectory(src/config)
 	add_subdirectory(src/core)
+	add_subdirectory(src/supervisor)
 	add_subdirectory(src/backends)
 endif()
 

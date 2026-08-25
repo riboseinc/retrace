@@ -27,6 +27,8 @@ if(RETRACE_PLATFORM_WINDOWS)
 
     target_link_libraries(retrace_test_logger_fmt PRIVATE
         retrace_core
+        retrace_supervisor_agent
+        retrace_supervisor_proto
         ${_otlp_lib}
     retrace_config_json
         retrace_backends
@@ -85,6 +87,8 @@ if(RETRACE_PLATFORM_WINDOWS)
 
     target_link_libraries(retrace_test_win_registry PRIVATE
         retrace_core
+        retrace_supervisor_agent
+        retrace_supervisor_proto
         ${_otlp_lib}
     retrace_config_json
         retrace_backends
@@ -114,6 +118,8 @@ if(RETRACE_PLATFORM_WINDOWS)
 
         target_link_libraries(retrace_test_win_wrapper PRIVATE
             retrace_core
+            retrace_supervisor_agent
+            retrace_supervisor_proto
             ${_otlp_lib}
             retrace_config_json
             retrace_backends

@@ -28,6 +28,7 @@ target_link_libraries(retrace_backend_preload_mingw
 		retrace_headers
 		retrace_backends
 		retrace_core
+		retrace_supervisor_agent
 		retrace_config_json)
 
 install(TARGETS retrace_backend_preload_mingw
