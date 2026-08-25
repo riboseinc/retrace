@@ -22,6 +22,7 @@
 #include "protocol.h"
 
 #ifndef _WIN32
+#include <dlfcn.h>
 #include <poll.h>
 #include <stdatomic.h>
 #include <sys/socket.h>
@@ -70,6 +71,19 @@ struct agent_state {
 
 static struct agent_state g_agent;
 static void *agent_thread_main(void *arg);
+
+/*
+ * The REAL setenv / pthread_atfork, resolved like real_impls
+ * does -- dlsym(RTLD_NEXT), NOT the as_get_real_safe table: that
+ * table only knows WRAPPED symbols (Linux's dlopen_guard), and
+ * setenv/pthread_atfork are not wrapped. Resolving via the table
+ * returned NULL and aborted boot (-40, the CI SEGV); calling the
+ * interposed pthread_atfork would dispatch the engine from the
+ * constructor.
+ */
+static int (*g_real_setenv)(const char *, const char *, int);
+static int (*g_real_atfork)(void (*)(void), void (*)(void),
+	void (*)(void));
 
 /* ---------- producer side (any thread) ---------- */
 
@@ -456,11 +470,10 @@ static void handle_frame(const uint8_t *buf, size_t len)
 
 			jscan_str(payload, "session_token", token,
 				sizeof(token));
-			if (token[0] != '\0' &&
+			if (token[0] != '\0' && g_real_setenv != NULL &&
 			    (cur == NULL || cur[0] == '\0' ||
 			     strcmp(cur, token) != 0)) {
-				retrace_real_impls.rc_setenv(
-					"RETRACE_SESSION", token, 1);
+				g_real_setenv("RETRACE_SESSION", token, 1);
 				log_info("agent: joined session %s",
 					token);
 			}
@@ -704,17 +717,18 @@ static void agent_atfork_parent(void)
 
 static void agent_atfork_child(void)
 {
-	char *item;
-
 	if (g_agent.fd >= 0) {
 		close(g_agent.fd);
 		g_agent.fd = -1;
 	}
 	g_agent.connected = 0;
 	g_agent.rfill = 0;
-	while (g_agent.q_count > 0 &&
-	       (item = queue_pop()) != NULL)
-		free(item);
+	/* NO malloc/free here: this runs in a fork child of a
+	 * multithreaded process, where the allocator can abort
+	 * (locks held by now-missing threads). Drop the pointers
+	 * and leak -- bounded, fork-children only.
+	 */
+	g_agent.q_count = 0;
 	atomic_store(&g_agent.thread_spawned, 0);
 	atomic_store(&g_agent.thread_done, 0);
 	atomic_store(&g_agent.stop, 0);
@@ -729,6 +743,11 @@ int retrace_agent_init(void)
 
 	memset(&g_agent, 0, sizeof(g_agent));
 	pthread_mutex_init(&g_agent.mu, NULL);
+	g_real_setenv = (int (*)(const char *, const char *, int))
+		retrace_real_impls.dlsym(RTLD_NEXT, "setenv");
+	g_real_atfork = (int (*)(void (*)(void), void (*)(void),
+		void (*)(void)))
+		retrace_real_impls.dlsym(RTLD_NEXT, "pthread_atfork");
 
 	env = retrace_real_impls.getenv("RETRACE_SUPERVISOR");
 	if (env == NULL || env[0] != '1')
@@ -754,8 +773,12 @@ int retrace_agent_init(void)
 	env = retrace_real_impls.getenv("RETRACE_SUPERVISOR_EAGER");
 	if (env != NULL && env[0] == '1')
 		(void)spawn_agent_thread();
-	pthread_atfork(agent_atfork_prepare, agent_atfork_parent,
-		agent_atfork_child);
+	if (g_real_atfork != NULL)
+		g_real_atfork(agent_atfork_prepare,
+			agent_atfork_parent, agent_atfork_child);
+	else
+		log_warn("agent: no real pthread_atfork; "
+			"fork children will not re-register");
 	log_info("retrace_agent: armed, supervisor %s",
 		g_agent.sock_path);
 	return 0;
