@@ -25,6 +25,7 @@
 
 #include "config_cache.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "real_impls.h"
@@ -35,32 +36,54 @@ struct cache_entry {
 	const JSON_Object *script;
 };
 
-static struct cache_entry g_entries[CONFIG_CACHE_MAX_ENTRIES];
-static int g_count;
+struct cache_snap {
+	struct cache_entry entries[CONFIG_CACHE_MAX_ENTRIES];
+	int count;
+};
 
 /*
- * Swap-atomicity (TODO.supervisor/05): policies can replace
- * the active config while target threads are dispatching, so
- * build (the swap writer) and lookup (the dispatch reader)
- * share this mutex. Uncontended in practice -- swaps are rare,
- * low-rate control-plane events.
+ * Swap-atomicity (TODO.supervisor/05): policies replace the
+ * active config while target threads are dispatching, so the
+ * reader must never take a lock -- a frozen wildcard target
+ * dispatches millions of calls a second and would starve a
+ * locking writer (and vice versa). The builder fills a fresh
+ * snapshot and flips ONE atomic pointer; lookups load it once
+ * and scan that snapshot. Retired snapshots are retained (the
+ * same never-free doctrine as the config trees themselves):
+ * swaps are rare control-plane events, and a reader may still
+ * be mid-scan.
  */
-static rc_mutex_t g_mu;
-static int g_mu_inited;
+/*
+ * MSVC without C11 atomics falls back to a volatile pointer: an
+ * aligned pointer store/load is atomic on every supported arch.
+ */
+#if defined(__STDC_NO_ATOMICS__)
+static struct cache_snap *volatile g_snap;
 
-static void cache_lock(void)
+static struct cache_snap *snap_load(void)
 {
-	if (!g_mu_inited) {
-		retrace_real_impls.rc_mutex_init(&g_mu);
-		g_mu_inited = 1;
-	}
-	retrace_real_impls.rc_mutex_lock(&g_mu);
+	return g_snap;
 }
 
-static void cache_unlock(void)
+static void snap_store(struct cache_snap *p)
 {
-	retrace_real_impls.rc_mutex_unlock(&g_mu);
+	g_snap = p;
 }
+#else
+#include <stdatomic.h>
+
+static _Atomic(struct cache_snap *) g_snap;
+
+static struct cache_snap *snap_load(void)
+{
+	return atomic_load(&g_snap);
+}
+
+static void snap_store(struct cache_snap *p)
+{
+	atomic_store(&g_snap, p);
+}
+#endif
 
 int retrace_config_cache_build(JSON_Object *conf)
 {
@@ -78,71 +101,75 @@ int retrace_config_cache_build(JSON_Object *conf)
 		return -1;
 	}
 
-	cache_lock();
-	g_count = 0;
+	{
+		struct cache_snap *snap = calloc(1, sizeof(*snap));
 
-	n = json_array_get_count(scripts);
-	for (i = 0; i < n && g_count < CONFIG_CACHE_MAX_ENTRIES; i++) {
-		const JSON_Object *script = json_array_get_object(scripts, i);
-		const char *name;
+		if (snap == NULL) {
+			log_err("config_cache: out of memory");
+			return -1;
+		}
+		n = json_array_get_count(scripts);
+		for (i = 0; i < n && snap->count < CONFIG_CACHE_MAX_ENTRIES;
+		     i++) {
+			const JSON_Object *script =
+				json_array_get_object(scripts, i);
+			const char *name;
 
-		if (script == NULL)
-			continue;
+			if (script == NULL)
+				continue;
 
-		name = json_object_get_string(script, "func_name");
-		if (name == NULL || name[0] == '\0')
-			continue;
+			name = json_object_get_string(script, "func_name");
+			if (name == NULL || name[0] == '\0')
+				continue;
 
-		if (retrace_real_impls.strcmp(name, "*") == 0)
-			continue;
+			if (retrace_real_impls.strcmp(name, "*") == 0)
+				continue;
 
-		g_entries[g_count].func_name = name;
-		g_entries[g_count].script = script;
-		g_count++;
+			snap->entries[snap->count].func_name = name;
+			snap->entries[snap->count].script = script;
+			snap->count++;
+		}
+		snap_store(snap);
 	}
-	cache_unlock();
 
 	log_info("config_cache: built with %d entries (%zu scripts total, %zu wildcards skipped)",
-		g_count, n, n - (size_t)g_count);
+		retrace_config_cache_count(), n,
+		n - (size_t)retrace_config_cache_count());
 
 	return 0;
 }
 
 const JSON_Object *retrace_config_cache_lookup(const char *func_name)
 {
+	const struct cache_snap *snap = snap_load();
 	const JSON_Object *hit = NULL;
 	int i;
 
-	if (func_name == NULL)
+	if (func_name == NULL || snap == NULL)
 		return NULL;
 
-	cache_lock();
-	for (i = 0; i < g_count; i++) {
-		if (retrace_real_impls.strcmp(g_entries[i].func_name,
+	for (i = 0; i < snap->count; i++) {
+		if (retrace_real_impls.strcmp(snap->entries[i].func_name,
 			    func_name) == 0) {
-			hit = g_entries[i].script;
+			hit = snap->entries[i].script;
 			break;
 		}
 	}
-	cache_unlock();
-
 	return hit;
 }
 
 void retrace_config_cache_clear(void)
 {
-	int i;
+	struct cache_snap *empty = calloc(1, sizeof(*empty));
 
-	cache_lock();
-	for (i = 0; i < g_count; i++) {
-		g_entries[i].func_name = NULL;
-		g_entries[i].script = NULL;
-	}
-	g_count = 0;
-	cache_unlock();
+	if (empty == NULL)
+		return;
+	snap_store(empty);
 }
 
 int retrace_config_cache_count(void)
 {
-	return g_count;
+	const struct cache_snap *snap = snap_load();
+
+	return snap != NULL ? snap->count : 0;
 }

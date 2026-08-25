@@ -119,10 +119,14 @@ def last_status(out_path):
     return st
 
 
-def wait_status(out_path, predicate, deadline):
-    """Wait until the target's latest line satisfies predicate."""
+def wait_status(out_path, predicate, deadline, proc=None):
+    """Wait until the target's latest line satisfies predicate.
+    A target that dies waiting is an immediate fail (a corpse
+    satisfies every static predicate)."""
     end = time.time() + deadline
     while time.time() < end:
+        if proc is not None and proc.poll() is not None:
+            return None
         st = last_status(out_path)
         if st is not None and predicate(st):
             return st
@@ -130,14 +134,18 @@ def wait_status(out_path, predicate, deadline):
     return None
 
 
-def wait_quiescence(dirpath, need, stable_s, deadline):
+def wait_quiescence(dirpath, need, stable_s, deadline, proc):
     """Freeze signal: >= need files existed, then no new ones for
     stable_s (pre-freeze pace is one file/second, so a stable
-    window longer than that is unambiguous)."""
+    window longer than that is unambiguous). A DEAD target also
+    stops creating files -- a corpse is not a freeze (the CI
+    SIGPIPE lesson), so death aborts immediately."""
     end = time.time() + deadline
     last_count = -1
     last_change = time.time()
     while time.time() < end:
+        if proc.poll() is not None:
+            return None
         n = len(os.listdir(dirpath))
         if n != last_count:
             last_count = n
@@ -230,7 +238,8 @@ def main():
         env=env, stdout=out_f, stderr=subprocess.DEVNULL)
 
     st = wait_status(out_path,
-                     lambda s: s.get("denied") == "-1", 10)
+                     lambda s: s.get("denied") == "-1", 10,
+                     proc=proc)
     if st is None:
         stop_daemon(d1, sock)
         proc.kill()
@@ -252,12 +261,12 @@ def main():
         print("FAIL: daemon never listened (phase 2)", file=sys.stderr)
         return 1
     nfiles = wait_quiescence(creatable_dir, need=2, stable_s=3.5,
-                             deadline=15)
+                             deadline=15, proc=proc)
     if nfiles is None:
         stop_daemon(d2, sock)
         proc.kill()
-        print("FAIL: freeze never landed (files kept appearing)",
-              file=sys.stderr)
+        print(f"FAIL: freeze never landed (target rc="
+              f"{proc.poll()})", file=sys.stderr)
         dump_daemon(dlog2, "d2")
         print(f"  last stdout: {last_status(out_path)}",
               file=sys.stderr)
@@ -304,6 +313,8 @@ def main():
     # boot before the refusal ACK lands
     end = time.time() + 25
     while time.time() < end:
+        if proc.poll() is not None:
+            break
         recs = acks(journal_records(journal))
         for a in recs:
             if a.get("applied") is False:
