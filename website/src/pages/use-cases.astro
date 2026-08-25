@@ -1,0 +1,180 @@
+---
+// Use cases — the workflows, end to end. Each is a runnable path.
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+const cases = [
+  {
+    id: "detonation",
+    accent: "break",
+    title: "Live detonation",
+    who: "Malware analysis, sandbox work",
+    body: "Run an unknown binary under observation, then confinement, without losing the live view. Denials surface the instant they happen.",
+    steps: [
+      "retrace-profile capture -o p.json -- ./sample  # observe",
+      "retrace-profile jail p.json -o jail.json       # emit policy",
+      "retrace run --config jail.json -- ./sample     # confine",
+    ],
+    note: "With RETRACE_OTLP_ENDPOINT set, every retrace.jail.denied event streams to your collector while the detonation runs (v2.36+).",
+    more: "Cookbook 34 — profile and jail",
+    href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/34-profile-and-jail.md",
+  },
+  {
+    id: "audit",
+    accent: "control",
+    title: "Continuous audit",
+    who: "Supply chain, compliance",
+    body: "Grade a binary's claims against kernel-layer truth and against its packaging manifest's declared set. Violations are headline output, not log spam.",
+    steps: [
+      "strace -f -e trace=file ./tool 2> truth.json    # kernel truth",
+      "retrace-profile --libc t.json --kernel k.json   # grade: libc_only / kernel_only",
+      "retrace-profile --libc t.json --inside declared.json  # confinement check",
+    ],
+    note: "Converters exist for strace, dtrace, truss, ktrace, procmon, and raw ETW — five platforms of ground truth in one shape.",
+    more: "docs/reports.md — output shapes",
+    href: "https://github.com/riboseinc/retrace/blob/main/docs/reports.md",
+  },
+  {
+    id: "fuzzing",
+    accent: "break",
+    title: "Fuzz campaigns",
+    who: "QA, security engineering",
+    body: "Deterministic failure injection plus corpus management: clusters, one reproducer per cluster, a minimized corpus, and a drift oracle for behavior the baseline never saw.",
+    steps: [
+      "retrace fuzz malloc --rate 0.2 --seed 42 -- ./target in.xml",
+      "retrace-fuzz-report --config fuzz.json --seeds corpus/ -o report.json -- ./target",
+      "retrace-fuzz-report --baseline good.json ...    # drift oracle",
+    ],
+    note: "Reports export over OTLP: crash clusters as log records, iteration/crash counters as metrics (--endpoint).",
+    more: "Cookbook 35 — dictionary fuzzing",
+    href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/35-dictionary-fuzz.md",
+  },
+  {
+    id: "otlp",
+    accent: "see",
+    title: "OTLP observability",
+    who: "SRE, detection engineering",
+    body: "One env variable turns the traced process into an OpenTelemetry emitter: spans per call, security events, timing metrics — into any otelcol/Tempo/Jaeger stack.",
+    steps: [
+      "RETRACE_OTLP_ENDPOINT=http://collector:4318 retrace trace '*' -- ./svc",
+      "retrace-profile export p.json --endpoint http://collector:4318",
+      "retrace-fuzz-report ... --endpoint http://collector:4318",
+    ],
+    note: "Attribute schema is documented and stable (retrace.func, retrace.jail.*, retrace.fuzz.*, retrace.risk.*) — dashboards can be shared.",
+    more: "Cookbook 36 — live OTLP stream",
+    href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/36-live-otlp-stream.md",
+  },
+  {
+    id: "escapes",
+    accent: "see",
+    title: "VFS escape hunting",
+    who: "Container/packaging security",
+    body: "Does the packaged app stay inside its declared world? Trace every path touch, normalize NT forms, diff against the escape set.",
+    steps: [
+      "retrace trace fopen,open,mkdir --log run.json -- ./app",
+      "retrace-correlate --libc run.json           # normalized path truth",
+      "retrace-profile --libc run.json --inside declared.json",
+    ],
+    note: "Works on Flatpak/Snap manifests too: flatpak2inside and snap2inside convert personal-files plugs to declared sets.",
+    more: "Example: escape-hunting",
+    href: "/retrace/examples/#escape-hunting",
+  },
+  {
+    id: "hardening",
+    accent: "control",
+    title: "Zero-trust hardening",
+    who: "Deployment, blue teams",
+    body: "Turn a known-good run into the strictest config that still works: allow-list the observed paths, deny the classes you never granted, redirect reads to decoys.",
+    steps: [
+      "retrace-profile harden p.json -o strict.json",
+      "retrace run --config strict.json -- ./tool   # deny-by-default",
+      "decoy_dir in the sandbox action              # deception mode",
+    ],
+    note: "Fail-closed by design: an unreachable supervisor never relaxes a jail (the planned retraced arc doubles down on this).",
+    more: "About the supervisor roadmap",
+    href: "/retrace/about/#roadmap",
+  },
+  {
+    id: "replay",
+    accent: "see",
+    title: "Time-travel replay",
+    who: "Debugging, CI archaeology",
+    body: "A recorded session replays with identical calls and mutations — the 3am failure reproduces on a laptop at 9am, deterministically.",
+    steps: [
+      "retrace run --config session.json --record r.json -- ./flaky",
+      "retrace replay r.json",
+    ],
+    note: "Seeds are first-class (RETRACE_FUZZ_SEED / fuzz_seed param): randomness is a dial, not a hazard.",
+    more: "Cookbook — replay debugging",
+    href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/27-replay-debug.md",
+  },
+  {
+    id: "windows",
+    accent: "control",
+    title: "Windows, including static CRT",
+    who: "Windows IR, software inventory",
+    body: "One injectable retrace.dll for MSVC and MinGW targets; /MT binaries that carry their own CRT are observed and jailed through the ntdll layer.",
+    steps: [
+      "retrace-win-run --dll retrace.dll -- target.exe",
+      "retrace-profile capture -o p.json -- target.exe",
+    ],
+    note: "ETW capture (etw-capture.ps1 → etw2retrace) provides the kernel truth on Windows; procmon CSV is equally first-class.",
+    more: "Docs — platforms",
+    href: "https://github.com/riboseinc/retrace/blob/main/docs/platforms.md",
+  },
+];
+---
+
+<Layout title="Use cases — workflows with retrace" description="Detonation, audit, fuzzing, OTLP observability, escapes, hardening, replay, Windows — every workflow with runnable commands.">
+  <Nav />
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">USE CASES</p>
+        <h1>Workflows, not features.</h1>
+        <p class="lede">
+          Eight paths through retrace, each a chain of commands you can run
+          today — from first observation to a signed-policy future.
+        </p>
+      </div>
+    </section>
+
+    <div class="wrap grid">
+      {cases.map((c) => (
+        <article class="case glass" id={c.id}>
+          <div class="tag-row">
+            <span class={`tag t-${c.accent}`}>{c.who}</span>
+          </div>
+          <h2>{c.title}</h2>
+          <p class="body">{c.body}</p>
+          <pre class="cmd">{c.steps.map((s) => `# ${s}`).join("\n").replace(/# (# )/g, "# ")}</pre>
+          <p class="note">{c.note}</p>
+          <a class="more" href={c.href}>{c.more} →</a>
+        </article>
+      ))}
+    </div>
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  .hero { padding: 96px 0 40px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .22em; color: var(--color-dim); margin-bottom: 14px; }
+  h1 { font-size: clamp(30px, 5vw, 46px); letter-spacing: -0.02em; margin: 0 0 14px; }
+  .lede { color: var(--color-dim); max-width: 640px; font-size: 16px; line-height: 1.6; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 18px; padding-bottom: 80px; }
+  @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+  .case { padding: 26px; border-radius: 12px; scroll-margin-top: 80px; }
+  .tag { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .08em; padding: 3px 9px; border-radius: 999px; }
+  .t-see { color: var(--color-see); background: var(--color-see-soft); }
+  .t-control { color: var(--color-control); background: var(--color-control-soft); }
+  .t-break { color: var(--color-break); background: var(--color-break-soft); }
+  .case h2 { font-size: 20px; margin: 12px 0 8px; letter-spacing: -0.01em; }
+  .body { color: var(--color-dim); font-size: 13.5px; line-height: 1.6; margin: 0 0 14px; }
+  .cmd { background: rgba(7,9,13,.7); border: 1px solid rgba(255,255,255,.06); border-radius: 8px; padding: 12px 14px; font-family: var(--font-mono); font-size: 11px; color: var(--color-text); overflow-x: auto; line-height: 1.6; margin: 0 0 12px; }
+  .note { color: var(--color-dim); font-size: 12px; line-height: 1.55; margin: 0 0 12px; }
+  .more { font-family: var(--font-mono); font-size: 12px; color: var(--color-see); text-decoration: none; }
+  .more:hover { text-decoration: underline; }
+</style>

@@ -1,0 +1,143 @@
+---
+// Examples — the runnable demos in the repo, as cards with commands.
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+const examples = [
+  {
+    id: "id-redirection",
+    accent: "control",
+    name: "id-redirection",
+    one: "Bypass a root check by rewriting getuid()/geteuid() return values — the classic interposition demo.",
+    run: "cd examples/id-redirection && gcc root-check.c -o root-check && ./test-id-redirection.sh",
+  },
+  {
+    id: "getenv-fuzzing",
+    accent: "break",
+    name: "getenv-fuzzing",
+    one: "Feed garbage, overflow-length, and format-string values into getenv consumers — buffer-overflow hunting without writing a fuzzer.",
+    run: "cd examples/getenv-fuzzing && ./run.sh",
+  },
+  {
+    id: "net-fuzzing",
+    accent: "break",
+    name: "net-fuzzing",
+    one: "Mutate connect() targets and garbage into recv() — protocol confusion and SSRF-path discovery.",
+    run: "cd examples/net-fuzzing && ./run.sh",
+  },
+  {
+    id: "dns-fuzz",
+    accent: "break",
+    name: "dns-fuzz",
+    one: "Serve malformed DNS answers through the resolver path — parser robustness from the outside.",
+    run: "cd examples/dns-fuzz && ./run.sh",
+  },
+  {
+    id: "http-server-overflow",
+    accent: "break",
+    name: "http-server-overflow",
+    one: "Long-request injection against a small http server — find the crash before the internet does.",
+    run: "cd examples/http-server-overflow && make && ./run.sh",
+  },
+  {
+    id: "unsafe-system",
+    accent: "see",
+    name: "unsafe-system",
+    one: "Watch every system()/popen() invocation with full argument capture — command-injection surface mapping.",
+    run: "cd examples/unsafe-system && ./run.sh",
+  },
+  {
+    id: "stringinject",
+    accent: "control",
+    name: "stringinject",
+    one: "Rewrite string arguments mid-flight (paths, hosts, options) — behavioral A/B without recompiling.",
+    run: "cd examples/stringinject && ./run.sh",
+  },
+  {
+    id: "escape-hunting",
+    accent: "see",
+    name: "escape-hunting",
+    one: "Does the app stay in its sandbox? Trace every path touch and diff against the declared world.",
+    run: "cd examples/escape-hunting && ./run-posix.sh",
+  },
+  {
+    id: "trace-profile-quickstart",
+    accent: "see",
+    name: "trace-profile-quickstart",
+    one: "The 10-minute tour: capture → profile → jail → harden, with kernel-truth grading on five platforms.",
+    run: "cd examples/trace-profile-quickstart && ./run-posix.sh   # also: run-macos.sh, run-windows.ps1, run-openbsd.sh",
+  },
+  {
+    id: "packaging-audit",
+    accent: "control",
+    name: "packaging-audit",
+    one: "Audit Snap/Flatpak declared-file sets against observed access — the compliance workflow as one script.",
+    run: "cd examples/packaging-audit && ./audit.sh app.snap",
+  },
+  {
+    id: "fuzz-workbench",
+    accent: "break",
+    name: "fuzz-workbench",
+    one: "Corpus → clustered crash report → per-cluster reproducers → minimized corpus, with the drift oracle.",
+    run: "cd examples/fuzz-workbench && ./run-posix.sh",
+  },
+  {
+    id: "fuzz-target",
+    accent: "break",
+    name: "fuzz-target",
+    one: "A libFuzzer template wired to retrace seeds — continuous fuzzing with deterministic reproduction.",
+    run: "cd examples/fuzz-target && make && ./fuzz corpus/",
+  },
+];
+---
+
+<Layout title="Examples — runnable demos" description="Twelve self-contained examples: from id-redirection to the fuzz workbench. Every one runs from its directory.">
+  <Nav />
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">EXAMPLES</p>
+        <h1>Twelve demos, zero setup.</h1>
+        <p class="lede">
+          Everything below lives in <code>examples/</code> in the repo,
+          self-contained, with its own runner. Build retrace once; the
+          examples assume <code>build/src/v2/libretrace.so</code> (or the
+          .dylib — the runners find either).
+        </p>
+      </div>
+    </section>
+
+    <div class="wrap grid">
+      {examples.map((e) => (
+        <article class="ex glass" id={e.id}>
+          <span class={`rail r-${e.accent}`}></span>
+          <h2>{e.name}</h2>
+          <p>{e.one}</p>
+          <pre class="cmd"><span class="prompt">$</span> {e.run}</pre>
+        </article>
+      ))}
+    </div>
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  .hero { padding: 96px 0 40px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .22em; color: var(--color-dim); margin-bottom: 14px; }
+  h1 { font-size: clamp(30px, 5vw, 46px); letter-spacing: -0.02em; margin: 0 0 14px; }
+  .lede { color: var(--color-dim); max-width: 680px; font-size: 15.5px; line-height: 1.6; }
+  .lede code { font-family: var(--font-mono); font-size: 13px; color: var(--color-text); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 3px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; padding-bottom: 80px; }
+  @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+  .ex { position: relative; padding: 22px; border-radius: 10px; scroll-margin-top: 80px; }
+  .rail { position: absolute; left: 0; top: 14px; bottom: 14px; width: 2px; border-radius: 2px; }
+  .r-see { background: rgba(94,227,255,.4); }
+  .r-control { background: rgba(242,180,65,.4); }
+  .r-break { background: rgba(255,107,92,.4); }
+  .ex h2 { font-family: var(--font-mono); font-size: 15px; margin: 0 0 8px; color: var(--color-text); }
+  .ex p { color: var(--color-dim); font-size: 13px; line-height: 1.6; margin: 0 0 12px; }
+  .cmd { background: rgba(7,9,13,.7); border: 1px solid rgba(255,255,255,.06); border-radius: 6px; padding: 10px 12px; font-family: var(--font-mono); font-size: 11px; color: var(--color-text); overflow-x: auto; margin: 0; line-height: 1.5; }
+  .prompt { color: var(--color-break); margin-right: 6px; }
+</style>

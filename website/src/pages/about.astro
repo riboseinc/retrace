@@ -1,0 +1,126 @@
+---
+// About — what retrace is, the license story, the roadmap.
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<Layout title="About retrace" description="What retrace is, who builds it, how it's licensed, and where it's going.">
+  <Nav />
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">ABOUT</p>
+        <h1>A userspace libc interceptor<br />that answers questions.</h1>
+        <p class="lede">
+          retrace began as a debugging tool and became an instrument: observe
+          every libc call, rewrite it, break it, jail it — without source,
+          without recompiling, on thirteen platforms. One shared library, one
+          JSON config language, BSD-2-Clause.
+        </p>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="wrap">
+        <h2>What it is</h2>
+        <div class="cols">
+          <div>
+            <h3>The engine</h3>
+            <p>A per-arch assembly trampoline funnels every intercepted call
+            into one engine, which runs a JSON script of composable actions —
+            log, mutate, inject failure, deny, decode, capture. Prototypes
+            (parameter metadata) live in tables; new functions are an
+            inventory line plus a prototype entry, conformance-tested.</p>
+          </div>
+          <div>
+            <h3>The backends</h3>
+            <p>Preload backends for ELF, Mach-O, and the BSDs; inline-hooking
+            backends for Windows (MSVC + MinGW, x64 + arm64, including
+            static-CRT binaries through the ntdll layer); ptrace for Linux
+            static binaries. All one engine behind them.</p>
+          </div>
+          <div>
+            <h3>The truth layer</h3>
+            <p>libc-level claims are graded against kernel truth: strace,
+            dtrace, truss, ktrace, procmon, and raw ETW all convert into the
+            retrace shape, so "what it touched" has evidence behind it.</p>
+          </div>
+          <div>
+            <h3>The observability bridge</h3>
+            <p>Live OTLP streaming (spans, security events, metrics) and a
+            documented attribute schema — retrace feeds the pipeline you
+            already run instead of inventing another one.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="wrap">
+        <h2>License & provenance</h2>
+        <ul class="plain">
+          <li><strong>retrace</strong> — BSD-2-Clause, by <a href="https://www.ribose.com">Ribose</a>. Source of truth: the LICENSE file; no CLA required, contributions are inbound BSD-2.</li>
+          <li><strong>otlp-c</strong> (vendored, <code>third_party/otlp-c</code>) — BSD-3-Clause. The pure-C OTLP client behind the streaming waves; see THIRD_PARTY_NOTICES.</li>
+          <li><strong>parson</strong> (vendored) — MIT. The tolerant JSON parser behind configs and traces.</li>
+        </ul>
+        <p>Every release ships a THIRD_PARTY_NOTICES with the license text
+        of each vendored dependency and its pin.</p>
+      </div>
+    </section>
+
+    <section class="sec" id="roadmap">
+      <div class="wrap">
+        <h2>Roadmap: the supervisor arc</h2>
+        <p>The next chapter is <code>retraced</code>: a per-host supervisor
+        daemon behind a formally-versioned control protocol. Fleets of
+        traced processes under central, signed policy; incident response
+        that attaches, freezes, and pulls the flight recorder from a live
+        hostile process; audit-grade, hash-chained event journals — with
+        telemetry still flowing through OTLP, untouched.</p>
+        <div class="pill-row">
+          <span class="pill">detonation farms</span>
+          <span class="pill">specimen freeze + black-box pull</span>
+          <span class="pill">signed, versioned policy</span>
+          <span class="pill">session trees → one trace</span>
+          <span class="pill">fleet CLI over TLS</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec last">
+      <div class="wrap">
+        <h2>Contributing</h2>
+        <p>Pull requests, issues, and cookbook recipes are all contributions.
+        The <a href="https://github.com/riboseinc/retrace/blob/main/docs/development.md">development
+        guide</a> covers the build, the test pyramid, and the one-line test
+        registration; CI runs the full 13-platform matrix on every PR, and
+        checkpatch holds the kernel style.</p>
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  .hero { padding: 96px 0 44px; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .22em; color: var(--color-dim); margin-bottom: 14px; }
+  h1 { font-size: clamp(28px, 4.6vw, 44px); letter-spacing: -0.02em; margin: 0 0 14px; line-height: 1.15; }
+  .lede { color: var(--color-dim); max-width: 660px; font-size: 16px; line-height: 1.65; }
+  .sec { padding: 44px 0; border-top: 1px solid rgba(255,255,255,.05); scroll-margin-top: 80px; }
+  .sec.last { padding-bottom: 90px; }
+  h2 { font-size: 22px; margin: 0 0 18px; letter-spacing: -0.01em; }
+  h3 { font-size: 14.5px; margin: 0 0 8px; }
+  p { color: var(--color-dim); font-size: 13.5px; line-height: 1.65; }
+  p code { font-family: var(--font-mono); font-size: 12px; color: var(--color-text); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 3px; }
+  a { color: var(--color-see); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+  @media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+  .plain { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 10px; }
+  .plain li { color: var(--color-dim); font-size: 13.5px; line-height: 1.6; }
+  .plain strong { color: var(--color-text); }
+  .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .pill { font-family: var(--font-mono); font-size: 11px; color: var(--color-see); background: var(--color-see-soft); padding: 4px 11px; border-radius: 999px; }
+</style>
