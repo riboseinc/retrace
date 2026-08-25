@@ -41,6 +41,7 @@
 #include "win_diag.h"
 
 #include "engine.h"
+#include "agent.h"
 #include "real_impls.h"
 #include "arch_spec.h"
 #include "actions.h"
@@ -128,6 +129,12 @@ void retrace_engine_wrapper(char *func_name,
 		retrace_as_sched_real(arch_spec_ctx, real_impl);
 		return;
 	}
+	/* first dispatch = the constructor provably finished: the
+	 * eager supervisor agent spawns here and nowhere earlier
+	 * (a constructor-time spawn races ld.so through the dlsym
+	 * below and crashes the boot on Linux)
+	 */
+	retrace_agent_kick();
 	retrace_win_diag("enter", func_name, 0);
 
 	thread_ctx = retrace_thread_context_get();

@@ -38,14 +38,15 @@ int retrace_agent_init(void);
 void retrace_agent_deinit(void);
 
 /*
- * Post-boot hook, called at the very END of the constructor
- * chain (after as_init_late): the eager spawn happens HERE, not
- * in init -- a thread spawned mid-constructor dispatches
- * interposed calls (socket on Linux) through a half-initialized
- * engine and crashes the boot. Lazy spawn is unaffected (the
- * first emit always happens post-boot).
+ * Called from the engine entry on the FIRST dispatch: by
+ * construction the constructor has finished (a dispatch from
+ * target code means every dependency's constructor ran -- link
+ * order). The eager spawn happens HERE; spawning any earlier
+ * raced ld.so's constructor machinery through the dispatch's
+ * dlsym(RTLD_NEXT) and crashed the boot on Linux. One atomic
+ * load per dispatch; no-op when unarmed.
  */
-void retrace_agent_post_boot(void);
+void retrace_agent_kick(void);
 
 /*
  * Queue one named security event for the daemon. kv is an

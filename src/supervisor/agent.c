@@ -812,7 +812,7 @@ int retrace_agent_init(void)
 	return 0;
 }
 
-void retrace_agent_post_boot(void)
+void retrace_agent_kick(void)
 {
 	if (!g_agent.armed || !g_eager_wanted)
 		return;
@@ -856,7 +856,7 @@ int retrace_agent_init(void)
 	return 0;
 }
 
-void retrace_agent_post_boot(void)
+void retrace_agent_kick(void)
 {
 }
 

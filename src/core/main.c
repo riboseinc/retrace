@@ -157,12 +157,6 @@ static void retrace_main(void)
 		return;
 	}
 
-	/* the eager agent spawns only now: a thread spawned any
-	 * earlier dispatches interposed calls through a
-	 * half-initialized engine (the Linux boot SEGV)
-	 */
-	retrace_agent_post_boot();
-
 	log_dbg("retrace init success");
 
 	retrace_inited = 1;
