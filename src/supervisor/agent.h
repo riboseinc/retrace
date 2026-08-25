@@ -38,6 +38,16 @@ int retrace_agent_init(void);
 void retrace_agent_deinit(void);
 
 /*
+ * Post-boot hook, called at the very END of the constructor
+ * chain (after as_init_late): the eager spawn happens HERE, not
+ * in init -- a thread spawned mid-constructor dispatches
+ * interposed calls (socket on Linux) through a half-initialized
+ * engine and crashes the boot. Lazy spawn is unaffected (the
+ * first emit always happens post-boot).
+ */
+void retrace_agent_post_boot(void);
+
+/*
  * Queue one named security event for the daemon. kv is an
  * array of n_kv PAIRS of strings (key, value) -- the wire
  * shape is the protocol's EVENT message (attrs: object).
