@@ -65,6 +65,20 @@ def dump_daemon(log_path, tag):
         print(f"  {tag}: (no daemon log)", file=sys.stderr)
 
 
+def dump_target_err(err_path):
+    """glibc abort et al. write the reason to stderr"""
+    try:
+        with open(err_path) as f:
+            tail = f.read().splitlines()[-10:]
+        if tail:
+            for ln in tail:
+                print(f"  target-stderr: {ln[:200]}", file=sys.stderr)
+        else:
+            print("  target-stderr: (empty)", file=sys.stderr)
+    except OSError:
+        print("  target-stderr: (none captured)", file=sys.stderr)
+
+
 def stop_daemon(d, sock):
     if d is None:
         return
@@ -175,6 +189,7 @@ def main():
     sock = os.path.join(work, "agent.sock")
     journal = os.path.join(work, "journal.jsonl")
     out_path = os.path.join(work, "target.out")
+    err_path = os.path.join(work, "target.err")
     dlog1 = os.path.join(work, "d1.log")
     dlog2 = os.path.join(work, "d2.log")
     dlog3 = os.path.join(work, "d3.log")
@@ -221,6 +236,7 @@ def main():
 
     # ---- the target: eager agent, permissive boot config -----
     out_f = open(out_path, "w")
+    err_f = open(err_path, "w")
     env = dict(os.environ)
     env.update({
         "RETRACE_JSON_CONFIG": boot_cfg,
@@ -235,7 +251,8 @@ def main():
         env["LD_PRELOAD"] = lib
     proc = subprocess.Popen(
         [target, "25", DENIED, ALLOWED, creatable_dir],
-        env=env, stdout=out_f, stderr=subprocess.DEVNULL)
+        env=env, stdout=out_f, stderr=err_f)
+    err_f.close()
 
     st = wait_status(out_path,
                      lambda s: s.get("denied") == "-1", 10,
@@ -268,6 +285,7 @@ def main():
         print(f"FAIL: freeze never landed (target rc="
               f"{proc.poll()})", file=sys.stderr)
         dump_daemon(dlog2, "d2")
+        dump_target_err(err_path)
         print(f"  last stdout: {last_status(out_path)}",
               file=sys.stderr)
         print(f"  files: {sorted(os.listdir(creatable_dir))}",
@@ -332,6 +350,7 @@ def main():
         dump_daemon(dlog3, "d3")
         print(f"  target alive: {proc.poll() is None} "
               f"(rc={proc.returncode})", file=sys.stderr)
+        dump_target_err(err_path)
         print(f"  last stdout: {last_status(out_path)}",
               file=sys.stderr)
         for rec in journal_records(journal)[-6:]:
