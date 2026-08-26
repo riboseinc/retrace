@@ -53,7 +53,6 @@ option(RETRACE_BUILD_TESTS         "Build unit and integration tests"           
 option(RETRACE_BUILD_DOCS          "Build Doxygen API reference"                         OFF)
 option(RETRACE_BUILD_SHARED        "Build shared libraries"                              ON)
 option(RETRACE_BUILD_STATIC        "Build static libraries"                              OFF)
-option(RETRACE_ENABLE_RPC          "Enable RPC subsystem"                                OFF)
 option(RETRACE_ENABLE_COVERAGE     "Enable code coverage instrumentation"               OFF)
 option(RETRACE_ENABLE_ASAN         "Enable AddressSanitizer"                             OFF)
 option(RETRACE_ENABLE_UBSAN        "Enable UndefinedBehaviorSanitizer"                   OFF)
@@ -287,9 +286,6 @@ endif()
 if(RETRACE_BUILD_CLI)
 	set(RTR_V2_WRAPPER ON)
 endif()
-if(RETRACE_ENABLE_RPC)
-	set(RTR_RPC ON)
-endif()
 
 # Generate config.h from the template
 configure_file(
@@ -434,10 +430,6 @@ endif()
 
 if(RETRACE_BUILD_EXAMPLES)
 	add_subdirectory(examples)
-endif()
-
-if(RETRACE_ENABLE_RPC)
-	add_subdirectory(rpc)
 endif()
 
 # The offline analysis tools are portable C and Windows users need

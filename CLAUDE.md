@@ -29,7 +29,6 @@ Useful CMake options:
 - `RETRACE_BUILD_CLI` (default ON) — build the CLI launcher (placeholder; new CLI lands in Phase 10).
 - `RETRACE_BUILD_TESTS` (default OFF) — build the per-feature test binaries in `test/`.
 - `RETRACE_BUILD_EXAMPLES` (default OFF) — build the demos under `examples/`.
-- `RETRACE_ENABLE_RPC` (default OFF) — build the `rpc/` subtree.
 - `RETRACE_ENABLE_ASAN` / `RETRACE_ENABLE_UBSAN` / `RETRACE_ENABLE_TSAN` / `RETRACE_ENABLE_COVERAGE` — instrumentation toggles (see `cmake/Sanitizers.cmake`).
 
 The CMake build does feature probes (`CheckIncludeFile`, `CheckSymbolExists`, `CheckCSourceCompiles`) that populate `config.h` from `cmake/config.h.cmake.in`. Per-OS selection happens via `RETRACE_PLATFORM_{LINUX,DARWIN,FREEBSD,OPENBSD,NETBSD,WINDOWS}`.
@@ -138,6 +137,5 @@ Analysis/tooling:
 - `tools/snap2inside/` + `tools/flatpak2inside/` — packaging declared-set conversion (personal-files/system-files plugs map via their inline read/write lists)
 - `tools/win-run/` — Windows launcher (CreateProcess suspended + DLL injection)
 - `tools/spawn/` — concurrent-process spawner for stress-testing; `tools/stringinjector/` — file/string injection helper
-- `rpc/` — opt-in RPC layer (built with `RETRACE_ENABLE_RPC=ON`); has templated function tables (`functions.{c,h}.template`, `handlers.c.template`, `shim.{c,h}.template`)
 
 Local CI parity: `CHECKPATCH_INSTALL=<dir> bash ci/checkpatch.sh` self-stages `const_structs`/`typedefs` config when the install lacks them; run it AFTER committing (it checks the last commit's diff).
