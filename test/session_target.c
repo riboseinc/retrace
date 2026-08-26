@@ -105,7 +105,11 @@ static void run_leaf(void)
 {
 	printf("stage:leaf denied=%d\n", probe_denied());
 	fflush(stdout);
-	sleep(2);
+	/* the fresh image's agent needs constructor + settle (250ms)
+	 * + connect + HELLO; loaded CI runners need a wider window
+	 * than the root because the leaf's whole life is this sleep
+	 */
+	sleep(5);
 }
 
 static void run_hop(const char *self, const char *lib)
@@ -170,7 +174,7 @@ int main(int argc, char **argv)
 			 * its connection down (CI runners need the
 			 * wider window)
 			 */
-			sleep(2);
+			sleep(5);
 			execve(argv[0],
 				(char *[]){argv[0], (char *)"--leaf",
 					NULL},
