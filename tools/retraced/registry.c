@@ -181,6 +181,8 @@ struct json_value_t *retraced_registry_to_json(
 			e->parent_id[0] != '\0' ? e->parent_id : NULL);
 		json_object_set_number(o, "parent_hole",
 			(double)e->parent_hole);
+		json_object_set_number(o, "spectator",
+			(double)e->spectator);
 		json_object_set_string(o, "cmdline", e->cmdline);
 		json_object_set_number(o, "pid", (double)e->pid);
 		json_object_set_number(o, "ppid", (double)e->ppid);

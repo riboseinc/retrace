@@ -32,11 +32,13 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
 #include "protocol.h"
 #include "journal.h"
+#include "peer_gate.h"
 
 #include "parson.h"
 
@@ -54,6 +56,14 @@ static volatile sig_atomic_t g_stop;
  */
 static char *g_policy_blob;
 static long g_policy_epoch;
+
+/* Agent-plane nonce (TODO.supervisor/08 P0): minted at startup
+ * (or injected via --nonce for reproducible runs), delivered to
+ * spawners out-of-band (--nonce-file), presented by agents in
+ * HELLO. No/wrong nonce => spectator: events still flow
+ * (evidence), commands and policy never do.
+ */
+static char g_agent_nonce[65];
 
 static int load_policy(const char *path)
 {
@@ -134,6 +144,7 @@ struct conn {
 	size_t fill;
 	char agent_id[RETRACED_AGENT_ID_MAX];
 	int helloed;
+	int spectator;
 };
 
 static int write_frame(int fd, uint16_t type, const char *payload)
@@ -179,6 +190,7 @@ static void handle_agent_frame(struct conn *c,
 	case RETRACE_RPC_MSG_HELLO: {
 		char session[RETRACED_SESSION_MAX];
 		char cmdline[RETRACED_CMDLINE_MAX];
+		char nonce[80];
 		struct agent_entry *e;
 		char welcome[512];
 		long pid, ppid;
@@ -189,8 +201,15 @@ static void handle_agent_frame(struct conn *c,
 		o = json_value_get_object(v);
 		jstr(o, "session_token", session, sizeof(session));
 		jstr(o, "cmdline", cmdline, sizeof(cmdline));
+		jstr(o, "nonce", nonce, sizeof(nonce));
 		pid = (long)json_object_get_number(o, "pid");
 		ppid = (long)json_object_get_number(o, "ppid");
+		/* P0 auth (TODO.supervisor/08): a HELLO without the
+		 * channel nonce is a spectator -- evidence flows,
+		 * policy and commands never reach it
+		 */
+		c->spectator = !retraced_nonce_matches(nonce,
+			g_agent_nonce);
 		/* agent-supplied ids are honored when the schema
 		 * grows re-HELLO (plan 04); P0 mints from pid
 		 */
@@ -205,6 +224,7 @@ static void handle_agent_frame(struct conn *c,
 		snprintf(c->agent_id, sizeof(c->agent_id), "%s",
 			e->id);
 		c->helloed = 1;
+		e->spectator = c->spectator;
 		e->last_hb_ms = now_ms();
 
 		/*
@@ -243,19 +263,30 @@ static void handle_agent_frame(struct conn *c,
 		}
 
 		snprintf(welcome, sizeof(welcome),
-			"{\"agent_id\":\"%s\",\"session_token\":\"%s\",\"policy_epoch\":%ld,\"heartbeat_ms\":1000}",
-			e->id, e->session, g_policy_epoch);
+			"{\"agent_id\":\"%s\",\"session_token\":\"%s\",\"policy_epoch\":%ld,\"heartbeat_ms\":1000,\"role\":\"%s\"}",
+			e->id, e->session, g_policy_epoch,
+			c->spectator ? "spectator" : "full");
 		write_frame(c->fd, RETRACE_RPC_MSG_WELCOME, welcome);
 		/* the policy rides every registration: an agent
 		 * that re-HELLOs after a daemon restart gets the
 		 * current epoch again (and refuses it if it
-		 * already holds a newer one)
+		 * already holds a newer one). Spectators never
+		 * receive policy or commands.
 		 */
-		if (g_policy_blob != NULL)
+		if (g_policy_blob != NULL && !c->spectator)
 			write_frame(c->fd, RETRACE_RPC_MSG_POLICY_SET,
 				g_policy_blob);
-		printf("retraced: agent %s (pid %ld) registered\n",
-			e->id, pid);
+		{
+			char ev[224];
+
+			snprintf(ev, sizeof(ev),
+				"{\"name\":\"retrace.auth.agent\",\"agent\":\"%s\",\"role\":\"%s\"}",
+				e->id, c->spectator ? "spectator" : "full");
+			retraced_journal_event(jr,
+				(long)time(NULL), "daemon", 0, ev);
+		}
+		printf("retraced: agent %s (pid %ld) registered%s\n",
+			e->id, pid, c->spectator ? " (spectator)" : "");
 		break;
 	}
 	case RETRACE_RPC_MSG_HEARTBEAT:
@@ -343,7 +374,8 @@ static int push_policy_to_agents(struct conn *conns,
 	int i, pushed = 0;
 
 	for (i = 0; i < MAX_AGENTS; i++) {
-		if (conns[i].fd >= 0 && conns[i].helloed) {
+		if (conns[i].fd >= 0 && conns[i].helloed &&
+		    !conns[i].spectator) {
 			write_frame(conns[i].fd,
 				RETRACE_RPC_MSG_POLICY_SET, blob);
 			pushed++;
@@ -560,12 +592,44 @@ static void handle_ctl_readable(struct conn *conns,
 	}
 }
 
+/*
+ * Accept gate (TODO.supervisor/08 P0): refuse and journal any
+ * peer that is not the daemon's euid or root. Returns the
+ * accepted fd, or -1 (already closed + journaled).
+ */
+static int accept_gated(int listen_fd,
+	struct retraced_journal *jr)
+{
+	int fd = accept(listen_fd, NULL, NULL);
+	long puid = -1;
+
+	if (fd < 0)
+		return -1;
+	if (retraced_peer_uid(fd, &puid) != 0)
+		return fd;	/* no query on this platform */
+	if (retraced_peer_allowed(puid, geteuid()))
+		return fd;
+	{
+		char ev[160];
+
+		snprintf(ev, sizeof(ev),
+			"{\"name\":\"retrace.auth.refused\",\"peer_uid\":%ld}",
+			puid);
+		retraced_journal_event(jr, (long)time(NULL),
+			"daemon", 0, ev);
+	}
+	close(fd);
+	return -1;
+}
+
 int main(int argc, char **argv)
 {
 	const char *sock_path = "/tmp/retraced.agent.sock";
 	const char *journal_path = "retraced-journal.jsonl";
 	const char *policy_path = NULL;
 	const char *ctl_path = NULL;
+	const char *nonce_arg = NULL;
+	const char *nonce_file = NULL;
 	struct retraced_registry reg;
 	struct retraced_journal jr;
 	struct conn *conns;
@@ -586,14 +650,23 @@ int main(int argc, char **argv)
 			policy_path = argv[++i];
 		else if (strcmp(argv[i], "--ctl") == 0 && i + 1 < argc)
 			ctl_path = argv[++i];
+		else if (strcmp(argv[i], "--nonce") == 0 && i + 1 < argc)
+			nonce_arg = argv[++i];
+		else if (strcmp(argv[i], "--nonce-file") == 0 &&
+			 i + 1 < argc)
+			nonce_file = argv[++i];
 		else {
 			fprintf(stderr,
 				"Usage: retraced [--sock <path>] [--journal <path>]\n"
-				"                 [--policy <file>]\n"
+				"                 [--policy <file>] [--ctl <path>]\n"
+				"                 [--nonce <hex32>] [--nonce-file <path>]\n"
 				"  --policy: a policy file (header + full\n"
 				"    retrace config) pushed to every agent\n"
 				"    at registration; POLICY_ACKs are\n"
-				"    journaled\n");
+				"    journaled\n"
+				"  --nonce: fix the agent nonce (32 hex; tests)\n"
+				"  --nonce-file: write the minted nonce here\n"
+				"    (0600) for spawners to inject\n");
 			return 2;
 		}
 	}
@@ -627,6 +700,49 @@ int main(int argc, char **argv)
 	if (policy_path != NULL && load_policy(policy_path) != 0)
 		return 1;
 
+	/* P0 transport auth (TODO.supervisor/08): mint or adopt the
+	 * agent nonce; publish it for spawners when asked
+	 */
+	if (nonce_arg != NULL) {
+		size_t j;
+
+		if (strlen(nonce_arg) != 32) {
+			fprintf(stderr,
+				"retraced: --nonce wants 32 hex chars\n");
+			return 2;
+		}
+		for (j = 0; nonce_arg[j] != '\0'; j++) {
+			if (strchr("0123456789abcdef", nonce_arg[j]) == NULL) {
+				fprintf(stderr,
+					"retraced: --nonce wants hex chars only\n");
+				return 2;
+			}
+		}
+		snprintf(g_agent_nonce, sizeof(g_agent_nonce), "%s",
+			nonce_arg);
+	} else {
+		retraced_registry_mint_session(g_agent_nonce);
+	}
+	if (!retraced_peer_query_supported()) {
+		char ev[128];
+
+		snprintf(ev, sizeof(ev),
+			"{\"name\":\"retrace.auth.gate_unavailable\"}");
+		retraced_journal_event(&jr, (long)time(NULL),
+			"daemon", 0, ev);
+	}
+	if (nonce_file != NULL) {
+		FILE *nf = fopen(nonce_file, "w");
+
+		if (nf == NULL) {
+			perror("nonce-file");
+			return 1;
+		}
+		fprintf(nf, "%s\n", g_agent_nonce);
+		fclose(nf);
+		chmod(nonce_file, 0600);
+	}
+
 	/* 1 MiB frame buffer per agent -- the heap, not the
 	 * stack: 128 x (cap + header) overflows any main frame
 	 * (found the hard way: ___chkstk_darwin in the prologue)
@@ -656,6 +772,7 @@ int main(int argc, char **argv)
 		perror("listen");
 		return 1;
 	}
+	chmod(sock_path, 0660);
 	printf("retraced: listening on %s (agents)\n", sock_path);
 
 	if (ctl_path != NULL) {
@@ -673,6 +790,7 @@ int main(int argc, char **argv)
 				close(g_ctl_listen);
 				g_ctl_listen = -1;
 			} else {
+				chmod(ctl_path, 0600);
 				printf("retraced: controller on %s\n",
 					ctl_path);
 			}
@@ -717,7 +835,7 @@ int main(int argc, char **argv)
 		if (g_ctl_pfd_slot >= 0 &&
 		    (pfds[g_ctl_pfd_slot].revents & POLLIN) &&
 		    g_ctl_fd < 0) {
-			g_ctl_fd = accept(g_ctl_listen, NULL, NULL);
+			g_ctl_fd = accept_gated(g_ctl_listen, &jr);
 			g_ctl_fill = 0;
 		}
 		if (g_ctl_fd >= 0) {
@@ -733,7 +851,7 @@ int main(int argc, char **argv)
 		}
 
 		if (pfds[0].revents & POLLIN) {
-			int fd = accept(listen_fd, NULL, NULL);
+			int fd = accept_gated(listen_fd, &jr);
 
 			if (fd >= 0) {
 				int slot = -1;
@@ -761,6 +879,7 @@ int main(int argc, char **argv)
 					conns[slot].fill = 0;
 					conns[slot].agent_id[0] = '\0';
 					conns[slot].helloed = 0;
+					conns[slot].spectator = 0;
 				} else {
 					close(fd);
 				}

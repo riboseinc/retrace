@@ -192,6 +192,18 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 120)
 
+	# Transport auth (TODO.supervisor/08 P0): socket mode
+	# gates, nonce roles (spectator vs full), peer-uid refusal.
+	add_test(NAME integration-supervisor-auth
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_supervisor_auth.py
+			$<TARGET_FILE:retrace_retraced>
+			$<TARGET_FILE:retrace_v2>
+			$<TARGET_FILE:retrace_test_policy_target>)
+	set_tests_properties(integration-supervisor-auth PROPERTIES
+		LABELS "integration"
+		TIMEOUT 120)
+
 	add_test(NAME integration-supervisor-session
 		COMMAND ${Python3_EXECUTABLE}
 			${CMAKE_SOURCE_DIR}/test/integration/test_supervisor_session.py

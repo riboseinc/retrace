@@ -39,6 +39,7 @@ struct agent_entry {
 	long pid;
 	long ppid;
 	int parent_hole;	/* ppid known, no traced agent there */
+	int spectator;		/* nonceless HELLO: evidence only */
 	uint64_t policy_epoch;
 	uint64_t last_seq;
 	long last_hb_ms;

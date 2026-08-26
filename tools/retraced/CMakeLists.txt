@@ -8,7 +8,7 @@
 set(_parson_source ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 
 add_executable(retrace_retraced
-	main.c registry.c journal.c ${_parson_source})
+	main.c registry.c journal.c peer_gate.c ${_parson_source})
 set_target_properties(retrace_retraced PROPERTIES
 	OUTPUT_NAME retraced)
 

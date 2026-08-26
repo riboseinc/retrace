@@ -616,12 +616,19 @@ static int try_connect(void)
 		char hello[512];
 		const char *sess = retrace_real_impls.getenv(
 			"RETRACE_SESSION");
+		/* channel nonce (TODO.supervisor/08): presented in
+		 * HELLO; no/wrong nonce lands the agent a
+		 * read-only spectator role on the daemon side
+		 */
+		const char *nonce = retrace_real_impls.getenv(
+			"RETRACE_SUPERVISOR_NONCE");
 
 		snprintf(hello, sizeof(hello),
-			"{\"session_token\":\"%s\",\"pid\":%ld,"
+			"{\"session_token\":\"%s\",\"nonce\":\"%s\",\"pid\":%ld,"
 			"\"ppid\":%ld,\"boot_id\":\"proc\","
 			"\"cmdline\":\"\",\"retrace_version\":\"agent\"}",
 			sess != NULL ? sess : "",
+			nonce != NULL ? nonce : "",
 			(long)getpid(), (long)getppid());
 		if (send_frame(RETRACE_RPC_MSG_HELLO, hello) != 0) {
 			drop_connection();
