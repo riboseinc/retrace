@@ -13,6 +13,11 @@
 if(RETRACE_PLATFORM_WINDOWS)
 	add_executable(getenv getenv-fuzzing/getenv.c)
 	add_executable(escape-demo escape-hunting/escape-demo.c)
+
+# supervisor-quickstart (TODO.supervisor/09): app.c is built by
+# the runner script itself (self-contained demo); nothing to
+# build here -- the flow is exercised by
+# integration-supervisor-quickstart.
 	add_executable(quickstart-app
 		trace-profile-quickstart/app.c)
 	return()
