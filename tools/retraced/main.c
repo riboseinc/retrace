@@ -635,6 +635,14 @@ int main(int argc, char **argv)
 	struct conn *conns;
 	struct sockaddr_un sa;
 	struct pollfd pfds[MAX_AGENTS + 3];
+	/* conn slot -> pollfd index (packed: holes skipped); -1
+	 * when the slot is empty. The read loop used to index
+	 * pfds[slot + 1], which only holds while NO earlier slot
+	 * ever disconnected -- after the first disconnect, every
+	 * later agent's readiness was read from a stranger's
+	 * entry: missed events, false stale sweeps.
+	 */
+	int pfd_of[MAX_AGENTS];
 	int listen_fd;
 	long last_sweep;
 	int i;
@@ -822,9 +830,11 @@ int main(int argc, char **argv)
 			g_ctl_pfd_slot = ctl_idx;
 		}
 		for (i = 0; i < MAX_AGENTS; i++) {
+			pfd_of[i] = -1;
 			if (conns[i].fd >= 0) {
 				pfds[nfd].fd = conns[i].fd;
 				pfds[nfd].events = POLLIN;
+				pfd_of[i] = nfd;
 				nfd++;
 			}
 		}
@@ -888,7 +898,9 @@ int main(int argc, char **argv)
 		for (i = 0; i < MAX_AGENTS; i++) {
 			if (conns[i].fd < 0)
 				continue;
-			if (!(pfds[i + 1].revents & (POLLIN | POLLHUP)))
+			if (pfd_of[i] < 0 ||
+			    !(pfds[pfd_of[i]].revents &
+			      (POLLIN | POLLHUP)))
 				continue;
 			{
 				ssize_t n = read(conns[i].fd,
