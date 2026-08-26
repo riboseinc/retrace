@@ -172,7 +172,7 @@ def main():
         except OSError:
             pass
         import glob
-        for bc in sorted(glob.glob("/tmp/agent-bc-*.log")):
+        for bc in sorted(glob.glob("/tmp/agent-trace-*.log")):
             try:
                 with open(bc) as f:
                     print(f"  fbc {bc}: {f.read()[:120]!r}",
