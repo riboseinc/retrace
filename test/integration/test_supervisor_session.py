@@ -15,6 +15,7 @@ the daemon's final registry snapshot and journal:
 Usage: test_supervisor_session.py <retraced> <libretrace> <target>
 """
 import json
+import re
 import os
 import signal
 import subprocess
