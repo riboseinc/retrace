@@ -1,0 +1,42 @@
+name: debug-arm-crash (temporary)
+on:
+  push:
+    branches: [supervisor/04-sessions]
+jobs:
+  gdb-trace:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc libcmocka-dev gdb
+      - name: build
+        run: |
+          cmake -B build -G Ninja -DRETRACE_BUILD_TESTS=ON \
+            -DRETRACE_BUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build -j 4
+      - name: gdb via env
+        run: |
+          D=build/tools/retraced/retraced
+          L=$(pwd)/build/src/v2/libretrace.so
+          T=$(pwd)/build/test/jail_otlp_target
+          SOCK=$(mktemp -u /tmp/dbg-sock.XXXX)
+          JNL=$(mktemp -u /tmp/dbg-jnl.XXXX)
+          CFG=$(mktemp -p /tmp dbg-cfg-XXXX.json)
+          cat > "$CFG" <<EOF
+          {"intercept_scripts": [{"func_name": "open",
+            "actions": [{"action_name": "sandbox",
+            "action_params": {"deny_paths": ["/etc/hosts"]}},
+            {"action_name": "call_real"}]}]}
+          EOF
+          "$D" --sock "$SOCK" --journal "$JNL" & DPID=$!
+          sleep 0.5
+          gdb -batch -ex 'set pagination off' -ex run \
+            -ex 'bt 30' -ex 'info threads' \
+            --args /usr/bin/env \
+            RETRACE_JSON_CONFIG="$CFG" RETRACE_SUPERVISOR=1 \
+            RETRACE_SUPERVISOR_EAGER=1 RETRACE_SUPERVISOR_SOCK="$SOCK" \
+            RETRACE_LOGGER_DEF_ENA=0 LD_PRELOAD="$L" \
+            "$T" /etc/hosts /etc/protocols 2>&1 | tail -70 || true
+          kill $DPID 2>/dev/null || true
