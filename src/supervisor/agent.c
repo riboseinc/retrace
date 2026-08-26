@@ -24,6 +24,7 @@
 #ifndef _WIN32
 #include <dlfcn.h>
 #include <poll.h>
+
 #include <stdatomic.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -528,8 +529,9 @@ static void handle_frame(const uint8_t *buf, size_t len)
 static int try_connect(void)
 {
 	struct sockaddr_un sa;
-	int fd = retrace_real_impls.rc_socket(AF_UNIX, SOCK_STREAM,
-		0);
+	int fd = retrace_real_impls.rc_socket != NULL ?
+		retrace_real_impls.rc_socket(AF_UNIX, SOCK_STREAM, 0)
+		: socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if (fd < 0)
 		return -1;
@@ -545,11 +547,21 @@ static int try_connect(void)
 	sa.sun_family = AF_UNIX;
 	strncpy(sa.sun_path, g_agent.sock_path,
 		sizeof(sa.sun_path) - 1);
-	if (retrace_real_impls.rc_connect(fd,
-		    (struct sockaddr *)&sa, (unsigned int)sizeof(sa))
-		    != 0) {
-		retrace_real_impls.rc_close(fd);
-		return -1;
+	{
+		int crc = retrace_real_impls.rc_connect != NULL ?
+			retrace_real_impls.rc_connect(fd,
+			    (struct sockaddr *)&sa,
+			    (unsigned int)sizeof(sa)) :
+			connect(fd, (struct sockaddr *)&sa,
+				sizeof(sa));
+
+		if (crc != 0) {
+			if (retrace_real_impls.rc_close != NULL)
+				retrace_real_impls.rc_close(fd);
+			else
+				close(fd);
+			return -1;
+		}
 	}
 	g_agent.fd = fd;
 
