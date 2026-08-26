@@ -122,16 +122,27 @@ def main():
         except subprocess.TimeoutExpired:
             print("FAIL: target timed out at 25s", file=sys.stderr)
             try:
-                ps = subprocess.run(
-                    ["ps", "-e", "-o",
+                ps_lines = subprocess.run(
+                    ["ps", "-e", "-L", "-o",
                      "pid,ppid,tid,stat,wchan,comm"],
                     stdout=subprocess.PIPE, timeout=5).stdout.decode(
-                         "utf-8", "replace")
-                for ln in ps.splitlines():
+                         "utf-8", "replace").splitlines()
+                for ln in ps_lines:
                     if "session_target" in ln:
                         print(f"  ps: {ln[:180]}", file=sys.stderr)
             except (OSError, subprocess.TimeoutExpired) as e:
                 print(f"  ps: failed: {e}", file=sys.stderr)
+            for pid in {ln.split()[0] for ln in ps_lines
+                         if "session_target" in ln}:
+                try:
+                    with open(f"/proc/{pid}/stack") as f:
+                        for k, ln in enumerate(f.read().splitlines()):
+                            print(f"  /proc/{pid}/stack:"
+                                  f" {ln[:140]}", file=sys.stderr)
+                            if k >= 18:
+                                break
+                except OSError:
+                    pass
             try:
                 with open(out_path) as f:
                     print(f"  out: {f.read()[:500]!r}",
