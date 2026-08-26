@@ -23,6 +23,7 @@
 
 #ifndef _WIN32
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <poll.h>
 
 #include <stdatomic.h>
@@ -75,6 +76,12 @@ static void *agent_thread_main(void *arg);
 static void agent_atfork_prepare(void);
 static void agent_atfork_parent(void);
 static void agent_atfork_child(void);
+
+/* temporary file-only lifecycle trace (/tmp/agent-bc-<pid>.log):
+ * the thread's permanent guard makes plain open/write/close
+ * dispatch-safe. Strip when S's story is complete.
+ */
+static void bc(const char *stage);
 
 /* ---------- producer side (any thread) ---------- */
 
@@ -465,6 +472,25 @@ static void resolve_reals(void)
 				"pthread_atfork");
 }
 
+static void bc(const char *stage)
+{
+	char path[64];
+	char line[96];
+	int fd;
+
+	snprintf(path, sizeof(path), "/tmp/agent-trace-%ld.log",
+		(long)getpid());
+	fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
+	if (fd < 0)
+		return;
+	{
+		ssize_t n = snprintf(line, sizeof(line), "%s\n", stage);
+
+		(void)write(fd, line, (size_t)n);
+	}
+	close(fd);
+}
+
 /* Daemon frames: WELCOME captures the minted agent_id (later
  * sends cite it) and the SESSION TOKEN -- stamped into the env
  * with the REAL setenv so exec'd children inherit it (supervisor
@@ -530,9 +556,12 @@ static int try_connect(void)
 {
 	struct sockaddr_un sa;
 
-	int fd = retrace_real_impls.rc_socket != NULL ?
-		retrace_real_impls.rc_socket(AF_UNIX, SOCK_STREAM, 0)
-		: socket(AF_UNIX, SOCK_STREAM, 0);
+	bc("try_connect");
+	{
+		int fd = retrace_real_impls.rc_socket != NULL ?
+			retrace_real_impls.rc_socket(AF_UNIX,
+				SOCK_STREAM, 0)
+			: socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if (fd < 0)
 		return -1;
@@ -583,6 +612,7 @@ static int try_connect(void)
 		}
 	}
 	return 0;
+	}
 }
 
 static void drain_queue(void)
