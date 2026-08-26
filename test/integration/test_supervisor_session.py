@@ -158,6 +158,18 @@ def main():
         print(f"FAIL: expected >=4 agents, got {len(agents)}: "
               f"{[a.get('id') for a in agents]}", file=sys.stderr)
         try:
+            with open(dlog) as f:
+                for ln in f.read().splitlines()[-14:]:
+                    print(f"  d: {ln[:150]}", file=sys.stderr)
+        except OSError:
+            pass
+        try:
+            with open(err_path) as f:
+                for ln in f.read().splitlines()[-6:]:
+                    print(f"  err: {ln[:150]}", file=sys.stderr)
+        except OSError:
+            pass
+        try:
             with open(out_path) as f:
                 print(f"  out: {f.read()[:300]!r}", file=sys.stderr)
         except OSError:
