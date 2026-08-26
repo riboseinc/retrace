@@ -681,6 +681,14 @@ static void *agent_thread_main(void *arg)
 			agent_atfork_parent, agent_atfork_child);
 #endif
 
+	/* an inherited thread's spawner pid is the parent -- bail
+	 * on the first loop iteration so only the new (correctly
+	 * owned) thread runs
+	 */
+	if (g_agent.spawner_pid != (long)getpid()) {
+		bc("inherited_thread_exit");
+		return NULL;
+	}
 	while (!atomic_load(&g_agent.stop)) {
 		if (!g_agent.connected) {
 			if (try_connect() == 0) {
