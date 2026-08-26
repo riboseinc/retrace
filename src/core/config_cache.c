@@ -25,6 +25,7 @@
 
 #include "config_cache.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
