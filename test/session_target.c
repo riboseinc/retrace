@@ -162,8 +162,10 @@ int main(int argc, char **argv)
 
 		if (c == 0) {
 			char *envp[512];
+			int drc = probe_denied();
 
-			probe_denied();
+			printf("stage:s-child denied=%d\n", drc);
+			fflush(stdout);
 			/* let the agent register BEFORE the exec tears
 			 * its connection down (CI runners need the
 			 * wider window)
