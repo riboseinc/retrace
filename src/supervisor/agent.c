@@ -686,7 +686,9 @@ static void *agent_thread_main(void *arg)
 	 * owned) thread runs
 	 */
 	if (g_agent.spawner_pid != (long)getpid()) {
-		bc("inherited_thread_exit");
+		/* inherited thread bails (pid mismatch); no trace -- the
+		 * fork-reset breadcrumb in the same file is the witness
+		 */
 		return NULL;
 	}
 	while (!atomic_load(&g_agent.stop)) {
