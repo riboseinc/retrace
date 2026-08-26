@@ -124,7 +124,23 @@ void retrace_engine_wrapper(char *func_name,
 	func_name = strip_darwin_extsn(func_name, clean_name,
 		sizeof(clean_name));
 
-	real_impl = retrace_as_get_real_safe(func_name);
+	/*
+	 * The ALLOCATOR lookups must never dlsym: glibc's dlsym
+	 * frees its per-thread dlerror result through the PLT
+	 * (_dlerror_run -> dl_error_free -> free), that dispatch
+	 * re-enters here, and this very dlsym would recurse without
+	 * bound -- the reentrance guard sits BELOW this line and
+	 * cannot break a cycle that never reaches it. The real
+	 * allocator impls are resolved once at init; use them.
+	 */
+	if (strcmp(func_name, "free") == 0 &&
+	    retrace_real_impls.free != NULL)
+		real_impl = retrace_real_impls.free;
+	else if (strcmp(func_name, "malloc") == 0 &&
+		 retrace_real_impls.malloc != NULL)
+		real_impl = retrace_real_impls.malloc;
+	else
+		real_impl = retrace_as_get_real_safe(func_name);
 	if (!retrace_inited) {
 		retrace_as_sched_real(arch_spec_ctx, real_impl);
 		return;
