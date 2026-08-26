@@ -23,6 +23,7 @@
 
 #ifndef _WIN32
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <poll.h>
 
 #include <stdatomic.h>
@@ -530,6 +531,8 @@ static void handle_frame(const uint8_t *buf, size_t len)
 static int try_connect(void)
 {
 	struct sockaddr_un sa;
+
+	breadcrumb("try_connect", g_agent.sock_path);
 	int fd = retrace_real_impls.rc_socket != NULL ?
 		retrace_real_impls.rc_socket(AF_UNIX, SOCK_STREAM, 0)
 		: socket(AF_UNIX, SOCK_STREAM, 0);
@@ -608,14 +611,39 @@ static void drain_queue(void)
  */
 static void breadcrumb(const char *stage, const char *detail)
 {
-	const char *kv[4];
+	/* FILE trace first: the journal breadcrumbs only drain
+	 * after HELLO, so a never-connecting thread is invisible
+	 * there. The thread's permanent guard makes the plain
+	 * open/write/close dispatch-bounce to the real ones.
+	 */
+	{
+		char path[64];
+		char line[160];
+		int fd;
 
-	kv[0] = "retrace.agent.stage";
-	kv[1] = stage;
-	kv[2] = "retrace.agent.detail";
-	kv[3] = detail != NULL ? detail : "";
-	(void)retrace_agent_emit_event("retrace.agent.lifecycle",
-		kv, 2);
+		snprintf(path, sizeof(path), "/tmp/agent-bc-%ld.log",
+			(long)getpid());
+		fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
+		if (fd >= 0) {
+			ssize_t n = snprintf(line, sizeof(line),
+				"%s %s\n", stage,
+				detail != NULL ? detail : "");
+
+			(void)write(fd, line, (size_t)n);
+			close(fd);
+		}
+	}
+
+	{
+		const char *kv[4];
+
+		kv[0] = "retrace.agent.stage";
+		kv[1] = stage;
+		kv[2] = "retrace.agent.detail";
+		kv[3] = detail != NULL ? detail : "";
+		(void)retrace_agent_emit_event(
+			"retrace.agent.lifecycle", kv, 2);
+	}
 }
 
 static void *agent_thread_main(void *arg)

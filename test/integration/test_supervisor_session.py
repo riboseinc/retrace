@@ -171,6 +171,14 @@ def main():
                     print(f"  err: {ln[:150]}", file=sys.stderr)
         except OSError:
             pass
+        import glob
+        for bc in sorted(glob.glob("/tmp/agent-bc-*.log")):
+            try:
+                with open(bc) as f:
+                    print(f"  fbc {bc}: {f.read()[:120]!r}",
+                          file=sys.stderr)
+            except OSError:
+                pass
         for rec in journal_records(journal):
             ev = rec.get("ev", {})
             name = ev.get("name", "")
