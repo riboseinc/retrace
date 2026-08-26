@@ -115,8 +115,32 @@ def main():
         env["LD_PRELOAD"] = lib
     err_path = os.path.join(work, "target.err")
     with open(out_path, "w") as out_f, open(err_path, "w") as err_f:
-        proc = subprocess.run([target], env=env, stdout=out_f,
-                              stderr=err_f, timeout=60)
+        proc = subprocess.Popen([target], env=env, stdout=out_f,
+                                stderr=err_f)
+        try:
+            proc.wait(timeout=25)
+        except subprocess.TimeoutExpired:
+            print("FAIL: target timed out at 25s", file=sys.stderr)
+            try:
+                ps = subprocess.run(
+                    ["ps", "-e", "-o",
+                     "pid,ppid,tid,stat,wchan,comm"],
+                    stdout=subprocess.PIPE, timeout=5).stdout.decode(
+                         "utf-8", "replace")
+                for ln in ps.splitlines():
+                    if "session_target" in ln:
+                        print(f"  ps: {ln[:180]}", file=sys.stderr)
+            except (OSError, subprocess.TimeoutExpired) as e:
+                print(f"  ps: failed: {e}", file=sys.stderr)
+            try:
+                with open(out_path) as f:
+                    print(f"  out: {f.read()[:500]!r}",
+                          file=sys.stderr)
+            except OSError:
+                pass
+            proc.kill()
+            d.kill()
+            return 1
     if proc.returncode != 0:
         d.kill()
         print(f"FAIL: target rc={proc.returncode}", file=sys.stderr)
