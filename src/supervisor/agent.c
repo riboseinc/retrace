@@ -126,14 +126,22 @@ static int spawn_agent_thread(void)
 
 	if (atomic_compare_exchange_strong(&g_agent.thread_spawned,
 		&expected, 1)) {
-		int rc = retrace_real_impls.rc_thread_create(
-			&g_agent.tid, agent_thread_main, NULL);
-
-		if (rc != 0) {
-			atomic_store(&g_agent.thread_spawned, 0);
-			return -1;
-		}
+		/* OWN the spawn BEFORE the create: the new thread's
+		 * first loop check reads spawner_pid, and a thread can
+		 * start before rc_thread_create returns -- reading the
+		 * stale (parent's) pid made fresh threads bail on
+		 * arrival in fork children
+		 */
 		g_agent.spawner_pid = (long)getpid();
+		{
+			int rc = retrace_real_impls.rc_thread_create(
+				&g_agent.tid, agent_thread_main, NULL);
+
+			if (rc != 0) {
+				atomic_store(&g_agent.thread_spawned, 0);
+				return -1;
+			}
+		}
 	}
 	return 0;
 }
