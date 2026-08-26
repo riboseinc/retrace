@@ -39,7 +39,26 @@ struct cache_entry {
 struct cache_snap {
 	struct cache_entry entries[CONFIG_CACHE_MAX_ENTRIES];
 	int count;
+	/*
+	 * Hash index (perf): the historical lookup was a LINEAR
+	 * strcmp scan over every entry -- per interposed call.
+	 * FNV-1a + open addressing; indices are +1 (0 = empty).
+	 * Lives and dies with the snapshot (never-free doctrine).
+	 */
+	uint32_t *buckets;
+	size_t nbuckets;
 };
+
+static uint32_t name_hash(const char *s)
+{
+	uint32_t h = 2166136261u;
+
+	for (; *s != '\0'; s++) {
+		h ^= (unsigned char)*s;
+		h *= 16777619u;
+	}
+	return h;
+}
 
 /*
  * Swap-atomicity (TODO.supervisor/05): policies replace the
@@ -129,6 +148,25 @@ int retrace_config_cache_build(JSON_Object *conf)
 			snap->entries[snap->count].script = script;
 			snap->count++;
 		}
+		{
+			size_t nb = 8;
+
+			while (nb < (size_t)snap->count * 4)
+				nb <<= 1;
+			snap->buckets = calloc(nb,
+				sizeof(*snap->buckets));
+			snap->nbuckets = snap->buckets != NULL ? nb : 0;
+			for (i = 0; snap->buckets != NULL &&
+			     i < (size_t)snap->count; i++) {
+				size_t b = name_hash(
+					snap->entries[i].func_name) &
+					(nb - 1);
+
+				while (snap->buckets[b] != 0)
+					b = (b + 1) & (nb - 1);
+				snap->buckets[b] = (uint32_t)(i + 1);
+			}
+		}
 		snap_store(snap);
 	}
 
@@ -148,6 +186,22 @@ const JSON_Object *retrace_config_cache_lookup(const char *func_name)
 	if (func_name == NULL || snap == NULL)
 		return NULL;
 
+	if (snap->nbuckets > 0) {
+		size_t b = name_hash(func_name) &
+			(snap->nbuckets - 1);
+
+		for (;;) {
+			uint32_t idx = snap->buckets[b];
+
+			if (idx == 0)
+				return NULL;
+			if (retrace_real_impls.strcmp(
+				    snap->entries[idx - 1].func_name,
+				    func_name) == 0)
+				return snap->entries[idx - 1].script;
+			b = (b + 1) & (snap->nbuckets - 1);
+		}
+	}
 	for (i = 0; i < snap->count; i++) {
 		if (retrace_real_impls.strcmp(snap->entries[i].func_name,
 			    func_name) == 0) {
