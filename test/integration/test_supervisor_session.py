@@ -158,6 +158,35 @@ def main():
     if len(agents) < 4:
         print(f"FAIL: expected >=4 agents, got {len(agents)}: "
               f"{[a.get('id') for a in agents]}", file=sys.stderr)
+        # see whether the inherited thread is dead, blocked, or
+        # never scheduled -- the answer to S's missing reconnect
+        try:
+            ps = subprocess.run(
+                ["ps", "-e", "-o",
+                 "pid,tid,stat,wchan,comm"],
+                stdout=subprocess.PIPE, timeout=5).stdout.decode(
+                     "utf-8", "replace")
+            want = set()
+            for a in agents:
+                if a.get("pid") is not None:
+                    want.add(str(a["pid"]))
+            for ln in ps.splitlines():
+                if ln.split()[0] in want:
+                    print(f"  ps: {ln[:160]}", file=sys.stderr)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            print(f"  ps: failed: {e}", file=sys.stderr)
+        for a in agents:
+            p = a.get("pid")
+            if p is None:
+                continue
+            for path, kw in (("/proc/%d/status" % p, {}),
+                              ("/proc/%d/wchan" % p, {})):
+                try:
+                    with open(path) as f:
+                        v = f.read().strip()[:200]
+                    print(f"  {path}: {v}", file=sys.stderr)
+                except OSError:
+                    pass
         try:
             with open(dlog) as f:
                 for ln in f.read().splitlines()[-46:]:
