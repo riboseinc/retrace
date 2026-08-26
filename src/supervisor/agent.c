@@ -131,12 +131,11 @@ static int spawn_agent_thread(void)
 			&g_agent.tid, agent_thread_main, NULL);
 
 		if (rc != 0) {
-			char detail[48];
-
-			snprintf(detail, sizeof(detail), "%d", rc);
+			bc("spawn_failed");
 			atomic_store(&g_agent.thread_spawned, 0);
 			return -1;
 		}
+		bc("spawn_ok");
 	}
 	return 0;
 }
@@ -637,6 +636,8 @@ static void *agent_thread_main(void *arg)
 	long backoff_ms = AGENT_BACKOFF_MIN_MS;
 
 	(void)arg;
+
+	bc("thread_start");
 
 	/*
 	 * Settle past the process's init-adjacent phase (the gdb
