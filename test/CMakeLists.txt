@@ -192,6 +192,20 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 120)
 
+	# The farm/IR playbook, end to end (TODO.supervisor/09):
+	# register, tighten mid-run, freeze, journal the story.
+	if(NOT WIN32)
+		add_test(NAME integration-supervisor-quickstart
+			COMMAND ${CMAKE_COMMAND}
+				-DDEMO_DIR=${CMAKE_SOURCE_DIR}/examples/supervisor-quickstart
+				-DBUILD_DIR=${CMAKE_BINARY_DIR}
+				-DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
+				-P ${CMAKE_SOURCE_DIR}/test/RunQuickstart.cmake)
+		set_tests_properties(integration-supervisor-quickstart
+			PROPERTIES LABELS "integration"
+			TIMEOUT 120)
+	endif()
+
 	# Transport auth (TODO.supervisor/08 P0): socket mode
 	# gates, nonce roles (spectator vs full), peer-uid refusal.
 	add_test(NAME integration-supervisor-auth
