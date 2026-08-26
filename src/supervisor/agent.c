@@ -154,11 +154,18 @@ static int spawn_agent_thread(void)
 
 	if (atomic_compare_exchange_strong(&g_agent.thread_spawned,
 		&expected, 1)) {
-		if (retrace_real_impls.rc_thread_create(&g_agent.tid,
-			agent_thread_main, NULL) != 0) {
+		int rc = retrace_real_impls.rc_thread_create(
+			&g_agent.tid, agent_thread_main, NULL);
+
+		if (rc != 0) {
+			char detail[48];
+
+			snprintf(detail, sizeof(detail), "%d", rc);
+			breadcrumb("spawn_failed_rc", detail);
 			atomic_store(&g_agent.thread_spawned, 0);
 			return -1;
 		}
+		breadcrumb("spawn_ok", NULL);
 	}
 	return 0;
 }
