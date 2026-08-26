@@ -892,10 +892,36 @@ int retrace_agent_init(void)
 	return 0;
 }
 
+/*
+ * Kick runs on EVERY engine dispatch; the one-shot flag is
+ * load-bearing, not a fast path: re-registering on each
+ * dispatch put __register_atfork inside fork's own atfork_lock
+ * window (fork's prepare handler locks g_agent.mu through the
+ * INTERPOSED pthread_mutex_lock -- a full engine dispatch --
+ * whose kick then blocked on the atfork_lock fork itself
+ * holds: self-deadlock, the ubuntu-22.04/Alpine session hang).
+ * Duplicate handlers also relock g_agent.mu in one prepare
+ * pass on libcs without dedup (musl). Register once per
+ * image; fork children inherit the registration and their
+ * agent lifecycle is driven by emit's pid-ownership reset.
+ */
+static _Atomic int g_kick_done;
+
 void retrace_agent_kick(void)
 {
-	if (!g_agent.armed || !g_eager_wanted)
+	if (atomic_load_explicit(&g_kick_done, memory_order_relaxed))
 		return;
+	if (!g_agent.armed || !g_eager_wanted) {
+		atomic_store_explicit(&g_kick_done, 1,
+			memory_order_relaxed);
+		return;
+	}
+	if (atomic_load_explicit(&g_agent.thread_spawned,
+		memory_order_relaxed)) {
+		atomic_store_explicit(&g_kick_done, 1,
+			memory_order_relaxed);
+		return;
+	}
 	/*
 	 * Resolution on the MAIN thread, post-boot, WITH THE GUARD
 	 * ACTIVE (kick runs after guard-enter in the engine entry):
@@ -922,6 +948,7 @@ void retrace_agent_kick(void)
 			agent_atfork_parent, agent_atfork_child);
 #endif
 	(void)spawn_agent_thread();
+	atomic_store_explicit(&g_kick_done, 1, memory_order_relaxed);
 }
 
 void retrace_agent_deinit(void)
