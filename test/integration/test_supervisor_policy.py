@@ -33,6 +33,9 @@ DENIED = "/etc/hosts"
 ALLOWED = "/etc/protocols"
 
 
+TEST_NONCE = "0123456789abcdef0123456789abcdef"
+
+
 def wait_sock(path, deadline=5.0):
     end = time.time() + deadline
     while time.time() < end:
@@ -46,6 +49,7 @@ def start_daemon(daemon, sock, journal, policy_file, log_path):
     log_f = open(log_path, "w")
     d = subprocess.Popen(
         [daemon, "--sock", sock, "--journal", journal,
+         "--nonce", TEST_NONCE,
          "--policy", policy_file],
         stdout=log_f, stderr=subprocess.STDOUT)
     log_f.close()
@@ -260,6 +264,7 @@ def main():
         "RETRACE_SUPERVISOR": "1",
         "RETRACE_SUPERVISOR_EAGER": "1",
         "RETRACE_SUPERVISOR_SOCK": sock,
+        "RETRACE_SUPERVISOR_NONCE": TEST_NONCE,
         "RETRACE_LOGGER_DEF_ENA": "0",
     })
     if sys.platform == "darwin":

@@ -25,6 +25,9 @@ import time
 RETRY_WAIT = 3.0
 
 
+TEST_NONCE = "0123456789abcdef0123456789abcdef"
+
+
 def wait_sock(path, deadline=5.0):
     end = time.time() + deadline
     while time.time() < end:
@@ -50,6 +53,7 @@ def run_target(lib, target, sock, denied, env_extra=None):
         "RETRACE_JSON_CONFIG": cfg.name,
         "RETRACE_SUPERVISOR": "1",
         "RETRACE_SUPERVISOR_SOCK": sock,
+        "RETRACE_SUPERVISOR_NONCE": TEST_NONCE,
         "RETRACE_LOGGER_DEF_ENA": "1",
         "RETRACE_LOGGER_DEF_STDOUT_ENA": "0",
     })
@@ -92,7 +96,8 @@ def main():
     # ---- phase 1: delivery ------------------------------------
     dlog = open(dlog_path, "w")
     d = subprocess.Popen(
-        [daemon, "--sock", sock, "--journal", journal],
+        [daemon, "--sock", sock, "--journal", journal,
+         "--nonce", TEST_NONCE],
         stdout=dlog, stderr=subprocess.STDOUT)
     if not wait_sock(sock):
         d.kill()
