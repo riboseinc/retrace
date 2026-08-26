@@ -816,6 +816,7 @@ static void agent_atfork_parent(void)
 
 static void agent_atfork_child(void)
 {
+	bc("atfork_child");
 	if (g_agent.fd >= 0) {
 		retrace_real_impls.rc_close(g_agent.fd);
 		g_agent.fd = -1;
