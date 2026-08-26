@@ -23,7 +23,6 @@
 
 #ifndef _WIN32
 #include <dlfcn.h>
-#include <fcntl.h>
 #include <poll.h>
 
 #include <stdatomic.h>
@@ -66,6 +65,7 @@ struct agent_state {
 	_Atomic int stop;
 	int fd;		/* agent thread only */
 	int connected;	/* agent thread only */
+	long spawner_pid;	/* the pid that spawned the thread */
 	uint8_t rbuf[RETRACE_RPC_HEADER_SZ + 4096];	/* agent thread */
 	size_t rfill;	/* agent thread only */
 	rc_thread_h tid;
@@ -81,7 +81,6 @@ static void agent_atfork_child(void);
  * the thread's permanent guard makes plain open/write/close
  * dispatch-safe. Strip when S's story is complete.
  */
-static void bc(const char *stage);
 
 /* ---------- producer side (any thread) ---------- */
 
@@ -131,11 +130,10 @@ static int spawn_agent_thread(void)
 			&g_agent.tid, agent_thread_main, NULL);
 
 		if (rc != 0) {
-			bc("spawn_failed");
 			atomic_store(&g_agent.thread_spawned, 0);
 			return -1;
 		}
-		bc("spawn_ok");
+		g_agent.spawner_pid = (long)getpid();
 	}
 	return 0;
 }
@@ -249,11 +247,37 @@ int retrace_agent_emit_event(const char *name,
 
 	payload = build_event_json(name, kv, n_kv);
 	if (payload == NULL) {
-		bc("payload_null");
 		return -1;
 	}
 	queue_push(payload);
-	bc("queued");
+
+	/*
+	 * Fork truth (the CI hunt, rounds 22-28): pthread_atfork
+	 * child handlers NEVER FIRE on the Linux runners, so a
+	 * child forked after our spawn inherits thread_spawned=1
+	 * and silently never spawns. OWNERSHIP is the reliable
+	 * witness: if the pid that spawned the thread is not THIS
+	 * pid, the state is a fork-inherited relic -- reset it
+	 * exactly as the child handler would, then spawn fresh.
+	 */
+	if (atomic_load(&g_agent.thread_spawned) &&
+	    g_agent.spawner_pid != (long)getpid()) {
+		if (g_agent.fd >= 0) {
+			if (retrace_real_impls.rc_close != NULL)
+				retrace_real_impls.rc_close(g_agent.fd);
+			else
+				close(g_agent.fd);
+			g_agent.fd = -1;
+		}
+		g_agent.connected = 0;
+		g_agent.rfill = 0;
+		g_agent.q_count = 0;
+		atomic_store(&g_agent.thread_done, 0);
+		atomic_store(&g_agent.stop, 0);
+		memcpy(g_agent.agent_id, "pending",
+			sizeof("pending"));
+		atomic_store(&g_agent.thread_spawned, 0);
+	}
 
 	if (spawn_agent_thread() != 0)
 		return -1;
@@ -473,24 +497,6 @@ static void resolve_reals(void)
 				"pthread_atfork");
 }
 
-static void bc(const char *stage)
-{
-	char path[64];
-	char line[96];
-	int fd;
-
-	snprintf(path, sizeof(path), "/tmp/agent-trace-%ld.log",
-		(long)getpid());
-	fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
-	if (fd < 0)
-		return;
-	{
-		ssize_t n = snprintf(line, sizeof(line), "%s\n", stage);
-
-		(void)write(fd, line, (size_t)n);
-	}
-	close(fd);
-}
 
 /* Daemon frames: WELCOME captures the minted agent_id (later
  * sends cite it) and the SESSION TOKEN -- stamped into the env
@@ -557,7 +563,6 @@ static int try_connect(void)
 {
 	struct sockaddr_un sa;
 
-	bc("try_connect");
 	{
 		int fd = retrace_real_impls.rc_socket != NULL ?
 			retrace_real_impls.rc_socket(AF_UNIX,
@@ -639,7 +644,6 @@ static void *agent_thread_main(void *arg)
 
 	(void)arg;
 
-	bc("thread_start");
 
 	/*
 	 * Settle past the process's init-adjacent phase (the gdb
@@ -816,7 +820,6 @@ static void agent_atfork_parent(void)
 
 static void agent_atfork_child(void)
 {
-	bc("atfork_child");
 	if (g_agent.fd >= 0) {
 		retrace_real_impls.rc_close(g_agent.fd);
 		g_agent.fd = -1;
