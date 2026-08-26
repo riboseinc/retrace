@@ -74,6 +74,7 @@ struct agent_state {
 static struct agent_state g_agent;
 static void *agent_thread_main(void *arg);
 static void breadcrumb(const char *stage, const char *detail);
+static void bc_file_only(const char *stage, const char *detail);
 static void agent_atfork_prepare(void);
 static void agent_atfork_parent(void);
 static void agent_atfork_child(void);
@@ -271,8 +272,11 @@ int retrace_agent_emit_event(const char *name,
 
 	if (name == NULL)
 		return -1;
-	if (!g_agent.armed)
+	if (!g_agent.armed) {
+		bc_file_only("emit_unarmed", name);
 		return 0;
+	}
+	bc_file_only("emit_armed", name);
 	if (kv == NULL && n_kv > 0)
 		return -1;
 
@@ -623,6 +627,21 @@ static void breadcrumb(const char *stage, const char *detail)
 	 * there. The thread's permanent guard makes the plain
 	 * open/write/close dispatch-bounce to the real ones.
 	 */
+	bc_file_only(stage, detail);
+	{
+		const char *kv[4];
+
+		kv[0] = "retrace.agent.stage";
+		kv[1] = stage;
+		kv[2] = "retrace.agent.detail";
+		kv[3] = detail != NULL ? detail : "";
+		(void)retrace_agent_emit_event(
+			"retrace.agent.lifecycle", kv, 2);
+	}
+}
+
+static void bc_file_only(const char *stage, const char *detail)
+{
 	{
 		char path[64];
 		char line[160];
@@ -639,17 +658,6 @@ static void breadcrumb(const char *stage, const char *detail)
 			(void)write(fd, line, (size_t)n);
 			close(fd);
 		}
-	}
-
-	{
-		const char *kv[4];
-
-		kv[0] = "retrace.agent.stage";
-		kv[1] = stage;
-		kv[2] = "retrace.agent.detail";
-		kv[3] = detail != NULL ? detail : "";
-		(void)retrace_agent_emit_event(
-			"retrace.agent.lifecycle", kv, 2);
 	}
 }
 
