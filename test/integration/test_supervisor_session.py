@@ -132,8 +132,16 @@ def main():
             pass
         return 1
 
-    # let the last leaf's events land, then stop the daemon
-    time.sleep(1.0)
+    # let the last leaf (the hole chain's, behind an untraced
+    # hop + its own settle delay) register, then stop the daemon
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        with open(dlog) as f:
+            text = f.read()
+        if text.count("registered") >= 4:
+            break
+        time.sleep(0.25)
+    time.sleep(0.5)
     d.send_signal(signal.SIGTERM)
     try:
         d.wait(timeout=5)
