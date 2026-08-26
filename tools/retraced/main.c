@@ -25,6 +25,7 @@
 
 #include <errno.h>
 #include <poll.h>
+#include <stdarg.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -314,16 +315,262 @@ static void handle_agent_frame(struct conn *c,
 	}
 }
 
+/*
+ * The CONTROLLER socket (TODO.supervisor/07): newline-delimited
+ * JSON, one request per line, one reply per line -- deliberately
+ * not RTRD-framed: this plane is local-only in P0 and every
+ * consumer is a script. Commands: status, ps, policy_push,
+ * freeze, thaw, kill.
+ */
+static int g_ctl_listen = -1;
+static int g_ctl_fd = -1;
+static int g_ctl_pfd_slot = -1;
+static char g_ctl_buf[8192];
+static size_t g_ctl_fill;
+static char *g_thaw_blob;	/* last user policy, for thaw */
+static int g_frozen;
+
+static void set_policy_blob(const char *blob, long epoch)
+{
+	free(g_policy_blob);
+	g_policy_blob = strdup(blob);
+	g_policy_epoch = epoch;
+}
+
+static int push_policy_to_agents(struct conn *conns,
+	const char *blob)
+{
+	int i, pushed = 0;
+
+	for (i = 0; i < MAX_AGENTS; i++) {
+		if (conns[i].fd >= 0 && conns[i].helloed) {
+			write_frame(conns[i].fd,
+				RETRACE_RPC_MSG_POLICY_SET, blob);
+			pushed++;
+		}
+	}
+	return pushed;
+}
+
+static void ctl_reply(const char *fmt, ...)
+{
+	char out[1024];
+	va_list ap;
+	int n;
+
+	va_start(ap, fmt);
+	n = vsnprintf(out, sizeof(out), fmt, ap);
+	va_end(ap);
+	if (n > 0)
+		(void)write(g_ctl_fd, out, (size_t)n);
+}
+
+static void handle_ctl_line(char *line, struct conn *conns,
+	struct retraced_registry *reg, struct retraced_journal *jr)
+{
+	JSON_Value *v = json_parse_string(line);
+	JSON_Object *o;
+	const char *cmd;
+
+	if (v == NULL) {
+		ctl_reply("{\"ok\":0,\"error\":\"malformed json\"}\n");
+		return;
+	}
+	o = json_value_get_object(v);
+	cmd = json_object_get_string(o, "cmd");
+	if (cmd == NULL) {
+		ctl_reply("{\"ok\":0,\"error\":\"no cmd\"}\n");
+		json_value_free(v);
+		return;
+	}
+	if (strcmp(cmd, "status") == 0) {
+		ctl_reply("{\"ok\":1,\"pid\":%ld,\"agents\":%zu,"
+			"\"policy_epoch\":%ld,\"frozen\":%d}\n",
+			(long)getpid(), reg->count, g_policy_epoch,
+			g_frozen);
+	} else if (strcmp(cmd, "ps") == 0) {
+		JSON_Value *snap = retraced_registry_to_json(reg);
+		char *s = json_serialize_to_string(snap);
+
+		ctl_reply("{\"ok\":1,\"registry\":%s}\n",
+			s != NULL ? s : "null");
+		json_free_serialized_string(s);
+		json_value_free(snap);
+	} else if (strcmp(cmd, "policy_push") == 0) {
+		const char *blob = json_object_get_string(o, "blob");
+		JSON_Value *pv;
+		JSON_Object *po, *proot;
+		double epoch;
+		int pushed;
+
+		if (blob == NULL) {
+			ctl_reply("{\"ok\":0,\"error\":\"no blob\"}\n");
+			json_value_free(v);
+			return;
+		}
+		pv = json_parse_string(blob);
+		proot = pv != NULL ? json_value_get_object(pv) : NULL;
+		po = proot != NULL ?
+			json_object_get_object(proot, "policy") : NULL;
+		epoch = po != NULL ?
+			json_object_get_number(po, "epoch") : 0.0;
+		if (epoch < 1.0 || json_object_get_array(proot,
+			    "intercept_scripts") == NULL) {
+			ctl_reply("{\"ok\":0,\"error\":\"bad policy"
+				" (need policy.epoch + scripts)\"}\n");
+			json_value_free(pv);
+			json_value_free(v);
+			return;
+		}
+		set_policy_blob(blob, (long)epoch);
+		g_frozen = 0;
+		free(g_thaw_blob);
+		g_thaw_blob = strdup(blob);
+		pushed = push_policy_to_agents(conns, blob);
+		{
+			char ev[160];
+
+			snprintf(ev, sizeof(ev),
+				"{\"name\":\"retrace.policy.pushed\",\"epoch\":%ld,\"agents\":%d}",
+				(long)epoch, pushed);
+			retraced_journal_event(jr, (long)time(NULL),
+				"daemon", 0, ev);
+		}
+		ctl_reply("{\"ok\":1,\"epoch\":%ld,\"pushed\":%d}\n",
+			(long)epoch, pushed);
+		json_value_free(pv);
+	} else if (strcmp(cmd, "freeze") == 0) {
+		char blob[256];
+		long epoch = g_policy_epoch + 1;
+		int pushed;
+
+		snprintf(blob, sizeof(blob),
+			"{\"policy\":{\"epoch\":%ld},"
+			"\"intercept_scripts\":[{\"func_name\":\"*\","
+			"\"actions\":[{\"action_name\":\"freeze\"}]}]}",
+			epoch);
+		set_policy_blob(blob, epoch);
+		g_frozen = 1;
+		pushed = push_policy_to_agents(conns, blob);
+		{
+			char ev[128];
+
+			snprintf(ev, sizeof(ev),
+				"{\"name\":\"retrace.policy.freeze\",\"epoch\":%ld,\"agents\":%d}",
+				epoch, pushed);
+			retraced_journal_event(jr, (long)time(NULL),
+				"daemon", 0, ev);
+		}
+		ctl_reply("{\"ok\":1,\"epoch\":%ld,\"pushed\":%d}\n",
+			epoch, pushed);
+	} else if (strcmp(cmd, "thaw") == 0) {
+		long epoch = g_policy_epoch + 1;
+		char thawed[8192];
+		const char *src = g_thaw_blob != NULL ? g_thaw_blob :
+			"{\"policy\":{\"epoch\":1},\"intercept_scripts\":[]}";
+		JSON_Value *tv = json_parse_string(src);
+		int pushed;
+
+		/* re-stamp the saved policy at a fresh epoch: agents
+		 * only ever accept strictly-greater epochs
+		 */
+		if (tv != NULL) {
+			JSON_Object *troot = json_value_get_object(tv);
+			JSON_Object *tpo = json_object_get_object(troot,
+				"policy");
+
+			if (tpo != NULL)
+				json_object_set_number(tpo, "epoch",
+					(double)epoch);
+		}
+		{
+			char *s = json_serialize_to_string(tv);
+
+			snprintf(thawed, sizeof(thawed), "%s",
+				s != NULL ? s : src);
+			json_free_serialized_string(s);
+		}
+		json_value_free(tv);
+		set_policy_blob(thawed, epoch);
+		g_frozen = 0;
+		pushed = push_policy_to_agents(conns, thawed);
+		{
+			char ev[128];
+
+			snprintf(ev, sizeof(ev),
+				"{\"name\":\"retrace.policy.thaw\",\"epoch\":%ld,\"agents\":%d}",
+				epoch, pushed);
+			retraced_journal_event(jr, (long)time(NULL),
+				"daemon", 0, ev);
+		}
+		ctl_reply("{\"ok\":1,\"epoch\":%ld,\"pushed\":%d}\n",
+			epoch, pushed);
+	} else if (strcmp(cmd, "kill") == 0) {
+		long pid = (long)json_object_get_number(o, "pid");
+
+		if (pid <= 0) {
+			ctl_reply("{\"ok\":0,\"error\":\"no pid\"}\n");
+			json_value_free(v);
+			return;
+		}
+		kill((pid_t)pid, SIGTERM);
+		{
+			char ev[128];
+
+			snprintf(ev, sizeof(ev),
+				"{\"name\":\"retrace.ctl.kill\",\"pid\":%ld}",
+				pid);
+			retraced_journal_event(jr, (long)time(NULL),
+				"daemon", 0, ev);
+		}
+		ctl_reply("{\"ok\":1,\"pid\":%ld}\n", pid);
+	} else {
+		ctl_reply("{\"ok\":0,\"error\":\"unknown cmd\"}\n");
+	}
+	json_value_free(v);
+}
+
+static void handle_ctl_readable(struct conn *conns,
+	struct retraced_registry *reg, struct retraced_journal *jr)
+{
+	ssize_t n = read(g_ctl_fd, g_ctl_buf + g_ctl_fill,
+		sizeof(g_ctl_buf) - 1 - g_ctl_fill);
+	char *nl;
+
+	if (n <= 0) {
+		close(g_ctl_fd);
+		g_ctl_fd = -1;
+		g_ctl_fill = 0;
+		return;
+	}
+	g_ctl_fill += (size_t)n;
+	g_ctl_buf[g_ctl_fill] = '\0';
+	while ((nl = strchr(g_ctl_buf, '\n')) != NULL) {
+		*nl = '\0';
+		handle_ctl_line(g_ctl_buf, conns, reg, jr);
+		memmove(g_ctl_buf, nl + 1,
+			g_ctl_fill - (size_t)(nl + 1 - g_ctl_buf));
+		g_ctl_fill -= (size_t)(nl + 1 - g_ctl_buf);
+	}
+	if (g_ctl_fill >= sizeof(g_ctl_buf) - 1) {
+		/* oversized line: drop the connection, not the daemon */
+		close(g_ctl_fd);
+		g_ctl_fd = -1;
+		g_ctl_fill = 0;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	const char *sock_path = "/tmp/retraced.agent.sock";
 	const char *journal_path = "retraced-journal.jsonl";
 	const char *policy_path = NULL;
+	const char *ctl_path = NULL;
 	struct retraced_registry reg;
 	struct retraced_journal jr;
 	struct conn *conns;
 	struct sockaddr_un sa;
-	struct pollfd pfds[MAX_AGENTS + 1];
+	struct pollfd pfds[MAX_AGENTS + 3];
 	int listen_fd;
 	long last_sweep;
 	int i;
@@ -337,6 +584,8 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[i], "--policy") == 0 &&
 			 i + 1 < argc)
 			policy_path = argv[++i];
+		else if (strcmp(argv[i], "--ctl") == 0 && i + 1 < argc)
+			ctl_path = argv[++i];
 		else {
 			fprintf(stderr,
 				"Usage: retraced [--sock <path>] [--journal <path>]\n"
@@ -407,8 +656,28 @@ int main(int argc, char **argv)
 		perror("listen");
 		return 1;
 	}
-	printf("retraced: listening on %s (P0: agent socket only)\n",
-		sock_path);
+	printf("retraced: listening on %s (agents)\n", sock_path);
+
+	if (ctl_path != NULL) {
+		unlink(ctl_path);
+		g_ctl_listen = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (g_ctl_listen >= 0) {
+			memset(&sa, 0, sizeof(sa));
+			sa.sun_family = AF_UNIX;
+			snprintf(sa.sun_path, sizeof(sa.sun_path), "%s",
+				ctl_path);
+			if (bind(g_ctl_listen,
+				    (struct sockaddr *)&sa, sizeof(sa)) != 0 ||
+			    listen(g_ctl_listen, 4) != 0) {
+				perror("ctl bind/listen");
+				close(g_ctl_listen);
+				g_ctl_listen = -1;
+			} else {
+				printf("retraced: controller on %s\n",
+					ctl_path);
+			}
+		}
+	}
 
 	last_sweep = now_ms();
 	while (!g_stop) {
@@ -418,6 +687,22 @@ int main(int argc, char **argv)
 		pfds[nfd].fd = listen_fd;
 		pfds[nfd].events = POLLIN;
 		nfd++;
+		{
+			int ctl_idx = -1;
+
+			if (g_ctl_listen >= 0) {
+				pfds[nfd].fd = g_ctl_listen;
+				pfds[nfd].events = POLLIN;
+				ctl_idx = nfd;
+				nfd++;
+			}
+			if (g_ctl_fd >= 0) {
+				pfds[nfd].fd = g_ctl_fd;
+				pfds[nfd].events = POLLIN;
+				nfd++;
+			}
+			g_ctl_pfd_slot = ctl_idx;
+		}
 		for (i = 0; i < MAX_AGENTS; i++) {
 			if (conns[i].fd >= 0) {
 				pfds[nfd].fd = conns[i].fd;
@@ -428,6 +713,24 @@ int main(int argc, char **argv)
 		r = poll(pfds, (nfds_t)nfd, 500);
 		if (r <= 0)
 			continue;
+
+		if (g_ctl_pfd_slot >= 0 &&
+		    (pfds[g_ctl_pfd_slot].revents & POLLIN) &&
+		    g_ctl_fd < 0) {
+			g_ctl_fd = accept(g_ctl_listen, NULL, NULL);
+			g_ctl_fill = 0;
+		}
+		if (g_ctl_fd >= 0) {
+			struct pollfd *cfd = NULL;
+
+			for (i = 0; i < nfd; i++) {
+				if (pfds[i].fd == g_ctl_fd)
+					cfd = &pfds[i];
+			}
+			if (cfd != NULL &&
+			    (cfd->revents & (POLLIN | POLLHUP)))
+				handle_ctl_readable(conns, &reg, &jr);
+		}
 
 		if (pfds[0].revents & POLLIN) {
 			int fd = accept(listen_fd, NULL, NULL);
