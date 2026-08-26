@@ -249,9 +249,11 @@ int retrace_agent_emit_event(const char *name,
 
 	payload = build_event_json(name, kv, n_kv);
 	if (payload == NULL) {
+		bc("payload_null");
 		return -1;
 	}
 	queue_push(payload);
+	bc("queued");
 
 	if (spawn_agent_thread() != 0)
 		return -1;
