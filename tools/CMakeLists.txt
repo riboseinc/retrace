@@ -24,5 +24,6 @@ add_subdirectory(fuzz-report)
 # the same gate fuzz-report uses.
 if(NOT WIN32)
 	add_subdirectory(retraced)
+	add_subdirectory(retrace-ctl)
 endif()
 add_subdirectory(profiler)
