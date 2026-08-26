@@ -129,12 +129,6 @@ void retrace_engine_wrapper(char *func_name,
 		retrace_as_sched_real(arch_spec_ctx, real_impl);
 		return;
 	}
-	/* first dispatch = the constructor provably finished: the
-	 * eager supervisor agent spawns here and nowhere earlier
-	 * (a constructor-time spawn races ld.so through the dlsym
-	 * below and crashes the boot on Linux)
-	 */
-	retrace_agent_kick();
 	retrace_win_diag("enter", func_name, 0);
 
 	thread_ctx = retrace_thread_context_get();
@@ -171,6 +165,15 @@ void retrace_engine_wrapper(char *func_name,
 
 	retrace_reentrance_guard_enter(thread_ctx, real_impl,
 		arch_spec_ctx);
+
+	/* first dispatch = the constructor provably finished. The
+	 * kick ALSO sits AFTER guard-enter: its dlsym resolutions
+	 * nest dispatches (glibc's dlsym calls free through the
+	 * PLT), and only the active guard bounds that nesting --
+	 * before guard-enter the cycle ran unbroken and overflowed
+	 * the stack (the macOS lldb and Linux gdb signatures).
+	 */
+	retrace_agent_kick();
 
 	thread_ctx->prototype = retrace_func_get(func_name);
 	retrace_win_diag("proto", func_name,
