@@ -137,6 +137,5 @@
 /* retrace build switches. */
 #cmakedefine01 RTR_V2
 #cmakedefine01 RTR_V2_WRAPPER
-#cmakedefine01 RTR_RPC
 
 #endif /* RETRACE_CONFIG_H */

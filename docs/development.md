@@ -32,7 +32,6 @@ build/test/...                   # test binaries (with RETRACE_BUILD_TESTS=ON)
 | `RETRACE_BUILD_CLI` | `ON` | Build the CLI launcher. |
 | `RETRACE_BUILD_TESTS` | `OFF` | Build the per-feature test binaries in `test/`. |
 | `RETRACE_BUILD_EXAMPLES` | `OFF` | Build the demos under `examples/`. |
-| `RETRACE_ENABLE_RPC` | `OFF` | Build the `rpc/` subtree. |
 | `RETRACE_ENABLE_ASAN` | `OFF` | AddressSanitizer. |
 | `RETRACE_ENABLE_UBSAN` | `OFF` | UndefinedBehaviorSanitizer. |
 | `RETRACE_ENABLE_TSAN` | `OFF` | ThreadSanitizer. |

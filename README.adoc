@@ -272,7 +272,6 @@ Useful CMake options:
 | `RETRACE_BUILD_CLI` | `ON` -- build the CLI launcher (placeholder; full CLI in a future release).
 | `RETRACE_BUILD_TESTS` | `OFF` -- build per-feature test binaries under `test/`.
 | `RETRACE_BUILD_EXAMPLES` | `OFF` -- build the demos under `examples/`.
-| `RETRACE_ENABLE_RPC` | `OFF` -- build the optional RPC subsystem under `rpc/`.
 | `RETRACE_ENABLE_ASAN` / `_UBSAN` / `_TSAN` / `_COVERAGE` | `OFF` -- instrumentation toggles.
 |===
 
