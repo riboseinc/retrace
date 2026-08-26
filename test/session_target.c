@@ -105,7 +105,7 @@ static void run_leaf(void)
 {
 	printf("stage:leaf denied=%d\n", probe_denied());
 	fflush(stdout);
-	sleep(1);
+	sleep(2);
 }
 
 static void run_hop(const char *self, const char *lib)
@@ -164,7 +164,11 @@ int main(int argc, char **argv)
 			char *envp[512];
 
 			probe_denied();
-			sleep(1);
+			/* let the agent register BEFORE the exec tears
+			 * its connection down (CI runners need the
+			 * wider window)
+			 */
+			sleep(2);
 			execve(argv[0],
 				(char *[]){argv[0], (char *)"--leaf",
 					NULL},
