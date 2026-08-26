@@ -723,7 +723,8 @@ static void *agent_thread_main(void *arg)
 				.events = POLLIN};
 
 			if (poll(&pfd, 1, 200) > 0 &&
-			    (pfd.revents & (POLLIN | POLLHUP))) {
+			    (pfd.revents & (POLLIN | POLLHUP |
+					     POLLERR | POLLNVAL))) {
 				ssize_t n = retrace_real_impls.rc_read(
 					g_agent.fd,
 					g_agent.rbuf + g_agent.rfill,
