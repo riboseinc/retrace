@@ -1,0 +1,47 @@
+# Diagnostic branch only (diag/session-hang): reproduce and
+# backtrace the integration-supervisor-session hang seen on
+# ubuntu-22.04-x64 and the Alpine qemu legs. Not for main.
+name: diag-session
+on:
+  push:
+    branches: [diag/session-hang]
+  workflow_dispatch:
+
+jobs:
+  loop:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev cmake ninja-build \
+            pkg-config gdb
+      - name: build
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DRETRACE_BUILD_TESTS=ON
+          cmake --build build
+      - name: loop under load
+        run: |
+          # CPU hogs: slow the box to qemu-CI levels (the hang is
+          # a scheduler race that only lands on slow runners)
+          hogs=""
+          for i in 1 2 3 4 5 6; do
+            sh -c 'while :; do :; done' &
+            hogs="$hogs $!"
+          done
+          rc=0
+          for i in $(seq 1 30); do
+            echo "=== iteration $i ==="
+            if ! python3 test/integration/test_supervisor_session.py \
+                 build/tools/retraced/retraced \
+                 build/src/v2/libretrace.so \
+                 build/test/session_target; then
+              rc=1
+              break
+            fi
+          done
+          kill $hogs 2>/dev/null || true
+          exit $rc

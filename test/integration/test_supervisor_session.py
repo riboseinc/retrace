@@ -143,12 +143,39 @@ def main():
                                 break
                 except OSError:
                     pass
+                try:
+                    subprocess.run(["sudo", "sysctl", "-w",
+                        "kernel.yama.ptrace_scope=0"],
+                        timeout=10,
+                        stdout=subprocess.DEVNULL)
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+                try:
+                    subprocess.run(["sudo", "gdb", "-p", pid,
+                        "-batch",
+                        "-ex", "set pagination off",
+                        "-ex", "thread apply all bt"],
+                        timeout=90)
+                except (OSError,
+                        subprocess.TimeoutExpired) as e:
+                    print(f"  gdb: failed: {e}",
+                          file=sys.stderr)
             try:
                 with open(out_path) as f:
                     print(f"  out: {f.read()[:500]!r}",
                           file=sys.stderr)
             except OSError:
                 pass
+            for label, path in (("journal", journal),
+                                ("daemon.log", dlog)):
+                try:
+                    with open(path) as f:
+                        tail = f.read().splitlines()[-15:]
+                    for ln in tail:
+                        print(f"  {label}: {ln[:180]}",
+                              file=sys.stderr)
+                except OSError:
+                    pass
             proc.kill()
             d.kill()
             return 1
