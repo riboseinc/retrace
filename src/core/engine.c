@@ -40,7 +40,11 @@
 
 #include "win_diag.h"
 
+#include <stdint.h>
+
+#if !defined(__STDC_NO_ATOMICS__)
 #include <stdatomic.h>
+#endif
 
 #include "engine.h"
 #include "agent.h"
@@ -133,11 +137,31 @@ static char *strip_darwin_extsn(char *name, char *buf, size_t bufsz)
  */
 #define REAL_CACHE_SLOTS 2048	/* pow2 */
 
+/*
+ * MSVC without C11 atomics: an aligned uint64_t store/load is
+ * atomic on every supported arch (the config_cache.c precedent)
+ */
+#if defined(__STDC_NO_ATOMICS__)
+struct real_cache_el {
+	volatile uint64_t hash;
+	void *real;
+	const char *name;
+};
+
+#define real_hash_load(p)	(*(p))
+#define real_hash_store(p, v)	(*(p) = (v))
+#else
 struct real_cache_el {
 	_Atomic(uint64_t) hash;
 	void *real;
 	const char *name;
 };
+
+#define real_hash_load(p)	atomic_load_explicit((p), \
+	memory_order_acquire)
+#define real_hash_store(p, v)	atomic_store_explicit((p), (v), \
+	memory_order_release)
+#endif
 
 static struct real_cache_el real_cache[REAL_CACHE_SLOTS];
 
@@ -193,8 +217,7 @@ void *retrace_real_impl_cached(const char *func_name)
 
 	for (;;) {
 		el = &real_cache[i & (REAL_CACHE_SLOTS - 1)];
-		k = atomic_load_explicit(&el->hash,
-			memory_order_acquire);
+		k = real_hash_load(&el->hash);
 		if (k == h && el->name != NULL &&
 		    retrace_real_impls.strcmp(el->name, func_name)
 			    == 0)
@@ -204,8 +227,7 @@ void *retrace_real_impl_cached(const char *func_name)
 
 			el->name = func_name;
 			el->real = real;
-			atomic_store_explicit(&el->hash, h,
-				memory_order_release);
+			real_hash_store(&el->hash, h);
 			return real;
 		}
 		i++;
