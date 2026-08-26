@@ -620,15 +620,11 @@ static void *agent_thread_main(void *arg)
 	}
 	retrace_logger_disable_for_this_thread();
 
-	/*
-	 * Resolve + register here, not in the constructor: dlsym is
-	 * live on this thread, and calling it at init crashed every
-	 * Linux boot (the member is NULL there until dlopen_guard
-	 * finishes). A fork before the agent's first spawn misses
-	 * atfork registration -- that child degrades to the
-	 * pre-slice-5 behavior.
+	/* registration only (resolution happened on the main
+	 * thread, inside the guard, at kick); a fork before the
+	 * agent's first spawn misses it and degrades to the
+	 * pre-slice-5 behavior
 	 */
-	resolve_reals();
 	if (g_real_atfork != NULL)
 		g_real_atfork(agent_atfork_prepare,
 			agent_atfork_parent, agent_atfork_child);
@@ -836,6 +832,15 @@ void retrace_agent_kick(void)
 {
 	if (!g_agent.armed || !g_eager_wanted)
 		return;
+	/*
+	 * Resolution on the MAIN thread, post-boot, WITH THE GUARD
+	 * ACTIVE (kick runs after guard-enter in the engine entry):
+	 * thread-side dlsym raced the loader on Linux (glibc dlsym
+	 * dispatches free() through the PLT), and unguarded dlsym
+	 * cycled the dispatch path to a stack overflow. Bounded
+	 * here: nested dispatches bail at the guard.
+	 */
+	resolve_reals();
 	(void)spawn_agent_thread();
 }
 

@@ -179,6 +179,19 @@ if(Python3_Interpreter_FOUND)
 	set_target_properties(retrace_test_session_target PROPERTIES
 		OUTPUT_NAME session_target
 		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test")
+	# retrace-ctl, the fleet CLI (TODO.supervisor/07): the
+	# whole lifecycle through one binary.
+	add_test(NAME integration-supervisor-ctl
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_supervisor_ctl.py
+			$<TARGET_FILE:retrace_retraced>
+			$<TARGET_FILE:retrace_ctl>
+			$<TARGET_FILE:retrace_v2>
+			$<TARGET_FILE:retrace_test_policy_target>)
+	set_tests_properties(integration-supervisor-ctl PROPERTIES
+		LABELS "integration"
+		TIMEOUT 120)
+
 	add_test(NAME integration-supervisor-session
 		COMMAND ${Python3_EXECUTABLE}
 			${CMAKE_SOURCE_DIR}/test/integration/test_supervisor_session.py
