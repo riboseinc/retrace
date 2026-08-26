@@ -23,7 +23,6 @@
 
 #ifndef _WIN32
 #include <dlfcn.h>
-#include <fcntl.h>
 #include <poll.h>
 
 #include <stdatomic.h>
@@ -73,43 +72,9 @@ struct agent_state {
 
 static struct agent_state g_agent;
 static void *agent_thread_main(void *arg);
-static void breadcrumb(const char *stage, const char *detail);
-static void bc_file_only(const char *stage, const char *detail);
 static void agent_atfork_prepare(void);
 static void agent_atfork_parent(void);
 static void agent_atfork_child(void);
-
-/*
- * Resolution rules (the Linux CI SEGV lesson):
- *   - pthread_atfork IS wrapped -> the as_get_real_safe table
- *     resolves its REAL pointer (no engine dispatch, callable
- *     from the constructor).
- *   - setenv is NOT wrapped -> the table returns NULL for it;
- *     retrace_real_impls.dlsym is NULL at agent-init time on
- *     Linux (dlopen_guard owns dlsym interposition), so setenv
- *     resolves LAZILY on the agent thread, where dlsym is live.
- *     Until then the token stamp is skipped -- inheritance only
- *     works for processes that connect, which is exactly the
- *     eager/lazy spawn population anyway.
- */
-static int (*g_real_setenv)(const char *, const char *, int);
-static int (*g_real_atfork)(void (*)(void), void (*)(void),
-	void (*)(void));
-
-static void resolve_reals(void)
-{
-	if (retrace_real_impls.dlsym == NULL)
-		return;
-	if (g_real_setenv == NULL)
-		g_real_setenv = (int (*)(const char *, const char *,
-			int))retrace_real_impls.dlsym(RTLD_NEXT,
-				"setenv");
-	if (g_real_atfork == NULL)
-		g_real_atfork = (int (*)(void (*)(void),
-			void (*)(void), void (*)(void)))
-			retrace_real_impls.dlsym(RTLD_NEXT,
-				"pthread_atfork");
-}
 
 /* ---------- producer side (any thread) ---------- */
 
@@ -162,11 +127,9 @@ static int spawn_agent_thread(void)
 			char detail[48];
 
 			snprintf(detail, sizeof(detail), "%d", rc);
-			breadcrumb("spawn_failed_rc", detail);
 			atomic_store(&g_agent.thread_spawned, 0);
 			return -1;
 		}
-		breadcrumb("spawn_ok", NULL);
 	}
 	return 0;
 }
@@ -273,20 +236,16 @@ int retrace_agent_emit_event(const char *name,
 	if (name == NULL)
 		return -1;
 	if (!g_agent.armed) {
-		bc_file_only("emit_unarmed", name);
 		return 0;
 	}
-	bc_file_only("emit_armed", name);
 	if (kv == NULL && n_kv > 0)
 		return -1;
 
 	payload = build_event_json(name, kv, n_kv);
 	if (payload == NULL) {
-		bc_file_only("payload_null", name);
 		return -1;
 	}
 	queue_push(payload);
-	bc_file_only("queued", NULL);
 
 	if (spawn_agent_thread() != 0)
 		return -1;
@@ -481,6 +440,31 @@ static void jscan_str(const char *payload, const char *key,
 	dst[n] = '\0';
 }
 
+/*
+ * The REAL setenv / pthread_atfork, resolved at kick (main
+ * thread, post-boot, inside the guard): thread-side dlsym raced
+ * the loader on Linux (glibc's dlsym dispatches free() through
+ * the PLT), and constructor-time dlsym hung macOS dyld.
+ */
+static int (*g_real_setenv)(const char *, const char *, int);
+static int (*g_real_atfork)(void (*)(void), void (*)(void),
+	void (*)(void));
+
+static void resolve_reals(void)
+{
+	if (retrace_real_impls.dlsym == NULL)
+		return;
+	if (g_real_setenv == NULL)
+		g_real_setenv = (int (*)(const char *, const char *,
+			int))retrace_real_impls.dlsym(RTLD_NEXT,
+				"setenv");
+	if (g_real_atfork == NULL)
+		g_real_atfork = (int (*)(void (*)(void),
+			void (*)(void), void (*)(void)))
+			retrace_real_impls.dlsym(RTLD_NEXT,
+				"pthread_atfork");
+}
+
 /* Daemon frames: WELCOME captures the minted agent_id (later
  * sends cite it) and the SESSION TOKEN -- stamped into the env
  * with the REAL setenv so exec'd children inherit it (supervisor
@@ -546,7 +530,6 @@ static int try_connect(void)
 {
 	struct sockaddr_un sa;
 
-	breadcrumb("try_connect", g_agent.sock_path);
 	int fd = retrace_real_impls.rc_socket != NULL ?
 		retrace_real_impls.rc_socket(AF_UNIX, SOCK_STREAM, 0)
 		: socket(AF_UNIX, SOCK_STREAM, 0);
@@ -574,7 +557,6 @@ static int try_connect(void)
 				sizeof(sa));
 
 		if (crc != 0) {
-			breadcrumb("connect_failed", NULL);
 			if (retrace_real_impls.rc_close != NULL)
 				retrace_real_impls.rc_close(fd);
 			else
@@ -596,7 +578,6 @@ static int try_connect(void)
 			sess != NULL ? sess : "",
 			(long)getpid(), (long)getppid());
 		if (send_frame(RETRACE_RPC_MSG_HELLO, hello) != 0) {
-			breadcrumb("hello_send_failed", NULL);
 			drop_connection();
 			return -1;
 		}
@@ -618,51 +599,7 @@ static void drain_queue(void)
 	}
 }
 
-/* lifecycle breadcrumbs: ride the EVENT queue to the daemon's
- * journal (the E2E dumps it) -- zero new I/O paths, and the
- * pre-connect events drain right after HELLO, so their presence
- * or absence tells exactly how far the thread got
- */
-static void breadcrumb(const char *stage, const char *detail)
-{
-	/* FILE trace first: the journal breadcrumbs only drain
-	 * after HELLO, so a never-connecting thread is invisible
-	 * there. The thread's permanent guard makes the plain
-	 * open/write/close dispatch-bounce to the real ones.
-	 */
-	bc_file_only(stage, detail);
-	{
-		const char *kv[4];
 
-		kv[0] = "retrace.agent.stage";
-		kv[1] = stage;
-		kv[2] = "retrace.agent.detail";
-		kv[3] = detail != NULL ? detail : "";
-		(void)retrace_agent_emit_event(
-			"retrace.agent.lifecycle", kv, 2);
-	}
-}
-
-static void bc_file_only(const char *stage, const char *detail)
-{
-	{
-		char path[64];
-		char line[160];
-		int fd;
-
-		snprintf(path, sizeof(path), "/tmp/agent-bc-%ld.log",
-			(long)getpid());
-		fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
-		if (fd >= 0) {
-			ssize_t n = snprintf(line, sizeof(line),
-				"%s %s\n", stage,
-				detail != NULL ? detail : "");
-
-			(void)write(fd, line, (size_t)n);
-			close(fd);
-		}
-	}
-}
 
 static void *agent_thread_main(void *arg)
 {
@@ -670,7 +607,6 @@ static void *agent_thread_main(void *arg)
 	long backoff_ms = AGENT_BACKOFF_MIN_MS;
 
 	(void)arg;
-	breadcrumb("thread_start", NULL);
 
 	/*
 	 * Settle past the process's init-adjacent phase (the gdb
@@ -699,14 +635,14 @@ static void *agent_thread_main(void *arg)
 	}
 	retrace_logger_disable_for_this_thread();
 
-	/* registration only (resolution happened on the main
-	 * thread, inside the guard, at kick); a fork before the
-	 * agent's first spawn misses it and degrades to the
-	 * pre-slice-5 behavior
+#ifdef __APPLE__
+	/* macOS registration site -- see the kick comment for the
+	 * platform split's history
 	 */
 	if (g_real_atfork != NULL)
 		g_real_atfork(agent_atfork_prepare,
 			agent_atfork_parent, agent_atfork_child);
+#endif
 
 	while (!atomic_load(&g_agent.stop)) {
 		if (!g_agent.connected) {
@@ -920,6 +856,22 @@ void retrace_agent_kick(void)
 	 * here: nested dispatches bail at the guard.
 	 */
 	resolve_reals();
+	/*
+	 * atfork registration split by platform, both measured:
+	 * Linux registers HERE -- thread-side registration raced
+	 * the target's forks (the first fork child inherited
+	 * thread_spawned=1 and never spawned; later forks worked
+	 * once the thread finally scheduled). macOS hangs if
+	 * pthread_atfork runs from inside a dispatch (dyld's
+	 * atfork machinery + the interposed allocation), so there
+	 * it stays at thread start, where the CI has been green
+	 * throughout.
+	 */
+#ifndef __APPLE__
+	if (g_real_atfork != NULL)
+		g_real_atfork(agent_atfork_prepare,
+			agent_atfork_parent, agent_atfork_child);
+#endif
 	(void)spawn_agent_thread();
 }
 
