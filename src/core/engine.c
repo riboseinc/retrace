@@ -133,11 +133,21 @@ void retrace_engine_wrapper(char *func_name,
 	 * cannot break a cycle that never reaches it. The real
 	 * allocator impls are resolved once at init; use them.
 	 */
-	if (strcmp(func_name, "free") == 0 &&
-	    retrace_real_impls.free != NULL)
+	/*
+	 * REAL strcmp (the plain call is interposed and would
+	 * recurse straight back into this entry); NULL before
+	 * real_impls_init reaches it -- dispatches that early are
+	 * construction-internal and take the old path, which has
+	 * never cycled (no dlerror state to free yet)
+	 */
+	if (retrace_real_impls.strcmp != NULL &&
+	    retrace_real_impls.free != NULL &&
+	    retrace_real_impls.strcmp(func_name, "free") == 0)
 		real_impl = retrace_real_impls.free;
-	else if (strcmp(func_name, "malloc") == 0 &&
-		 retrace_real_impls.malloc != NULL)
+	else if (retrace_real_impls.strcmp != NULL &&
+		 retrace_real_impls.malloc != NULL &&
+		 retrace_real_impls.strcmp(func_name, "malloc")
+			== 0)
 		real_impl = retrace_real_impls.malloc;
 	else
 		real_impl = retrace_as_get_real_safe(func_name);
