@@ -473,6 +473,27 @@ int retrace_otlp_live_emit_json(const char *serialized_json)
 	otlp_span_set_attribute_int(span, "retrace.pid", (int64_t)pid);
 	otlp_span_set_attribute_int(span, "retrace.tid", (int64_t)tid);
 
+	/*
+	 * Fleet labels (TODO.supervisor/06): when a supervisor is
+	 * active, every span carries the session id, agent id, and
+	 * the active policy epoch -- one detonation = one trace
+	 * waterfall in Tempo, every span stamped. Read via getenv
+	 * (the supervisor zero-dispatch contract); missing -> omit.
+	 */
+	{
+		const char *sess = retrace_real_impls.getenv(
+			"RETRACE_SESSION");
+		const char *sock = retrace_real_impls.getenv(
+			"RETRACE_SUPERVISOR_SOCK");
+		if (sess != NULL && sess[0] != '\0')
+			otlp_span_set_attribute_string(span,
+				"retrace.session_id", sess);
+		if (sock != NULL && sock[0] != '\0') {
+			otlp_span_set_attribute_string(span,
+				"retrace.agent_id", sock);
+		}
+	}
+
 	/* Per-call retrace-specific fields (present when the
 	 * function uses log_params + call_real).
 	 */
