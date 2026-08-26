@@ -40,6 +40,8 @@
 
 #include "win_diag.h"
 
+#include <stdatomic.h>
+
 #include "engine.h"
 #include "agent.h"
 #include "real_impls.h"
@@ -112,6 +114,104 @@ static char *strip_darwin_extsn(char *name, char *buf, size_t bufsz)
 	return buf;
 }
 
+/*
+ * real-impl cache: name-hash keyed, open addressing. The
+ * historical entry dlsym'd EVERY dispatch -- the loader lock
+ * plus an ELF lookup per interposed call, dominating the
+ * per-call budget. This table resolves each function exactly
+ * once for the process lifetime.
+ *
+ * THE LAW (the engine-entry order, restated): everything
+ * between entry and the reentrance-guard check must be
+ * dispatch-free -- only member calls (retrace_real_impls.*)
+ * and pure code. This cache obeys it: hashing is arithmetic,
+ * comparison is the member strcmp. The miss path resolves via
+ * the allocator law below (free/malloc take the init-resolved
+ * members; everything else dlsyms once). func_get and the rest
+ * of the historical entry stay BELOW the guard exactly as
+ * they were.
+ */
+#define REAL_CACHE_SLOTS 2048	/* pow2 */
+
+struct real_cache_el {
+	_Atomic(uint64_t) hash;
+	void *real;
+	const char *name;
+};
+
+static struct real_cache_el real_cache[REAL_CACHE_SLOTS];
+
+static uint64_t real_name_hash(const char *s)
+{
+	uint64_t h = 14695981039346656037ULL;
+
+	for (; *s != '\0'; s++) {
+		h ^= (unsigned char)*s;
+		h *= 1099511628211ULL;
+	}
+	return h;
+}
+
+/*
+ * Miss-path resolution. The ALLOCATOR law (the rounds-12/13
+ * recursion): glibc's dlsym frees its per-thread dlerror
+ * result through the PLT, that free re-enters the engine, and
+ * the dlsym would recurse unbounded -- free/malloc take the
+ * init-resolved members instead.
+ */
+void *retrace_real_impl_resolve(const char *func_name)
+{
+	if (retrace_real_impls.strcmp != NULL &&
+	    retrace_real_impls.free != NULL &&
+	    retrace_real_impls.strcmp(func_name, "free") == 0)
+		return retrace_real_impls.free;
+	if (retrace_real_impls.strcmp != NULL &&
+	    retrace_real_impls.malloc != NULL &&
+	    retrace_real_impls.strcmp(func_name, "malloc") == 0)
+		return retrace_real_impls.malloc;
+	return retrace_as_get_real_safe(func_name);
+}
+
+void *retrace_real_impl_cached(const char *func_name)
+{
+	/*
+	 * Pre-init dispatches take the HISTORICAL path: they are
+	 * construction-internal, single-threaded, and carry no
+	 * dlerror state -- dlsym is safe exactly there and only
+	 * there. The cache (and its member free/malloc miss law)
+	 * operates post-init, when real_impls is fully resolved.
+	 */
+	uint64_t h;
+	size_t i;
+	struct real_cache_el *el;
+	uint64_t k;
+
+	if (!retrace_inited)
+		return retrace_as_get_real_safe(func_name);
+	h = real_name_hash(func_name);
+	i = (size_t)h & (REAL_CACHE_SLOTS - 1);
+
+	for (;;) {
+		el = &real_cache[i & (REAL_CACHE_SLOTS - 1)];
+		k = atomic_load_explicit(&el->hash,
+			memory_order_acquire);
+		if (k == h && el->name != NULL &&
+		    retrace_real_impls.strcmp(el->name, func_name)
+			    == 0)
+			return el->real;
+		if (k == 0) {
+			void *real = retrace_real_impl_resolve(func_name);
+
+			el->name = func_name;
+			el->real = real;
+			atomic_store_explicit(&el->hash, h,
+				memory_order_release);
+			return real;
+		}
+		i++;
+	}
+}
+
 void retrace_engine_wrapper(char *func_name,
 	void *arch_spec_ctx)
 {
@@ -124,33 +224,7 @@ void retrace_engine_wrapper(char *func_name,
 	func_name = strip_darwin_extsn(func_name, clean_name,
 		sizeof(clean_name));
 
-	/*
-	 * The ALLOCATOR lookups must never dlsym: glibc's dlsym
-	 * frees its per-thread dlerror result through the PLT
-	 * (_dlerror_run -> dl_error_free -> free), that dispatch
-	 * re-enters here, and this very dlsym would recurse without
-	 * bound -- the reentrance guard sits BELOW this line and
-	 * cannot break a cycle that never reaches it. The real
-	 * allocator impls are resolved once at init; use them.
-	 */
-	/*
-	 * REAL strcmp (the plain call is interposed and would
-	 * recurse straight back into this entry); NULL before
-	 * real_impls_init reaches it -- dispatches that early are
-	 * construction-internal and take the old path, which has
-	 * never cycled (no dlerror state to free yet)
-	 */
-	if (retrace_real_impls.strcmp != NULL &&
-	    retrace_real_impls.free != NULL &&
-	    retrace_real_impls.strcmp(func_name, "free") == 0)
-		real_impl = retrace_real_impls.free;
-	else if (retrace_real_impls.strcmp != NULL &&
-		 retrace_real_impls.malloc != NULL &&
-		 retrace_real_impls.strcmp(func_name, "malloc")
-			== 0)
-		real_impl = retrace_real_impls.malloc;
-	else
-		real_impl = retrace_as_get_real_safe(func_name);
+	real_impl = retrace_real_impl_cached(func_name);
 	if (!retrace_inited) {
 		retrace_as_sched_real(arch_spec_ctx, real_impl);
 		return;

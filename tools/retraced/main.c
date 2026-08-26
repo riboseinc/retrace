@@ -745,9 +745,22 @@ int main(int argc, char **argv)
 					}
 				}
 				if (slot >= 0) {
-					memset(&conns[slot], 0,
-						sizeof(conns[slot]));
+					/*
+					 * Field init only -- NOT memset of
+					 * the whole struct: each conn
+					 * carries a 1 MiB frame buffer,
+					 * and a full memset COMMITS that
+					 * MiB of RSS per accepted agent
+					 * (128 agents = 128 MiB for zero
+					 * reason). The buffer's contents
+					 * are governed by `fill`; zero
+					 * pages stay untouched until the
+					 * peer actually sends.
+					 */
 					conns[slot].fd = fd;
+					conns[slot].fill = 0;
+					conns[slot].agent_id[0] = '\0';
+					conns[slot].helloed = 0;
 				} else {
 					close(fd);
 				}

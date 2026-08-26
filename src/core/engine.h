@@ -64,6 +64,14 @@ extern int retrace_inited;
 void retrace_core_boot(void);
 
 /*
+ * Perf/test surface: the engine's cached real-impl resolver and
+ * its uncached baseline (the historical per-dispatch dlsym).
+ * benched head-to-head in test/perf/bench_real_impl_lookup.c.
+ */
+void *retrace_real_impl_cached(const char *func_name);
+void *retrace_real_impl_resolve(const char *func_name);
+
+/*
  * dlopen reentrance guard (issue #450). Returns 1 while the current
  * thread is inside a dlopen/dlclose/dlsym/dlerror call. The engine
  * skips action processing while this is active.
