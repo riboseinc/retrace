@@ -159,7 +159,9 @@ def main():
               f"{[a.get('id') for a in agents]}", file=sys.stderr)
         try:
             with open(dlog) as f:
-                for ln in f.read().splitlines()[-14:]:
+                for ln in f.read().splitlines()[-46:]:
+                    if "registry" in ln or "{" in ln or '}' in ln:
+                        continue
                     print(f"  d: {ln[:150]}", file=sys.stderr)
         except OSError:
             pass
