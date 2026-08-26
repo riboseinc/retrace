@@ -260,13 +260,16 @@ int retrace_agent_emit_event(const char *name,
 	queue_push(payload);
 
 	/*
-	 * Fork truth (the CI hunt, rounds 22-28): pthread_atfork
-	 * child handlers NEVER FIRE on the Linux runners, so a
-	 * child forked after our spawn inherits thread_spawned=1
-	 * and silently never spawns. OWNERSHIP is the reliable
-	 * witness: if the pid that spawned the thread is not THIS
-	 * pid, the state is a fork-inherited relic -- reset it
-	 * exactly as the child handler would, then spawn fresh.
+	 * Fork truth (the CI hunt, rounds 22-31): pthread_atfork
+	 * child handlers never fire on the Linux runners, and
+	 * spawning a SECOND thread in the child raced the inherited
+	 * one (the 60s timeouts). But the inherited thread is
+	 * perfectly functional -- it just holds the PARENT's
+	 * connection. ADOPT it: close the inherited socket, clear
+	 * the identity, and re-own the spawn bookkeeping; the
+	 * thread's loop sees the dead fd, drops the connection, and
+	 * re-HELLOs under the child's pid. One thread before the
+	 * fork, one thread after.
 	 */
 	if (atomic_load(&g_agent.thread_spawned) &&
 	    g_agent.spawner_pid != (long)getpid()) {
@@ -280,11 +283,11 @@ int retrace_agent_emit_event(const char *name,
 		g_agent.connected = 0;
 		g_agent.rfill = 0;
 		g_agent.q_count = 0;
-		atomic_store(&g_agent.thread_done, 0);
 		atomic_store(&g_agent.stop, 0);
 		memcpy(g_agent.agent_id, "pending",
 			sizeof("pending"));
-		atomic_store(&g_agent.thread_spawned, 0);
+		g_agent.spawner_pid = (long)getpid();
+		atomic_store(&g_agent.thread_spawned, 1);
 	}
 
 	if (spawn_agent_thread() != 0)
@@ -689,16 +692,6 @@ static void *agent_thread_main(void *arg)
 			agent_atfork_parent, agent_atfork_child);
 #endif
 
-	/* an inherited thread's spawner pid is the parent -- bail
-	 * on the first loop iteration so only the new (correctly
-	 * owned) thread runs
-	 */
-	if (g_agent.spawner_pid != (long)getpid()) {
-		/* inherited thread bails (pid mismatch); no trace -- the
-		 * fork-reset breadcrumb in the same file is the witness
-		 */
-		return NULL;
-	}
 	while (!atomic_load(&g_agent.stop)) {
 		if (!g_agent.connected) {
 			if (try_connect() == 0) {
