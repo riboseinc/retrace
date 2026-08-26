@@ -171,6 +171,13 @@ def main():
                     print(f"  err: {ln[:150]}", file=sys.stderr)
         except OSError:
             pass
+        for rec in journal_records(journal):
+            ev = rec.get("ev", {})
+            name = ev.get("name", "")
+            if isinstance(name, str) and name.startswith(
+                    "retrace.agent"):
+                print(f"  bc: {rec.get('agent')} "
+                      f"{ev.get('attrs')}", file=sys.stderr)
         try:
             with open(out_path) as f:
                 print(f"  out: {f.read()[:300]!r}", file=sys.stderr)

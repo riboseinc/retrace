@@ -72,6 +72,7 @@ struct agent_state {
 
 static struct agent_state g_agent;
 static void *agent_thread_main(void *arg);
+static void breadcrumb(const char *stage, const char *detail);
 static void agent_atfork_prepare(void);
 static void agent_atfork_parent(void);
 static void agent_atfork_child(void);
@@ -556,6 +557,7 @@ static int try_connect(void)
 				sizeof(sa));
 
 		if (crc != 0) {
+			breadcrumb("connect_failed", NULL);
 			if (retrace_real_impls.rc_close != NULL)
 				retrace_real_impls.rc_close(fd);
 			else
@@ -577,6 +579,7 @@ static int try_connect(void)
 			sess != NULL ? sess : "",
 			(long)getpid(), (long)getppid());
 		if (send_frame(RETRACE_RPC_MSG_HELLO, hello) != 0) {
+			breadcrumb("hello_send_failed", NULL);
 			drop_connection();
 			return -1;
 		}
@@ -598,12 +601,30 @@ static void drain_queue(void)
 	}
 }
 
+/* lifecycle breadcrumbs: ride the EVENT queue to the daemon's
+ * journal (the E2E dumps it) -- zero new I/O paths, and the
+ * pre-connect events drain right after HELLO, so their presence
+ * or absence tells exactly how far the thread got
+ */
+static void breadcrumb(const char *stage, const char *detail)
+{
+	const char *kv[4];
+
+	kv[0] = "retrace.agent.stage";
+	kv[1] = stage;
+	kv[2] = "retrace.agent.detail";
+	kv[3] = detail != NULL ? detail : "";
+	(void)retrace_agent_emit_event("retrace.agent.lifecycle",
+		kv, 2);
+}
+
 static void *agent_thread_main(void *arg)
 {
 	struct timespec beat = {.tv_sec = 0, .tv_nsec = 100000000};
 	long backoff_ms = AGENT_BACKOFF_MIN_MS;
 
 	(void)arg;
+	breadcrumb("thread_start", NULL);
 
 	/*
 	 * Settle past the process's init-adjacent phase (the gdb
