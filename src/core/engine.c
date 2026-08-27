@@ -202,16 +202,20 @@ void *retrace_real_impl_resolve(const char *func_name)
 }
 
 /*
- * ONE probe, BOTH answers (the post-wave audit's F1): the
- * engine resolved the real impl at entry and the prototype at
- * the dispatch tail -- two FNV hashes and two open-addressing
- * probes against this same table for the same name on every
- * single call. The element already holds both pointers; this
- * hands them out together. The wrappers below stay for the
- * bench and any external caller.
+ * ONE probe per dispatch, both answers (the post-wave audit's
+ * F1) -- with the ENGINE-ENTRY LAW respected: nothing between
+ * engine entry and the reentrance-guard check may dispatch
+ * (func_get logs through log_dbg, whose formatter dispatches
+ * malloc/snprintf; at the entry that recursion is unbounded --
+ * the Linux CI stack-overflow lesson). So the ENTRY resolves
+ * the SLOT (hash + probe + real only; a miss inserts with
+ * proto deliberately NULL), and the dispatch TAIL -- post
+ * guard -- reads the prototype from the SAME slot, running the
+ * func_get self-heal only there. One hash, one probe, and the
+ * law holds.
  */
-void retrace_name_lookup(const char *func_name, void **real_out,
-	const struct FuncPrototype **proto_out)
+static struct real_cache_el *name_slot_lookup(
+	const char *func_name, void **real_out)
 {
 	uint64_t h;
 	size_t i;
@@ -220,12 +224,10 @@ void retrace_name_lookup(const char *func_name, void **real_out,
 
 	if (real_out != NULL)
 		*real_out = NULL;
-	if (proto_out != NULL)
-		*proto_out = NULL;
 	if (!retrace_inited) {
 		if (real_out != NULL)
 			*real_out = retrace_as_get_real_safe(func_name);
-		return;
+		return NULL;
 	}
 	h = real_name_hash(func_name);
 	i = (size_t)h & (REAL_CACHE_SLOTS - 1);
@@ -238,19 +240,7 @@ void retrace_name_lookup(const char *func_name, void **real_out,
 			    == 0) {
 			if (real_out != NULL)
 				*real_out = el->real;
-			if (proto_out == NULL)
-				return;
-			if (el->proto != NULL) {
-				*proto_out = el->proto;
-				return;
-			}
-			/* filled post-funcs_init on the first query
-			 * that needs it; benign racing (same value
-			 * stored twice)
-			 */
-			el->proto = retrace_func_get(func_name);
-			*proto_out = el->proto;
-			return;
+			return el;
 		}
 		if (k == 0) {
 			void *real = retrace_real_impl_resolve(func_name);
@@ -271,19 +261,51 @@ void retrace_name_lookup(const char *func_name, void **real_out,
 			el->real = real;
 			/* NULL means not-yet-resolved (funcs_init
 			 * may not have run when retrace_inited
-			 * flipped): the first post-init query
-			 * self-heals the entry
+			 * flipped): the dispatch tail self-heals
 			 */
 			el->proto = NULL;
 			real_hash_store(&el->hash, h);
 			if (real_out != NULL)
 				*real_out = real;
-			if (proto_out != NULL)
-				*proto_out = el->proto;
-			return;
+			return el;
 		}
 		i++;
 	}
+}
+
+/*
+ * The dispatch tail's prototype, from the slot the entry
+ * already resolved: no second hash, no second probe. The
+ * func_get self-heal runs HERE (post guard) -- see the entry
+ * law note above.
+ */
+static const struct FuncPrototype *slot_proto(
+	struct real_cache_el *el, const char *func_name)
+{
+	/* pre-init (Windows: hooks live before core boot): no
+	 * cache slot, resolve directly -- the historical behavior
+	 */
+	if (el == NULL)
+		return retrace_func_get(func_name);
+	if (el->proto != NULL)
+		return el->proto;
+	el->proto = retrace_func_get(func_name);
+	return el->proto;
+}
+
+/*
+ * Public convenience (the bench): both answers in one call.
+ * Only use OUTSIDE the engine entry (unguarded callers have no
+ * dispatch recursion, so the self-heal is safe for them).
+ */
+void retrace_name_lookup(const char *func_name, void **real_out,
+	const struct FuncPrototype **proto_out)
+{
+	struct real_cache_el *el = name_slot_lookup(func_name,
+		real_out);
+
+	if (proto_out != NULL)
+		*proto_out = slot_proto(el, func_name);
 }
 
 void *retrace_real_impl_cached(const char *func_name)
@@ -317,7 +339,7 @@ void retrace_engine_wrapper(char *func_name,
 	void *arch_spec_ctx)
 {
 	void *real_impl;
-	const struct FuncPrototype *proto = NULL;
+	struct real_cache_el *name_slot = NULL;
 	struct ThreadContext *thread_ctx;
 	const JSON_Object *i_script;
 	const JSON_Array *i_scripts;
@@ -326,7 +348,7 @@ void retrace_engine_wrapper(char *func_name,
 	func_name = strip_darwin_extsn(func_name, clean_name,
 		sizeof(clean_name));
 
-	retrace_name_lookup(func_name, &real_impl, &proto);
+	name_slot = name_slot_lookup(func_name, &real_impl);
 	if (!retrace_inited) {
 		retrace_as_sched_real(arch_spec_ctx, real_impl);
 		return;
@@ -377,7 +399,8 @@ void retrace_engine_wrapper(char *func_name,
 	 */
 	retrace_agent_kick();
 
-	thread_ctx->prototype = proto;
+	thread_ctx->prototype = slot_proto(name_slot,
+		func_name);
 	retrace_win_diag("proto", func_name,
 		thread_ctx->prototype != NULL);
 
