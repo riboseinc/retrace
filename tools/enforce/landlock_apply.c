@@ -156,6 +156,18 @@ int enforce_landlock_apply(const struct enforce_spec *spec)
 		struct stat st;
 
 		if (path_fd < 0) {
+			if (errno == ENOENT || errno == ENOTDIR) {
+				/* a declared path may legitimately be
+				 * absent on this host (e.g.
+				 * ld.so.preload): skip the rule, keep
+				 * the rest -- fail-closed stays, the
+				 * absent path simply grants nothing
+				 */
+				fprintf(stderr,
+					"retrace-enforce: rule path absent, skipped: %s\n",
+					r->path);
+				continue;
+			}
 			close(fd);
 			return -1;
 		}
