@@ -8,7 +8,7 @@ set(_parson_source ${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 
 add_executable(retrace_enforce
 	main.c enforce_spec.c landlock_apply.c seccomp_apply.c
-	sandbox_apply.c artifact_audit.c
+	sandbox_apply.c artifact_audit.c appcontainer_apply.c
 	${_parson_source})
 set_target_properties(retrace_enforce PROPERTIES
 	OUTPUT_NAME retrace-enforce)
@@ -25,6 +25,10 @@ endif()
 
 # Audited artifacts (01 P2): SHA-256 digests when OpenSSL is
 # linked; FNV-1a-64 fallback otherwise (the record says which).
+if(RETRACE_PLATFORM_WINDOWS)
+	target_link_libraries(retrace_enforce PRIVATE userenv)
+endif()
+
 if(OpenSSL_FOUND)
 	target_compile_definitions(retrace_enforce PRIVATE
 		RETRACE_HAVE_OPENSSL=1)

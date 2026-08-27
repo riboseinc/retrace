@@ -36,6 +36,7 @@
 #include "seccomp_apply.h"
 #include "sandbox_apply.h"
 #include "artifact_audit.h"
+#include "appcontainer_apply.h"
 
 static void enforce_usage(void)
 {
@@ -175,7 +176,8 @@ int main(int argc, char **argv)
 		return 2;
 	}
 	if (rc == 1 && !allow_missing &&
-	    spec.sandbox_exec[0] == '\0')
+	    spec.sandbox_exec[0] == '\0' &&
+	    spec.ac_name[0] == '\0')
 		return 2;
 
 	rc = enforce_seccomp_apply(&spec);
@@ -189,7 +191,8 @@ int main(int argc, char **argv)
 		return 2;
 	}
 	if (rc == 1 && !allow_missing &&
-	    spec.sandbox_exec[0] == '\0')
+	    spec.sandbox_exec[0] == '\0' &&
+	    spec.ac_name[0] == '\0')
 		return 2;
 
 	/*
@@ -226,6 +229,25 @@ int main(int argc, char **argv)
 		}
 	}
 	free(json);
+
+	if (spec.ac_name[0] != '\0') {
+		int crc = enforce_appcontainer_apply(&spec, &argv[i + 1],
+			NULL);
+
+		if (crc == 1) {
+			/* the plane is missing HERE: same fail-closed
+			 * contract as the other planes
+			 */
+			if (!allow_missing) {
+				fprintf(stderr,
+					"retrace-enforce: appcontainer not supported on this host\n");
+				return 2;
+			}
+			/* dev path: run without the container */
+		} else {
+			return crc < 0 ? 2 : crc;
+		}
+	}
 
 	if (spec.sandbox_exec[0] != '\0') {
 		static char wrap[16384];

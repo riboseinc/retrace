@@ -112,6 +112,45 @@ int enforce_spec_parse(struct enforce_spec *spec, const char *json)
 		json_object_get_boolean(root, "no_new_privs") != 0;
 	(void)parse_rules(spec, root);
 	(void)parse_deny(spec, root);
+	{
+		JSON_Object *ac = json_object_get_object(root,
+			"appcontainer");
+
+		if (ac != NULL) {
+			const char *nm = json_object_get_string(ac, "name");
+			JSON_Array *rd = json_object_get_array(ac,
+				"read_paths");
+			JSON_Array *wr = json_object_get_array(ac,
+				"write_paths");
+			size_t k, n;
+
+			if (nm != NULL)
+				snprintf(spec->ac_name,
+					sizeof(spec->ac_name), "%s", nm);
+			n = rd != NULL ? json_array_get_count(rd) : 0;
+			for (k = 0; k < n &&
+			     spec->ac_read_n < ENFORCE_AC_PATHS_MAX; k++) {
+				const char *s = json_array_get_string(rd, k);
+
+				if (s != NULL)
+					snprintf(
+						spec->ac_read[spec->ac_read_n++],
+						sizeof(spec->ac_read[0]),
+						"%s", s);
+			}
+			n = wr != NULL ? json_array_get_count(wr) : 0;
+			for (k = 0; k < n &&
+			     spec->ac_write_n < ENFORCE_AC_PATHS_MAX; k++) {
+				const char *s = json_array_get_string(wr, k);
+
+				if (s != NULL)
+					snprintf(
+						spec->ac_write[spec->ac_write_n++],
+						sizeof(spec->ac_write[0]),
+						"%s", s);
+			}
+		}
+	}
 	json_value_free(v);
 	return 0;
 }

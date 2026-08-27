@@ -39,6 +39,7 @@
 
 #define ENFORCE_RULES_MAX 512
 #define ENFORCE_SYSCALLS_MAX 128
+#define ENFORCE_AC_PATHS_MAX 256	/* appcontainer grants */
 
 enum enforce_access {
 	ENF_READ = 0x01,	/* read files / list dirs */
@@ -62,6 +63,14 @@ struct enforce_spec {
 	struct enforce_syscall deny[ENFORCE_SYSCALLS_MAX];
 	size_t deny_n;
 	int no_new_privs;	/* set PR_SET_NO_NEW_PRIVS (default 1) */
+	/* AppContainer (Windows, 01 P1): the coarse kernel plane.
+	 * name empty = not compiled into this spec.
+	 */
+	char ac_name[128];
+	char ac_read[ENFORCE_AC_PATHS_MAX][512];
+	size_t ac_read_n;
+	char ac_write[ENFORCE_AC_PATHS_MAX][512];
+	size_t ac_write_n;
 };
 
 /*

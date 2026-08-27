@@ -19,6 +19,22 @@ if(RETRACE_PLATFORM_WINDOWS)
 			RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/smoke")
 		target_link_libraries(retrace_static_smoke PRIVATE retrace_headers)
 	endif()
+
+	# AppContainer kernel enforcement (TODO.beyond-libc/01 P1):
+	# the Windows backend E2E. Self-skips on non-Windows hosts,
+	# so POSIX CI legs can carry it too if ever moved.
+	find_package(Python3 COMPONENTS Interpreter)
+	if(Python3_Interpreter_FOUND AND TARGET retrace_profile
+	   AND TARGET retrace_enforce)
+		add_test(NAME integration-enforce-win
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_enforce_win.py
+				$<TARGET_FILE:retrace_profile>
+				$<TARGET_FILE:retrace_enforce>)
+		set_tests_properties(integration-enforce-win PROPERTIES
+			LABELS "integration"
+			TIMEOUT 120)
+	endif()
 	return()
 endif()
 
