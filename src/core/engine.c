@@ -47,6 +47,7 @@
 #endif
 
 #include "engine.h"
+#include "funcs.h"
 #include "agent.h"
 #include "real_impls.h"
 #include "arch_spec.h"
@@ -145,7 +146,8 @@ static char *strip_darwin_extsn(char *name, char *buf, size_t bufsz)
 struct real_cache_el {
 	volatile uint64_t hash;
 	void *real;
-	const char *name;
+	char name[MAXLEN_FUNC_NAME];
+	const struct FuncPrototype *proto;
 };
 
 #define real_hash_load(p)	(*(p))
@@ -154,7 +156,8 @@ struct real_cache_el {
 struct real_cache_el {
 	_Atomic(uint64_t) hash;
 	void *real;
-	const char *name;
+	char name[MAXLEN_FUNC_NAME];
+	const struct FuncPrototype *proto;
 };
 
 #define real_hash_load(p)	atomic_load_explicit((p), \
@@ -162,6 +165,8 @@ struct real_cache_el {
 #define real_hash_store(p, v)	atomic_store_explicit((p), (v), \
 	memory_order_release)
 #endif
+
+struct FuncPrototype;
 
 static struct real_cache_el real_cache[REAL_CACHE_SLOTS];
 
@@ -224,12 +229,76 @@ void *retrace_real_impl_cached(const char *func_name)
 			return el->real;
 		if (k == 0) {
 			void *real = retrace_real_impl_resolve(func_name);
+			size_t n = 0;
 
-			el->name = func_name;
+			/* COPY the name -- never store the caller's
+			 * pointer: on macOS strip_darwin_extsn hands
+			 * back a buffer on the engine frame, dead
+			 * the moment this returns. Manual loop: a
+			 * libc copy here would itself dispatch.
+			 */
+			while (func_name[n] != '\0' &&
+			       n + 1 < sizeof(el->name)) {
+				el->name[n] = func_name[n];
+				n++;
+			}
+			el->name[n] = '\0';
 			el->real = real;
+			/* one index, both answers -- with one trap:
+			 * retrace_inited flips BEFORE funcs_init
+			 * registers the prototype table, so a
+			 * construction-window dispatch of a name
+			 * (parson opens the config) would freeze
+			 * proto=NULL forever. NULL therefore means
+			 * not-yet-resolved: proto_cached re-walks
+			 * and self-heals the entry.
+			 */
+			el->proto = NULL;
 			real_hash_store(&el->hash, h);
 			return real;
 		}
+		i++;
+	}
+}
+
+/*
+ * The dispatch tail's prototype lookup, served from the same
+ * name->slot index the real-impl pointer comes from: one probe
+ * per dispatch answers both. Only runs post-init (after the
+ * guard), where the entry was just inserted by the real-impl
+ * lookup earlier in this same dispatch -- the fallback covers
+ * ordering drift, never inserts.
+ */
+const struct FuncPrototype *retrace_proto_cached(
+	const char *func_name)
+{
+	uint64_t h;
+	size_t i;
+	struct real_cache_el *el;
+	uint64_t k;
+
+	if (!retrace_inited)
+		return retrace_func_get(func_name);
+	h = real_name_hash(func_name);
+	i = (size_t)h & (REAL_CACHE_SLOTS - 1);
+
+	for (;;) {
+		el = &real_cache[i & (REAL_CACHE_SLOTS - 1)];
+		k = real_hash_load(&el->hash);
+		if (k == h && el->name != NULL &&
+		    retrace_real_impls.strcmp(el->name, func_name)
+			    == 0) {
+			if (el->proto != NULL)
+				return el->proto;
+			/* filled post-funcs_init on the first
+			 * query that needs it; benign racing
+			 * (same value stored twice)
+			 */
+			el->proto = retrace_func_get(func_name);
+			return el->proto;
+		}
+		if (k == 0)
+			return retrace_func_get(func_name);
 		i++;
 	}
 }
@@ -297,7 +366,7 @@ void retrace_engine_wrapper(char *func_name,
 	 */
 	retrace_agent_kick();
 
-	thread_ctx->prototype = retrace_func_get(func_name);
+	thread_ctx->prototype = retrace_proto_cached(func_name);
 	retrace_win_diag("proto", func_name,
 		thread_ctx->prototype != NULL);
 
