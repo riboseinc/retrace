@@ -205,6 +205,21 @@ if(Python3_Interpreter_FOUND)
 			PROPERTIES LABELS "integration"
 			TIMEOUT 120)
 
+		# The ETW kernel-observation agent (TODO.beyond-libc/03 P1):
+		# the Windows lane as a spectator peer; --synthetic proves
+		# the pipe on POSIX CI (the --loader source carries the
+		# real Windows chain; pipes ride supervisor/12).
+		if(NOT WIN32)
+			add_test(NAME integration-etw-agent
+				COMMAND ${Python3_EXECUTABLE}
+					${CMAKE_SOURCE_DIR}/test/integration/test_etw_agent.py
+					$<TARGET_FILE:retrace_retraced>
+					${CMAKE_SOURCE_DIR}/etw-bridge/retrace-etw-agent)
+			set_tests_properties(integration-etw-agent
+				PROPERTIES LABELS "integration"
+				TIMEOUT 120)
+		endif()
+
 		# Runtime agents (TODO.beyond-libc/04): pyretrace
 		# (Python) and jretrace (JVM, P1) as full peers on the
 		# same session. jretrace self-skips where no JDK is

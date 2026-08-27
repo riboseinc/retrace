@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# retrace-etw-agent (TODO.beyond-libc/03 P1): the Windows
+# kernel-observation agent. Same doctrine as the eBPF lane:
+# an OBSERVER -- HELLO without the nonce deliberately, seated
+# as a spectator (evidence ALWAYS, policy NEVER) -- feeding
+# kernel-source events into the supervisor's journal so one
+# session shows the libc CLAIMS and the kernel TRUTH.
+#
+# Sources:
+#   --synthetic     emit demonstration kernel events (no Windows
+#                   needed; the CI path and the protocol proof)
+#   --loader PATH   wrap etw2retrace: its retrace JSON stdout
+#                   lines become kernel events. The full Windows
+#                   chain is: pwsh scripts/win/etw-capture.ps1
+#                   -> etw2retrace -> this agent. (The native
+#                   named-pipe transport rides TODO.supervisor/12;
+#                   until then the loader path carries the lane.)
+#
+# Usage:
+#   retrace-etw-agent --sock /run/retraced/agent.sock [--synthetic]
+#   retrace-etw-agent --sock ... --loader ./etw2retrace -- args...
+
+import argparse
+import json
+import os
+import signal
+import socket
+import struct
+import subprocess
+import sys
+import threading
+import time
+
+MAGIC = b"RTRD"
+HELLO, HEARTBEAT, EVENT, BYE = 1, 2, 4, 6
+
+
+def frame(mid, payload):
+    b = payload.encode()
+    return MAGIC + struct.pack("<HHI", 1, mid, len(b)) + b
+
+
+class Agent:
+    def __init__(self, sock_path):
+        self.sock_path = sock_path
+        self.s = None
+        self.agent_id = "pending"
+        self.seq = 0
+        self.stop = False
+
+    def connect(self):
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(self.sock_path)
+        # HELLO without a nonce: the spectator seat, on purpose
+        s.sendall(frame(HELLO, json.dumps({
+            "session_token": "", "nonce": "",
+            "pid": os.getpid(), "ppid": os.getppid(),
+            "boot_id": "kernel", "cmdline": "retrace-etw-agent",
+            "retrace_version": "etw-agent-1"})))
+        hdr = b""
+        while len(hdr) < 12:
+            hdr += s.recv(12 - len(hdr))
+        _, _, mid, ln = struct.unpack("<4sHHI", hdr)
+        body = b""
+        while len(body) < ln:
+            body += s.recv(ln - len(body))
+        if mid != 16:
+            raise RuntimeError(f"expected WELCOME, got {mid}")
+        self.welcome = json.loads(body)
+        if self.welcome.get("role") != "spectator":
+            sys.stderr.write(
+                "retrace-etw-agent: WARNING daemon seated us as "
+                f"{self.welcome.get('role')}; the doctrine says "
+                "observers ride as spectators\n")
+        self.agent_id = self.welcome.get("agent_id", "pending")
+        self.s = s
+        # a POLICY_SET may follow; observers drop it
+        s.settimeout(0.2)
+        try:
+            hdr = s.recv(12)
+            if len(hdr) == 12:
+                _, _, m2, l2 = struct.unpack("<4sHHI", hdr)
+                while l2:
+                    b = s.recv(l2)
+                    l2 -= len(b)
+        except OSError:
+            pass
+        s.settimeout(None)
+
+    def emit(self, name, **attrs):
+        self.seq += 1
+        self.s.sendall(frame(EVENT, json.dumps({
+            "agent_id": self.agent_id, "seq": self.seq,
+            "ts": int(time.time()), "name": name,
+            "attrs": {k: str(v) for k, v in attrs.items()},
+            "source": "kernel"}, sort_keys=True)))
+
+    def heartbeat_loop(self):
+        while not self.stop:
+            time.sleep(1.0)
+            if self.s is None:
+                continue
+            try:
+                self.s.sendall(frame(HEARTBEAT, json.dumps(
+                    {"agent_id": self.agent_id,
+                     "seq": self.seq})))
+            except OSError:
+                return
+
+    def bye(self):
+        if self.s is None:
+            return
+        try:
+            self.s.sendall(frame(BYE, json.dumps(
+                {"agent_id": self.agent_id})))
+            self.s.close()
+        except OSError:
+            pass
+        self.s = None
+
+
+def run_synthetic(agent, n):
+    for i in range(n):
+        agent.emit("kernel.syscall.observe", syscall="NtCreateFile",
+                   sample=i, note="etw synthetic lane")
+        time.sleep(0.3)
+
+
+def run_loader(agent, loader, argv):
+    """Wrap etw2retrace: each retrace JSON entry it prints becomes
+    one kernel-source event."""
+    proc = subprocess.Popen([loader] + argv, stdout=subprocess.PIPE,
+        stderr=sys.stderr, text=True)
+    for line in proc.stdout:
+        line = line.strip()
+        if not line or line in ("[", "]"):
+            continue
+        entry = line.rstrip(",")
+        try:
+            doc = json.loads(entry)
+        except json.JSONDecodeError:
+            continue
+        msg = doc.get("message", {})
+        agent.emit("kernel.syscall.observe",
+            syscall=msg.get("func", "?"),
+            ret=msg.get("ret_val", ""),
+            ts=doc.get("time", ""))
+    proc.wait()
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="retrace-etw-agent")
+    ap.add_argument("--sock", required=True)
+    ap.add_argument("--synthetic", action="store_true")
+    ap.add_argument("--samples", type=int, default=3)
+    ap.add_argument("--loader")
+    ap.add_argument("argv", nargs=argparse.REMAINDER)
+    args = ap.parse_args()
+
+    agent = Agent(args.sock)
+    try:
+        agent.connect()
+    except (OSError, RuntimeError) as e:
+        sys.stderr.write(f"retrace-etw-agent: {e}\n")
+        return 2
+    hb = threading.Thread(target=agent.heartbeat_loop, daemon=True)
+    hb.start()
+    try:
+        if args.synthetic:
+            run_synthetic(agent, args.samples)
+        elif args.loader:
+            run_loader(agent, args.loader, args.argv)
+        else:
+            ap.error("one of --synthetic or --loader is required")
+    finally:
+        agent.stop = True
+        time.sleep(0.2)
+        agent.bye()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
