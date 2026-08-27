@@ -206,13 +206,19 @@ def main():
             return 1
 
         # -- wrong uid refused (best effort) -------------------
-        have_nobody = subprocess.run(
-            ["id", "-u", "nobody"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL).returncode == 0
-        sudo = subprocess.run(["sudo", "-n", "true"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL).returncode == 0
+        # sudo/id may not EXIST at all (Alpine): probe with
+        # FileNotFoundError treated as unavailable
+        def _have(cmd):
+            try:
+                return subprocess.run(cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                    ).returncode == 0
+            except OSError:
+                return False
+
+        have_nobody = _have(["id", "-u", "nobody"])
+        sudo = _have(["sudo", "-n", "true"])
         if have_nobody and sudo:
             probe = subprocess.run(
                 ["sudo", "-n", "-u", "nobody", sys.executable,
