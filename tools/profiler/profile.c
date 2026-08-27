@@ -37,6 +37,8 @@
  */
 
 #include "aggregate.h"
+#include "prof_feed.h"
+#include "enforce.h"
 
 #ifdef RETRACE_HAVE_OTLP
 #include <otlp-c/exporter.h>
@@ -90,10 +92,6 @@ fail:
 	return NULL;
 }
 
-struct ProfFeed {
-	struct Profile prof;
-	size_t skipped;
-};
 
 static void feed_cb(JSON_Object *entry, void *ctx)
 {
@@ -124,7 +122,7 @@ static int load_profile(const char *path, struct ProfFeed *feed)
  * traces fall through to the scanner. The jail subcommand
  * accepts either artifact.
  */
-static int load_any(const char *path, struct ProfFeed *feed)
+int load_any(const char *path, struct ProfFeed *feed)
 {
 	char *text;
 	size_t len = 0;
@@ -635,6 +633,8 @@ int main(int argc, char **argv)
 		return capture_mode(argc, argv);
 	if (argc >= 2 && strcmp(argv[1], "jail") == 0)
 		return jail_mode(argc, argv);
+	if (argc >= 2 && strcmp(argv[1], "enforce") == 0)
+		return enforce_mode(argc, argv);
 	if (argc >= 2 && strcmp(argv[1], "export") == 0) {
 #ifdef RETRACE_HAVE_OTLP
 		/*
