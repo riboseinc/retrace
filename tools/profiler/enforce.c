@@ -52,7 +52,7 @@ static void usage(void)
 {
 	fprintf(stderr,
 "Usage: retrace-profile enforce <profile.json> [--inside d.json]\n"
-"        [--backend landlock|seccomp|both] [--exec <path>]\n"
+"        [--backend landlock|seccomp|sandbox-exec|all] [--exec <path>]\n"
 "        [-o spec.json]\n");
 }
 
@@ -69,7 +69,7 @@ static int profile_uses(const struct Profile *p, const char *fn)
 
 static JSON_Value *build_spec(const struct Profile *allow_src,
 	const struct Profile *usage_src, const char *exec_path,
-	int want_landlock, int want_seccomp)
+	int want_landlock, int want_seccomp, int want_sb)
 {
 	JSON_Value *root_v = json_value_init_object();
 	JSON_Object *root = json_value_get_object(root_v);
@@ -133,6 +133,51 @@ static JSON_Value *build_spec(const struct Profile *allow_src,
 		}
 	}
 
+#ifdef __APPLE__
+	if (want_sb) {
+		/*
+		 * Seatbelt (01 P1): allow default, then deny writes
+		 * under the mutable roots, then re-allow each
+		 * declared write path (deny-before-allow ordering;
+		 * macOS resolves /tmp -> /private/tmp so both
+		 * spellings are denied). Reads ride "allow default"
+		 * -- the P0 honesty documented in the slice.
+		 */
+		static const char *const roots[] = {
+			"/private/tmp", "/tmp", "/Users", "/var",
+			"/Library", "/private/var", NULL,
+		};
+		char prof[8192];
+		size_t o = 0;
+		size_t k;
+
+		o += (size_t)snprintf(prof + o, sizeof(prof) - o,
+			"(version 1)(allow default)");
+		for (k = 0; roots[k] != NULL; k++)
+			o += (size_t)snprintf(prof + o,
+				sizeof(prof) - o,
+				"(deny file-write* (subpath \"%s\"))",
+				roots[k]);
+		for (i = 0; i < allow_src->accesses.count; i++) {
+			const struct ProfAccess *a =
+				&allow_src->accesses.items[i];
+
+			if (!a->class_write || a->path[0] != '/')
+				continue;
+			o += (size_t)snprintf(prof + o,
+				sizeof(prof) - o,
+				"(allow file-write* (subpath \"%s\"))",
+				a->path);
+		}
+		{
+			JSON_Value *sb_v =
+				json_value_init_string(prof);
+
+			json_object_set_value(root, "sandbox_exec",
+				sb_v);
+		}
+	}
+#endif
 	if (want_seccomp) {
 		JSON_Value *sc_v = json_value_init_object();
 		JSON_Object *sc = json_value_get_object(sc_v);
@@ -169,6 +214,12 @@ int enforce_mode(int argc, char **argv)
 	JSON_Value *spec;
 	int i;
 	int want_ll = 1, want_sc = 1;
+#ifdef __APPLE__
+	int want_sb = 0;
+#else
+	int want_sb_unused = 0;
+#define want_sb want_sb_unused
+#endif
 
 	memset(&feed, 0, sizeof(feed));
 	memset(&inside_feed, 0, sizeof(inside_feed));
@@ -198,6 +249,12 @@ int enforce_mode(int argc, char **argv)
 		want_sc = 0;
 	} else if (strcmp(backend, "seccomp") == 0) {
 		want_ll = 0;
+	} else if (strcmp(backend, "sandbox-exec") == 0) {
+		want_sb = 1;
+		want_ll = 0;
+		want_sc = 0;
+	} else if (strcmp(backend, "all") == 0) {
+		want_sb = 1;
 	} else if (strcmp(backend, "both") != 0) {
 		usage();
 		return 2;
@@ -221,7 +278,7 @@ int enforce_mode(int argc, char **argv)
 	}
 
 	spec = build_spec(allow_src, &feed.prof, exec_path,
-		want_ll, want_sc);
+		want_ll, want_sc, want_sb);
 	{
 		char *ser = json_serialize_to_string_pretty(spec);
 

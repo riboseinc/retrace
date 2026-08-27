@@ -56,6 +56,7 @@ struct enforce_syscall {
 };
 
 struct enforce_spec {
+	char sandbox_exec[8192];	/* Seatbelt profile (macOS) */
 	struct enforce_rule rules[ENFORCE_RULES_MAX];
 	size_t rules_n;
 	struct enforce_syscall deny[ENFORCE_SYSCALLS_MAX];
