@@ -50,8 +50,11 @@ static double now_ns(void)
 int main(void)
 {
 	double t0, t1, dlsym_ns, cache_ns;
+	double two_ns = 1e9, one_ns = 1e9;
 	volatile void *sink = NULL;
+	volatile const struct FuncPrototype *psink = NULL;
 	long i;
+	int run;
 
 	t0 = now_ns();
 	for (i = 0; i < DLSYM_ITERS; i++)
@@ -97,6 +100,49 @@ int main(void)
 		printf("proto speedup: %.1fx\n", walk_ns / proto_ns);
 		if (proto_ns > walk_ns) {
 			printf("FAIL: proto cache slower than walk\n");
+			return 1;
+		}
+	}
+
+	/* F1: the combined lookup -- one hash + one probe for BOTH
+	 * answers -- against the two separate probes it replaced.
+	 * Ratio legs are noise-sensitive under a loaded CI box:
+	 * min-of-3 samples, and a 10% tolerance before failing.
+	 */
+	{
+		for (run = 0; run < 3; run++) {
+			double ns;
+
+			t0 = now_ns();
+			for (i = 0; i < CACHE_ITERS; i++) {
+				sink = retrace_real_impl_cached("open");
+				psink = retrace_proto_cached("open");
+			}
+			t1 = now_ns();
+			ns = (t1 - t0) / CACHE_ITERS;
+			if (ns < two_ns)
+				two_ns = ns;
+
+			t0 = now_ns();
+			for (i = 0; i < CACHE_ITERS; i++) {
+				void *r;
+				const struct FuncPrototype *pp;
+
+				retrace_name_lookup("open", &r, &pp);
+				sink = r;
+				psink = pp;
+			}
+			t1 = now_ns();
+			ns = (t1 - t0) / CACHE_ITERS;
+			if (ns < one_ns)
+				one_ns = ns;
+		}
+
+		printf("two probes   : %.1f ns/op\n", two_ns);
+		printf("one probe    : %.1f ns/op\n", one_ns);
+		printf("fold speedup : %.1fx\n", two_ns / one_ns);
+		if (one_ns > two_ns * 1.10) {
+			printf("FAIL: fold slower than two probes\n");
 			return 1;
 		}
 	}

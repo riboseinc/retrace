@@ -201,22 +201,32 @@ void *retrace_real_impl_resolve(const char *func_name)
 	return retrace_as_get_real_safe(func_name);
 }
 
-void *retrace_real_impl_cached(const char *func_name)
+/*
+ * ONE probe, BOTH answers (the post-wave audit's F1): the
+ * engine resolved the real impl at entry and the prototype at
+ * the dispatch tail -- two FNV hashes and two open-addressing
+ * probes against this same table for the same name on every
+ * single call. The element already holds both pointers; this
+ * hands them out together. The wrappers below stay for the
+ * bench and any external caller.
+ */
+void retrace_name_lookup(const char *func_name, void **real_out,
+	const struct FuncPrototype **proto_out)
 {
-	/*
-	 * Pre-init dispatches take the HISTORICAL path: they are
-	 * construction-internal, single-threaded, and carry no
-	 * dlerror state -- dlsym is safe exactly there and only
-	 * there. The cache (and its member free/malloc miss law)
-	 * operates post-init, when real_impls is fully resolved.
-	 */
 	uint64_t h;
 	size_t i;
 	struct real_cache_el *el;
 	uint64_t k;
 
-	if (!retrace_inited)
-		return retrace_as_get_real_safe(func_name);
+	if (real_out != NULL)
+		*real_out = NULL;
+	if (proto_out != NULL)
+		*proto_out = NULL;
+	if (!retrace_inited) {
+		if (real_out != NULL)
+			*real_out = retrace_as_get_real_safe(func_name);
+		return;
+	}
 	h = real_name_hash(func_name);
 	i = (size_t)h & (REAL_CACHE_SLOTS - 1);
 
@@ -225,8 +235,23 @@ void *retrace_real_impl_cached(const char *func_name)
 		k = real_hash_load(&el->hash);
 		if (k == h && el->name != NULL &&
 		    retrace_real_impls.strcmp(el->name, func_name)
-			    == 0)
-			return el->real;
+			    == 0) {
+			if (real_out != NULL)
+				*real_out = el->real;
+			if (proto_out == NULL)
+				return;
+			if (el->proto != NULL) {
+				*proto_out = el->proto;
+				return;
+			}
+			/* filled post-funcs_init on the first query
+			 * that needs it; benign racing (same value
+			 * stored twice)
+			 */
+			el->proto = retrace_func_get(func_name);
+			*proto_out = el->proto;
+			return;
+		}
 		if (k == 0) {
 			void *real = retrace_real_impl_resolve(func_name);
 			size_t n = 0;
@@ -244,22 +269,31 @@ void *retrace_real_impl_cached(const char *func_name)
 			}
 			el->name[n] = '\0';
 			el->real = real;
-			/* one index, both answers -- with one trap:
-			 * retrace_inited flips BEFORE funcs_init
-			 * registers the prototype table, so a
-			 * construction-window dispatch of a name
-			 * (parson opens the config) would freeze
-			 * proto=NULL forever. NULL therefore means
-			 * not-yet-resolved: proto_cached re-walks
-			 * and self-heals the entry.
+			/* NULL means not-yet-resolved (funcs_init
+			 * may not have run when retrace_inited
+			 * flipped): the first post-init query
+			 * self-heals the entry
 			 */
 			el->proto = NULL;
 			real_hash_store(&el->hash, h);
-			return real;
+			if (real_out != NULL)
+				*real_out = real;
+			if (proto_out != NULL)
+				*proto_out = el->proto;
+			return;
 		}
 		i++;
 	}
 }
+
+void *retrace_real_impl_cached(const char *func_name)
+{
+	void *real;
+
+	retrace_name_lookup(func_name, &real, NULL);
+	return real;
+}
+
 
 /*
  * The dispatch tail's prototype lookup, served from the same
@@ -272,41 +306,18 @@ void *retrace_real_impl_cached(const char *func_name)
 const struct FuncPrototype *retrace_proto_cached(
 	const char *func_name)
 {
-	uint64_t h;
-	size_t i;
-	struct real_cache_el *el;
-	uint64_t k;
+	const struct FuncPrototype *proto;
 
-	if (!retrace_inited)
-		return retrace_func_get(func_name);
-	h = real_name_hash(func_name);
-	i = (size_t)h & (REAL_CACHE_SLOTS - 1);
-
-	for (;;) {
-		el = &real_cache[i & (REAL_CACHE_SLOTS - 1)];
-		k = real_hash_load(&el->hash);
-		if (k == h && el->name != NULL &&
-		    retrace_real_impls.strcmp(el->name, func_name)
-			    == 0) {
-			if (el->proto != NULL)
-				return el->proto;
-			/* filled post-funcs_init on the first
-			 * query that needs it; benign racing
-			 * (same value stored twice)
-			 */
-			el->proto = retrace_func_get(func_name);
-			return el->proto;
-		}
-		if (k == 0)
-			return retrace_func_get(func_name);
-		i++;
-	}
+	retrace_name_lookup(func_name, NULL, &proto);
+	return proto;
 }
+
 
 void retrace_engine_wrapper(char *func_name,
 	void *arch_spec_ctx)
 {
 	void *real_impl;
+	const struct FuncPrototype *proto = NULL;
 	struct ThreadContext *thread_ctx;
 	const JSON_Object *i_script;
 	const JSON_Array *i_scripts;
@@ -315,7 +326,7 @@ void retrace_engine_wrapper(char *func_name,
 	func_name = strip_darwin_extsn(func_name, clean_name,
 		sizeof(clean_name));
 
-	real_impl = retrace_real_impl_cached(func_name);
+	retrace_name_lookup(func_name, &real_impl, &proto);
 	if (!retrace_inited) {
 		retrace_as_sched_real(arch_spec_ctx, real_impl);
 		return;
@@ -366,7 +377,7 @@ void retrace_engine_wrapper(char *func_name,
 	 */
 	retrace_agent_kick();
 
-	thread_ctx->prototype = retrace_proto_cached(func_name);
+	thread_ctx->prototype = proto;
 	retrace_win_diag("proto", func_name,
 		thread_ctx->prototype != NULL);
 
