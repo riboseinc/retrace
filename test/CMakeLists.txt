@@ -192,6 +192,20 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 120)
 
+	# The kernel-observation agent (TODO.beyond-libc/03):
+	# eBPF lane as a spectator peer; synthetic source proves
+	# the pipe on CI (no BPF privileges).
+	if(NOT WIN32)
+		add_test(NAME integration-ebpf-agent
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_ebpf_agent.py
+				$<TARGET_FILE:retrace_retraced>
+				${CMAKE_SOURCE_DIR}/ebpf-bridge/retrace-ebpf-agent)
+		set_tests_properties(integration-ebpf-agent
+			PROPERTIES LABELS "integration"
+			TIMEOUT 120)
+	endif()
+
 	# Kernel enforcement compile (TODO.beyond-libc/01):
 	# declared-set -> Landlock ruleset + seccomp floor, installed
 	# by retrace-enforce. Linux-only; self-skips elsewhere or
