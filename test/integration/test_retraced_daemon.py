@@ -144,14 +144,17 @@ def main():
         return 1
     names = [e.get("ev", {}).get("name") for e in events]
     # this test HELLOs nonceless: the auth event records the
-    # spectator role (TODO.supervisor/08) alongside the events
+    # spectator role (TODO.supervisor/08) and is journaled at
+    # HELLO -- BEFORE the agent's own events
     if len(events) != 3 or \
-            events[0].get("ev", {}).get("name") != \
-            "retrace.jail.denied" or \
-            "retrace.auth.agent" not in names:
+            "retrace.jail.denied" not in names or \
+            names[0] != "retrace.auth.agent":
         print(f"FAIL: journal events wrong: {lines}", file=sys.stderr)
         return 1
-    if any(json.loads(ln)["agent"] != agent_id for ln in lines):
+    # daemon-authored records (retrace.auth.agent, session
+    # minting) are the exception to per-agent attribution
+    if any(json.loads(ln)["agent"] not in (agent_id, "daemon")
+           for ln in lines):
         print("FAIL: journal attribution wrong", file=sys.stderr)
         return 1
     print(f"boot 1 ok: agent={agent_id}, {len(lines)} journal lines")
