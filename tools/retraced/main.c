@@ -39,10 +39,10 @@
 #include "protocol.h"
 #include "journal.h"
 #include "peer_gate.h"
+#include "retraced_ctl.h"
 
 #include "parson.h"
 
-#define MAX_AGENTS 128
 #define HB_TIMEOUT_MS 15000
 #define SWEEP_INTERVAL_MS 1000
 #define POLICY_MAX_BYTES 4000	/* the agent's inbound budget */
@@ -54,8 +54,15 @@ static volatile sig_atomic_t g_stop;
  * Pushed to every agent on registration; POLICY_ACKs update
  * the registry's per-agent epoch.
  */
-static char *g_policy_blob;
-static long g_policy_epoch;
+static struct retraced_ctl_ctx g_ctl;
+
+static void ctl_reply_fd(const char *line, void *user)
+{
+	int fd = *(int *)user;
+
+	(void)write(fd, line, strlen(line));
+}
+
 
 /* Agent-plane nonce (TODO.supervisor/08 P0): minted at startup
  * (or injected via --nonce for reproducible runs), delivered to
@@ -89,23 +96,23 @@ static int load_policy(const char *path)
 		fclose(f);
 		return -1;
 	}
-	g_policy_blob = malloc((size_t)sz + 1);
-	if (g_policy_blob == NULL) {
+	g_ctl.policy_blob = malloc((size_t)sz + 1);
+	if (g_ctl.policy_blob == NULL) {
 		fclose(f);
 		return -1;
 	}
-	if (fread(g_policy_blob, 1, (size_t)sz, f) != (size_t)sz) {
+	if (fread(g_ctl.policy_blob, 1, (size_t)sz, f) != (size_t)sz) {
 		fprintf(stderr, "retraced: policy %s read failed\n",
 			path);
-		free(g_policy_blob);
-		g_policy_blob = NULL;
+		free(g_ctl.policy_blob);
+		g_ctl.policy_blob = NULL;
 		fclose(f);
 		return -1;
 	}
 	fclose(f);
-	g_policy_blob[sz] = '\0';
+	g_ctl.policy_blob[sz] = '\0';
 
-	v = json_parse_string(g_policy_blob);
+	v = json_parse_string(g_ctl.policy_blob);
 	root = v != NULL ? json_value_get_object(v) : NULL;
 	pol = root != NULL ? json_object_get_object(root, "policy") : NULL;
 	epoch = pol != NULL ? json_object_get_number(pol, "epoch") : 0.0;
@@ -114,13 +121,13 @@ static int load_policy(const char *path)
 			"retraced: policy %s: policy.epoch >= 1 required\n",
 			path);
 		json_value_free(v);
-		free(g_policy_blob);
-		g_policy_blob = NULL;
+		free(g_ctl.policy_blob);
+		g_ctl.policy_blob = NULL;
 		return -1;
 	}
-	g_policy_epoch = (long)epoch;
+	g_ctl.policy_epoch = (long)epoch;
 	json_value_free(v);
-	printf("retraced: policy loaded: epoch %ld\n", g_policy_epoch);
+	printf("retraced: policy loaded: epoch %ld\n", g_ctl.policy_epoch);
 	return 0;
 }
 
@@ -138,16 +145,7 @@ static long now_ms(void)
 	return (long)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
 }
 
-struct conn {
-	int fd;
-	uint8_t buf[RETRACE_RPC_PAYLOAD_MAX + RETRACE_RPC_HEADER_SZ];
-	size_t fill;
-	char agent_id[RETRACED_AGENT_ID_MAX];
-	int helloed;
-	int spectator;
-};
-
-static int write_frame(int fd, uint16_t type, const char *payload)
+int write_frame(int fd, uint16_t type, const char *payload)
 {
 	size_t plen = payload != NULL ? strlen(payload) : 0;
 	uint8_t *out = malloc(RETRACE_RPC_HEADER_SZ + plen);
@@ -264,7 +262,7 @@ static void handle_agent_frame(struct conn *c,
 
 		snprintf(welcome, sizeof(welcome),
 			"{\"agent_id\":\"%s\",\"session_token\":\"%s\",\"policy_epoch\":%ld,\"heartbeat_ms\":1000,\"role\":\"%s\"}",
-			e->id, e->session, g_policy_epoch,
+			e->id, e->session, g_ctl.policy_epoch,
 			c->spectator ? "spectator" : "full");
 		write_frame(c->fd, RETRACE_RPC_MSG_WELCOME, welcome);
 		/* the policy rides every registration: an agent
@@ -273,9 +271,9 @@ static void handle_agent_frame(struct conn *c,
 		 * already holds a newer one). Spectators never
 		 * receive policy or commands.
 		 */
-		if (g_policy_blob != NULL && !c->spectator)
+		if (g_ctl.policy_blob != NULL && !c->spectator)
 			write_frame(c->fd, RETRACE_RPC_MSG_POLICY_SET,
-				g_policy_blob);
+				g_ctl.policy_blob);
 		{
 			char ev[224];
 
@@ -358,210 +356,6 @@ static int g_ctl_fd = -1;
 static int g_ctl_pfd_slot = -1;
 static char g_ctl_buf[8192];
 static size_t g_ctl_fill;
-static char *g_thaw_blob;	/* last user policy, for thaw */
-static int g_frozen;
-
-static void set_policy_blob(const char *blob, long epoch)
-{
-	free(g_policy_blob);
-	g_policy_blob = strdup(blob);
-	g_policy_epoch = epoch;
-}
-
-static int push_policy_to_agents(struct conn *conns,
-	const char *blob)
-{
-	int i, pushed = 0;
-
-	for (i = 0; i < MAX_AGENTS; i++) {
-		if (conns[i].fd >= 0 && conns[i].helloed &&
-		    !conns[i].spectator) {
-			write_frame(conns[i].fd,
-				RETRACE_RPC_MSG_POLICY_SET, blob);
-			pushed++;
-		}
-	}
-	return pushed;
-}
-
-static void ctl_reply(const char *fmt, ...)
-{
-	char out[1024];
-	va_list ap;
-	int n;
-
-	va_start(ap, fmt);
-	n = vsnprintf(out, sizeof(out), fmt, ap);
-	va_end(ap);
-	if (n > 0)
-		(void)write(g_ctl_fd, out, (size_t)n);
-}
-
-static void handle_ctl_line(char *line, struct conn *conns,
-	struct retraced_registry *reg, struct retraced_journal *jr)
-{
-	JSON_Value *v = json_parse_string(line);
-	JSON_Object *o;
-	const char *cmd;
-
-	if (v == NULL) {
-		ctl_reply("{\"ok\":0,\"error\":\"malformed json\"}\n");
-		return;
-	}
-	o = json_value_get_object(v);
-	cmd = json_object_get_string(o, "cmd");
-	if (cmd == NULL) {
-		ctl_reply("{\"ok\":0,\"error\":\"no cmd\"}\n");
-		json_value_free(v);
-		return;
-	}
-	if (strcmp(cmd, "status") == 0) {
-		ctl_reply("{\"ok\":1,\"pid\":%ld,\"agents\":%zu,"
-			"\"policy_epoch\":%ld,\"frozen\":%d}\n",
-			(long)getpid(), reg->count, g_policy_epoch,
-			g_frozen);
-	} else if (strcmp(cmd, "ps") == 0) {
-		JSON_Value *snap = retraced_registry_to_json(reg);
-		char *s = json_serialize_to_string(snap);
-
-		ctl_reply("{\"ok\":1,\"registry\":%s}\n",
-			s != NULL ? s : "null");
-		json_free_serialized_string(s);
-		json_value_free(snap);
-	} else if (strcmp(cmd, "policy_push") == 0) {
-		const char *blob = json_object_get_string(o, "blob");
-		JSON_Value *pv;
-		JSON_Object *po, *proot;
-		double epoch;
-		int pushed;
-
-		if (blob == NULL) {
-			ctl_reply("{\"ok\":0,\"error\":\"no blob\"}\n");
-			json_value_free(v);
-			return;
-		}
-		pv = json_parse_string(blob);
-		proot = pv != NULL ? json_value_get_object(pv) : NULL;
-		po = proot != NULL ?
-			json_object_get_object(proot, "policy") : NULL;
-		epoch = po != NULL ?
-			json_object_get_number(po, "epoch") : 0.0;
-		if (epoch < 1.0 || json_object_get_array(proot,
-			    "intercept_scripts") == NULL) {
-			ctl_reply("{\"ok\":0,\"error\":\"bad policy"
-				" (need policy.epoch + scripts)\"}\n");
-			json_value_free(pv);
-			json_value_free(v);
-			return;
-		}
-		set_policy_blob(blob, (long)epoch);
-		g_frozen = 0;
-		free(g_thaw_blob);
-		g_thaw_blob = strdup(blob);
-		pushed = push_policy_to_agents(conns, blob);
-		{
-			char ev[160];
-
-			snprintf(ev, sizeof(ev),
-				"{\"name\":\"retrace.policy.pushed\",\"epoch\":%ld,\"agents\":%d}",
-				(long)epoch, pushed);
-			retraced_journal_event(jr, (long)time(NULL),
-				"daemon", 0, ev);
-		}
-		ctl_reply("{\"ok\":1,\"epoch\":%ld,\"pushed\":%d}\n",
-			(long)epoch, pushed);
-		json_value_free(pv);
-	} else if (strcmp(cmd, "freeze") == 0) {
-		char blob[256];
-		long epoch = g_policy_epoch + 1;
-		int pushed;
-
-		snprintf(blob, sizeof(blob),
-			"{\"policy\":{\"epoch\":%ld},"
-			"\"intercept_scripts\":[{\"func_name\":\"*\","
-			"\"actions\":[{\"action_name\":\"freeze\"}]}]}",
-			epoch);
-		set_policy_blob(blob, epoch);
-		g_frozen = 1;
-		pushed = push_policy_to_agents(conns, blob);
-		{
-			char ev[128];
-
-			snprintf(ev, sizeof(ev),
-				"{\"name\":\"retrace.policy.freeze\",\"epoch\":%ld,\"agents\":%d}",
-				epoch, pushed);
-			retraced_journal_event(jr, (long)time(NULL),
-				"daemon", 0, ev);
-		}
-		ctl_reply("{\"ok\":1,\"epoch\":%ld,\"pushed\":%d}\n",
-			epoch, pushed);
-	} else if (strcmp(cmd, "thaw") == 0) {
-		long epoch = g_policy_epoch + 1;
-		char thawed[8192];
-		const char *src = g_thaw_blob != NULL ? g_thaw_blob :
-			"{\"policy\":{\"epoch\":1},\"intercept_scripts\":[]}";
-		JSON_Value *tv = json_parse_string(src);
-		int pushed;
-
-		/* re-stamp the saved policy at a fresh epoch: agents
-		 * only ever accept strictly-greater epochs
-		 */
-		if (tv != NULL) {
-			JSON_Object *troot = json_value_get_object(tv);
-			JSON_Object *tpo = json_object_get_object(troot,
-				"policy");
-
-			if (tpo != NULL)
-				json_object_set_number(tpo, "epoch",
-					(double)epoch);
-		}
-		{
-			char *s = json_serialize_to_string(tv);
-
-			snprintf(thawed, sizeof(thawed), "%s",
-				s != NULL ? s : src);
-			json_free_serialized_string(s);
-		}
-		json_value_free(tv);
-		set_policy_blob(thawed, epoch);
-		g_frozen = 0;
-		pushed = push_policy_to_agents(conns, thawed);
-		{
-			char ev[128];
-
-			snprintf(ev, sizeof(ev),
-				"{\"name\":\"retrace.policy.thaw\",\"epoch\":%ld,\"agents\":%d}",
-				epoch, pushed);
-			retraced_journal_event(jr, (long)time(NULL),
-				"daemon", 0, ev);
-		}
-		ctl_reply("{\"ok\":1,\"epoch\":%ld,\"pushed\":%d}\n",
-			epoch, pushed);
-	} else if (strcmp(cmd, "kill") == 0) {
-		long pid = (long)json_object_get_number(o, "pid");
-
-		if (pid <= 0) {
-			ctl_reply("{\"ok\":0,\"error\":\"no pid\"}\n");
-			json_value_free(v);
-			return;
-		}
-		kill((pid_t)pid, SIGTERM);
-		{
-			char ev[128];
-
-			snprintf(ev, sizeof(ev),
-				"{\"name\":\"retrace.ctl.kill\",\"pid\":%ld}",
-				pid);
-			retraced_journal_event(jr, (long)time(NULL),
-				"daemon", 0, ev);
-		}
-		ctl_reply("{\"ok\":1,\"pid\":%ld}\n", pid);
-	} else {
-		ctl_reply("{\"ok\":0,\"error\":\"unknown cmd\"}\n");
-	}
-	json_value_free(v);
-}
-
 static void handle_ctl_readable(struct conn *conns,
 	struct retraced_registry *reg, struct retraced_journal *jr)
 {
@@ -579,7 +373,7 @@ static void handle_ctl_readable(struct conn *conns,
 	g_ctl_buf[g_ctl_fill] = '\0';
 	while ((nl = strchr(g_ctl_buf, '\n')) != NULL) {
 		*nl = '\0';
-		handle_ctl_line(g_ctl_buf, conns, reg, jr);
+		retraced_ctl_handle_line(&g_ctl, g_ctl_buf);
 		memmove(g_ctl_buf, nl + 1,
 			g_ctl_fill - (size_t)(nl + 1 - g_ctl_buf));
 		g_ctl_fill -= (size_t)(nl + 1 - g_ctl_buf);
@@ -773,6 +567,11 @@ int main(int argc, char **argv)
 	}
 	for (i = 0; i < MAX_AGENTS; i++)
 		conns[i].fd = -1;
+	g_ctl.reg = &reg;
+	g_ctl.jr = &jr;
+	g_ctl.conns = conns;
+	g_ctl.reply_sink = ctl_reply_fd;
+	g_ctl.reply_user = &g_ctl_fd;
 
 	unlink(sock_path);
 	listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
