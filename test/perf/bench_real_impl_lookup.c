@@ -34,6 +34,7 @@
 #include <time.h>
 
 #include "engine.h"
+#include "funcs.h"
 
 #define DLSYM_ITERS 100000
 #define CACHE_ITERS 10000000
@@ -71,6 +72,34 @@ int main(void)
 		printf("FAIL: cache slower than dlsym\n");
 		return 1;
 	}
-	printf("PASS: real-impl cache\n");
+
+	/*
+	 * The dispatch-tail prototype lookup, same harness: the
+	 * historical per-dispatch table walk vs the shared index.
+	 */
+	{
+		double walk_ns, proto_ns;
+
+		t0 = now_ns();
+		for (i = 0; i < DLSYM_ITERS; i++)
+			sink = retrace_func_get("open");
+		t1 = now_ns();
+		walk_ns = (t1 - t0) / DLSYM_ITERS;
+
+		t0 = now_ns();
+		for (i = 0; i < CACHE_ITERS; i++)
+			sink = retrace_proto_cached("open");
+		t1 = now_ns();
+		proto_ns = (t1 - t0) / CACHE_ITERS;
+
+		printf("proto(walk)  : %.1f ns/op\n", walk_ns);
+		printf("proto(cached): %.1f ns/op\n", proto_ns);
+		printf("proto speedup: %.1fx\n", walk_ns / proto_ns);
+		if (proto_ns > walk_ns) {
+			printf("FAIL: proto cache slower than walk\n");
+			return 1;
+		}
+	}
+	printf("PASS: real-impl + prototype caches\n");
 	return 0;
 }
