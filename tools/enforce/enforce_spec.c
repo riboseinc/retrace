@@ -100,6 +100,14 @@ int enforce_spec_parse(struct enforce_spec *spec, const char *json)
 		json_value_free(v);
 		return -1;
 	}
+	{
+		const char *sb = json_object_get_string(root,
+			"sandbox_exec");
+
+		if (sb != NULL)
+			snprintf(spec->sandbox_exec,
+				sizeof(spec->sandbox_exec), "%s", sb);
+	}
 	spec->no_new_privs =
 		json_object_get_boolean(root, "no_new_privs") != 0;
 	(void)parse_rules(spec, root);

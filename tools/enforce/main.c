@@ -27,6 +27,7 @@
 #include "enforce_spec.h"
 #include "landlock_apply.h"
 #include "seccomp_apply.h"
+#include "sandbox_apply.h"
 
 static void enforce_usage(void)
 {
@@ -101,7 +102,8 @@ int main(int argc, char **argv)
 			strerror(errno));
 		return 2;
 	}
-	if (rc == 1 && !allow_missing)
+	if (rc == 1 && !allow_missing &&
+	    spec.sandbox_exec[0] == '\0')
 		return 2;
 
 	rc = enforce_seccomp_apply(&spec);
@@ -114,8 +116,28 @@ int main(int argc, char **argv)
 			strerror(errno));
 		return 2;
 	}
-	if (rc == 1 && !allow_missing)
+	if (rc == 1 && !allow_missing &&
+	    spec.sandbox_exec[0] == '\0')
 		return 2;
+
+	if (spec.sandbox_exec[0] != '\0') {
+		static char wrap[16384];
+
+		if (enforce_sandbox_exec_wrap(spec.sandbox_exec,
+			    argc - i - 1, &argv[i + 1], wrap,
+			    sizeof(wrap)) != 0) {
+			fprintf(stderr,
+				"retrace-enforce: sandbox wrap overflow\n");
+			return 2;
+		}
+		{
+			char *sh_argv[] = {"/bin/sh", "-c", wrap, NULL};
+
+			execvp("/bin/sh", sh_argv);
+			perror("execvp(sh)");
+			return 2;
+		}
+	}
 
 	execvp(argv[i + 1], &argv[i + 1]);
 	perror("execvp");
