@@ -36,6 +36,7 @@
 #include <stdlib.h>
 
 #include "retraced_ctl.h"
+#include "tls_gate.h"
 
 /*
  * the connection-plane writer, stubbed: pushes are COUNTED,
@@ -110,6 +111,7 @@ static void setup(void)
 	ctx.reg = &reg;
 	ctx.jr = &jr;
 	ctx.reply_sink = sink;
+	ctx.scopes = RETRACED_SCOPE_ALL; /* local-UDS peer default */
 }
 
 static void test_malformed(void)
@@ -197,6 +199,18 @@ static void test_kill_no_pid(void)
 	CHECK(strstr(reply_buf, "\"error\":\"no pid\"") != NULL);
 }
 
+static void test_scope_denied(void)
+{
+	/* TLS peer with status-only claims cannot freeze */
+	setup();
+	ctx.scopes = RETRACED_SCOPE_STATUS;
+	feed(&ctx, "{\"cmd\":\"status\"}");
+	CHECK(strstr(reply_buf, "\"ok\":1") != NULL);
+	feed(&ctx, "{\"cmd\":\"freeze\"}");
+	CHECK(strstr(reply_buf, "\"error\":\"scope denied\"") != NULL);
+	CHECK(ctx.frozen == 0);
+}
+
 int main(void)
 {
 	printf("retraced ctl plane tests:\n");
@@ -209,6 +223,7 @@ int main(void)
 	TEST(policy_push_bad);
 	TEST(freeze_thaw);
 	TEST(kill_no_pid);
+	TEST(scope_denied);
 
 	printf("%d tests: %d pass, %d fail\n", tests_run, tests_pass,
 		tests_fail);

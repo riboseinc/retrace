@@ -226,6 +226,20 @@ if(Python3_Interpreter_FOUND)
 		set_tests_properties(integration-jretrace
 			PROPERTIES LABELS "integration"
 			TIMEOUT 120)
+
+		# TLS fleet transport (TODO.supervisor/08 P1 /
+		# TODO.beyond-libc/05): mTLS + claim scopes. Needs
+		# OpenSSL both at build (daemon linked) and at test
+		# time (openssl CLI mints the throwaway PKI).
+		if(OpenSSL_FOUND)
+			add_test(NAME integration-tls-fleet
+				COMMAND ${Python3_EXECUTABLE}
+					${CMAKE_SOURCE_DIR}/test/integration/test_tls_fleet.py
+					$<TARGET_FILE:retrace_retraced>)
+			set_tests_properties(integration-tls-fleet
+				PROPERTIES LABELS "integration"
+				TIMEOUT 120)
+		endif()
 	endif()
 
 	# Kernel enforcement compile (TODO.beyond-libc/01):

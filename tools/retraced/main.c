@@ -40,6 +40,7 @@
 #include "journal.h"
 #include "peer_gate.h"
 #include "retraced_ctl.h"
+#include "tls_gate.h"
 
 #include "parson.h"
 
@@ -56,11 +57,16 @@ static volatile sig_atomic_t g_stop;
  */
 static struct retraced_ctl_ctx g_ctl;
 
+static void *g_ctl_ssl; /* non-NULL when the active ctl is TLS */
+
 static void ctl_reply_fd(const char *line, void *user)
 {
 	int fd = *(int *)user;
 
-	(void)write(fd, line, strlen(line));
+	if (g_ctl_ssl != NULL)
+		(void)retraced_tls_write(g_ctl_ssl, line, (int)strlen(line));
+	else if (fd >= 0)
+		(void)write(fd, line, strlen(line));
 }
 
 
@@ -379,17 +385,43 @@ static int g_ctl_fd = -1;
 static int g_ctl_pfd_slot = -1;
 static char g_ctl_buf[8192];
 static size_t g_ctl_fill;
+/* TLS fleet listener (TODO.supervisor/08 P1 / beyond-libc/05) */
+static int g_tls_listen = -1;
+static struct retraced_tls_ctx *g_tls_ctx;
+static int g_tls_pfd_slot = -1;
+static void ctl_drop(void)
+{
+	if (g_ctl_ssl != NULL) {
+		retraced_tls_ssl_free(g_ctl_ssl);
+		g_ctl_ssl = NULL;
+	}
+	if (g_ctl_fd >= 0) {
+		close(g_ctl_fd);
+		g_ctl_fd = -1;
+	}
+	g_ctl_fill = 0;
+	/* local UDS peers regain full scope on next accept */
+	g_ctl.scopes = RETRACED_SCOPE_ALL;
+}
+
 static void handle_ctl_readable(struct conn *conns,
 	struct retraced_registry *reg, struct retraced_journal *jr)
 {
-	ssize_t n = read(g_ctl_fd, g_ctl_buf + g_ctl_fill,
-		sizeof(g_ctl_buf) - 1 - g_ctl_fill);
+	ssize_t n;
 	char *nl;
 
+	(void)conns;
+	(void)reg;
+	(void)jr;
+	if (g_ctl_ssl != NULL)
+		n = (ssize_t)retraced_tls_read(g_ctl_ssl,
+			g_ctl_buf + g_ctl_fill,
+			(int)(sizeof(g_ctl_buf) - 1 - g_ctl_fill));
+	else
+		n = read(g_ctl_fd, g_ctl_buf + g_ctl_fill,
+			sizeof(g_ctl_buf) - 1 - g_ctl_fill);
 	if (n <= 0) {
-		close(g_ctl_fd);
-		g_ctl_fd = -1;
-		g_ctl_fill = 0;
+		ctl_drop();
 		return;
 	}
 	g_ctl_fill += (size_t)n;
@@ -403,9 +435,7 @@ static void handle_ctl_readable(struct conn *conns,
 	}
 	if (g_ctl_fill >= sizeof(g_ctl_buf) - 1) {
 		/* oversized line: drop the connection, not the daemon */
-		close(g_ctl_fd);
-		g_ctl_fd = -1;
-		g_ctl_fill = 0;
+		ctl_drop();
 	}
 }
 
@@ -481,11 +511,15 @@ int main(int argc, char **argv)
 	const char *ctl_path = NULL;
 	const char *nonce_arg = NULL;
 	const char *nonce_file = NULL;
+	const char *tls_listen = NULL;
+	const char *tls_cert = NULL;
+	const char *tls_key = NULL;
+	const char *tls_ca = NULL;
 	struct retraced_registry reg;
 	struct retraced_journal jr;
 	struct conn *conns;
 	struct sockaddr_un sa;
-	struct pollfd pfds[MAX_AGENTS + 3];
+	struct pollfd pfds[MAX_AGENTS + 5];
 	/* conn slot -> pollfd index (packed: holes skipped); -1
 	 * when the slot is empty. The read loop used to index
 	 * pfds[slot + 1], which only holds while NO earlier slot
@@ -514,18 +548,35 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[i], "--nonce-file") == 0 &&
 			 i + 1 < argc)
 			nonce_file = argv[++i];
+		else if (strcmp(argv[i], "--tls-listen") == 0 &&
+			 i + 1 < argc)
+			tls_listen = argv[++i];
+		else if (strcmp(argv[i], "--tls-cert") == 0 &&
+			 i + 1 < argc)
+			tls_cert = argv[++i];
+		else if (strcmp(argv[i], "--tls-key") == 0 &&
+			 i + 1 < argc)
+			tls_key = argv[++i];
+		else if (strcmp(argv[i], "--tls-ca") == 0 &&
+			 i + 1 < argc)
+			tls_ca = argv[++i];
 		else {
 			fprintf(stderr,
 				"Usage: retraced [--sock <path>] [--journal <path>]\n"
 				"                 [--policy <file>] [--ctl <path>]\n"
 				"                 [--nonce <hex32>] [--nonce-file <path>]\n"
+				"                 [--tls-listen host:port --tls-cert c\n"
+				"                  --tls-key k --tls-ca ca]\n"
 				"  --policy: a policy file (header + full\n"
 				"    retrace config) pushed to every agent\n"
 				"    at registration; POLICY_ACKs are\n"
 				"    journaled\n"
 				"  --nonce: fix the agent nonce (32 hex; tests)\n"
 				"  --nonce-file: write the minted nonce here\n"
-				"    (0600) for spawners to inject\n");
+				"    (0600) for spawners to inject\n"
+				"  --tls-*: fleet TLS 1.3 mutual-auth ctl\n"
+				"    (all four flags required together; no\n"
+				"    plaintext remote mode exists)\n");
 			return 2;
 		}
 	}
@@ -629,6 +680,7 @@ int main(int argc, char **argv)
 	g_ctl.conns = conns;
 	g_ctl.reply_sink = ctl_reply_fd;
 	g_ctl.reply_user = &g_ctl_fd;
+	g_ctl.scopes = RETRACED_SCOPE_ALL; /* local UDS default */
 
 	unlink(sock_path);
 	listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -672,6 +724,46 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/*
+	 * TLS fleet listener (TODO.supervisor/08 P1 /
+	 * TODO.beyond-libc/05): ALL four flags or none. No
+	 * plaintext remote mode exists -- a partial set is a
+	 * hard error, never a silent degradation.
+	 */
+	{
+		int tls_n = (tls_listen != NULL) + (tls_cert != NULL) +
+			(tls_key != NULL) + (tls_ca != NULL);
+
+		if (tls_n != 0 && tls_n != 4) {
+			fprintf(stderr,
+				"retraced: --tls-listen/cert/key/ca are all-or-nothing\n");
+			return 2;
+		}
+		if (tls_n == 4) {
+			if (!retraced_tls_available()) {
+				fprintf(stderr,
+					"retraced: TLS requested but OpenSSL was not linked\n");
+				return 2;
+			}
+			g_tls_ctx = retraced_tls_server_new(tls_cert,
+				tls_key, tls_ca);
+			if (g_tls_ctx == NULL) {
+				fprintf(stderr,
+					"retraced: TLS context failed (cert/key/ca)\n");
+				return 1;
+			}
+			g_tls_listen = retraced_tls_listen(tls_listen);
+			if (g_tls_listen < 0) {
+				fprintf(stderr,
+					"retraced: TLS listen failed on %s\n",
+					tls_listen);
+				return 1;
+			}
+			printf("retraced: TLS controller on %s (TLS 1.3 mTLS)\n",
+				tls_listen);
+		}
+	}
+
 	last_sweep = now_ms();
 	while (!g_stop) {
 		int nfd = 0;
@@ -682,11 +774,18 @@ int main(int argc, char **argv)
 		nfd++;
 		{
 			int ctl_idx = -1;
+			int tls_idx = -1;
 
 			if (g_ctl_listen >= 0) {
 				pfds[nfd].fd = g_ctl_listen;
 				pfds[nfd].events = POLLIN;
 				ctl_idx = nfd;
+				nfd++;
+			}
+			if (g_tls_listen >= 0) {
+				pfds[nfd].fd = g_tls_listen;
+				pfds[nfd].events = POLLIN;
+				tls_idx = nfd;
 				nfd++;
 			}
 			if (g_ctl_fd >= 0) {
@@ -695,6 +794,7 @@ int main(int argc, char **argv)
 				nfd++;
 			}
 			g_ctl_pfd_slot = ctl_idx;
+			g_tls_pfd_slot = tls_idx;
 		}
 		for (i = 0; i < MAX_AGENTS; i++) {
 			pfd_of[i] = -1;
@@ -714,6 +814,45 @@ int main(int argc, char **argv)
 		    g_ctl_fd < 0) {
 			g_ctl_fd = accept_gated(g_ctl_listen, &jr);
 			g_ctl_fill = 0;
+			g_ctl_ssl = NULL;
+			g_ctl.scopes = RETRACED_SCOPE_ALL;
+		}
+		/* TLS fleet accept (08 P1): mutual auth + claim scopes */
+		if (g_tls_pfd_slot >= 0 &&
+		    (pfds[g_tls_pfd_slot].revents & POLLIN) &&
+		    g_ctl_fd < 0) {
+			int tfd = accept(g_tls_listen, NULL, NULL);
+			struct retraced_tls_peer peer;
+			void *ssl;
+			char ev[256];
+
+			if (tfd >= 0) {
+				ssl = retraced_tls_accept(g_tls_ctx, tfd,
+					&peer);
+				if (ssl == NULL) {
+					snprintf(ev, sizeof(ev),
+						"{\"name\":\"retrace.auth.tls_refused\"}");
+					retraced_journal_event(&jr,
+						(long)time(NULL), "daemon",
+						0, ev);
+					close(tfd);
+				} else {
+					g_ctl_fd = tfd;
+					g_ctl_ssl = ssl;
+					g_ctl_fill = 0;
+					g_ctl.scopes = peer.scopes;
+					snprintf(ev, sizeof(ev),
+						"{\"name\":\"retrace.auth.tls\",\"cn\":\"%s\",\"scopes\":%u}",
+						peer.cn,
+						(unsigned int)peer.scopes);
+					retraced_journal_event(&jr,
+						(long)time(NULL), "daemon",
+						0, ev);
+					printf("retraced: TLS peer %s scopes=0x%x\n",
+						peer.cn,
+						(unsigned int)peer.scopes);
+				}
+			}
 		}
 		if (g_ctl_fd >= 0) {
 			struct pollfd *cfd = NULL;
@@ -834,6 +973,10 @@ int main(int argc, char **argv)
 	}
 	emit_drift_summaries(&reg, &jr);
 	retraced_journal_close(&jr);
+	ctl_drop();
+	if (g_tls_listen >= 0)
+		close(g_tls_listen);
+	retraced_tls_free(g_tls_ctx);
 	unlink(sock_path);
 	free(conns);
 	return 0;

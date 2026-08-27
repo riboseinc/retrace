@@ -317,6 +317,7 @@ retrace_add_unit_test(retraced_ctl
     EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/tools/retraced/retraced_ctl.c
         ${CMAKE_SOURCE_DIR}/tools/retraced/registry.c
         ${CMAKE_SOURCE_DIR}/tools/retraced/journal.c
+        ${CMAKE_SOURCE_DIR}/tools/retraced/tls_gate.c
     EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/tools/retraced
         ${CMAKE_SOURCE_DIR}/tools/retraced/../..
         ${CMAKE_SOURCE_DIR}/src/supervisor

@@ -39,6 +39,7 @@
 #include <unistd.h>
 
 #include "retraced_ctl.h"
+#include "tls_gate.h"
 #include "parson.h"
 
 /*
@@ -103,6 +104,34 @@ void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
 		ctl_reply(ctx, "{\"ok\":0,\"error\":\"no cmd\"}\n");
 		json_value_free(v);
 		return;
+	}
+	/*
+	 * Scope gate (TODO.supervisor/08 P1): every command maps
+	 * to a claim bit; a TLS peer whose cert URI SAN does not
+	 * carry it is refused + journaled. Local UDS peers hold
+	 * RETRACED_SCOPE_ALL (set at accept).
+	 */
+	{
+		uint32_t need = retraced_tls_scope_for_cmd(cmd);
+
+		if (need == 0) {
+			ctl_reply(ctx, "{\"ok\":0,\"error\":\"unknown cmd\"}\n");
+			json_value_free(v);
+			return;
+		}
+		if ((ctx->scopes & need) != need) {
+			char ev[160];
+
+			snprintf(ev, sizeof(ev),
+				"{\"name\":\"retrace.auth.overscope\",\"cmd\":\"%s\",\"have\":%u,\"need\":%u}",
+				cmd, (unsigned int)ctx->scopes, (unsigned int)need);
+			retraced_journal_event(ctx->jr, (long)time(NULL),
+				"daemon", 0, ev);
+			ctl_reply(ctx,
+				"{\"ok\":0,\"error\":\"scope denied\"}\n");
+			json_value_free(v);
+			return;
+		}
 	}
 	if (strcmp(cmd, "status") == 0) {
 		ctl_reply(ctx, "{\"ok\":1,\"pid\":%ld,\"agents\":%zu,"
