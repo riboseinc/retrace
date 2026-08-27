@@ -97,8 +97,26 @@ def main():
                   file=sys.stderr)
             return 1
 
+        # Live drift grading (03 P1): on clean shutdown the daemon
+        # journals a retrace.drift.summary with the kernel_obs delta
+        # for every agent that observed. The offline correlate tool
+        # still does path-level grading; this is the heartbeat-grade.
+        drift = [r for r in recs
+                 if r.get("ev", {}).get("name") ==
+                 "retrace.drift.summary"]
+        if not drift:
+            print(f"FAIL: no retrace.drift.summary on clean stop: "
+                  f"{names}", file=sys.stderr)
+            return 1
+        d0 = drift[-1]["ev"]
+        if int(d0.get("kernel_obs", 0)) < 3 or int(d0.get("delta", 0)) < 3:
+            print(f"FAIL: drift summary under-counts observations: "
+                  f"{d0}", file=sys.stderr)
+            return 1
+
         print("ebpf-agent: 3 kernel observations journaled; "
-              "spectator seat; zero policy reach -- OK")
+              "spectator seat; zero policy reach; "
+              "drift summary on stop -- OK")
         return 0
     finally:
         if d.poll() is None:

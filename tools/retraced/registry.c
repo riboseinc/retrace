@@ -183,6 +183,8 @@ struct json_value_t *retraced_registry_to_json(
 			(double)e->parent_hole);
 		json_object_set_number(o, "spectator",
 			(double)e->spectator);
+		json_object_set_number(o, "kernel_obs",
+			(double)e->kernel_obs);
 		json_object_set_string(o, "cmdline", e->cmdline);
 		json_object_set_number(o, "pid", (double)e->pid);
 		json_object_set_number(o, "ppid", (double)e->ppid);
