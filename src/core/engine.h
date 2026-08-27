@@ -69,6 +69,8 @@ void retrace_core_boot(void);
  * benched head-to-head in test/perf/bench_real_impl_lookup.c.
  */
 void *retrace_real_impl_cached(const char *func_name);
+void retrace_name_lookup(const char *func_name, void **real_out,
+	const struct FuncPrototype **proto_out);
 const struct FuncPrototype *retrace_proto_cached(
 	const char *func_name);
 void *retrace_real_impl_resolve(const char *func_name);
