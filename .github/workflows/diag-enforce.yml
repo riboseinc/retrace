@@ -1,0 +1,53 @@
+# Diagnostic branch only (diag/enforce): prove the kernel-
+# enforcement legs of TODO.beyond-libc/01 on a real Linux
+# runner (landlock + seccomp live). Not for main.
+name: diag-enforce
+on:
+  push:
+    branches: [diag/enforce]
+  workflow_dispatch:
+
+jobs:
+  enforce:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev cmake ninja-build \
+            pkg-config
+      - name: build
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DRETRACE_BUILD_TESTS=ON
+          cmake --build build
+      - name: kernel + tool smoke
+        run: |
+          uname -a
+          grep -i landlock /proc/self/status || true
+      - name: the enforce E2E, verbose
+        run: |
+          python3 test/integration/test_enforce.py \
+            build/tools/retrace-profile \
+            build/tools/enforce/retrace-enforce
+      - name: manual probes
+        run: |
+          W=$(mktemp -d)
+          printf '{"profile":{"functions":[{"name":"open","count":4}],"accesses":[{"path":"/etc/hosts","class":"read","hits":1},{"path":"%s","class":"write","hits":2}]}}' "$W" > $W/p.json
+          build/tools/retrace-profile enforce $W/p.json \
+            --backend both --exec /bin/sh -o $W/spec.json
+          echo '--- spec:'; cat $W/spec.json | head -20
+          echo '--- declared write:'
+          build/tools/enforce/retrace-enforce $W/spec.json -- \
+            /bin/sh -c "echo hi > $W/f.txt && cat $W/f.txt" || \
+            echo "rc=$? (declared write FAILED)"
+          echo '--- undeclared write (must be refused):'
+          build/tools/enforce/retrace-enforce $W/spec.json -- \
+            /bin/sh -c "echo x > $W/../escape.txt" && \
+            echo "ESCAPED (BAD)" || echo "refused (good)"
+          echo '--- socket under the floor:'
+          build/tools/enforce/retrace-enforce $W/spec.json -- \
+            python3 -c "import socket; socket.socket()" && \
+            echo "socket passed" || echo "socket refused (good)"
