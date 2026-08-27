@@ -145,10 +145,13 @@ def main():
     names = [e.get("ev", {}).get("name") for e in events]
     # this test HELLOs nonceless: the auth event records the
     # spectator role (TODO.supervisor/08) and is journaled at
-    # HELLO -- BEFORE the agent's own events
-    if len(events) != 3 or \
+    # HELLO -- BEFORE the agent's own events; a clean SIGTERM
+    # appends the journal's close marker (the durability
+    # contract)
+    if len(events) != 4 or \
             "retrace.jail.denied" not in names or \
-            names[0] != "retrace.auth.agent":
+            names[0] != "retrace.auth.agent" or \
+            names[-1] != "retrace.journal.closed":
         print(f"FAIL: journal events wrong: {lines}", file=sys.stderr)
         return 1
     # daemon-authored records (retrace.auth.agent, session

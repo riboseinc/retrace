@@ -46,16 +46,30 @@
 #define AGENT_FLUSH_BUDGET_MS 2000
 #define AGENT_SOCK_DEFAULT "/tmp/retraced.agent.sock"
 
+#define AGENT_EVENT_INLINE 768
+
+/*
+ * A queue item owns its bytes: the common case formats straight
+ * into the inline buffer (zero allocations on the evidence
+ * path); the escaping fallback heap-points. heap == NULL means
+ * inline.
+ */
+struct queue_item {
+	char *heap;
+	char inline_buf[AGENT_EVENT_INLINE];
+};
+
 struct agent_state {
 	int armed;
 	char sock_path[108];
 	char agent_id[96];
 
 	pthread_mutex_t mu;
-	char *queue[AGENT_QUEUE_CAP];
+	struct queue_item queue[AGENT_QUEUE_CAP];
 	size_t q_head;
 	size_t q_count;
 	uint64_t dropped;
+	uint64_t drops_reported;
 
 	_Atomic uint64_t seq;
 	uint64_t policy_epoch;
@@ -84,35 +98,61 @@ static void agent_atfork_child(void);
 
 /* ---------- producer side (any thread) ---------- */
 
-static void queue_push(char *item)
+/*
+ * Push one serialized event. buf != NULL: bytes are copied
+ * into the slot (the zero-alloc path); otherwise heap_item is
+ * a heap string the queue owns. Returns 0 queued, -1 dropped
+ * (counted -- the consumer reports drops to the daemon).
+ */
+static int queue_push(const char *buf, char *heap_item)
 {
 	pthread_mutex_lock(&g_agent.mu);
 	if (g_agent.q_count >= AGENT_QUEUE_CAP) {
 		g_agent.dropped++;
 		pthread_mutex_unlock(&g_agent.mu);
-		free(item);
-		return;
+		free(heap_item);
+		return -1;
 	}
-	g_agent.queue[(g_agent.q_head + g_agent.q_count) %
-		AGENT_QUEUE_CAP] = item;
+	{
+		struct queue_item *slot =
+			&g_agent.queue[(g_agent.q_head + g_agent.q_count) %
+				AGENT_QUEUE_CAP];
+
+		slot->heap = NULL;
+		if (buf != NULL)
+			memcpy(slot->inline_buf, buf,
+				AGENT_EVENT_INLINE);
+		else
+			slot->heap = heap_item;
+	}
 	g_agent.q_count++;
 	pthread_mutex_unlock(&g_agent.mu);
+	return 0;
 }
 
-static char *queue_pop(void)
+/*
+ * Pop the next event: *out views the slot's inline buffer or
+ * the heap string; *heap_out is the pointer to free (NULL for
+ * inline). Returns 0 popped, -1 empty.
+ */
+static int queue_pop(const char **out, char **heap_out)
 {
-	char *item;
+	struct queue_item *slot;
 
+	*out = NULL;
+	*heap_out = NULL;
 	pthread_mutex_lock(&g_agent.mu);
 	if (g_agent.q_count == 0) {
 		pthread_mutex_unlock(&g_agent.mu);
-		return NULL;
+		return -1;
 	}
-	item = g_agent.queue[g_agent.q_head];
+	slot = &g_agent.queue[g_agent.q_head];
 	g_agent.q_head = (g_agent.q_head + 1) % AGENT_QUEUE_CAP;
 	g_agent.q_count--;
+	*heap_out = slot->heap;
+	*out = slot->heap != NULL ? slot->heap : slot->inline_buf;
 	pthread_mutex_unlock(&g_agent.mu);
-	return item;
+	return 0;
 }
 
 /*
@@ -178,6 +218,85 @@ static char *jesc(const char *s)
 	}
 	out[o] = '\0';
 	return out;
+}
+
+/*
+ * The stack fast path (the evidence pipeline's allocator
+ * budget): the common event needs NO escaping -- internal
+ * names and ordinary paths contain no quotes, backslashes, or
+ * control bytes. Format straight into the caller's buffer;
+ * return -1 when anything needs escaping or the buffer is too
+ * small, and the heap path (jesc + malloc) handles it. The
+ * 7-mallocs-per-event floor becomes zero for typical traffic.
+ */
+int retrace_agent_format_event_stack(char *out, size_t cap,
+	const char *agent_id, uint64_t seq, const char *name,
+	char **kv, size_t n_kv)
+{
+	size_t o = 0;
+	size_t i;
+	int w;
+
+	/* static so the macro's continued lines carry no quoted
+	 * literals (checkpatch: continuations in quoted strings)
+	 */
+	static const char ev_dq = '"';
+	static const char ev_bs = '\\';
+
+#define APP_STR(s) do { \
+	const char *_p; \
+	char _c; \
+	for (_p = (s); *_p != '\0'; _p++) { \
+		_c = *_p; \
+		if (_c == ev_dq || _c == ev_bs) \
+			return -1; \
+		if ((unsigned char)_c < 0x20) \
+			return -1; \
+		if (o + 1 >= cap) \
+			return -1; \
+		out[o++] = _c; \
+	} \
+} while (0)
+
+	w = snprintf(out, cap,
+		"{\"agent_id\":\"%s\",\"seq\":%llu,\"ts\":%ld,"
+		"\"name\":\"",
+		agent_id, (unsigned long long)seq, time(NULL));
+	if (w <= 0 || (size_t)w >= cap)
+		return -1;
+	o = (size_t)w;
+	APP_STR(name);
+	if (o + 10 >= cap)
+		return -1;
+	o += (size_t)snprintf(out + o, cap - o, "\",\"attrs\":{");
+	for (i = 0; i < n_kv; i++) {
+		if (i > 0) {
+			if (o + 2 >= cap)
+				return -1;
+			out[o++] = ',';
+		}
+		if (o + 2 >= cap)
+			return -1;
+		out[o++] = '"';
+		APP_STR(kv[2 * i]);
+		if (o + 4 >= cap)
+			return -1;
+		out[o++] = '"';
+		out[o++] = ':';
+		out[o++] = '"';
+		APP_STR(kv[2 * i + 1]);
+		if (o + 2 >= cap)
+			return -1;
+		out[o++] = '"';
+	}
+	if (o + 3 >= cap)
+		return -1;
+	out[o++] = '}';
+	out[o++] = '}';
+	out[o] = '\0';
+	return 0;
+
+#undef APP_STR
 }
 
 /*
@@ -253,11 +372,25 @@ int retrace_agent_emit_event(const char *name,
 	if (kv == NULL && n_kv > 0)
 		return -1;
 
+	/* stack fast path: zero allocations for the common event */
+	{
+		char stackbuf[AGENT_EVENT_INLINE];
+		uint64_t seq = atomic_fetch_add(&g_agent.seq, 1) + 1;
+
+		if (retrace_agent_format_event_stack(stackbuf,
+			    sizeof(stackbuf), g_agent.agent_id, seq,
+			    name, kv, n_kv) == 0) {
+			(void)queue_push(stackbuf, NULL);
+			goto fork_adopt;
+		}
+	}
+	/* escaping/oversize fallback: the heap path */
 	payload = build_event_json(name, kv, n_kv);
 	if (payload == NULL) {
 		return -1;
 	}
-	queue_push(payload);
+	(void)queue_push(NULL, payload);
+fork_adopt:;
 
 	/*
 	 * Fork truth (the CI hunt, rounds 22-31): pthread_atfork
@@ -641,15 +774,45 @@ static int try_connect(void)
 
 static void drain_queue(void)
 {
-	char *item;
+	for (;;) {
+		const char *item;
+		char *heap = NULL;
 
-	while ((item = queue_pop()) != NULL) {
+		if (queue_pop(&item, &heap) != 0)
+			break;
 		if (send_frame(RETRACE_RPC_MSG_EVENT, item) != 0) {
 			drop_connection();
-			free(item);
+			free(heap);
 			return;
 		}
-		free(item);
+		free(heap);
+	}
+
+	/*
+	 * Loss signaling (the evidence doctrine): dropped events
+	 * are counted at push; the drain reports the delta as its
+	 * own journal-bound record, so the audit trail records
+	 * its own gaps -- never silent. The slots freed by this
+	 * drain make room for the marker itself.
+	 */
+	{
+		uint64_t now = g_agent.dropped;
+
+		if (now != g_agent.drops_reported) {
+			char marker[176];
+			uint64_t delta = now - g_agent.drops_reported;
+
+			snprintf(marker, sizeof(marker),
+				"{\"agent_id\":\"%s\",\"seq\":0,\"ts\":%ld,"
+				"\"name\":\"retrace.agent.dropped\","
+				"\"attrs\":{\"count\":\"%llu\","
+				"\"total\":\"%llu\"}}}}",
+				g_agent.agent_id, (long)time(NULL),
+				(unsigned long long)delta,
+				(unsigned long long)now);
+			if (queue_push(marker, NULL) == 0)
+				g_agent.drops_reported = now;
+		}
 	}
 }
 

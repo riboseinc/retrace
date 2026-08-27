@@ -310,6 +310,12 @@ retrace_add_unit_test(modify_return_value_int
     EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/test/helpers)
 
 #
+# evidence-pipeline formatter tests: the zero-alloc stack path
+# and its decline contract (escaping/oversize -> heap path).
+#
+retrace_add_unit_test(event_format)
+
+#
 # freeze action unit tests (TODO.supervisor/09 quiet hold): the
 # fabricated returns per type and the pure-timeout exemption.
 #

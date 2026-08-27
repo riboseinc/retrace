@@ -42,6 +42,13 @@ static int payload_is_durable(const char *payload)
 		"\"name\":\"retrace.policy.",
 		"\"name\":\"retrace.session.",
 		"\"name\":\"retrace.journal.",
+		/* POLICY_ACK records carry no name field -- they ARE
+		 * policy decisions (applied or refused) and belong
+		 * on the durable side (the phase-3 lesson: a
+		 * buffered refusal ack is invisible to a live
+		 * auditor until an unrelated flush)
+		 */
+		"\"applied\":",
 	};
 	size_t i;
 

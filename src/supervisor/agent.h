@@ -6,6 +6,8 @@
 #ifndef RETRACE_SUPERVISOR_AGENT_H_
 #define RETRACE_SUPERVISOR_AGENT_H_
 
+#include <stdint.h>
+
 #include <stddef.h>
 
 /*
@@ -47,6 +49,15 @@ void retrace_agent_deinit(void);
  * load per dispatch; no-op when unarmed.
  */
 void retrace_agent_kick(void);
+
+/*
+ * The stack fast-path formatter for EVENT payloads (exported
+ * for unit tests): returns 0 on success, -1 when the payload
+ * needs escaping or exceeds cap (the heap path handles those).
+ */
+int retrace_agent_format_event_stack(char *out, size_t cap,
+	const char *agent_id, uint64_t seq, const char *name,
+	char **kv, size_t n_kv);
 
 /*
  * Queue one named security event for the daemon. kv is an
