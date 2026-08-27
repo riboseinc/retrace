@@ -52,7 +52,8 @@ static void usage(void)
 {
 	fprintf(stderr,
 "Usage: retrace-profile enforce <profile.json> [--inside d.json]\n"
-"        [--backend landlock|seccomp|sandbox-exec|all] [--exec <path>]\n"
+"        [--backend landlock|seccomp|sandbox-exec|appcontainer|all]\n"
+"        [--exec <path>]\n"
 "        [-o spec.json]\n");
 }
 
@@ -69,7 +70,8 @@ static int profile_uses(const struct Profile *p, const char *fn)
 
 static JSON_Value *build_spec(const struct Profile *allow_src,
 	const struct Profile *usage_src, const char *exec_path,
-	int want_landlock, int want_seccomp, int want_sb)
+	int want_landlock, int want_seccomp, int want_sb,
+	int want_ac)
 {
 	JSON_Value *root_v = json_value_init_object();
 	JSON_Object *root = json_value_get_object(root_v);
@@ -244,6 +246,51 @@ static JSON_Value *build_spec(const struct Profile *allow_src,
 			json_array_append_string(deny, fn);
 		}
 	}
+
+	/*
+	 * AppContainer (01 P1, the Windows sibling): coarse and
+	 * fail-closed by construction -- a container with no
+	 * capabilities has no network, no registry, and no
+	 * filesystem access beyond explicit ACL grants. The spec
+	 * carries the container name (derived from the exec
+	 * identity), the capability set (empty = least privilege),
+	 * and the declared paths the installer turns into ACL
+	 * grants. POSIX hosts compile this unchanged; the installer
+	 * reports the plane missing.
+	 */
+	if (want_ac) {
+		JSON_Value *ac_v = json_value_init_object();
+		JSON_Object *ac = json_value_get_object(ac_v);
+		JSON_Value *rd_v = json_value_init_array();
+		JSON_Value *wr_v = json_value_init_array();
+		JSON_Array *rd = json_value_get_array(rd_v);
+		JSON_Array *wr = json_value_get_array(wr_v);
+		char name[128];
+		unsigned long long h = 1469598103934665603ULL;
+		const char *seed = exec_path != NULL ? exec_path :
+			"retrace";
+
+		for (i = 0; seed[i] != '\0'; i++) {
+			h ^= (unsigned char)seed[i];
+			h *= 1099511628211ULL;
+		}
+		snprintf(name, sizeof(name), "retrace.%016llx", h);
+		for (i = 0; i < allow_src->accesses.count; i++) {
+			const struct ProfAccess *a =
+				&allow_src->accesses.items[i];
+
+			if (a->path == NULL || a->path[0] == '\0')
+				continue;
+			if (a->class_write)
+				json_array_append_string(wr, a->path);
+			else if (a->class_read)
+				json_array_append_string(rd, a->path);
+		}
+		json_object_set_string(ac, "name", name);
+		json_object_set_value(ac, "read_paths", rd_v);
+		json_object_set_value(ac, "write_paths", wr_v);
+		json_object_set_value(root, "appcontainer", ac_v);
+	}
 	return root_v;
 }
 
@@ -265,6 +312,7 @@ int enforce_mode(int argc, char **argv)
 	int want_sb_unused = 0;
 #define want_sb want_sb_unused
 #endif
+	int want_ac = 0;
 
 	memset(&feed, 0, sizeof(feed));
 	memset(&inside_feed, 0, sizeof(inside_feed));
@@ -298,8 +346,13 @@ int enforce_mode(int argc, char **argv)
 		want_sb = 1;
 		want_ll = 0;
 		want_sc = 0;
+	} else if (strcmp(backend, "appcontainer") == 0) {
+		want_ac = 1;
+		want_ll = 0;
+		want_sc = 0;
 	} else if (strcmp(backend, "all") == 0) {
 		want_sb = 1;
+		want_ac = 1;
 	} else if (strcmp(backend, "both") != 0) {
 		usage();
 		return 2;
@@ -323,7 +376,7 @@ int enforce_mode(int argc, char **argv)
 	}
 
 	spec = build_spec(allow_src, &feed.prof, exec_path,
-		want_ll, want_sc, want_sb);
+		want_ll, want_sc, want_sb, want_ac);
 	{
 		char *ser = json_serialize_to_string_pretty(spec);
 
