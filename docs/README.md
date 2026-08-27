@@ -25,6 +25,7 @@ install, quick start, and platform support.
 | Trace an Android app via `wrap.sh` or Magisk | [Android guide](android.md) |
 | Understand a design decision | [Architecture decisions (ADR)](adr/README.md) |
 | Read the public API | [`include/retrace/`](../include/retrace/) |
+| Write a runtime agent (Python, JVM, any language) | [Runtime agents](runtime-agents.md) — the supervisor protocol for third-party agents |
 
 ## Documentation map
 
@@ -38,6 +39,7 @@ docs/
 ├── tools.md               ← standalone tooling ecosystem (audit, diff, replay, ws, frida, ebpf, ide plugins)
 ├── development.md         ← building, testing, contributing, debugging retrace
 ├── architecture.md        ← how engine, backends, and actions fit together
+├── runtime-agents.md      ← writing a supervisor runtime agent (protocol, doctrine)
 ├── engine-state-machine.md ← per-call lifecycle (engine_wrapper flow)
 ├── cookbook/              ← 32 recipe-driven walkthroughs
 │   ├── README.md          ← index + compact action reference
