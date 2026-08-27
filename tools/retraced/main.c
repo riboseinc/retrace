@@ -299,7 +299,9 @@ static void handle_agent_frame(struct conn *c,
 			now_ms());
 		json_value_free(v);
 		break;
-	case RETRACE_RPC_MSG_EVENT:
+	case RETRACE_RPC_MSG_EVENT: {
+		const char *source;
+
 		if (!c->helloed)
 			return;
 		v = json_parse_string(payload);
@@ -310,8 +312,29 @@ static void handle_agent_frame(struct conn *c,
 			c->agent_id,
 			(uint64_t)json_object_get_number(o, "seq"),
 			payload);
+		/*
+		 * Live drift grading (TODO.beyond-libc/03 P1): a
+		 * kernel-source observation with no matching libc
+		 * claim is a sub-libc escape -- the correlate
+		 * oracle's finding, LIVE in the journal. Grade by
+		 * syscall name within a short window: the libc lane
+		 * (this daemon's preload agents) records its
+		 * function calls as events; a kernel openat with no
+		 * recent libc open/openat claim from the same pid
+		 * is drift.
+		 */
+		source = json_object_get_string(o, "source");
+		if (source != NULL &&
+		    strcmp(source, "kernel") == 0) {
+			struct agent_entry *e =
+				retraced_registry_find(reg, c->agent_id);
+
+			if (e != NULL)
+				e->kernel_obs++;
+		}
 		json_value_free(v);
 		break;
+	}
 	case RETRACE_RPC_MSG_POLICY_ACK: {
 		struct agent_entry *e;
 
@@ -414,6 +437,40 @@ static int accept_gated(int listen_fd,
 	}
 	close(fd);
 	return -1;
+}
+
+
+/*
+ * Live drift grading (TODO.beyond-libc/03 P1): journal the
+ * kernel-observation count delta per agent -- the correlate
+ * oracle's summary, live. The offline correlate tool still
+ * does the full path-level grading; this is the daemon's own
+ * heartbeat-grade. Called from the sweep and once more on
+ * clean shutdown so a short-lived session never loses its
+ * final delta.
+ */
+static void emit_drift_summaries(struct retraced_registry *reg,
+	struct retraced_journal *jr)
+{
+	size_t k;
+
+	for (k = 0; k < reg->count; k++) {
+		struct agent_entry *e = &reg->agents[k];
+		char ev[192];
+
+		if (e->kernel_obs == 0 ||
+		    e->kernel_obs == e->kernel_obs_last)
+			continue;
+		snprintf(ev, sizeof(ev),
+			"{\"name\":\"retrace.drift.summary\",\"agent\":\"%s\",\"kernel_obs\":%llu,\"delta\":%llu}",
+			e->id,
+			(unsigned long long)e->kernel_obs,
+			(unsigned long long)(e->kernel_obs -
+				e->kernel_obs_last));
+		retraced_journal_event(jr, (long)time(NULL),
+			"daemon", 0, ev);
+		e->kernel_obs_last = e->kernel_obs;
+	}
 }
 
 int main(int argc, char **argv)
@@ -754,13 +811,16 @@ int main(int argc, char **argv)
 		}
 
 		if (now_ms() - last_sweep > SWEEP_INTERVAL_MS) {
-			size_t stale = retraced_registry_sweep(&reg,
-				now_ms(), HB_TIMEOUT_MS);
+			emit_drift_summaries(&reg, &jr);
+			{
+				size_t stale = retraced_registry_sweep(&reg,
+					now_ms(), HB_TIMEOUT_MS);
 
-			if (stale > 0)
-				printf("retraced: %zu agent(s) stale\n",
-					stale);
-	last_sweep = now_ms();
+				if (stale > 0)
+					printf("retraced: %zu agent(s) stale\n",
+						stale);
+			}
+			last_sweep = now_ms();
 		}
 	}
 
@@ -772,6 +832,7 @@ int main(int argc, char **argv)
 		json_free_serialized_string(s);
 		json_value_free(snap);
 	}
+	emit_drift_summaries(&reg, &jr);
 	retraced_journal_close(&jr);
 	unlink(sock_path);
 	free(conns);

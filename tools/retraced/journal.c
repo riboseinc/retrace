@@ -42,6 +42,11 @@ static int payload_is_durable(const char *payload)
 		"\"name\":\"retrace.policy.",
 		"\"name\":\"retrace.session.",
 		"\"name\":\"retrace.journal.",
+		/* Live drift grading (03 P1): a kernel-obs delta is
+		 * the daemon's own heartbeat-grade of sub-libc
+		 * escapes -- audit-class, never buffered away.
+		 */
+		"\"name\":\"retrace.drift.",
 		/* POLICY_ACK records carry no name field -- they ARE
 		 * policy decisions (applied or refused) and belong
 		 * on the durable side (the phase-3 lesson: a
