@@ -185,8 +185,13 @@ static void retrace_destructor(void)
 		retrace_call_hash_walk(hash_print_cb, stderr);
 	}
 	retrace_call_hash_deinit();
-	retrace_otlp_live_deinit();
 	retrace_agent_deinit();
+	/* logger BEFORE otlp_live: the flusher's final drain must
+	 * pass through the otlp sink while its door is still open
+	 * (the tail ships); otlp_live_deinit then closes the door,
+	 * drains callers, and frees -- the teardown-UAF order
+	 */
 	retrace_logger_deinit();
+	retrace_otlp_live_deinit();
 }
 #endif /* MSVC has no destructors */
