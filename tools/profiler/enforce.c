@@ -161,6 +161,8 @@ static JSON_Value *build_spec(const struct Profile *allow_src,
 		for (i = 0; i < allow_src->accesses.count; i++) {
 			const struct ProfAccess *a =
 				&allow_src->accesses.items[i];
+			const char *alt_path = NULL;
+			const char *suffix = NULL;
 
 			if (!a->class_write || a->path[0] != '/')
 				continue;
@@ -168,6 +170,49 @@ static JSON_Value *build_spec(const struct Profile *allow_src,
 				sizeof(prof) - o,
 				"(allow file-write* (subpath \"%s\"))",
 				a->path);
+			/*
+			 * Seatbelt evaluates RESOLVED paths. A
+			 * declared allow under /tmp must also
+			 * allow /private/tmp (and /var <->
+			 * /private/var); otherwise a write the
+			 * profile intends to permit is still
+			 * denied after symlink resolution. The
+			 * deny list above already carries both
+			 * spellings; the allow list must too.
+			 */
+			if (strcmp(a->path, "/tmp") == 0) {
+				alt_path = "/private/tmp";
+				suffix = "";
+			} else if (strncmp(a->path, "/tmp/", 5) == 0) {
+				alt_path = "/private/tmp";
+				suffix = a->path + 4;
+			} else if (strcmp(a->path, "/private/tmp") == 0) {
+				alt_path = "/tmp";
+				suffix = "";
+			} else if (strncmp(a->path, "/private/tmp/",
+					 13) == 0) {
+				alt_path = "/tmp";
+				suffix = a->path + 12;
+			} else if (strcmp(a->path, "/var") == 0) {
+				alt_path = "/private/var";
+				suffix = "";
+			} else if (strncmp(a->path, "/var/", 5) == 0) {
+				alt_path = "/private/var";
+				suffix = a->path + 4;
+			} else if (strcmp(a->path, "/private/var") == 0) {
+				alt_path = "/var";
+				suffix = "";
+			} else if (strncmp(a->path, "/private/var/",
+					 13) == 0) {
+				alt_path = "/var";
+				suffix = a->path + 12;
+			}
+			if (alt_path != NULL) {
+				o += (size_t)snprintf(prof + o,
+					sizeof(prof) - o,
+					"(allow file-write* (subpath \"%s%s\"))",
+					alt_path, suffix);
+			}
 		}
 		{
 			JSON_Value *sb_v =
