@@ -71,6 +71,21 @@ static struct {
 	_Atomic int running;
 	_Atomic int thread_spawned;
 	_Atomic int stop_signal;
+	/*
+	 * Teardown handshake (the exit-time UAF): the emit DOOR and
+	 * the thread handshake are SEPARATE flags. door_open admits
+	 * new emit callers and closes FIRST; emit_busy counts
+	 * in-flight callers and must drain before any free; running
+	 * is the tick thread's own "I am done" flag (cleared after
+	 * its final flush) and doubles as the join condition. The
+	 * old design joined only the tick thread -- the FLUSHER
+	 * thread's sink (and the engine threads' security events)
+	 * also touch the exporter and were never synchronized
+	 * against deinit's free: a freed-exporter use at exit, the
+	 * silent SEGV/abort under OTLP+logging.
+	 */
+	_Atomic int door_open;
+	_Atomic int emit_busy;
 	char endpoint[512];
 	char service_name[128];
 } g_otlp;
@@ -78,10 +93,15 @@ static struct {
 static void *otlp_live_thread_main(void *arg);
 static void otlp_live_ensure_thread(void);
 static int otlp_live_sink(const struct LogEntry *entry, void *ctx);
+static int otlp_live_emit_event_inner(int severity,
+	const char *event_name,
+	const struct retrace_otlp_event_attr *attrs, size_t n_attrs);
+static int otlp_live_emit_json_inner(const char *serialized_json);
 
 static void otlp_live_final_stats(void);
 
-int retrace_otlp_live_emit_event(int severity, const char *event_name,
+static int otlp_live_emit_event_inner(int severity,
+	const char *event_name,
 	const struct retrace_otlp_event_attr *attrs, size_t n_attrs)
 {
 	otlp_log_record_t *lr;
@@ -130,6 +150,71 @@ int retrace_otlp_live_emit_event(int severity, const char *event_name,
 		return -1;
 	}
 	return 0;
+}
+
+/*
+ * The guarded emit doors. The early running check is the fast
+ * path; the counter + re-check closes the teardown race: deinit
+ * sets running=0, waits for emit_busy to drain, THEN frees the
+ * exporter -- an in-flight caller is either counted (deinit
+ * waits) or sees running==0 under the counter and leaves. The
+ * wrapper shape means no early return inside the body can leak
+ * the counter.
+ */
+int retrace_otlp_live_emit_event(int severity, const char *event_name,
+	const struct retrace_otlp_event_attr *attrs, size_t n_attrs)
+{
+	/* args packaged into a small struct; kept on the stack */
+	struct {
+		int severity;
+		const char *event_name;
+		const struct retrace_otlp_event_attr *attrs;
+		size_t n_attrs;
+	} pkg = {severity, event_name, attrs, n_attrs};
+
+	if (atomic_load_explicit(&g_otlp.door_open,
+		memory_order_acquire) != 1)
+		return 0;
+	atomic_fetch_add_explicit(&g_otlp.emit_busy, 1,
+		memory_order_acq_rel);
+	if (atomic_load_explicit(&g_otlp.door_open,
+		memory_order_acquire) != 1) {
+		atomic_fetch_sub_explicit(&g_otlp.emit_busy, 1,
+			memory_order_release);
+		return 0;
+	}
+	{
+		int rc = otlp_live_emit_event_inner(pkg.severity,
+			pkg.event_name, pkg.attrs, pkg.n_attrs);
+
+		atomic_fetch_sub_explicit(&g_otlp.emit_busy, 1,
+			memory_order_release);
+		return rc;
+	}
+}
+
+int retrace_otlp_live_emit_json(const char *serialized_json)
+{
+	if (serialized_json == NULL)
+		return -1;
+	if (atomic_load_explicit(&g_otlp.door_open,
+		memory_order_acquire) != 1)
+		return 0;
+	atomic_fetch_add_explicit(&g_otlp.emit_busy, 1,
+		memory_order_acq_rel);
+	if (atomic_load_explicit(&g_otlp.door_open,
+		memory_order_acquire) != 1) {
+		atomic_fetch_sub_explicit(&g_otlp.emit_busy, 1,
+			memory_order_release);
+		return 0;
+	}
+	{
+		int rc = otlp_live_emit_json_inner(serialized_json);
+
+		atomic_fetch_sub_explicit(&g_otlp.emit_busy, 1,
+			memory_order_release);
+		return rc;
+	}
 }
 
 int retrace_otlp_live_init(void)
@@ -241,6 +326,8 @@ int retrace_otlp_live_init(void)
 
 	atomic_store_explicit(&g_otlp.stop_signal, 0,
 		memory_order_relaxed);
+	atomic_store_explicit(&g_otlp.door_open, 1,
+		memory_order_release);
 	atomic_store_explicit(&g_otlp.running, 1,
 		memory_order_relaxed);
 
@@ -308,6 +395,33 @@ void retrace_otlp_live_deinit(void)
 		memory_order_relaxed) != 1)
 		return;
 
+	/*
+	 * Close the door, drain in-flight emitters (the flusher's
+	 * sink, engine threads), THEN the thread handshake + free.
+	 * running stays 1 here: it is the TICK THREAD's "I am
+	 * done" flag (it clears it after the final flush) and the
+	 * join condition below. On a drain timeout we LEAK instead
+	 * of freeing under a live caller -- at exit a bounded leak
+	 * is the safe side. The logger's deinit (which drains the
+	 * flusher's tail through this sink) runs BEFORE us by
+	 * destructor order; the door still being open then is why
+	 * the tail ships.
+	 */
+	atomic_store_explicit(&g_otlp.door_open, 0,
+		memory_order_release);
+	{
+		struct timespec poll = {.tv_sec = 0, .tv_nsec = 100000};
+		int waits = 0;
+
+		while (atomic_load_explicit(&g_otlp.emit_busy,
+			memory_order_acquire) != 0 && waits < 30000) {
+			nanosleep(&poll, NULL);
+			waits++;
+		}
+		if (waits >= 30000)
+			return;	/* leak, never free under a caller */
+	}
+
 	atomic_store_explicit(&g_otlp.stop_signal, 1,
 		memory_order_relaxed);
 
@@ -352,6 +466,9 @@ void retrace_otlp_live_deinit(void)
 		g_otlp.tracer = NULL;
 	}
 
+	/* running was cleared at entry; keep the release for the
+	 * tick thread's own exit path (it also clears it)
+	 */
 	atomic_store_explicit(&g_otlp.running, 0,
 		memory_order_release);
 }
@@ -408,7 +525,7 @@ static void *otlp_live_thread_main(void *arg)
 	return NULL;
 }
 
-int retrace_otlp_live_emit_json(const char *serialized_json)
+static int otlp_live_emit_json_inner(const char *serialized_json)
 {
 	otlp_span_t *span;
 	JSON_Value *root;
