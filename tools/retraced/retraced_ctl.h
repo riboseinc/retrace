@@ -69,6 +69,16 @@ struct retraced_ctl_ctx {
 	struct retraced_registry *reg;
 	struct retraced_journal *jr;
 
+	/*
+	 * Claim scopes for the CURRENT controller peer
+	 * (TODO.supervisor/08 P1 / beyond-libc/05). Local UDS
+	 * ctl starts with RETRACED_SCOPE_ALL (PEERCRED already
+	 * gated the accept); a TLS peer gets the bitmask from
+	 * its cert URI SAN. Every mutating command checks the
+	 * bit before acting -- least privilege by construction.
+	 */
+	uint32_t scopes;
+
 	/* the reply sink (one line per command) */
 	void (*reply_sink)(const char *line, void *user);
 	void *reply_user;
