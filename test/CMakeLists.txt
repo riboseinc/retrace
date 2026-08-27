@@ -204,6 +204,28 @@ if(Python3_Interpreter_FOUND)
 		set_tests_properties(integration-ebpf-agent
 			PROPERTIES LABELS "integration"
 			TIMEOUT 120)
+
+		# Runtime agents (TODO.beyond-libc/04): pyretrace
+		# (Python) and jretrace (JVM, P1) as full peers on the
+		# same session. jretrace self-skips where no JDK is
+		# present; both assert source=runtime events land in
+		# the shared journal.
+		add_test(NAME integration-pyretrace
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_pyretrace.py
+				$<TARGET_FILE:retrace_retraced>
+				${CMAKE_SOURCE_DIR}/bindings/python)
+		set_tests_properties(integration-pyretrace
+			PROPERTIES LABELS "integration"
+			TIMEOUT 120)
+		add_test(NAME integration-jretrace
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_jretrace.py
+				$<TARGET_FILE:retrace_retraced>
+				${CMAKE_SOURCE_DIR}/bindings/jvm/src/main/java)
+		set_tests_properties(integration-jretrace
+			PROPERTIES LABELS "integration"
+			TIMEOUT 120)
 	endif()
 
 	# Kernel enforcement compile (TODO.beyond-libc/01):
