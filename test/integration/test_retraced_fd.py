@@ -92,6 +92,21 @@ def read_file(path):
         return ""
 
 
+def pick_unprivileged_user():
+    """An existing non-root account (images differ: Alpine CI has
+    no 'nobody'); None when none exists."""
+    try:
+        with open("/etc/passwd") as f:
+            for ln in f:
+                parts = ln.strip().split(":")
+                if len(parts) >= 3 and parts[0] and \
+                        parts[2].isdigit() and 0 < int(parts[2]) < 65534:
+                    return parts[0]
+    except OSError:
+        pass
+    return None
+
+
 def main():
     if len(sys.argv) != 2:
         print("usage: test_retraced_fd.py <retraced>", file=sys.stderr)
@@ -162,13 +177,19 @@ def main():
             print("fd-activation: inherited socket served; no "
                   "unlink; drop section skipped (not root) -- OK")
             return 0
+        drop_user = pick_unprivileged_user()
+        if drop_user is None:
+            print("fd-activation: inherited socket served; no "
+                  "unlink; drop section skipped (no unprivileged "
+                  "account) -- OK")
+            return 0
 
         d2_out = os.path.join(work, "d2.out")
         with open(d2_out, "w") as df:
             d2 = subprocess.Popen(
                 [daemon, "--sock", os.path.join(work, "a2.sock"),
                  "--journal", os.path.join(work, "j2.jsonl"),
-                 "--user", "nobody"],
+                 "--user", drop_user],
                 stdin=subprocess.DEVNULL, stdout=df,
                 stderr=subprocess.STDOUT)
         try:
