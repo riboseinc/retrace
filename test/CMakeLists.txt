@@ -275,6 +275,18 @@ if(Python3_Interpreter_FOUND)
 	# Journal durability (the writer deepening): durable
 	# control-plane records, recorded gaps on unclean shutdown,
 	# clean-close markers, chain across boots.
+	# Socket activation + privilege drop (TODO.supervisor/08
+	# P2 / TODO.beyond-libc/05 P2): inherited listener served and
+	# not unlinked; the drop section runs where the runner is
+	# root (the Alpine container leg) and skips elsewhere.
+	add_test(NAME integration-retraced-fd
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_retraced_fd.py
+			$<TARGET_FILE:retrace_retraced>)
+	set_tests_properties(integration-retraced-fd PROPERTIES
+		LABELS "integration"
+		TIMEOUT 120)
+
 	add_test(NAME integration-journal-durability
 		COMMAND ${Python3_EXECUTABLE}
 			${CMAKE_SOURCE_DIR}/test/integration/test_journal_durability.py
