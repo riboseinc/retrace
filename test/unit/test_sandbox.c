@@ -391,6 +391,63 @@ static void test_deny_wins_over_allow(void)
 	json_value_free(root_val);
 }
 
+static void test_cache_alias_after_policy_swap(void)
+{
+	/* The compiled-set cache keys on the array pointer. A freed
+	 * policy tree can be recycled into a NEW array at the same
+	 * address (the allocator does this readily); validation by
+	 * address alone then answers for the WRONG policy. Swap
+	 * deny lists in a free/realloc cycle and require every
+	 * round to police its OWN list: new path denied, retired
+	 * path released.
+	 */
+	action_fn_t action = retrace_actions_get("sandbox");
+	int round;
+
+	for (round = 0; round < 8; round++) {
+		char deny_old[32], deny_new[32];
+		char path_old[48], path_new[48];
+		const char *a[1], *b[1];
+		JSON_Object *params_a, *params_b;
+		struct param_desc pd_old, pd_new;
+		struct ThreadContext *ctx;
+		int rc;
+
+		snprintf(deny_old, sizeof(deny_old), "/old%d/target/",
+			round);
+		snprintf(deny_new, sizeof(deny_new), "/new%d/target/",
+			round);
+		snprintf(path_old, sizeof(path_old), "%sfile.dat",
+			deny_old);
+		snprintf(path_new, sizeof(path_new), "%sfile.dat",
+			deny_new);
+
+		/* policy A in force, cache warms */
+		a[0] = deny_old;
+		params_a = build_params_with_array("deny_paths", a, 1);
+		pd_old = (struct param_desc){ "path", path_old, 0, 1 };
+		ctx = build_ctx(&pd_old, 1);
+		rc = action(ctx, params_a);
+		CHECK(rc == -1);
+		free_params(params_a);
+
+		/* policy swap: same shape, different content */
+		b[0] = deny_new;
+		params_b = build_params_with_array("deny_paths", b, 1);
+		pd_new = (struct param_desc){ "path", path_new, 0, 1 };
+		ctx = build_ctx(&pd_new, 1);
+		rc = action(ctx, params_b);
+		CHECK(rc == -1);
+
+		/* the RETIRED path must be released under policy B */
+		pd_old = (struct param_desc){ "path", path_old, 0, 1 };
+		ctx = build_ctx(&pd_old, 1);
+		rc = action(ctx, params_b);
+		CHECK(rc == 0);
+		free_params(params_b);
+	}
+}
+
 int main(void)
 {
 	retrace_real_impls.strcmp = strcmp;
@@ -426,6 +483,9 @@ int main(void)
 	TEST(allow_passes_listed);
 	TEST(allow_prefix_entry);
 	TEST(deny_wins_over_allow);
+
+	printf("  -- compiled-set cache across policy swaps --\n");
+	TEST(cache_alias_after_policy_swap);
 
 	printf("\nPass: %d, Fail: %d (of %d)\n",
 		tests_pass, tests_fail, tests_run);

@@ -108,18 +108,23 @@ static int path_matches(const char *path_arg, const char *entry)
  * set is instead COMPILED once per policy array: entries bucket
  * by their first path component's hash, so a lookup touches
  * only its bucket plus the small wildcard list (relative-path
- * and root-prefix rules). Entries are pointers INTO the config
- * tree (no copies); the compiled set is cached against the
- * array pointer and revalidated (count + first entry) per call
- * -- a policy swap that frees the old tree can at worst alias
- * the cache into a rebuild, never a wrong answer.
+ * and root-prefix rules).
+ *
+ * Validation: the cache keys on the array POINTER, and a freed
+ * policy tree's memory can be recycled into a NEW array at the
+ * same address (macOS 26's allocator does this readily -- the
+ * CI lesson). Address-only checks (count + first-entry pointer)
+ * then alias the cache into a WRONG answer. The set therefore
+ * owns copies of the first and last entries and revalidates by
+ * CONTENT: arr pointer + count + both boundary strings.
  */
 #define PATH_BUCKETS 32
 #define PATH_SETS_MAX 8
 
 struct path_set {
 	size_t count;		/* entries, for validation */
-	const char *first;	/* first entry ptr, ditto */
+	char *first_copy;	/* owned copies of the boundary */
+	char *last_copy;	/* entries, for validation */
 	size_t off[PATH_BUCKETS + 2];	/* prefix sums; b..b+1 */
 	size_t idx[];		/* entry indices, bucketed */
 };
@@ -131,6 +136,59 @@ struct path_set_cache {
 
 static struct path_set_cache g_path_sets[PATH_SETS_MAX];
 static int g_path_set_next;
+
+/* malloc + copy via the real-impl table (reentrancy law);
+ * real_snprintf not memcpy -- macOS macro-substitutes memcpy
+ * into __builtin___memcpy_chk (the v2.11.2 lesson)
+ */
+static char *path_set_strndup(const char *s)
+{
+	size_t n;
+	char *out;
+
+	if (s == NULL)
+		return NULL;
+	n = retrace_real_impls.strlen(s);
+	out = (char *)retrace_real_impls.malloc(n + 1);
+	if (out == NULL)
+		return NULL;
+	(void)retrace_real_impls.real_snprintf(out, n + 1, "%s", s);
+	return out;
+}
+
+static void path_set_free(struct path_set *set)
+{
+	if (set == NULL)
+		return;
+	free(set->first_copy);
+	free(set->last_copy);
+	free(set);
+}
+
+/*
+ * Cache validation: exact for every list shape an aliasing
+ * recycler can produce with distinct content (boundary strings
+ * differ => rebuild). Same boundary strings + same count with a
+ * different middle only arises within a single immutable tree,
+ * which cannot alias itself.
+ */
+static int path_set_valid(const struct path_set *set,
+			  JSON_Array *list, size_t n)
+{
+	const char *first, *last;
+
+	if (set == NULL || set->count != n)
+		return 0;
+	if (n == 0)
+		return 1;
+	first = json_array_get_string(list, 0);
+	last = json_array_get_string(list, n - 1);
+	if (first == NULL || last == NULL ||
+	    set->first_copy == NULL || set->last_copy == NULL)
+		return 0;
+	return retrace_real_impls.strcmp(first, set->first_copy) == 0 &&
+	       retrace_real_impls.strcmp(last, set->last_copy) == 0;
+}
 
 static uint32_t first_comp_hash(const char *s)
 {
@@ -179,7 +237,18 @@ static struct path_set *path_set_build(JSON_Array *list)
 	if (set == NULL)
 		return NULL;
 	set->count = n;
-	set->first = n > 0 ? json_array_get_string(list, 0) : NULL;
+	set->first_copy = NULL;
+	set->last_copy = NULL;
+	if (n > 0) {
+		set->first_copy = path_set_strndup(
+			json_array_get_string(list, 0));
+		set->last_copy = path_set_strndup(
+			json_array_get_string(list, n - 1));
+		if (set->first_copy == NULL || set->last_copy == NULL) {
+			path_set_free(set);
+			return NULL;
+		}
+	}
 	for (i = 0; i < n; i++) {
 		const char *e = json_array_get_string(list, i);
 
@@ -217,11 +286,7 @@ static int list_contains(const char *path_arg, JSON_Array *list)
 	n = json_array_get_count(list);
 	for (i = 0; i < PATH_SETS_MAX; i++) {
 		if (g_path_sets[i].arr == list &&
-		    g_path_sets[i].set != NULL &&
-		    g_path_sets[i].set->count == n &&
-		    g_path_sets[i].set->first ==
-			    (n > 0 ? json_array_get_string(list, 0)
-				   : NULL)) {
+		    path_set_valid(g_path_sets[i].set, list, n)) {
 			set = g_path_sets[i].set;
 			break;
 		}
@@ -244,7 +309,7 @@ static int list_contains(const char *path_arg, JSON_Array *list)
 			}
 			return 0;
 		}
-		free(g_path_sets[slot].set);
+		path_set_free(g_path_sets[slot].set);
 		g_path_sets[slot].arr = list;
 		g_path_sets[slot].set = set;
 		g_path_set_next = (slot + 1) % PATH_SETS_MAX;
