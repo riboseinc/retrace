@@ -101,15 +101,170 @@ static int path_matches(const char *path_arg, const char *entry)
 	return retrace_real_impls.strcmp(path_arg, entry) == 0;
 }
 
-static int list_contains(const char *path_arg, JSON_Array *list)
+/*
+ * The membership deepening (architecture-review F3): a policy
+ * list was walked linearly on every path-policed call -- up to
+ * N strcmps per intercepted open under an N-path policy. The
+ * set is instead COMPILED once per policy array: entries bucket
+ * by their first path component's hash, so a lookup touches
+ * only its bucket plus the small wildcard list (relative-path
+ * and root-prefix rules). Entries are pointers INTO the config
+ * tree (no copies); the compiled set is cached against the
+ * array pointer and revalidated (count + first entry) per call
+ * -- a policy swap that frees the old tree can at worst alias
+ * the cache into a rebuild, never a wrong answer.
+ */
+#define PATH_BUCKETS 32
+#define PATH_SETS_MAX 8
+
+struct path_set {
+	size_t count;		/* entries, for validation */
+	const char *first;	/* first entry ptr, ditto */
+	size_t off[PATH_BUCKETS + 2];	/* prefix sums; b..b+1 */
+	size_t idx[];		/* entry indices, bucketed */
+};
+
+struct path_set_cache {
+	JSON_Array *arr;
+	struct path_set *set;
+};
+
+static struct path_set_cache g_path_sets[PATH_SETS_MAX];
+static int g_path_set_next;
+
+static uint32_t first_comp_hash(const char *s)
+{
+	uint32_t h = 2166136261u;
+	const char *p = s;
+
+	if (*p == '/')
+		p++;
+	for (; *p != '\0' && *p != '/' && *p != '\\'; p++) {
+		h ^= (unsigned char)*p;
+		h *= 16777619u;
+	}
+	return h;
+}
+
+/*
+ * Which bucket an ENTRY belongs to. Separator-terminated rules
+ * (prefix rules) bucket by their own first component; relative
+ * entries and the bare root rule go to the wildcard bucket
+ * (PATH_BUCKETS).
+ */
+static int entry_bucket(const char *entry)
+{
+	size_t elen = retrace_real_impls.strlen(entry);
+	char last;
+
+	if (elen == 0 || entry[0] != '/')
+		return PATH_BUCKETS;
+	last = entry[elen - 1];
+	if ((last == '/' || last == '\\') && elen == 1)
+		return PATH_BUCKETS;	/* the root rule */
+	return (int)(first_comp_hash(entry) % PATH_BUCKETS);
+}
+
+static struct path_set *path_set_build(JSON_Array *list)
 {
 	size_t i, n = json_array_get_count(list);
+	size_t counts[PATH_BUCKETS + 1] = {0};
+	size_t cursor[PATH_BUCKETS + 1];
+	struct path_set *set;
+	size_t need = sizeof(struct path_set) +
+		(PATH_BUCKETS + n) * sizeof(size_t);
 
+	set = retrace_real_impls.malloc != NULL ?
+		retrace_real_impls.malloc(need) : malloc(need);
+	if (set == NULL)
+		return NULL;
+	set->count = n;
+	set->first = n > 0 ? json_array_get_string(list, 0) : NULL;
 	for (i = 0; i < n; i++) {
-		const char *entry = json_array_get_string(list, i);
+		const char *e = json_array_get_string(list, i);
 
-		if (entry != NULL && path_matches(path_arg, entry))
-			return 1;
+		counts[e != NULL ?
+			entry_bucket(e) : PATH_BUCKETS]++;
+	}
+	{
+		size_t off = 0;
+
+		for (i = 0; i <= PATH_BUCKETS; i++) {
+			set->off[i] = off;
+			cursor[i] = off;
+			off += counts[i];
+		}
+		set->off[PATH_BUCKETS + 1] = off;
+	}
+	for (i = 0; i < n; i++) {
+		const char *e = json_array_get_string(list, i);
+
+		set->idx[cursor[e != NULL ?
+			entry_bucket(e) : PATH_BUCKETS]++] = i;
+	}
+	return set;
+}
+
+static int list_contains(const char *path_arg, JSON_Array *list)
+{
+	struct path_set *set = NULL;
+	size_t i, n;
+	size_t *idx;
+	int buckets[2];
+	int k;
+
+	/* registry hit, validated against the live array */
+	n = json_array_get_count(list);
+	for (i = 0; i < PATH_SETS_MAX; i++) {
+		if (g_path_sets[i].arr == list &&
+		    g_path_sets[i].set != NULL &&
+		    g_path_sets[i].set->count == n &&
+		    g_path_sets[i].set->first ==
+			    (n > 0 ? json_array_get_string(list, 0)
+				   : NULL)) {
+			set = g_path_sets[i].set;
+			break;
+		}
+	}
+	if (set == NULL) {
+		int slot = g_path_set_next;
+
+		set = path_set_build(list);
+		if (set == NULL) {
+			/* OOM: the honest fallback is the old walk */
+			size_t j;
+
+			for (j = 0; j < n; j++) {
+				const char *e =
+					json_array_get_string(list, j);
+
+				if (e != NULL &&
+				    path_matches(path_arg, e))
+					return 1;
+			}
+			return 0;
+		}
+		free(g_path_sets[slot].set);
+		g_path_sets[slot].arr = list;
+		g_path_sets[slot].set = set;
+		g_path_set_next = (slot + 1) % PATH_SETS_MAX;
+	}
+
+	/* the caller's own bucket + the wildcard bucket */
+	idx = set->idx;
+	buckets[0] = (int)(first_comp_hash(path_arg) % PATH_BUCKETS);
+	buckets[1] = PATH_BUCKETS;
+	for (k = 0; k < 2; k++) {
+		size_t lo = set->off[buckets[k]];
+		size_t hi = set->off[buckets[k] + 1];
+
+		for (i = lo; i < hi; i++) {
+			const char *e =
+				json_array_get_string(list, idx[i]);
+
+			if (e != NULL && path_matches(path_arg, e))
+				return 1;
+		}
 	}
 	return 0;
 }
@@ -138,10 +293,13 @@ static const char *const g_write_funcs[] = {
 static int is_write_func(const char *name)
 {
 	size_t i;
+	char c0 = name[0];
 
+	/* first-char reject: most calls miss on the first compare */
 	for (i = 0; g_write_funcs[i] != NULL; i++) {
-		if (retrace_real_impls.strcmp(name, g_write_funcs[i])
-			== 0)
+		if (g_write_funcs[i][0] == c0 &&
+		    retrace_real_impls.strcmp(name, g_write_funcs[i])
+			    == 0)
 			return 1;
 	}
 	return 0;
