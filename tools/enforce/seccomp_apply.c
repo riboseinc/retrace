@@ -22,9 +22,10 @@
 
 #include "seccomp_apply.h"
 
-#if defined(__linux__)
+#if defined(__linux__) && (defined(__x86_64__) || \
+	defined(__aarch64__))
 
-#include <sys/prctl.h> && (defined(__x86_64__) || defined(__aarch64__))
+#include <sys/prctl.h>
 
 #include <linux/audit.h>
 #include <linux/filter.h>
