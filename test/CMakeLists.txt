@@ -192,6 +192,21 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 120)
 
+	# Kernel enforcement compile (TODO.beyond-libc/01):
+	# declared-set -> Landlock ruleset + seccomp floor, installed
+	# by retrace-enforce. Linux-only; self-skips elsewhere or
+	# where the kernel lacks the planes.
+	if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+		add_test(NAME integration-enforce
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_enforce.py
+				$<TARGET_FILE:retrace_profile>
+				$<TARGET_FILE:retrace_enforce>)
+		set_tests_properties(integration-enforce
+			PROPERTIES LABELS "integration"
+			TIMEOUT 120)
+	endif()
+
 	# Journal durability (the writer deepening): durable
 	# control-plane records, recorded gaps on unclean shutdown,
 	# clean-close markers, chain across boots.
