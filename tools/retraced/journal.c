@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "parson.h"
 
@@ -24,12 +25,43 @@ static uint64_t fnv1a(const char *s, uint64_t h)
 	return h & 0xffffffffffffffffULL;
 }
 
+/*
+ * Durability classes (the audit contract): control-plane
+ * records are flushed the moment they are written -- an
+ * auth decision, policy push, or session mint surviving a
+ * crash is the compliance story. Routine agent telemetry is
+ * buffered; on an unclean shutdown the buffered tail is lost
+ * and the NEXT boot journals retrace.journal.unclean so the
+ * gap is recorded, never silent (the same doctrine as the
+ * agent's drop signaling).
+ */
+static int payload_is_durable(const char *payload)
+{
+	static const char *const classes[] = {
+		"\"name\":\"retrace.auth.",
+		"\"name\":\"retrace.policy.",
+		"\"name\":\"retrace.session.",
+		"\"name\":\"retrace.journal.",
+	};
+	size_t i;
+
+	if (payload == NULL)
+		return 0;
+	for (i = 0; i < sizeof(classes) / sizeof(classes[0]); i++) {
+		if (strstr(payload, classes[i]) != NULL)
+			return 1;
+	}
+	return 0;
+}
+
 int retraced_journal_open(struct retraced_journal *j,
 	const char *path)
 {
 	memset(j, 0, sizeof(*j));
 	snprintf(j->path, sizeof(j->path), "%s", path);
 	j->chain_broken_at = -1;
+	j->f = NULL;
+	j->clean_close = 0;
 	/* append mode: history is immutable; the chain head
 	 * resumes from replay
 	 */
@@ -38,7 +70,34 @@ int retraced_journal_open(struct retraced_journal *j,
 
 void retraced_journal_close(struct retraced_journal *j)
 {
-	(void)j;
+	/* the close marker is itself a chained, flushed record:
+	 * its absence on the next boot means the buffered tail
+	 * was lost to an unclean shutdown -- and that gap gets
+	 * its own journal record (never silent)
+	 */
+	(void)retraced_journal_event(j, (long)time(NULL), "daemon",
+		0, "{\"name\":\"retrace.journal.closed\"}");
+	if (j->f != NULL) {
+		fflush(j->f);
+		fclose(j->f);
+		j->f = NULL;
+	}
+	j->clean_close = 1;
+}
+
+/*
+ * The writer deepening (the audit story's throughput floor):
+ * ONE fopen for the daemon's lifetime, not one per event --
+ * an open(2)+close(2) per journal line bought nothing, since
+ * every line was already safely in the OS page cache. The
+ * FILE* is opened lazily on first append so a read-only boot
+ * (replay-only, refused start) never creates the file.
+ */
+static FILE *journal_writer(struct retraced_journal *j)
+{
+	if (j->f == NULL)
+		j->f = fopen(j->path, "a");
+	return j->f;
 }
 
 int retraced_journal_event(struct retraced_journal *j,
@@ -60,14 +119,13 @@ int retraced_journal_event(struct retraced_journal *j,
 
 	link = fnv1a(line, j->prev_hash ^ 0x9e3779b97f4a7c15ULL);
 
-	f = fopen(j->path, "a");
+	f = journal_writer(j);
 	if (f == NULL)
 		return -1;
-	if (fputs(line, f) == EOF) {
-		fclose(f);
+	if (fputs(line, f) == EOF)
 		return -1;
-	}
-	fclose(f);
+	if (payload_is_durable(payload))
+		fflush(f);
 
 	j->prev_hash = link;
 	j->lines++;
@@ -91,6 +149,7 @@ int retraced_journal_replay(struct retraced_journal *j,
 	j->replay_ok = 0;
 	j->replay_events = 0;
 	j->chain_broken_at = -1;
+	j->clean_close = 0;
 	if (f == NULL)
 		return -1;
 
@@ -110,6 +169,9 @@ int retraced_journal_replay(struct retraced_journal *j,
 			saw_torn = 1;
 			break;
 		}
+		/* only a marker as the LAST complete line counts */
+		j->clean_close = strstr(line,
+			"\"name\":\"retrace.journal.closed\"") != NULL;
 		v = json_parse_string(line);
 		if (v == NULL) {
 			saw_torn = 1; /* corrupt tail: treat as torn */

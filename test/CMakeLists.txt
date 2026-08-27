@@ -192,6 +192,19 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 120)
 
+	# Journal durability (the writer deepening): durable
+	# control-plane records, recorded gaps on unclean shutdown,
+	# clean-close markers, chain across boots.
+	add_test(NAME integration-journal-durability
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_journal_durability.py
+			$<TARGET_FILE:retrace_retraced>
+			$<TARGET_FILE:retrace_v2>
+			$<TARGET_FILE:retrace_test_policy_target>)
+	set_tests_properties(integration-journal-durability
+		PROPERTIES LABELS "integration"
+		TIMEOUT 120)
+
 	# The farm/IR playbook, end to end (TODO.supervisor/09):
 	# register, tighten mid-run, freeze, journal the story.
 	if(NOT WIN32)
