@@ -226,21 +226,34 @@ def main():
                  "import socket,sys\n"
                  "s=socket.socket(socket.AF_UNIX,"
                  "socket.SOCK_STREAM)\n"
-                 f"s.connect({sock!r})\n"
+                 "try:\n"
+                 f"    s.connect({sock!r})\n"
+                 "except PermissionError:\n"
+                 "    sys.exit(1)\n"
                  "s.settimeout(3)\n"
                  "try:\n"
                  "    d=s.recv(16)\n"
-                 "    sys.exit(0 if d==b'' else 1)\n"
+                 "    sys.exit(0 if d==b'' else 3)\n"
                  "except socket.timeout:\n"
                  "    sys.exit(2)\n"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL)
-            refused = probe.returncode == 0 and any(
-                r.get("ev", {}).get("name") ==
-                "retrace.auth.refused"
-                for r in journal_records(journal))
-            if not refused:
-                print("FAIL: wrong-uid peer not refused+journaled",
+            # 0 = connected then closed (the daemon's PEERCRED
+            # gate); 1 = EACCES (the 0660 mode gate refused the
+            # connect outright). BOTH are refusals; 2 (timeout)
+            # and 3 (got data) are not.
+            if probe.returncode not in (0, 1):
+                print(f"FAIL: wrong-uid peer got through: "
+                      f"rc={probe.returncode}", file=sys.stderr)
+                return 1
+            # the journal record exists when the refusal happened
+            # daemon-side (PEERCRED); the mode-gate path never
+            # reaches the daemon
+            if probe.returncode == 0 and not any(
+                    r.get("ev", {}).get("name") ==
+                    "retrace.auth.refused"
+                    for r in journal_records(journal)):
+                print("FAIL: closed peer not journaled",
                       file=sys.stderr)
                 return 1
 
