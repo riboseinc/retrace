@@ -56,4 +56,16 @@ long enforce_audit_verify(const char *path,
 int enforce_audit_hash(const char *prev_hex, const char *payload,
 	char out[ENFORCE_DIGEST_HEX_MAX]);
 
+/*
+ * Record signatures (the "signed" in signed artifacts): with a
+ * private key loaded, every appended record carries an Ed25519
+ * signature over the same bytes the chain hash covers. Verify
+ * with a public key requires a valid signature on EVERY record
+ * (fail-closed: a missing signature fails when a key is set).
+ * Returns 0/-1; both are no-ops when built without OpenSSL.
+ */
+int enforce_audit_set_key(const char *priv_pem_path);
+int enforce_audit_set_pubkey(const char *pub_pem_path);
+int enforce_audit_signing(void);
+
 #endif /* RETRACE_TOOLS_ENFORCE_ARTIFACT_AUDIT_H_ */

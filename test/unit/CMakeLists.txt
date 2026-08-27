@@ -320,6 +320,13 @@ retrace_add_unit_test(modify_return_value_int
 retrace_add_unit_test(enforce_audit
     EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/tools/enforce/artifact_audit.c
     EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/tools/enforce)
+if(OpenSSL_FOUND)
+    target_compile_definitions(retrace_test_enforce_audit PRIVATE
+        RETRACE_HAVE_OPENSSL=1
+        RETRACE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+    target_link_libraries(retrace_test_enforce_audit PRIVATE
+        OpenSSL::Crypto)
+endif()
 
 retrace_add_unit_test(retraced_ctl
     EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/tools/retraced/retraced_ctl.c
