@@ -14,10 +14,138 @@
 #include <unistd.h>
 
 #ifdef RETRACE_HAVE_OPENSSL
+#include <openssl/evp.h>
+#include <openssl/pem.h>
 #include <openssl/sha.h>
 #endif
 
 #define AUDIT_LINE_MAX 4200
+#define AUDIT_SIG_B64_MAX 128	/* Ed25519 64B -> ~88 base64 */
+
+#ifdef RETRACE_HAVE_OPENSSL
+static EVP_PKEY *g_sign_key;
+static EVP_PKEY *g_verify_key;
+#endif
+
+int enforce_audit_signing(void)
+{
+#ifdef RETRACE_HAVE_OPENSSL
+	return g_sign_key != NULL;
+#else
+	return 0;
+#endif
+}
+
+#ifdef RETRACE_HAVE_OPENSSL
+/* sign prev_hex||payload; out holds base64 (no newline) */
+static int audit_sign(const char *prev_hex, const char *payload,
+	char out[AUDIT_SIG_B64_MAX])
+{
+	EVP_MD_CTX *ctx = NULL;
+	unsigned char input[AUDIT_LINE_MAX];
+	unsigned char sig[128];
+	size_t inlen, siglen = sizeof(sig);
+	size_t prevlen = strlen(prev_hex), plen = strlen(payload);
+	int rc = -1;
+
+	if (g_sign_key == NULL)
+		return -1;
+	if (prevlen + plen + 1 > sizeof(input))
+		return -1;
+	memcpy(input, prev_hex, prevlen);
+	memcpy(input + prevlen, payload, plen + 1);
+	inlen = prevlen + plen;
+	ctx = EVP_MD_CTX_new();
+	if (ctx == NULL)
+		return -1;
+	if (EVP_DigestSignInit(ctx, NULL, NULL, NULL, g_sign_key) == 1 &&
+	    EVP_DigestSign(ctx, sig, &siglen, input, inlen) == 1) {
+		EVP_EncodeBlock((unsigned char *)out, sig, (int)siglen);
+		rc = 0;
+	}
+	EVP_MD_CTX_free(ctx);
+	return rc;
+}
+
+static int audit_verify_sig(const char *prev_hex, const char *payload,
+	const char *b64)
+{
+	EVP_MD_CTX *ctx = NULL;
+	unsigned char input[AUDIT_LINE_MAX];
+	unsigned char sig[128];
+	unsigned char expected[AUDIT_SIG_B64_MAX];
+	size_t prevlen = strlen(prev_hex), plen = strlen(payload);
+	int rc = -1;
+
+	if (g_verify_key == NULL || b64 == NULL)
+		return -1;
+	if (prevlen + plen + 1 > sizeof(input))
+		return -1;
+	memcpy(input, prev_hex, prevlen);
+	memcpy(input + prevlen, payload, plen + 1);
+	{
+		size_t blen = strlen(b64);
+		size_t pad = 0;
+		int declen;
+
+		if (blen == 0 || blen % 4 != 0 || blen >= sizeof(expected))
+			return -1;	/* canonical base64 is quartets */
+		while (pad < 2 && b64[blen - 1 - pad] == '=')
+			pad++;
+		declen = EVP_DecodeBlock(sig, (const unsigned char *)b64,
+			(int)blen);
+		if (declen < 0)
+			return -1;
+		/* EVP_DecodeBlock decodes '=' as NUL bytes: strip them */
+		declen -= (int)pad;
+		EVP_EncodeBlock(expected, sig, declen);
+		if (strcmp((const char *)expected, b64) != 0)
+			return -1;	/* non-canonical encoding */
+		ctx = EVP_MD_CTX_new();
+		if (ctx != NULL) {
+			if (EVP_DigestVerifyInit(ctx, NULL, NULL, NULL,
+				    g_verify_key) == 1 &&
+			    EVP_DigestVerify(ctx, sig, (size_t)declen,
+				    input, prevlen + plen) == 1)
+				rc = 0;
+			EVP_MD_CTX_free(ctx);
+		}
+	}
+	return rc;
+}
+#endif
+
+int enforce_audit_set_key(const char *priv_pem_path)
+{
+#ifdef RETRACE_HAVE_OPENSSL
+	FILE *f = fopen(priv_pem_path, "r");
+
+	if (f == NULL)
+		return -1;
+	g_sign_key = PEM_read_PrivateKey(f, NULL, NULL, NULL);
+	fclose(f);
+	return g_sign_key != NULL ? 0 : -1;
+#else
+	(void)priv_pem_path;
+	return -1;
+#endif
+}
+
+int enforce_audit_set_pubkey(const char *pub_pem_path)
+{
+#ifdef RETRACE_HAVE_OPENSSL
+	FILE *f = fopen(pub_pem_path, "r");
+
+	if (f == NULL)
+		return -1;
+	g_verify_key = PEM_read_PUBKEY(f, NULL, NULL, NULL);
+	fclose(f);
+	return g_verify_key != NULL ? 0 : -1;
+#else
+	(void)pub_pem_path;
+	return -1;
+#endif
+}
 
 /*
  * FNV-1a 64 -- the fallback digest when the build has no
@@ -155,6 +283,23 @@ static void extract_hash(const char *line, char out[ENFORCE_DIGEST_HEX_MAX])
 	out[n] = '\0';
 }
 
+static void extract_sig(const char *line, char out[AUDIT_SIG_B64_MAX])
+{
+	const char *h = strstr(line, ",\"sig\":\"");
+	size_t n = 0;
+
+	if (h == NULL) {
+		out[0] = '\0';
+		return;
+	}
+	h += 8;
+	while (h[n] != '\0' && h[n] != '"' &&
+	       n + 1 < AUDIT_SIG_B64_MAX)
+		n++;
+	memcpy(out, h, n);
+	out[n] = '\0';
+}
+
 static long verify_chain(const char *path,
 	char last_hash[ENFORCE_DIGEST_HEX_MAX])
 {
@@ -192,6 +337,16 @@ static long verify_chain(const char *path,
 			    enforce_audit_hash(prev, payload, want) != 0 ||
 			    strcmp(want, stored) != 0)
 				return -2;
+#ifdef RETRACE_HAVE_OPENSSL
+			if (g_verify_key != NULL) {
+				char sig[AUDIT_SIG_B64_MAX];
+
+				extract_sig(line, sig);
+				if (sig[0] == '\0' ||
+				    audit_verify_sig(prev, payload, sig) != 0)
+					return -2;
+			}
+#endif
 		}
 		snprintf(prev, sizeof(prev), "%s", stored);
 		count++;
@@ -259,6 +414,20 @@ int enforce_audit_append(const char *path, long ts, long pid,
 		snprintf(prev, sizeof(prev), "0");
 	if (enforce_audit_hash(prev, payload, hash) != 0)
 		return -1;
+#ifdef RETRACE_HAVE_OPENSSL
+	if (g_sign_key != NULL) {
+		char sig[AUDIT_SIG_B64_MAX];
+		int n;
+
+		if (audit_sign(prev, payload, sig) != 0)
+			return -1;
+		n = snprintf(line, sizeof(line),
+			"%s{\"hash\":\"%s\",\"sig\":\"%s\"}\n",
+			payload, hash, sig);
+		if (n <= 0 || (size_t)n >= sizeof(line))
+			return -1;
+	} else
+#endif
 	{
 		int n = snprintf(line, sizeof(line), "%s{\"hash\":\"%s\"}\n",
 			payload, hash);

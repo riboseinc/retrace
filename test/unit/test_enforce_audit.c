@@ -153,6 +153,60 @@ static void test_digest_stable_and_sensitive(void)
 	CHECK(strcmp(a, b) != 0);
 }
 
+static void test_signed_records(void)
+{
+	char digest[ENFORCE_DIGEST_HEX_MAX];
+	char head[ENFORCE_DIGEST_HEX_MAX];
+
+	fresh_trail();
+	CHECK(enforce_spec_digest("s", 1, digest, NULL) == 0);
+	if (!enforce_audit_signing() &&
+	    enforce_audit_set_key("test/fixtures/audit_ed25519_key.pem") != 0) {
+		printf("SKIP (built without OpenSSL) ");
+		return;
+	}
+	CHECK(enforce_audit_append(trail, 1, 11, digest, NULL,
+		"landlock", (char *[]){"/bin/true", NULL}) == 0);
+	/* the record carries a signature */
+	{
+		FILE *f = fopen(trail, "r");
+		char buf[4096];
+		size_t n;
+
+		CHECK(f != NULL);
+		n = fread(buf, 1, sizeof(buf) - 1, f);
+		fclose(f);
+		buf[n] = '\0';
+		CHECK(strstr(buf, "\"sig\":\"") != NULL);
+	}
+	/* verify WITHOUT the pubkey: chain still ok */
+	CHECK(enforce_audit_verify(trail, head) == 1);
+	/* verify WITH the pubkey: signature must hold */
+	CHECK(enforce_audit_set_pubkey(
+		"test/fixtures/audit_ed25519_pub.pem") == 0);
+	CHECK(enforce_audit_verify(trail, NULL) == 1);
+	/* flip one signed byte: signature must fail */
+	{
+		FILE *f = fopen(trail, "r");
+		char buf[4096];
+		size_t n;
+		char *pid;
+
+		CHECK(f != NULL);
+		n = fread(buf, 1, sizeof(buf) - 1, f);
+		fclose(f);
+		buf[n] = '\0';
+		pid = strstr(buf, "\"pid\":11");
+		CHECK(pid != NULL);
+		pid[6] = '2';
+		f = fopen(trail, "w");
+		CHECK(f != NULL);
+		fwrite(buf, 1, n, f);
+		fclose(f);
+	}
+	CHECK(enforce_audit_verify(trail, NULL) == -2);
+}
+
 int main(void)
 {
 	snprintf(trail, sizeof(trail), "%s",
@@ -165,6 +219,7 @@ int main(void)
 	TEST(append_refuses_after_tamper);
 	TEST(missing_file_verifies_empty);
 	TEST(digest_stable_and_sensitive);
+	TEST(signed_records);
 
 	printf("%d tests: %d pass, %d fail\n", tests_run, tests_pass,
 		tests_fail);

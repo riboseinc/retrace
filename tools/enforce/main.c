@@ -49,7 +49,10 @@ static void enforce_usage(void)
 		"  --audit PATH: append a hash-chained record of this\n"
 		"    exec (spec digest + backends + argv); a broken\n"
 		"    trail refuses the exec\n"
-		"  --verify-audit PATH: replay + verify a trail\n");
+		"  --verify-audit PATH: replay + verify a trail\n"
+		"  --audit-key PEM: sign each record (Ed25519)\n"
+		"  --audit-pubkey PEM: require valid signatures\n"
+		"    during --verify-audit (fail-closed)\n");
 }
 
 static void spec_backends(const struct enforce_spec *spec, char *out,
@@ -74,6 +77,8 @@ int main(int argc, char **argv)
 	const char *spec_path = NULL;
 	const char *audit_path = NULL;
 	const char *verify_path = NULL;
+	const char *audit_key = NULL;
+	const char *audit_pubkey = NULL;
 	int allow_missing = 0;
 	int i;
 	int rc;
@@ -90,6 +95,12 @@ int main(int argc, char **argv)
 		} else if (strcmp(argv[i], "--verify-audit") == 0 &&
 			   i + 1 < argc) {
 			verify_path = argv[++i];
+		} else if (strcmp(argv[i], "--audit-key") == 0 &&
+			   i + 1 < argc) {
+			audit_key = argv[++i];
+		} else if (strcmp(argv[i], "--audit-pubkey") == 0 &&
+			   i + 1 < argc) {
+			audit_pubkey = argv[++i];
 		} else if (strcmp(argv[i], "--") == 0) {
 			break;
 		} else if (argv[i][0] != '-' && spec_path == NULL) {
@@ -101,7 +112,16 @@ int main(int argc, char **argv)
 	}
 	if (verify_path != NULL) {
 		char head[ENFORCE_DIGEST_HEX_MAX];
-		long n = enforce_audit_verify(verify_path, head);
+		long n;
+
+		if (audit_pubkey != NULL &&
+		    enforce_audit_set_pubkey(audit_pubkey) != 0) {
+			fprintf(stderr,
+				"retrace-enforce: cannot load pubkey %s\n",
+				audit_pubkey);
+			return 2;
+		}
+		n = enforce_audit_verify(verify_path, head);
 
 		if (n < 0) {
 			fprintf(stderr,
@@ -183,6 +203,13 @@ int main(int argc, char **argv)
 		const char *alg = NULL;
 		char backends[64];
 
+		if (audit_key != NULL &&
+		    enforce_audit_set_key(audit_key) != 0) {
+			fprintf(stderr,
+				"retrace-enforce: cannot load audit key %s\n",
+				audit_key);
+			return 2;
+		}
 		if (enforce_spec_digest(json, (size_t)sz, digest,
 			    &alg) != 0) {
 			fprintf(stderr,
