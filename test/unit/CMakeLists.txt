@@ -310,6 +310,19 @@ retrace_add_unit_test(modify_return_value_int
     EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/test/helpers)
 
 #
+# retraced ctl-plane command surface, unit-tested through the
+# extracted module (buffer sink, no socket/daemon).
+#
+retrace_add_unit_test(retraced_ctl
+    EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/tools/retraced/retraced_ctl.c
+        ${CMAKE_SOURCE_DIR}/tools/retraced/registry.c
+        ${CMAKE_SOURCE_DIR}/tools/retraced/journal.c
+    EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/tools/retraced
+        ${CMAKE_SOURCE_DIR}/tools/retraced/../..
+        ${CMAKE_SOURCE_DIR}/src/supervisor
+        ${CMAKE_SOURCE_DIR}/src/config/json)
+
+#
 # evidence-pipeline formatter tests: the zero-alloc stack path
 # and its decline contract (escaping/oversize -> heap path).
 #
