@@ -231,7 +231,7 @@ static char *jesc(const char *s)
  */
 int retrace_agent_format_event_stack(char *out, size_t cap,
 	const char *agent_id, uint64_t seq, const char *name,
-	char **kv, size_t n_kv)
+	const char *const *kv, size_t n_kv)
 {
 	size_t o = 0;
 	size_t i;

@@ -57,7 +57,7 @@ void retrace_agent_kick(void);
  */
 int retrace_agent_format_event_stack(char *out, size_t cap,
 	const char *agent_id, uint64_t seq, const char *name,
-	char **kv, size_t n_kv);
+	const char *const *kv, size_t n_kv);
 
 /*
  * Queue one named security event for the daemon. kv is an
