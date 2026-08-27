@@ -30,6 +30,10 @@ fi
 CHECKPATCH_FLAGS=(
 	--ignore ARRAY_SIZE
 	--ignore AVOID_EXTERNS
+# ENOSYS: the kernel's DOCUMENTED contract for "feature not
+# implemented" (landlock_create_ruleset, seccomp probes) --
+# checkpatch's in-kernel heuristic false-positives here
+	--ignore ENOSYS
 	--ignore BRACES
 	--ignore COMMIT_LOG_LONG_LINE
 	--ignore COMPLEX_MACRO
