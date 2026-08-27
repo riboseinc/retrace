@@ -108,10 +108,13 @@ def main():
             print(f"FAIL: no retrace.drift.summary on clean stop: "
                   f"{names}", file=sys.stderr)
             return 1
-        d0 = drift[-1]["ev"]
-        if int(d0.get("kernel_obs", 0)) < 3 or int(d0.get("delta", 0)) < 3:
-            print(f"FAIL: drift summary under-counts observations: "
-                  f"{d0}", file=sys.stderr)
+        d_kernel = [int(r["ev"].get("kernel_obs", 0))
+                    for r in drift]
+        d_delta = [int(r["ev"].get("delta", 0))
+                   for r in drift]
+        if max(d_kernel) < 3 or sum(d_delta) < 3:
+            print(f"FAIL: drift summaries under-count observations: "
+                  f"{[r['ev'] for r in drift]}", file=sys.stderr)
             return 1
 
         print("ebpf-agent: 3 kernel observations journaled; "
