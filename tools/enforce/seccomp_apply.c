@@ -32,18 +32,6 @@
 #include <linux/seccomp.h>
 #include <sys/syscall.h>
 
-struct sock_filter {
-	uint16_t code;
-	uint8_t jt;
-	uint8_t jf;
-	uint32_t k;
-};
-
-struct sock_fprog {
-	uint16_t len;
-	struct sock_filter *filter;
-};
-
 #ifndef SECCOMP_RET_ERRNO
 #define SECCOMP_RET_ERRNO 0x00050000U
 #endif
@@ -180,6 +168,17 @@ static const struct sc_name sc_names[] = {
 #endif
 	{NULL, -1},
 };
+
+static long sc_nr(const char *name)
+{
+	const struct sc_name *s;
+
+	for (s = sc_names; s->name != NULL; s++) {
+		if (strcmp(s->name, name) == 0)
+			return s->nr;
+	}
+	return -1;
+}
 
 #define FILTER_MAX (4 + ENFORCE_SYSCALLS_MAX * 2 + 2)
 
