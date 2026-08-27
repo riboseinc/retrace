@@ -313,6 +313,14 @@ retrace_add_unit_test(modify_return_value_int
 # retraced ctl-plane command surface, unit-tested through the
 # extracted module (buffer sink, no socket/daemon).
 #
+#
+# audited enforcement artifacts (TODO.beyond-libc/01 P2): the
+# hash chain binding exec to spec digest + backends.
+#
+retrace_add_unit_test(enforce_audit
+    EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/tools/enforce/artifact_audit.c
+    EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/tools/enforce)
+
 retrace_add_unit_test(retraced_ctl
     EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/tools/retraced/retraced_ctl.c
         ${CMAKE_SOURCE_DIR}/tools/retraced/registry.c
