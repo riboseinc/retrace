@@ -7,6 +7,7 @@
 #define RETRACE_TOOLS_JOURNAL_H_
 
 #include <stdint.h>
+#include <stdio.h>
 
 /*
  * The retraced append-only event journal (TODO.supervisor/02).
@@ -23,6 +24,12 @@
  * stop at the first torn tail line (crash-only state; losing
  * the trailing partial record is the contract). The registry
  * rebuilds agent liveness from the last HELLO/BYE per id.
+ *
+ * Durability contract (v2.45): control-plane records (auth,
+ * policy, session, journal) are flushed on write; routine
+ * telemetry is buffered and may lose the unflushed tail on an
+ * unclean shutdown. The next boot journals
+ * retrace.journal.unclean -- gaps are recorded, never silent.
  */
 
 #include "registry.h"
@@ -35,6 +42,12 @@ struct retraced_journal {
 	uint64_t replay_ok;
 	uint64_t replay_events;
 	int chain_broken_at; /* line no. of first mismatch, -1 ok */
+	/* writer state (the open-once deepening): the FILE* lives
+	 * for the daemon's lifetime; routine telemetry is buffered
+	 * by stdio and flushed at durability points + close
+	 */
+	FILE *f;
+	int clean_close;
 };
 
 int retraced_journal_open(struct retraced_journal *j,

@@ -698,11 +698,22 @@ int main(int argc, char **argv)
 				jr.chain_broken_at);
 			return 1;
 		}
-		if (rc == 0)
+		if (rc == 0) {
 			printf("retraced: journal replayed: %llu events, chain ok\n",
 				(unsigned long long)jr.replay_events);
-		else
+			if (jr.lines > 0 && !jr.clean_close) {
+				/* the buffered tail was lost to an
+				 * unclean shutdown: the gap gets its
+				 * own record -- never silent
+				 */
+				retraced_journal_event(&jr,
+					(long)time(NULL), "daemon", 0,
+					"{\"name\":\"retrace.journal.unclean\"}");
+				printf("retraced: prior shutdown was unclean; gap journaled\n");
+			}
+		} else {
 			printf("retraced: no prior journal (fresh boot)\n");
+		}
 	}
 
 	if (policy_path != NULL && load_policy(policy_path) != 0)
