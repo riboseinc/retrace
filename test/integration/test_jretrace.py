@@ -11,6 +11,7 @@ Usage: test_jretrace.py <retraced> <java-source-root>
 """
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -60,16 +61,37 @@ def journal_records(path):
     return recs
 
 
+def jdk_ok():
+    """A usable JDK is one with the UDS API (Java 16+): on
+    runners without java the exec itself raises FileNotFoundError
+    (which used to crash the test instead of skipping), and older
+    default JDKs (11) cannot compile UnixDomainSocketAddress."""
+    for tool, args in (("java", ["-version"]),
+                       ("javac", ["-version"])):
+        try:
+            r = subprocess.run([tool] + args, capture_output=True,
+                               text=True, timeout=15)
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return False
+        if r.returncode != 0:
+            return False
+        # java: 'openjdk version "17.0.2"'; javac: 'javac 21.0.2';
+        # legacy: 'java version "1.8.0_382"' (1 < 16 -> skip)
+        blob = (r.stderr or "") + (r.stdout or "")
+        m = (re.search(r'version\s+"(\d+)', blob) or
+             re.search(r'javac\s+(\d+)', blob))
+        if not m or int(m.group(1)) < 16:
+            return False
+    return True
+
+
 def main():
     if len(sys.argv) != 3:
         print("usage: test_jretrace.py <retraced> <java-source-root>",
               file=sys.stderr)
         return 2
-    if subprocess.run(["java", "-version"], capture_output=True).returncode != 0:
-        print("SKIP: java unavailable", file=sys.stderr)
-        return 0
-    if subprocess.run(["javac", "-version"], capture_output=True).returncode != 0:
-        print("SKIP: javac unavailable", file=sys.stderr)
+    if not jdk_ok():
+        print("SKIP: no JDK 16+ on PATH", file=sys.stderr)
         return 0
 
     daemon, srcroot = (os.path.abspath(p) for p in sys.argv[1:3])
