@@ -310,6 +310,12 @@ retrace_add_unit_test(modify_return_value_int
     EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/test/helpers)
 
 #
+# freeze action unit tests (TODO.supervisor/09 quiet hold): the
+# fabricated returns per type and the pure-timeout exemption.
+#
+retrace_add_unit_test(freeze)
+
+#
 # call_count_limit action unit tests (TODO.complete/14).
 #
 retrace_add_unit_test(call_count_limit

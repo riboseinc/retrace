@@ -51,10 +51,37 @@
  * action_params: none (presence is the instruction).
  */
 
+/*
+ * The quiet-hold exemption (the cookbook-39 lesson): a wildcard
+ * freeze fabricates sleep() returns too, so frozen polling
+ * loops spin hot -- the hold AMPLIFIES the load it was meant to
+ * stop. Pure timeouts are inert by definition: passing them
+ * through keeps the specimen quiet while everything else stays
+ * frozen. nanosleep/clock_nanosleep never reach an action (no
+ * prototype -> call real), so only the two wrapped time calls
+ * need naming.
+ */
+static int is_pure_timeout(const char *name)
+{
+	size_t i;
+	static const char *const timeouts[] = { "sleep", "usleep" };
+
+	for (i = 0; i < sizeof(timeouts) / sizeof(timeouts[0]);
+		i++) {
+		if (retrace_real_impls.strcmp(name, timeouts[i]) == 0)
+			return 1;
+	}
+	return 0;
+}
+
 static int ia_freeze(struct ThreadContext *t_ctx,
 		     const JSON_Object *action_params)
 {
 	(void)action_params;
+
+	if (t_ctx->prototype != NULL &&
+	    is_pure_timeout(t_ctx->prototype->name))
+		return 0;	/* let the real timeout run: quiet hold */
 
 	if (t_ctx->prototype != NULL &&
 	    retrace_real_impls.strcmp(
