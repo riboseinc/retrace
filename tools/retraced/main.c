@@ -24,7 +24,10 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <poll.h>
+#include <grp.h>
+#include <pwd.h>
 #include <stdarg.h>
 #include <signal.h>
 #include <stdio.h>
@@ -515,6 +518,10 @@ int main(int argc, char **argv)
 	const char *tls_cert = NULL;
 	const char *tls_key = NULL;
 	const char *tls_ca = NULL;
+	const char *drop_user = NULL;
+	const char *drop_group = NULL;
+	int inherit_fd = -1;
+	int unlink_sock = 1;
 	struct retraced_registry reg;
 	struct retraced_journal jr;
 	struct conn *conns;
@@ -560,6 +567,15 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[i], "--tls-ca") == 0 &&
 			 i + 1 < argc)
 			tls_ca = argv[++i];
+		else if (strcmp(argv[i], "--user") == 0 &&
+			 i + 1 < argc)
+			drop_user = argv[++i];
+		else if (strcmp(argv[i], "--group") == 0 &&
+			 i + 1 < argc)
+			drop_group = argv[++i];
+		else if (strcmp(argv[i], "--fd") == 0 &&
+			 i + 1 < argc)
+			inherit_fd = atoi(argv[++i]);
 		else {
 			fprintf(stderr,
 				"Usage: retraced [--sock <path>] [--journal <path>]\n"
@@ -567,6 +583,7 @@ int main(int argc, char **argv)
 				"                 [--nonce <hex32>] [--nonce-file <path>]\n"
 				"                 [--tls-listen host:port --tls-cert c\n"
 				"                  --tls-key k --tls-ca ca]\n"
+				"                 [--user u] [--group g] [--fd N]\n"
 				"  --policy: a policy file (header + full\n"
 				"    retrace config) pushed to every agent\n"
 				"    at registration; POLICY_ACKs are\n"
@@ -576,11 +593,36 @@ int main(int argc, char **argv)
 				"    (0600) for spawners to inject\n"
 				"  --tls-*: fleet TLS 1.3 mutual-auth ctl\n"
 				"    (all four flags required together; no\n"
-				"    plaintext remote mode exists)\n");
+				"    plaintext remote mode exists)\n"
+				"  --user/--group: drop privileges after every\n"
+				"    socket is bound (fail-closed: a failed\n"
+				"    drop exits, never continues elevated)\n"
+				"  --fd N: inherit an already-bound, listening\n"
+				"    agent socket on fd N (socket activation;\n"
+				"    --sock names it for clients only)\n");
 			return 2;
 		}
 	}
 
+	/*
+	 * Socket activation (05 P2): an explicit --fd, else the
+	 * systemd convention (LISTEN_FDS=1 -> fd 3 when LISTEN_PID
+	 * is ours). An inherited listener is never bound or
+	 * unlinked by this process.
+	 */
+	if (inherit_fd < 0) {
+		const char *lf = getenv("LISTEN_FDS");
+		const char *lp = getenv("LISTEN_PID");
+
+		if (lf != NULL && strcmp(lf, "1") == 0 && lp != NULL &&
+		    (long)strtol(lp, NULL, 10) == (long)getpid())
+			inherit_fd = 3;		/* SD_LISTEN_FDS_START */
+	}
+
+	/* stdout may be a file or pipe (service managers): the
+	 * readiness/diagnostic lines must not sit in a buffer
+	 */
+	setvbuf(stdout, NULL, _IOLBF, 0);
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
 	signal(SIGPIPE, SIG_IGN);
@@ -682,25 +724,44 @@ int main(int argc, char **argv)
 	g_ctl.reply_user = &g_ctl_fd;
 	g_ctl.scopes = RETRACED_SCOPE_ALL; /* local UDS default */
 
-	unlink(sock_path);
-	listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (listen_fd < 0) {
-		perror("socket");
-		return 1;
+	if (inherit_fd >= 0) {
+		/* socket activation: the listener is ours to serve,
+		 * not to bind or unlink. Fail-closed on a bad fd --
+		 * poll would silently spin on POLLNVAL.
+		 */
+		if (fcntl(inherit_fd, F_GETFD) == -1) {
+			fprintf(stderr,
+				"retraced: --fd %d is not an open descriptor\n",
+				inherit_fd);
+			return 2;
+		}
+		listen_fd = inherit_fd;
+		unlink_sock = 0;
+		printf("retraced: agent socket inherited on fd %d (%s)\n",
+			inherit_fd, sock_path);
+	} else {
+		unlink(sock_path);
+		listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (listen_fd < 0) {
+			perror("socket");
+			return 1;
+		}
+		memset(&sa, 0, sizeof(sa));
+		sa.sun_family = AF_UNIX;
+		snprintf(sa.sun_path, sizeof(sa.sun_path), "%s",
+			sock_path);
+		if (bind(listen_fd, (struct sockaddr *)&sa,
+			    sizeof(sa)) != 0) {
+			perror("bind");
+			return 1;
+		}
+		if (listen(listen_fd, 16) != 0) {
+			perror("listen");
+			return 1;
+		}
+		chmod(sock_path, 0660);
+		printf("retraced: listening on %s (agents)\n", sock_path);
 	}
-	memset(&sa, 0, sizeof(sa));
-	sa.sun_family = AF_UNIX;
-	snprintf(sa.sun_path, sizeof(sa.sun_path), "%s", sock_path);
-	if (bind(listen_fd, (struct sockaddr *)&sa, sizeof(sa)) != 0) {
-		perror("bind");
-		return 1;
-	}
-	if (listen(listen_fd, 16) != 0) {
-		perror("listen");
-		return 1;
-	}
-	chmod(sock_path, 0660);
-	printf("retraced: listening on %s (agents)\n", sock_path);
 
 	if (ctl_path != NULL) {
 		unlink(ctl_path);
@@ -762,6 +823,53 @@ int main(int argc, char **argv)
 			printf("retraced: TLS controller on %s (TLS 1.3 mTLS)\n",
 				tls_listen);
 		}
+	}
+
+	/*
+	 * Privilege drop (05 P2): every privileged operation is
+	 * done -- sockets bound, nonce file written, journal
+	 * open. A requested drop that cannot complete exits
+	 * (fail-closed: the daemon never continues elevated).
+	 * Without --user the daemon keeps its caller's rights,
+	 * which for a systemd unit means whatever User= says.
+	 */
+	if (drop_user != NULL || drop_group != NULL) {
+		uid_t uid = getuid();
+		gid_t gid = getgid();
+
+		if (drop_group != NULL) {
+			struct group *gr = getgrnam(drop_group);
+
+			if (gr == NULL) {
+				fprintf(stderr,
+					"retraced: unknown group %s\n",
+					drop_group);
+				return 2;
+			}
+			gid = gr->gr_gid;
+		}
+		if (drop_user != NULL) {
+			struct passwd *pw = getpwnam(drop_user);
+
+			if (pw == NULL) {
+				fprintf(stderr,
+					"retraced: unknown user %s\n",
+					drop_user);
+				return 2;
+			}
+			if (drop_group == NULL)
+				gid = pw->pw_gid;
+			uid = pw->pw_uid;
+		}
+		if (setgid(gid) != 0 || setuid(uid) != 0 ||
+		    getuid() != uid || getgid() != gid) {
+			fprintf(stderr,
+				"retraced: privilege drop failed: %s\n",
+				strerror(errno));
+			return 2;
+		}
+		printf("retraced: running as uid=%ld gid=%ld\n",
+			(long)uid, (long)gid);
 	}
 
 	last_sweep = now_ms();
@@ -977,7 +1085,8 @@ int main(int argc, char **argv)
 	if (g_tls_listen >= 0)
 		close(g_tls_listen);
 	retraced_tls_free(g_tls_ctx);
-	unlink(sock_path);
+	if (unlink_sock)
+		unlink(sock_path);
 	free(conns);
 	return 0;
 }
