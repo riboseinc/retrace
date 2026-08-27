@@ -379,8 +379,14 @@ static void *handshake(struct retraced_tls_ctx *ctx, int fd, int server,
 			sizeof(peer->cn));
 	}
 	X509_free(cert);
-	/* fail-closed: a cert without claim scopes is refused */
-	if (peer != NULL && peer->scopes == 0) {
+	/*
+	 * Fail-closed on the SERVER side only: a controller cert
+	 * without claim scopes is refused. The client side talks
+	 * to a daemon cert that carries DNS/IP SANs, not scopes --
+	 * requiring scopes there would make every fleet connection
+	 * fail.
+	 */
+	if (server && peer != NULL && peer->scopes == 0) {
 		SSL_free(ssl);
 		return NULL;
 	}

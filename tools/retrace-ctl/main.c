@@ -38,7 +38,10 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <netdb.h>
 #include <unistd.h>
+
+#include "../retraced/tls_gate.h"
 
 #define CTL_DEFAULT "/tmp/retraced.ctl.sock"
 
@@ -105,8 +108,17 @@ static char *read_file(const char *path)
 	return buf;
 }
 
-/* one round trip: send the request line, print the reply line */
-static int ctl_roundtrip(const char *sock_path, const char *request)
+static int print_reply(const char *reply)
+{
+	fputs(reply, stdout);
+	if (strstr(reply, "\"ok\":1") == NULL &&
+	    strstr(reply, "\"ok\": true") == NULL)
+		return 1;
+	return 0;
+}
+
+/* one round trip over local UDS */
+static int ctl_roundtrip_uds(const char *sock_path, const char *request)
 {
 	struct sockaddr_un sa;
 	char reply[8192];
@@ -138,40 +150,147 @@ static int ctl_roundtrip(const char *sock_path, const char *request)
 		return 2;
 	}
 	reply[n] = '\0';
-	fputs(reply, stdout);
-	if (strstr(reply, "\"ok\":1") == NULL &&
-	    strstr(reply, "\"ok\": true") == NULL)
-		return 1;
-	return 0;
+	return print_reply(reply);
+}
+
+/* one round trip over TLS 1.3 mTLS (TODO.supervisor/08 P1) */
+static int ctl_roundtrip_tls(const char *hostport, const char *cert,
+	const char *key, const char *ca, const char *request)
+{
+	struct retraced_tls_ctx *ctx;
+	struct retraced_tls_peer peer;
+	struct addrinfo hints, *res = NULL, *rp;
+	char host[128], port[16];
+	const char *colon;
+	void *ssl = NULL;
+	char reply[8192];
+	int fd = -1, n, rc = 2;
+
+	if (!retraced_tls_available()) {
+		fprintf(stderr, "retrace-ctl: TLS requested but OpenSSL "
+			"was not linked\n");
+		return 2;
+	}
+	colon = strrchr(hostport, ':');
+	if (colon == NULL) {
+		fprintf(stderr, "retrace-ctl: --tls-host wants host:port\n");
+		return 2;
+	}
+	{
+		size_t hn = (size_t)(colon - hostport);
+
+		if (hn >= sizeof(host))
+			return 2;
+		memcpy(host, hostport, hn);
+		host[hn] = '\0';
+		snprintf(port, sizeof(port), "%s", colon + 1);
+	}
+	ctx = retraced_tls_client_new(cert, key, ca);
+	if (ctx == NULL) {
+		fprintf(stderr, "retrace-ctl: TLS client context failed\n");
+		return 2;
+	}
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	if (getaddrinfo(host, port, &hints, &res) != 0) {
+		retraced_tls_free(ctx);
+		fprintf(stderr, "retrace-ctl: resolve %s failed\n", hostport);
+		return 2;
+	}
+	for (rp = res; rp != NULL; rp = rp->ai_next) {
+		fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		if (fd < 0)
+			continue;
+		if (connect(fd, rp->ai_addr, rp->ai_addrlen) == 0)
+			break;
+		close(fd);
+		fd = -1;
+	}
+	freeaddrinfo(res);
+	if (fd < 0) {
+		retraced_tls_free(ctx);
+		fprintf(stderr, "retrace-ctl: connect %s failed\n", hostport);
+		return 2;
+	}
+	ssl = retraced_tls_connect(ctx, fd, &peer);
+	if (ssl == NULL) {
+		fprintf(stderr, "retrace-ctl: TLS handshake failed "
+			"(mutual auth / claim scopes)\n");
+		close(fd);
+		retraced_tls_free(ctx);
+		return 2;
+	}
+	if (retraced_tls_write(ssl, request, (int)strlen(request)) <= 0) {
+		fprintf(stderr, "retrace-ctl: TLS write failed\n");
+		goto out;
+	}
+	n = retraced_tls_read(ssl, reply, (int)sizeof(reply) - 1);
+	if (n <= 0) {
+		fprintf(stderr, "retrace-ctl: no TLS reply\n");
+		goto out;
+	}
+	reply[n] = '\0';
+	rc = print_reply(reply);
+out:
+	retraced_tls_ssl_free(ssl);
+	close(fd);
+	retraced_tls_free(ctx);
+	return rc;
 }
 
 static int ctl_usage(void)
 {
 	fprintf(stderr,
 		"usage: retrace-ctl [--sock PATH] COMMAND\n"
+		"       retrace-ctl --tls-host H:P --tls-cert C --tls-key K\n"
+		"                   --tls-ca CA COMMAND\n"
 		"  status                 daemon info, agent count\n"
 		"  ps                     registry table (JSON)\n"
 		"  policy-push FILE       push a policy to all agents\n"
 		"  freeze                 hold every agent (wildcard freeze)\n"
 		"  thaw                   restore the pre-freeze policy\n"
-		"  kill PID               SIGTERM one target\n");
+		"  kill PID               SIGTERM one target\n"
+		"  --tls-*: fleet mTLS (all four required together)\n");
 	return 2;
 }
 
 int main(int argc, char **argv)
 {
 	const char *sock_path = CTL_DEFAULT;
+	const char *tls_host = NULL;
+	const char *tls_cert = NULL;
+	const char *tls_key = NULL;
+	const char *tls_ca = NULL;
 	char req[64000];
 	int i;
 
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--sock") == 0 && i + 1 < argc)
 			sock_path = argv[++i];
+		else if (strcmp(argv[i], "--tls-host") == 0 && i + 1 < argc)
+			tls_host = argv[++i];
+		else if (strcmp(argv[i], "--tls-cert") == 0 && i + 1 < argc)
+			tls_cert = argv[++i];
+		else if (strcmp(argv[i], "--tls-key") == 0 && i + 1 < argc)
+			tls_key = argv[++i];
+		else if (strcmp(argv[i], "--tls-ca") == 0 && i + 1 < argc)
+			tls_ca = argv[++i];
 		else
 			break;
 	}
 	if (i >= argc)
 		return ctl_usage();
+	{
+		int tls_n = (tls_host != NULL) + (tls_cert != NULL) +
+			(tls_key != NULL) + (tls_ca != NULL);
+
+		if (tls_n != 0 && tls_n != 4) {
+			fprintf(stderr,
+				"retrace-ctl: --tls-host/cert/key/ca are all-or-nothing\n");
+			return 2;
+		}
+	}
 
 	if (strcmp(argv[i], "status") == 0) {
 		snprintf(req, sizeof(req),
@@ -214,5 +333,8 @@ int main(int argc, char **argv)
 	} else {
 		return ctl_usage();
 	}
-	return ctl_roundtrip(sock_path, req);
+	if (tls_host != NULL)
+		return ctl_roundtrip_tls(tls_host, tls_cert, tls_key,
+			tls_ca, req);
+	return ctl_roundtrip_uds(sock_path, req);
 }
