@@ -24,6 +24,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <sddl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -375,14 +376,76 @@ static DWORD WINAPI ctl_thread(LPVOID arg)
 
 /* ---- accept loop ---- */
 
+/*
+ * Explicit DACL (supervisor/12 P1 hardening): the default pipe
+ * DACL follows the process token's default, which broader
+ * contexts can widen. We set our own: the token's OWNER gets
+ * full duplex, Administrators and SYSTEM too (ops reality), and
+ * NO world/Everyone grant -- the PEERCRED equivalent on Windows.
+ */
 static HANDLE make_pipe(const char *name)
 {
-	return CreateNamedPipeA(name,
+	char owner[128];
+	SECURITY_ATTRIBUTES sa;
+	PSECURITY_DESCRIPTOR sd = NULL;
+	HANDLE h;
+
+	owner[0] = '\0';
+	{
+		HANDLE tok = NULL;
+
+		if (OpenProcessToken(GetCurrentProcess(),
+			    TOKEN_QUERY, &tok)) {
+			DWORD need = 0;
+			TOKEN_USER *tu = NULL;
+
+			GetTokenInformation(tok, TokenUser, NULL, 0,
+				&need);
+			if (need > 0) {
+				tu = (TOKEN_USER *)HeapAlloc(
+					GetProcessHeap(), 0, need);
+				if (tu != NULL &&
+				    GetTokenInformation(tok, TokenUser,
+					    tu, need, &need)) {
+					LPSTR sid = NULL;
+
+					if (ConvertSidToStringSidA(
+						    tu->User.Sid, &sid)) {
+						snprintf(owner,
+							sizeof(owner),
+							"%s", sid);
+						LocalFree(sid);
+					}
+				}
+				HeapFree(GetProcessHeap(), 0, tu);
+			}
+			CloseHandle(tok);
+		}
+	}
+	sa.nLength = sizeof(sa);
+	sa.bInheritHandle = FALSE;
+	if (owner[0] != '\0') {
+		char sddl[256];
+
+		snprintf(sddl, sizeof(sddl),
+			"D:P(A;;GA;;;BA)(A;;GA;;;SY)(A;;GRGW;;;%s)",
+			owner);
+		if (!ConvertStringSecurityDescriptorToSecurityDescriptorA(
+			    sddl, SDDL_REVISION_1, &sd, NULL))
+			sd = NULL;
+	}
+	sa.lpSecurityDescriptor = sd;
+
+	h = CreateNamedPipeA(name,
 		PIPE_ACCESS_DUPLEX,
 		PIPE_TYPE_BYTE | PIPE_READMODE_BYTE |
 		PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
 		PIPE_UNLIMITED_INSTANCES,
-		64 * 1024, 64 * 1024, 0, NULL);
+		64 * 1024, 64 * 1024, 0,
+		sd != NULL ? &sa : NULL);
+	if (sd != NULL)
+		LocalFree(sd);
+	return h;
 }
 
 static BOOL WINAPI on_console_ctrl(DWORD type)
