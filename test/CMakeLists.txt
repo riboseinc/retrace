@@ -20,6 +20,21 @@ if(RETRACE_PLATFORM_WINDOWS)
 		target_link_libraries(retrace_static_smoke PRIVATE retrace_headers)
 	endif()
 
+	# The supervised loop on Windows (TODO.supervisor/12 P0):
+	# retraced + retrace-win-run + the in-process agent, HELLO
+	# with the nonce (full peer), policy push + ACK.
+	find_package(Python3 COMPONENTS Interpreter)
+	if(Python3_Interpreter_FOUND AND TARGET retrace_win_run)
+		add_test(NAME integration-supervised-win
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_supervised_win.py
+				$<TARGET_FILE:retrace_retraced>
+				$<TARGET_FILE:retrace_win_run>)
+		set_tests_properties(integration-supervised-win PROPERTIES
+			LABELS "integration"
+			TIMEOUT 180)
+	endif()
+
 	# The named-pipe daemon (TODO.supervisor/12 P0): the same
 	# protocol over \\.\pipe\; a python stub walks the full
 	# HELLO/WINDOW/EVENT/BYE exchange as a spectator.

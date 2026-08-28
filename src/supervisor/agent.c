@@ -1151,36 +1151,542 @@ void retrace_agent_deinit(void)
 			(unsigned long long)g_agent.dropped);
 }
 
-#else /* _WIN32: named pipes arrive with plan 12 */
+#else /* _WIN32: the named-pipe agent (TODO.supervisor/12 P0) */
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+/*
+ * Same doctrine as the POSIX body, Win32 primitives: producers
+ * only enqueue (never block the target thread); the agent
+ * thread owns the pipe, framing, heartbeats, and the final
+ * drain; a dead supervisor means backoff and retry -- fail-open
+ * liveness, never a crash. Losses are counted and reported
+ * (retrace.agent.dropped) -- never silent. Flags are volatile +
+ * Interlocked (no C11 atomics in the MSVC core context).
+ *
+ * P0 honesty: queue items are inline-only (768 bytes); longer
+ * events are dropped-and-counted rather than heap-copied. The
+ * heap fallback can follow the POSIX shape when a target needs
+ * it.
+ */
+#define WIN_AGENT_QUEUE_CAP 256
+#define WIN_AGENT_ITEM_MAX 768
+#define WIN_AGENT_BACKOFF_MIN_MS 500
+#define WIN_AGENT_BACKOFF_MAX_MS 30000
+
+struct win_queue_item {
+	char buf[WIN_AGENT_ITEM_MAX];
+	size_t len;
+};
+
+static struct {
+	int enabled;
+	int inited;
+	char sock_path[256];
+	volatile LONG thread_spawned;
+	volatile LONG stop;
+	volatile LONG connected;
+	HANDLE pipe;
+	char agent_id[64];
+	volatile LONG64 seq;
+	volatile LONG64 dropped;
+	volatile LONG64 drops_reported;
+	uint64_t policy_epoch;
+	struct win_queue_item q[WIN_AGENT_QUEUE_CAP];
+	size_t q_head, q_tail, q_count;
+	CRITICAL_SECTION mu;
+	CONDITION_VARIABLE cv;
+} w_agent;
+
+static void w_set_reason(char *out, size_t cap, const char *msg)
+{
+	if (out != NULL && cap > 0)
+		snprintf(out, cap, "%s", msg);
+}
+
+/* ---- framing (little-endian RTRD over the byte-mode pipe) ---- */
+
+static int w_pipe_write(const void *buf, DWORD len)
+{
+	const char *p = (const char *)buf;
+	size_t left = len;
+
+	while (left > 0) {
+		DWORD put = 0;
+
+		if (!WriteFile(w_agent.pipe, p, (DWORD)left, &put,
+			    NULL) || put == 0)
+			return -1;
+		p += put;
+		left -= put;
+	}
+	return 0;
+}
+
+static int w_send_frame(uint16_t type, const char *payload)
+{
+	char hdr[RETRACE_RPC_HEADER_SZ];
+	DWORD plen = (DWORD)strlen(payload);
+	uint16_t v = 1, t = type;
+	uint32_t l = plen;
+
+	memcpy(hdr, "RTRD", 4);
+	memcpy(hdr + 4, &v, 2);
+	memcpy(hdr + 6, &t, 2);
+	memcpy(hdr + 8, &l, 4);
+	if (w_pipe_write(hdr, sizeof(hdr)) != 0)
+		return -1;
+	if (plen > 0 && w_pipe_write(payload, plen) != 0)
+		return -1;
+	return 0;
+}
+
+static int w_pipe_read(void *buf, DWORD n)
+{
+	char *p = (char *)buf;
+	size_t left = n;
+
+	while (left > 0) {
+		DWORD got = 0;
+
+		if (!ReadFile(w_agent.pipe, p, (DWORD)left, &got,
+			    NULL) || got == 0)
+			return -1;
+		p += got;
+		left -= got;
+	}
+	return 0;
+}
+
+static int w_bytes_avail(void)
+{
+	DWORD avail = 0;
+
+	if (!PeekNamedPipe(w_agent.pipe, NULL, 0, NULL, &avail, NULL))
+		return -1;
+	return (int)avail;
+}
+
+static int w_recv_frame(char *payload, size_t cap)
+{
+	char hdr[RETRACE_RPC_HEADER_SZ];
+	uint16_t v, t;
+	uint32_t l;
+
+	if (w_pipe_read(hdr, sizeof(hdr)) != 0)
+		return -1;
+	if (memcmp(hdr, "RTRD", 4) != 0)
+		return -1;
+	memcpy(&v, hdr + 4, 2);
+	memcpy(&t, hdr + 6, 2);
+	memcpy(&l, hdr + 8, 4);
+	if (v != 1 || l >= cap)
+		return -1;
+	if (l > 0 && w_pipe_read(payload, l) != 0)
+		return -1;
+	payload[l] = '\0';
+	return (int)t;
+}
+
+/* ---- queue (producers enqueue only; thread drains) ---- */
+
+static int w_queue_push(const char *item, size_t len)
+{
+	int rc = -1;
+
+	if (len > WIN_AGENT_ITEM_MAX - 1)
+		return -1;
+	EnterCriticalSection(&w_agent.mu);
+	if (w_agent.q_count < WIN_AGENT_QUEUE_CAP) {
+		memcpy(w_agent.q[w_agent.q_tail].buf, item, len);
+		w_agent.q[w_agent.q_tail].buf[len] = '\0';
+		w_agent.q[w_agent.q_tail].len = len;
+		w_agent.q_tail = (w_agent.q_tail + 1) %
+			WIN_AGENT_QUEUE_CAP;
+		w_agent.q_count++;
+		rc = 0;
+		WakeConditionVariable(&w_agent.cv);
+	}
+	LeaveCriticalSection(&w_agent.mu);
+	return rc;
+}
+
+static int w_queue_pop(char out[WIN_AGENT_ITEM_MAX])
+{
+	int rc = -1;
+
+	EnterCriticalSection(&w_agent.mu);
+	if (w_agent.q_count > 0) {
+		memcpy(out, w_agent.q[w_agent.q_head].buf,
+			w_agent.q[w_agent.q_head].len + 1);
+		w_agent.q_head = (w_agent.q_head + 1) %
+			WIN_AGENT_QUEUE_CAP;
+		w_agent.q_count--;
+		rc = 0;
+	}
+	LeaveCriticalSection(&w_agent.mu);
+	return rc;
+}
+
+static void w_drop_connection(void)
+{
+	if (w_agent.pipe != INVALID_HANDLE_VALUE)
+		CloseHandle(w_agent.pipe);
+	w_agent.pipe = INVALID_HANDLE_VALUE;
+	InterlockedExchange(&w_agent.connected, 0);
+}
+
+/* ---- policy (mirrors the POSIX apply) ---- */
+
+int retrace_agent_policy_apply(const char *payload_json,
+	char *reason_out, size_t reason_cap)
+{
+	JSON_Value *v;
+	JSON_Object *root, *pol;
+	double epoch;
+
+	if (reason_out != NULL && reason_cap > 0)
+		reason_out[0] = '\0';
+	if (payload_json == NULL) {
+		w_set_reason(reason_out, reason_cap, "null payload");
+		return -1;
+	}
+	v = json_parse_string(payload_json);
+	if (v == NULL) {
+		w_set_reason(reason_out, reason_cap, "malformed json");
+		return -1;
+	}
+	root = json_value_get_object(v);
+	pol = root != NULL ? json_object_get_object(root, "policy")
+		: NULL;
+	if (pol == NULL) {
+		json_value_free(v);
+		w_set_reason(reason_out, reason_cap, "no policy header");
+		return -1;
+	}
+	epoch = json_object_get_number(pol, "epoch");
+	if (epoch < 1.0) {
+		json_value_free(v);
+		w_set_reason(reason_out, reason_cap,
+			"policy.epoch missing");
+		return -1;
+	}
+	if ((uint64_t)epoch == w_agent.policy_epoch) {
+		json_value_free(v);
+		return 0;	/* idempotent re-delivery */
+	}
+	if ((uint64_t)epoch < w_agent.policy_epoch) {
+		json_value_free(v);
+		w_set_reason(reason_out, reason_cap,
+			"epoch regression refused");
+		return -1;
+	}
+	if (json_object_get_array(root, "intercept_scripts") == NULL) {
+		json_value_free(v);
+		w_set_reason(reason_out, reason_cap,
+			"no intercept_scripts");
+		return -1;
+	}
+	if (retrace_config_cache_build(root) != 0) {
+		json_value_free(v);
+		w_set_reason(reason_out, reason_cap,
+			"cache rebuild failed");
+		return -1;
+	}
+	retrace_conf = root;
+	w_agent.policy_epoch = (uint64_t)epoch;
+	return 0;
+}
+
+static void w_send_policy_ack(int applied, const char *reason)
+{
+	char ack[320];
+
+	snprintf(ack, sizeof(ack),
+		"{\"agent_id\":\"%s\",\"policy_epoch\":%llu,"
+		"\"applied\":%s,\"reason\":\"%s\"}",
+		w_agent.agent_id,
+		(unsigned long long)w_agent.policy_epoch,
+		applied ? "true" : "false",
+		applied ? "" :
+			(reason[0] != '\0' ? reason : "refused"));
+	w_send_frame(RETRACE_RPC_MSG_POLICY_ACK, ack);
+}
+
+/* ---- daemon frames ---- */
+
+static void w_jscan_str(const char *payload, const char *key,
+	char *dst, size_t cap)
+{
+	char tag[48];
+	const char *p;
+
+	snprintf(tag, sizeof(tag), "\"%s\":\"", key);
+	p = strstr(payload, tag);
+	dst[0] = '\0';
+	if (p == NULL)
+		return;
+	p += strlen(tag);
+	{
+		size_t n = 0;
+
+		while (p[n] != '\0' && p[n] != '"' && n + 1 < cap)
+			n++;
+		memcpy(dst, p, n);
+		dst[n] = '\0';
+	}
+}
+
+static void w_handle_frame(int type, const char *payload)
+{
+	if (type == RETRACE_RPC_MSG_WELCOME) {
+		w_jscan_str(payload, "agent_id", w_agent.agent_id,
+			sizeof(w_agent.agent_id));
+	} else if (type == RETRACE_RPC_MSG_POLICY_SET) {
+		char reason[64];
+		int rc = retrace_agent_policy_apply(payload, reason,
+			sizeof(reason));
+
+		w_send_policy_ack(rc == 0, reason);
+	} else if (type == RETRACE_RPC_MSG_PING) {
+		w_send_frame(RETRACE_RPC_MSG_PING, "{}");
+	}
+}
+
+static int w_try_connect(void)
+{
+	HANDLE h;
+	char hello[512];
+	const char *sess = NULL;
+	const char *nonce = NULL;
+
+	h = CreateFileA(w_agent.sock_path, GENERIC_READ | GENERIC_WRITE,
+		0, NULL, OPEN_EXISTING, 0, NULL);
+	if (h == INVALID_HANDLE_VALUE) {
+		if (GetLastError() == ERROR_PIPE_BUSY)
+			WaitNamedPipeA(w_agent.sock_path, 200);
+		return -1;
+	}
+	w_agent.pipe = h;
+	if (retrace_real_impls.getenv != NULL) {
+		sess = retrace_real_impls.getenv("RETRACE_SESSION");
+		nonce = retrace_real_impls.getenv(
+			"RETRACE_SUPERVISOR_NONCE");
+	}
+	snprintf(hello, sizeof(hello),
+		"{\"session_token\":\"%s\",\"nonce\":\"%s\","
+		"\"pid\":%lu,\"ppid\":0,\"boot_id\":\"proc\","
+		"\"cmdline\":\"\",\"retrace_version\":\"agent\"}",
+		sess != NULL ? sess : "",
+		nonce != NULL ? nonce : "",
+		(unsigned long)GetCurrentProcessId());
+	if (w_send_frame(RETRACE_RPC_MSG_HELLO, hello) != 0) {
+		w_drop_connection();
+		return -1;
+	}
+	{
+		char payload[1024];
+		int type = w_recv_frame(payload, sizeof(payload) - 1);
+
+		if (type != RETRACE_RPC_MSG_WELCOME) {
+			w_drop_connection();
+			return -1;
+		}
+		w_handle_frame(type, payload);
+	}
+	InterlockedExchange(&w_agent.connected, 1);
+	return 0;
+}
+
+static void w_drain_queue(void)
+{
+	char item[WIN_AGENT_ITEM_MAX];
+
+	for (;;) {
+		if (w_queue_pop(item) != 0)
+			break;
+		if (w_send_frame(RETRACE_RPC_MSG_EVENT, item) != 0) {
+			w_drop_connection();
+			return;
+		}
+	}
+	/* loss signaling: report the counted delta, never silent */
+	{
+		LONG64 now = InterlockedAdd64(&w_agent.dropped, 0);
+
+		if (now != w_agent.drops_reported) {
+			char marker[256];
+			LONG64 delta = now - w_agent.drops_reported;
+
+			snprintf(marker, sizeof(marker),
+				"{\"agent_id\":\"%s\",\"seq\":0,"
+				"\"ts\":%ld,"
+				"\"name\":\"retrace.agent.dropped\","
+				"\"attrs\":{\"count\":\"%lld\","
+				"\"total\":\"%lld\"}}}",
+				w_agent.agent_id, (long)time(NULL),
+				delta, now);
+			if (w_queue_push(marker, strlen(marker)) == 0)
+				w_agent.drops_reported = now;
+		}
+	}
+}
+
+static DWORD WINAPI w_agent_thread(LPVOID arg)
+{
+	long backoff_ms = WIN_AGENT_BACKOFF_MIN_MS;
+
+	(void)arg;
+	Sleep(250);	/* settle past init-adjacent dispatch */
+	while (!w_agent.stop) {
+		if (!w_agent.connected) {
+			if (w_try_connect() == 0) {
+				backoff_ms = WIN_AGENT_BACKOFF_MIN_MS;
+			} else {
+				Sleep(backoff_ms);
+				backoff_ms *= 2;
+				if (backoff_ms > WIN_AGENT_BACKOFF_MAX_MS)
+					backoff_ms =
+						WIN_AGENT_BACKOFF_MAX_MS;
+				continue;
+			}
+		}
+		w_drain_queue();
+		{
+			int avail = w_bytes_avail();
+
+			if (avail > 0) {
+				char payload[1024];
+				int type = w_recv_frame(payload,
+					sizeof(payload) - 1);
+
+				if (type < 0)
+					w_drop_connection();
+				else
+					w_handle_frame(type, payload);
+			} else if (avail < 0) {
+				w_drop_connection();
+			}
+		}
+		{
+			char hb[256];
+
+			snprintf(hb, sizeof(hb),
+				"{\"agent_id\":\"%s\",\"seq\":%lld}",
+				w_agent.agent_id,
+				InterlockedAdd64(&w_agent.seq, 0));
+			if (w_send_frame(RETRACE_RPC_MSG_HEARTBEAT, hb)
+			    != 0)
+				w_drop_connection();
+		}
+		Sleep(100);
+	}
+	/* bounded final flush + BYE */
+	if (!w_agent.connected)
+		(void)w_try_connect();
+	if (w_agent.connected) {
+		w_drain_queue();
+		{
+			char bye[128];
+
+			snprintf(bye, sizeof(bye),
+				"{\"agent_id\":\"%s\"}",
+				w_agent.agent_id);
+			w_send_frame(RETRACE_RPC_MSG_BYE, bye);
+		}
+	}
+	w_drop_connection();
+	return 0;
+}
 
 int retrace_agent_init(void)
 {
+	const char *sock;
+
+	if (w_agent.inited)
+		return 0;
+	w_agent.inited = 1;
+	w_agent.pipe = INVALID_HANDLE_VALUE;
+	InitializeCriticalSection(&w_agent.mu);
+	InitializeConditionVariable(&w_agent.cv);
+	if (retrace_real_impls.getenv == NULL ||
+	    retrace_real_impls.getenv("RETRACE_SUPERVISOR") == NULL)
+		return 0;
+	sock = retrace_real_impls.getenv("RETRACE_SUPERVISOR_SOCK");
+	if (sock == NULL || sock[0] == '\0')
+		return 0;
+	snprintf(w_agent.sock_path, sizeof(w_agent.sock_path), "%s",
+		sock);
+	w_agent.enabled = 1;
 	return 0;
 }
 
 void retrace_agent_kick(void)
 {
+	HANDLE th;
+
+	if (!w_agent.enabled || w_agent.stop)
+		return;
+	if (InterlockedCompareExchange(&w_agent.thread_spawned, 1, 0)
+	    != 0)
+		return;
+	th = CreateThread(NULL, 0, w_agent_thread, NULL, 0, NULL);
+	if (th != NULL)
+		CloseHandle(th);
 }
 
 void retrace_agent_deinit(void)
 {
+	if (!w_agent.inited)
+		return;
+	InterlockedExchange(&w_agent.stop, 1);
+	if (w_agent.thread_spawned) {
+		/* bounded wait: a stuck pipe must not hang teardown */
+		DWORD end = GetTickCount() + 3000;
+
+		while (w_agent.connected &&
+		       GetTickCount() < end)
+			Sleep(20);
+	}
 }
 
 int retrace_agent_emit_event(const char *name,
 	const char *const *kv, size_t n_kv)
 {
-	(void)name;
-	(void)kv;
-	(void)n_kv;
-	return 0;
-}
+	char item[WIN_AGENT_ITEM_MAX];
+	size_t o = 0;
+	size_t i;
+	int n;
 
-int retrace_agent_policy_apply(const char *payload_json,
-	char *reason_out, size_t reason_cap)
-{
-	(void)payload_json;
-	if (reason_out != NULL && reason_cap > 0)
-		reason_out[0] = '\0';
+	if (!w_agent.enabled)
+		return 0;
+	n = snprintf(item + o, sizeof(item) - o,
+		"{\"agent_id\":\"%s\",\"seq\":%lld,\"ts\":%ld,"
+		"\"name\":\"%s\",\"attrs\":{",
+		w_agent.agent_id,
+		InterlockedIncrement64(&w_agent.seq),
+		(long)time(NULL), name);
+	if (n <= 0 || (size_t)n >= sizeof(item) - o)
+		goto drop;
+	o += (size_t)n;
+	for (i = 0; i < n_kv; i++) {
+		n = snprintf(item + o, sizeof(item) - o,
+			"%s\"%s\":\"%s\"", i > 0 ? "," : "", kv[i * 2],
+			kv[i * 2 + 1]);
+		if (n <= 0 || (size_t)n >= sizeof(item) - o)
+			goto drop;
+		o += (size_t)n;
+	}
+	n = snprintf(item + o, sizeof(item) - o, "},\"source\":\"libc\"}");
+	if (n <= 0 || (size_t)n >= sizeof(item) - o)
+		goto drop;
+	o += (size_t)n;
+	if (w_queue_push(item, o) != 0)
+		goto drop;
+	return 0;
+drop:
+	InterlockedIncrement64(&w_agent.dropped);
 	return -1;
 }
 
