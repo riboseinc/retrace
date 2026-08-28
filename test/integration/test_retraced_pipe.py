@@ -140,8 +140,22 @@ def main():
                   f"{[r['ev'] for r in drift]}", file=sys.stderr)
             return 1
 
+        # supervisor/12 P1 hardening: the pipe DACL must grant
+        # owner/Admins/SYSTEM only -- NO Everyone/World access
+        ps_cmd = ("(Get-Acl '%s').Access | "
+                  "ForEach-Object { $_.IdentityReference } | "
+                  "Select-Object -ExpandProperty Value") % pipe
+        acl = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_cmd],
+            capture_output=True, text=True, timeout=30)
+        granted = " ".join(acl.stdout.lower().split())
+        if "everyone" in granted or "world" in granted:
+            print(f"FAIL: pipe DACL grants world: {granted}",
+                  file=sys.stderr)
+            return 1
+
         print("retraced-pipe: 3 kernel observations journaled; "
-              "spectator seat; drift summary -- OK")
+              "spectator seat; drift summary; no world ACL -- OK")
         return 0
     finally:
         if d.poll() is None:
