@@ -20,6 +20,20 @@ if(RETRACE_PLATFORM_WINDOWS)
 		target_link_libraries(retrace_static_smoke PRIVATE retrace_headers)
 	endif()
 
+	# The named-pipe daemon (TODO.supervisor/12 P0): the same
+	# protocol over \\.\pipe\; a python stub walks the full
+	# HELLO/WINDOW/EVENT/BYE exchange as a spectator.
+	find_package(Python3 COMPONENTS Interpreter)
+	if(Python3_Interpreter_FOUND AND TARGET retrace_retraced)
+		add_test(NAME integration-retraced-pipe
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_retraced_pipe.py
+				$<TARGET_FILE:retrace_retraced>)
+		set_tests_properties(integration-retraced-pipe PROPERTIES
+			LABELS "integration"
+			TIMEOUT 120)
+	endif()
+
 	# AppContainer kernel enforcement (TODO.beyond-libc/01 P1):
 	# the Windows backend E2E. Self-skips on non-Windows hosts,
 	# so POSIX CI legs can carry it too if ever moved.

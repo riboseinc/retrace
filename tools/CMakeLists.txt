@@ -21,10 +21,11 @@ add_subdirectory(ktrace2retrace)
 add_subdirectory(etw2retrace)
 add_subdirectory(fuzz-report)
 
-# retraced is POSIX-only until plan 12 (named-pipe transport);
-# the same gate fuzz-report uses.
+# retraced runs everywhere since plan 12 (the named-pipe
+# transport on Windows); retrace-ctl stays POSIX until its own
+# Windows port.
+add_subdirectory(retraced)
 if(NOT WIN32)
-	add_subdirectory(retraced)
 	add_subdirectory(retrace-ctl)
 endif()
 add_subdirectory(profiler)
