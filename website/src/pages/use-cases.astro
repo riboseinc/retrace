@@ -91,8 +91,8 @@ const cases = [
       "retrace run --config strict.json -- ./tool   # deny-by-default",
       "decoy_dir in the sandbox action              # deception mode",
     ],
-    note: "Fail-closed by design: an unreachable supervisor never relaxes a jail (the planned retraced arc doubles down on this).",
-    more: "About the supervisor roadmap",
+    note: "Fail-closed by design: an unreachable supervisor never relaxes a jail — and the same declared-set now compiles into kernel enforcement (landlock/seccomp, Seatbelt, AppContainer) with a signed audit trail.",
+    more: "About the supervisor arc",
     href: "/retrace/about/#roadmap",
   },
   {

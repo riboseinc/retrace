@@ -52,6 +52,15 @@ import Footer from "../components/Footer.astro";
             documented attribute schema — retrace feeds the pipeline you
             already run instead of inventing another one.</p>
           </div>
+          <div>
+            <h3>The supervisor (shipped in v2.49)</h3>
+            <p>A per-host daemon (<code>retraced</code>) owns every traced
+            process: registry, versioned policy, a hash-chained journal, and
+            a fleet CLI over TLS 1.3 with certificate claim scopes — plus
+            kernel enforcement on Linux (Landlock + seccomp), macOS
+            (Seatbelt), and Windows (AppContainer), each exec bound to a
+            signed audit trail.</p>
+          </div>
         </div>
       </div>
     </section>
@@ -71,19 +80,23 @@ import Footer from "../components/Footer.astro";
 
     <section class="sec" id="roadmap">
       <div class="wrap">
-        <h2>Roadmap: the supervisor arc</h2>
-        <p>The next chapter is <code>retraced</code>: a per-host supervisor
-        daemon behind a formally-versioned control protocol. Fleets of
-        traced processes under central, signed policy; incident response
-        that attaches, freezes, and pulls the flight recorder from a live
-        hostile process; audit-grade, hash-chained event journals — with
-        telemetry still flowing through OTLP, untouched.</p>
+        <h2>Shipped: the supervisor arc</h2>
+        <p>The supervisor is here: <code>retraced</code> runs per host
+        behind a formally-versioned control protocol — fleets under central
+        policy, freeze and thaw of live specimens, hash-chained journals,
+        and a fleet CLI over mutual-TLS where each certificate carries its
+        own claim scopes. Observation now runs on three lanes (libc,
+        kernel via eBPF/ETW, runtime via Python and JVM agents) with drift
+        graded live, and declared-sets compile into kernel enforcement on
+        every desktop OS — each exec leaving a signed, verifiable audit
+        record.</p>
         <div class="pill-row">
           <span class="pill">detonation farms</span>
           <span class="pill">specimen freeze + black-box pull</span>
-          <span class="pill">signed, versioned policy</span>
+          <span class="pill">versioned policy epochs</span>
           <span class="pill">session trees → one trace</span>
           <span class="pill">fleet CLI over TLS</span>
+          <span class="pill">kernel enforcement, audited</span>
         </div>
       </div>
     </section>
