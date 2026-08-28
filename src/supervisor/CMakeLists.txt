@@ -19,11 +19,17 @@ target_include_directories(retrace_supervisor_proto PUBLIC
 # protocol lib verbatim (DRY) and core's public surfaces
 # (logger, real_impls, reentrance_guard) resolved at final
 # link. POSIX body + WIN32 stubs in one file.
-add_library(retrace_supervisor_agent STATIC agent.c)
+add_library(retrace_supervisor_agent STATIC agent.c policy_sig.c)
 target_include_directories(retrace_supervisor_agent PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 target_link_libraries(retrace_supervisor_agent PUBLIC
 	retrace_supervisor_proto)
+if(OpenSSL_FOUND)
+	target_compile_definitions(retrace_supervisor_agent PRIVATE
+		RETRACE_HAVE_OPENSSL=1)
+	target_link_libraries(retrace_supervisor_agent PUBLIC
+		OpenSSL::Crypto)
+endif()
 # The per-arch include core computes (engine.h ->
 # arch_spec_macros.h); mirrored here because the agent links
 # core headers without core's CMake context.

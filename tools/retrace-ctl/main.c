@@ -43,6 +43,11 @@
 
 #include "../retraced/tls_gate.h"
 
+#ifdef RETRACE_HAVE_OPENSSL
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#endif
+
 #define CTL_DEFAULT "/tmp/retraced.ctl.sock"
 
 /* JSON string escape (policy blobs are JSON-in-JSON); caller frees */
@@ -239,6 +244,66 @@ out:
 	return rc;
 }
 
+/* sign-policy: wrapper {sig:{alg,key_id,sig},blob} over the file
+ * bytes with Ed25519; the blob string is the exact file text.
+ */
+static int cmd_sign_policy(const char *file, const char *key_path)
+{
+#ifdef RETRACE_HAVE_OPENSSL
+	char *blob = read_file(file);
+	FILE *kf;
+	EVP_PKEY *key;
+	EVP_MD_CTX *ctx;
+	unsigned char sig[128];
+	size_t siglen = sizeof(sig);
+	char enc[256];
+	char *esc;
+	int n;
+
+	if (blob == NULL) {
+		fprintf(stderr, "retrace-ctl: cannot read %s\n", file);
+		return 2;
+	}
+	kf = fopen(key_path, "r");
+	if (kf == NULL) {
+		fprintf(stderr, "retrace-ctl: cannot read %s\n", key_path);
+		return 2;
+	}
+	key = PEM_read_PrivateKey(kf, NULL, NULL, NULL);
+	fclose(kf);
+	if (key == NULL) {
+		fprintf(stderr, "retrace-ctl: bad key %s\n", key_path);
+		return 2;
+	}
+	ctx = EVP_MD_CTX_new();
+	if (ctx == NULL ||
+	    EVP_DigestSignInit(ctx, NULL, NULL, NULL, key) != 1 ||
+	    EVP_DigestSign(ctx, sig, &siglen,
+		    (const unsigned char *)blob, strlen(blob)) != 1) {
+		fprintf(stderr, "retrace-ctl: sign failed\n");
+		return 2;
+	}
+	EVP_MD_CTX_free(ctx);
+	EVP_EncodeBlock((unsigned char *)enc, sig, (int)siglen);
+	esc = jesc(blob);
+	free(blob);
+	if (esc == NULL)
+		return 2;
+	n = printf("{\"sig\":{\"alg\":\"ed25519\",\"key_id\":\"%02x%02x\",\"sig\":\"%s\"},\"blob\":\"%s\"}\n",
+		sig[0], sig[1], enc, esc);
+	free(esc);
+	if (n <= 0)
+		return 2;
+	return 0;
+#else
+	(void)file;
+	(void)key_path;
+	fprintf(stderr,
+		"retrace-ctl: sign-policy needs an OpenSSL build\n");
+	return 2;
+#endif
+}
+
 static int ctl_usage(void)
 {
 	fprintf(stderr,
@@ -251,6 +316,7 @@ static int ctl_usage(void)
 		"  freeze                 hold every agent (wildcard freeze)\n"
 		"  thaw                   restore the pre-freeze policy\n"
 		"  kill PID               SIGTERM one target\n"
+		"  sign-policy FILE KEY   emit a signed wrapper to stdout\n"
 		"  --tls-*: fleet mTLS (all four required together)\n");
 	return 2;
 }
@@ -323,6 +389,9 @@ int main(int argc, char **argv)
 		snprintf(req, sizeof(req), "{\"cmd\":\"freeze\"}\n");
 	} else if (strcmp(argv[i], "thaw") == 0) {
 		snprintf(req, sizeof(req), "{\"cmd\":\"thaw\"}\n");
+	} else if (strcmp(argv[i], "sign-policy") == 0 &&
+		   i + 2 < argc) {
+		return cmd_sign_policy(argv[i + 1], argv[i + 2]);
 	} else if (strcmp(argv[i], "kill") == 0 && i + 1 < argc) {
 		long pid = strtol(argv[i + 1], NULL, 10);
 

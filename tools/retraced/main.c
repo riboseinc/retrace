@@ -123,6 +123,17 @@ static int load_policy(const char *path)
 
 	v = json_parse_string(g_ctl.policy_blob);
 	root = v != NULL ? json_value_get_object(v) : NULL;
+	/* signed policies: the wrapper carries the policy in "blob" */
+	if (root != NULL && json_object_get_string(root, "blob") != NULL) {
+		JSON_Value *bv = json_parse_string(
+			json_object_get_string(root, "blob"));
+
+		if (bv != NULL) {
+			json_value_free(v);
+			v = bv;
+			root = json_value_get_object(bv);
+		}
+	}
 	pol = root != NULL ? json_object_get_object(root, "policy") : NULL;
 	epoch = pol != NULL ? json_object_get_number(pol, "epoch") : 0.0;
 	if (epoch < 1.0) {

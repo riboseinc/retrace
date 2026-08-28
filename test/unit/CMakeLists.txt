@@ -317,6 +317,21 @@ retrace_add_unit_test(modify_return_value_int
 # audited enforcement artifacts (TODO.beyond-libc/01 P2): the
 # hash chain binding exec to spec digest + backends.
 #
+#
+# signed POLICY_SET (TODO.supervisor/05): the wrapper format +
+# fail-closed pin (Ed25519 over the exact blob bytes).
+#
+retrace_add_unit_test(policy_sig
+    EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/src/supervisor/policy_sig.c
+    EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/src/supervisor)
+if(OpenSSL_FOUND)
+    target_compile_definitions(retrace_test_policy_sig PRIVATE
+        RETRACE_HAVE_OPENSSL=1
+        RETRACE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+    target_link_libraries(retrace_test_policy_sig PRIVATE
+        OpenSSL::Crypto)
+endif()
+
 retrace_add_unit_test(enforce_audit
     EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/tools/enforce/artifact_audit.c
     EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/tools/enforce)
