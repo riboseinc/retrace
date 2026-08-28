@@ -24,6 +24,7 @@ install, quick start, and platform support.
 | Add retrace to a Dockerfile or compose stack | [Docker guide](docker.md) |
 | Trace an Android app via `wrap.sh` or Magisk | [Android guide](android.md) |
 | Understand a design decision | [Architecture decisions (ADR)](adr/README.md) |
+| Run the supervisor, fleet CLI, or kernel enforcement | [Supervisor reference](supervisor.md) — retraced, retrace-ctl, enforce, the lanes |
 | Read the public API | [`include/retrace/`](../include/retrace/) |
 | Write a runtime agent (Python, JVM, any language) | [Runtime agents](runtime-agents.md) — the supervisor protocol for third-party agents |
 
@@ -40,6 +41,7 @@ docs/
 ├── development.md         ← building, testing, contributing, debugging retrace
 ├── architecture.md        ← how engine, backends, and actions fit together
 ├── runtime-agents.md      ← writing a supervisor runtime agent (protocol, doctrine)
+├── supervisor.md           ← retraced + retrace-ctl + enforce: the control plane
 ├── engine-state-machine.md ← per-call lifecycle (engine_wrapper flow)
 ├── cookbook/              ← 32 recipe-driven walkthroughs
 │   ├── README.md          ← index + compact action reference

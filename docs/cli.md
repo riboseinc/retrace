@@ -331,6 +331,21 @@ When a quick subcommand stops being enough — conditional logic,
 multi-function scripts, custom actions — graduate to `run --config`
 and the [configuration reference](configuration.md).
 
+## The supervisor and enforcement binaries
+
+Beyond the launcher, the control plane ships three binaries — the
+[full reference](supervisor.md) covers flags, scopes, and the audit
+trail:
+
+```sh
+retraced --sock /run/retraced/agent.sock --ctl /run/retraced/ctl.sock          --journal /var/log/retrace/journal.jsonl --user retrace
+retrace-ctl status                     # local: PEERCRED-gated
+retrace-ctl --tls-host fleet.internal:9443 --tls-key k.pem             --tls-cert c.pem --tls-ca ca.pem freeze   # fleet: mTLS + scopes
+retrace-profile enforce app.json --inside inside.json --backend all -o spec.json
+retrace-enforce --audit trail.jsonl --audit-key ed.pem spec.json -- ./target
+retrace-enforce --verify-audit trail.jsonl --audit-pubkey ed.pub.pem
+```
+
 ## See also
 
 - [Configuration reference](configuration.md) — full JSON schema.
