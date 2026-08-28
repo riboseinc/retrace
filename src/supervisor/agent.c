@@ -20,6 +20,7 @@
 #include "conf.h"
 #include "parson.h"
 #include "protocol.h"
+#include "policy_sig.h"
 
 #ifndef _WIN32
 #include <dlfcn.h>
@@ -507,18 +508,37 @@ static void set_reason(char *dst, size_t cap, const char *msg)
  * small and swaps are rare, so retention is the bounded price
  * of lock-free readers on the dispatch path.
  */
-int retrace_agent_policy_apply(const char *payload_json,
+int retrace_agent_policy_apply(const char *payload_wrapped,
 	char *reason_out, size_t reason_cap)
 {
+	char payload_buf[8192];
+	const char *payload_json = payload_wrapped;
 	JSON_Value *v;
 	JSON_Object *root, *pol;
 	double epoch, expires;
 
 	if (reason_out != NULL && reason_cap > 0)
 		reason_out[0] = '\0';
-	if (payload_json == NULL) {
+	if (payload_wrapped == NULL) {
 		set_reason(reason_out, reason_cap, "null payload");
 		return -1;
+	}
+
+	/*
+	 * Signed policies (TODO.supervisor/05): a wrapper carries
+	 * the exact policy bytes + an Ed25519 signature; with a key
+	 * pinned (RETRACE_SUPERVISOR_PUBKEY) verification is
+	 * fail-closed. Bare policies pass through unchanged.
+	 */
+	(void)retrace_policy_sig_init();
+	{
+		int src = retrace_policy_sig_check(payload_wrapped,
+			payload_buf, sizeof(payload_buf), reason_out,
+			reason_cap);
+
+		if (src < 0)
+			return -1;
+		payload_json = payload_buf;
 	}
 
 	v = json_parse_string(payload_json);
@@ -1033,6 +1053,7 @@ int retrace_agent_init(void)
 	memset(&g_agent, 0, sizeof(g_agent));
 	pthread_mutex_init(&g_agent.mu, NULL);
 
+	(void)retrace_policy_sig_init();
 	env = retrace_real_impls.getenv("RETRACE_SUPERVISOR");
 	if (env == NULL || env[0] != '1')
 		return 0; /* not armed: silent, zero-delta */
@@ -1339,18 +1360,30 @@ static void w_drop_connection(void)
 
 /* ---- policy (mirrors the POSIX apply) ---- */
 
-int retrace_agent_policy_apply(const char *payload_json,
+int retrace_agent_policy_apply(const char *payload_wrapped,
 	char *reason_out, size_t reason_cap)
 {
+	char payload_buf[8192];
+	const char *payload_json = payload_wrapped;
 	JSON_Value *v;
 	JSON_Object *root, *pol;
 	double epoch;
 
 	if (reason_out != NULL && reason_cap > 0)
 		reason_out[0] = '\0';
-	if (payload_json == NULL) {
+	if (payload_wrapped == NULL) {
 		w_set_reason(reason_out, reason_cap, "null payload");
 		return -1;
+	}
+	(void)retrace_policy_sig_init();
+	{
+		int src = retrace_policy_sig_check(payload_wrapped,
+			payload_buf, sizeof(payload_buf), reason_out,
+			reason_cap);
+
+		if (src < 0)
+			return -1;
+		payload_json = payload_buf;
 	}
 	v = json_parse_string(payload_json);
 	if (v == NULL) {

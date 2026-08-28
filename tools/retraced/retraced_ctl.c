@@ -160,6 +160,18 @@ void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
 		}
 		pv = json_parse_string(blob);
 		proot = pv != NULL ? json_value_get_object(pv) : NULL;
+		/* signed policies: validate inside the wrapper's blob */
+		if (proot != NULL &&
+		    json_object_get_string(proot, "blob") != NULL) {
+			JSON_Value *bv = json_parse_string(
+				json_object_get_string(proot, "blob"));
+
+			if (bv != NULL) {
+				json_value_free(pv);
+				pv = bv;
+				proot = json_value_get_object(bv);
+			}
+		}
 		po = proot != NULL ?
 			json_object_get_object(proot, "policy") : NULL;
 		epoch = po != NULL ?

@@ -15,7 +15,8 @@ target_include_directories(retrace_ctl PRIVATE
 
 if(OpenSSL_FOUND)
 	target_compile_definitions(retrace_ctl PRIVATE
-		RETRACED_HAVE_OPENSSL=1)
+		RETRACED_HAVE_OPENSSL=1
+		RETRACE_HAVE_OPENSSL=1)
 	target_link_libraries(retrace_ctl PRIVATE OpenSSL::SSL)
 	target_include_directories(retrace_ctl PRIVATE
 		${OPENSSL_INCLUDE_DIR})
