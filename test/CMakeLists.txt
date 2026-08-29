@@ -35,6 +35,20 @@ if(RETRACE_PLATFORM_WINDOWS)
 			TIMEOUT 180)
 	endif()
 
+	# retraced as a Windows SERVICE (TODO.supervisor/12 P1):
+	# the real SCM lifecycle (sc create/start/stop/delete) on the
+	# elevated runners.
+	find_package(Python3 COMPONENTS Interpreter)
+	if(Python3_Interpreter_FOUND AND TARGET retrace_retraced)
+		add_test(NAME integration-retraced-service
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_retraced_service.py
+				$<TARGET_FILE:retrace_retraced>)
+		set_tests_properties(integration-retraced-service PROPERTIES
+			LABELS "integration"
+			TIMEOUT 180)
+	endif()
+
 	# The named-pipe daemon (TODO.supervisor/12 P0): the same
 	# protocol over \\.\pipe\; a python stub walks the full
 	# HELLO/WINDOW/EVENT/BYE exchange as a spectator.
