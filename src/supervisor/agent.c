@@ -1197,6 +1197,7 @@ void retrace_agent_deinit(void)
 #define WIN_AGENT_BACKOFF_MAX_MS 30000
 
 struct win_queue_item {
+	char *heap;		/* oversize events own their bytes */
 	char buf[WIN_AGENT_ITEM_MAX];
 	size_t len;
 };
@@ -1312,42 +1313,57 @@ static int w_recv_frame(char *payload, size_t cap)
 
 /* ---- queue (producers enqueue only; thread drains) ---- */
 
+static void w_drop_connection(void);
+
 static int w_queue_push(const char *item, size_t len)
 {
 	int rc = -1;
 
-	if (len > WIN_AGENT_ITEM_MAX - 1)
-		return -1;
 	EnterCriticalSection(&w_agent.mu);
 	if (w_agent.q_count < WIN_AGENT_QUEUE_CAP) {
-		memcpy(w_agent.q[w_agent.q_tail].buf, item, len);
-		w_agent.q[w_agent.q_tail].buf[len] = '\0';
-		w_agent.q[w_agent.q_tail].len = len;
+		struct win_queue_item *slot =
+			&w_agent.q[w_agent.q_tail];
+
+		slot->heap = NULL;
+		if (len > WIN_AGENT_ITEM_MAX - 1) {
+			/* heap fallback (the P0 honesty note,
+			 * retired): oversize events own their bytes
+			 */
+			slot->heap = (char *)malloc(len + 1);
+			if (slot->heap == NULL)
+				goto out;
+			memcpy(slot->heap, item, len);
+			slot->heap[len] = '\0';
+		} else {
+			memcpy(slot->buf, item, len);
+			slot->buf[len] = '\0';
+		}
+		slot->len = len;
 		w_agent.q_tail = (w_agent.q_tail + 1) %
 			WIN_AGENT_QUEUE_CAP;
 		w_agent.q_count++;
 		rc = 0;
 		WakeConditionVariable(&w_agent.cv);
 	}
+out:
 	LeaveCriticalSection(&w_agent.mu);
 	return rc;
 }
 
-static int w_queue_pop(char out[WIN_AGENT_ITEM_MAX])
+static void w_queue_send_one(void)
 {
-	int rc = -1;
+	struct win_queue_item *slot = &w_agent.q[w_agent.q_head];
+	const char *item = slot->heap != NULL ? slot->heap :
+		slot->buf;
 
-	EnterCriticalSection(&w_agent.mu);
-	if (w_agent.q_count > 0) {
-		memcpy(out, w_agent.q[w_agent.q_head].buf,
-			w_agent.q[w_agent.q_head].len + 1);
-		w_agent.q_head = (w_agent.q_head + 1) %
-			WIN_AGENT_QUEUE_CAP;
-		w_agent.q_count--;
-		rc = 0;
+	if (w_send_frame(RETRACE_RPC_MSG_EVENT, item) != 0) {
+		w_drop_connection();
+	} else if (slot->heap != NULL) {
+		free(slot->heap);
+		slot->heap = NULL;
 	}
-	LeaveCriticalSection(&w_agent.mu);
-	return rc;
+	w_agent.q_head = (w_agent.q_head + 1) % WIN_AGENT_QUEUE_CAP;
+	w_agent.q_count--;
 }
 
 static void w_drop_connection(void)
@@ -1534,15 +1550,15 @@ static int w_try_connect(void)
 
 static void w_drain_queue(void)
 {
-	char item[WIN_AGENT_ITEM_MAX];
-
 	for (;;) {
-		if (w_queue_pop(item) != 0)
+		if (w_agent.q_count == 0)
 			break;
-		if (w_send_frame(RETRACE_RPC_MSG_EVENT, item) != 0) {
-			w_drop_connection();
-			return;
-		}
+		if (w_agent.q[w_agent.q_head].heap == NULL &&
+		    w_agent.q[w_agent.q_head].len == 0)
+			break;
+		w_queue_send_one();
+		if (!w_agent.connected)
+			break;
 	}
 	/* loss signaling: report the counted delta, never silent */
 	{
@@ -1715,6 +1731,22 @@ int retrace_agent_emit_event(const char *name,
 	if (n <= 0 || (size_t)n >= sizeof(item) - o)
 		goto drop;
 	o += (size_t)n;
+	{
+		size_t need = o;
+		char *big = need > sizeof(item) ?
+			(char *)malloc(need + 1) : NULL;
+
+		if (big != NULL) {
+			memcpy(big, item, o);
+			big[o] = '\0';
+			if (w_queue_push(big, o) == 0) {
+				free(big);
+				return 0;
+			}
+			free(big);
+			goto drop;
+		}
+	}
 	if (w_queue_push(item, o) != 0)
 		goto drop;
 	return 0;

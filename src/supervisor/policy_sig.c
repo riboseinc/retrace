@@ -18,6 +18,13 @@
 #endif
 
 #define SIG_B64_MAX 128
+#ifdef _WIN32
+#define POLICY_KEY_SEP ";"
+#define retrace_strtok(a, b, c) strtok_s(a, b, c)
+#else
+#define POLICY_KEY_SEP ":"
+#define retrace_strtok(a, b, c) strtok_r(a, b, c)
+#endif
 
 #define REASON(reason) \
 	do { \
@@ -26,7 +33,9 @@
 	} while (0)
 
 #ifdef RETRACE_HAVE_OPENSSL
-static EVP_PKEY *g_key;
+#define POLICY_KEYS_MAX 8
+static EVP_PKEY *g_keys[POLICY_KEYS_MAX];
+static int g_key_n;
 #endif
 static int g_pinned;
 
@@ -82,6 +91,8 @@ static EVP_PKEY *load_pubkey(const char *spec)
 }
 
 /* Ed25519 verify: base64 (canonical quartets) over the message */
+static EVP_PKEY *g_vkey;	/* key currently attempting verify */
+
 static int verify_b64(const char *sig_b64, const char *msg)
 {
 	unsigned char raw[SIG_B64_MAX];
@@ -103,7 +114,7 @@ static int verify_b64(const char *sig_b64, const char *msg)
 	ctx = EVP_MD_CTX_new();
 	if (ctx != NULL) {
 		if (EVP_DigestVerifyInit(ctx, NULL, NULL, NULL,
-			    g_key) == 1 &&
+			    g_vkey) == 1 &&
 		    EVP_DigestVerify(ctx, raw, (size_t)declen,
 			    (const unsigned char *)msg,
 			    strlen(msg)) == 1)
@@ -120,12 +131,36 @@ int retrace_policy_sig_init(void)
 		return 0;
 #ifdef RETRACE_HAVE_OPENSSL
 	{
+		/*
+		 * Rotation (the architecture review's A): the env holds
+		 * an OS-path-separator-delimited LIST of PEMs -- pin
+		 * every loadable one so old and new keys overlap during
+		 * rotation. At least one must load or the pin fails.
+		 */
 		const char *spec = getenv("RETRACE_SUPERVISOR_PUBKEY");
+		char buf[2048];
+		char *tok, *save = NULL;
+		int loaded = 0;
 
 		if (spec == NULL || spec[0] == '\0')
 			return 0;
-		g_key = load_pubkey(spec);
-		if (g_key == NULL)
+		snprintf(buf, sizeof(buf), "%s", spec);
+		for (tok = retrace_strtok(buf, POLICY_KEY_SEP, &save);
+		     tok != NULL;
+		     tok = retrace_strtok(NULL, POLICY_KEY_SEP, &save)) {
+			EVP_PKEY *k = load_pubkey(tok);
+
+			if (k == NULL)
+				continue;	/* skip unreadable */
+			if (g_key_n < POLICY_KEYS_MAX)
+				g_keys[g_key_n++] = k;
+			else {
+				EVP_PKEY_free(k);
+				break;
+			}
+			loaded++;
+		}
+		if (!loaded)
 			return -1;
 		g_pinned = 1;
 	}
@@ -194,9 +229,19 @@ int retrace_policy_sig_check(const char *payload, char *blob_out,
 			json_value_free(v);
 			return 1;
 		}
-		if (!verify_b64(sig_b64, blob)) {
-			REASON("signature invalid");
-			goto out;
+		{
+			int ok = 0;
+			int ki;
+
+			for (ki = 0; ki < g_key_n && !ok; ki++) {
+				g_vkey = g_keys[ki];
+				ok = verify_b64(sig_b64, blob);
+			}
+			g_vkey = NULL;
+			if (!ok) {
+				REASON("signature invalid");
+				goto out;
+			}
 		}
 		snprintf(blob_out, blob_cap, "%s", blob);
 		json_value_free(v);
