@@ -130,7 +130,7 @@ def main():
     with open(d_out, "w") as df:
         d = subprocess.Popen(
             [daemon, "--sock", sock, "--journal", journal,
-             "--fd", str(fdnum)],
+             "--exit-after", "60", "--fd", str(fdnum)],
             stdin=subprocess.DEVNULL, stdout=df,
             stderr=subprocess.STDOUT,
             pass_fds=(fdnum,))
@@ -189,6 +189,7 @@ def main():
             d2 = subprocess.Popen(
                 [daemon, "--sock", os.path.join(work, "a2.sock"),
                  "--journal", os.path.join(work, "j2.jsonl"),
+                 "--exit-after", "60",
                  "--user", drop_user],
                 stdin=subprocess.DEVNULL, stdout=df,
                 stderr=subprocess.STDOUT)
