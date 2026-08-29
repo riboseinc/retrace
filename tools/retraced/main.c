@@ -44,6 +44,7 @@
 #include "peer_gate.h"
 #include "retraced_ctl.h"
 #include "tls_gate.h"
+#include "daemon_frame.h"
 
 #include "parson.h"
 
@@ -61,6 +62,14 @@ static volatile sig_atomic_t g_stop;
 static struct retraced_ctl_ctx g_ctl;
 
 static void *g_ctl_ssl; /* non-NULL when the active ctl is TLS */
+
+int write_frame(int fd, uint16_t type, const char *payload);
+
+/* the transport seam for the shared frame module: fd-backed */
+static int df_write_fd(void *io, uint16_t type, const char *payload)
+{
+	return write_frame((int)(intptr_t)io, type, payload);
+}
 
 static void ctl_reply_fd(const char *line, void *user)
 {
@@ -91,7 +100,7 @@ static int load_policy(const char *path)
 
 	f = fopen(path, "rb");
 	if (f == NULL) {
-		fprintf(stderr, "retraced: cannot open policy %s\n",
+		fprintf(stderr, "retraced: cannot open policy path\n",
 			path);
 		return -1;
 	}
@@ -100,7 +109,7 @@ static int load_policy(const char *path)
 	fseek(f, 0, SEEK_SET);
 	if (sz <= 0 || sz > POLICY_MAX_BYTES) {
 		fprintf(stderr,
-			"retraced: policy %s bad size %ld (max %d)\n",
+			"retraced: policy path bad size %ld (max %d)\n",
 			path, sz, POLICY_MAX_BYTES);
 		fclose(f);
 		return -1;
@@ -111,7 +120,7 @@ static int load_policy(const char *path)
 		return -1;
 	}
 	if (fread(g_ctl.policy_blob, 1, (size_t)sz, f) != (size_t)sz) {
-		fprintf(stderr, "retraced: policy %s read failed\n",
+		fprintf(stderr, "retraced: policy path read failed\n",
 			path);
 		free(g_ctl.policy_blob);
 		g_ctl.policy_blob = NULL;
@@ -121,32 +130,22 @@ static int load_policy(const char *path)
 	fclose(f);
 	g_ctl.policy_blob[sz] = '\0';
 
-	v = json_parse_string(g_ctl.policy_blob);
-	root = v != NULL ? json_value_get_object(v) : NULL;
-	/* signed policies: the wrapper carries the policy in "blob" */
-	if (root != NULL && json_object_get_string(root, "blob") != NULL) {
-		JSON_Value *bv = json_parse_string(
-			json_object_get_string(root, "blob"));
+	{
+		char *blob = NULL;
+		long epoch = 0;
 
-		if (bv != NULL) {
-			json_value_free(v);
-			v = bv;
-			root = json_value_get_object(bv);
+		if (retraced_policy_load(g_ctl.policy_blob, &blob,
+			    &epoch) != 0) {
+			fprintf(stderr,
+				"retraced: policy path: policy.epoch >= 1 + intercept_scripts required\n",
+				path);
+			free(blob);
+			return -1;
 		}
-	}
-	pol = root != NULL ? json_object_get_object(root, "policy") : NULL;
-	epoch = pol != NULL ? json_object_get_number(pol, "epoch") : 0.0;
-	if (epoch < 1.0) {
-		fprintf(stderr,
-			"retraced: policy %s: policy.epoch >= 1 required\n",
-			path);
-		json_value_free(v);
 		free(g_ctl.policy_blob);
-		g_ctl.policy_blob = NULL;
-		return -1;
+		g_ctl.policy_blob = blob;
+		g_ctl.policy_epoch = epoch;
 	}
-	g_ctl.policy_epoch = (long)epoch;
-	json_value_free(v);
 	printf("retraced: policy loaded: epoch %ld\n", g_ctl.policy_epoch);
 	return 0;
 }
@@ -203,6 +202,14 @@ static void handle_agent_frame(struct conn *c,
 
 	memcpy(payload, c->buf + RETRACE_RPC_HEADER_SZ, plen);
 	payload[plen] = '\0';
+
+	struct daemon_conn_state st;
+	int frame_rc;
+
+	st.helloed = c->helloed;
+	st.spectator = c->spectator;
+	snprintf(st.agent_id, sizeof(st.agent_id), "%s",
+		c->agent_id);
 
 	switch (fr->type) {
 	case RETRACE_RPC_MSG_HELLO: {
@@ -305,81 +312,45 @@ static void handle_agent_frame(struct conn *c,
 		}
 		printf("retraced: agent %s (pid %ld) registered%s\n",
 			e->id, pid, c->spectator ? " (spectator)" : "");
+		st.helloed = c->helloed;
+		st.spectator = c->spectator;
+		snprintf(st.agent_id, sizeof(st.agent_id), "%s",
+			c->agent_id);
 		break;
 	}
 	case RETRACE_RPC_MSG_HEARTBEAT:
-		if (!c->helloed)
-			return;
-		v = json_parse_string(payload);
-		if (v == NULL)
-			return;
-		o = json_value_get_object(v);
-		retraced_registry_heartbeat(reg, c->agent_id,
-			(uint64_t)json_object_get_number(o, "seq"),
-			now_ms());
-		json_value_free(v);
+		(void)v;
+		(void)o;
+		frame_rc = daemon_frame_handle(&st,
+			RETRACE_RPC_MSG_HEARTBEAT, payload, now_ms(),
+			reg, jr, &g_ctl, g_agent_nonce, df_write_fd,
+			(void *)(intptr_t)c->fd);
 		break;
-	case RETRACE_RPC_MSG_EVENT: {
-		const char *source;
-
-		if (!c->helloed)
-			return;
-		v = json_parse_string(payload);
-		if (v == NULL)
-			return;
-		o = json_value_get_object(v);
-		retraced_journal_event(jr, (long)time(NULL),
-			c->agent_id,
-			(uint64_t)json_object_get_number(o, "seq"),
-			payload);
-		/*
-		 * Live drift grading (TODO.beyond-libc/03 P1): a
-		 * kernel-source observation with no matching libc
-		 * claim is a sub-libc escape -- the correlate
-		 * oracle's finding, LIVE in the journal. Grade by
-		 * syscall name within a short window: the libc lane
-		 * (this daemon's preload agents) records its
-		 * function calls as events; a kernel openat with no
-		 * recent libc open/openat claim from the same pid
-		 * is drift.
-		 */
-		source = json_object_get_string(o, "source");
-		if (source != NULL &&
-		    strcmp(source, "kernel") == 0) {
-			struct agent_entry *e =
-				retraced_registry_find(reg, c->agent_id);
-
-			if (e != NULL)
-				e->kernel_obs++;
-		}
-		json_value_free(v);
+	case RETRACE_RPC_MSG_EVENT:
+		(void)v;
+		(void)o;
+		frame_rc = daemon_frame_handle(&st,
+			RETRACE_RPC_MSG_EVENT, payload, now_ms(),
+			reg, jr, &g_ctl, g_agent_nonce, df_write_fd,
+			(void *)(intptr_t)c->fd);
 		break;
-	}
-	case RETRACE_RPC_MSG_POLICY_ACK: {
-		struct agent_entry *e;
-
-		if (!c->helloed)
-			return;
-		v = json_parse_string(payload);
-		if (v == NULL)
-			return;
-		o = json_value_get_object(v);
-		e = retraced_registry_find(reg, c->agent_id);
-		if (e != NULL)
-			e->policy_epoch = (uint64_t)
-				json_object_get_number(o,
-					"policy_epoch");
-		json_value_free(v);
-		retraced_journal_event(jr, (long)time(NULL),
-			c->agent_id, 0, payload);
+	case RETRACE_RPC_MSG_POLICY_ACK:
+		(void)v;
+		(void)o;
+		frame_rc = daemon_frame_handle(&st,
+			RETRACE_RPC_MSG_POLICY_ACK, payload, now_ms(),
+			reg, jr, &g_ctl, g_agent_nonce, df_write_fd,
+			(void *)(intptr_t)c->fd);
 		break;
-	}
 	case RETRACE_RPC_MSG_BYE:
-		retraced_registry_bye(reg, c->agent_id);
-		c->helloed = 0;
-		break;
 	case RETRACE_RPC_MSG_PING:
-		write_frame(c->fd, RETRACE_RPC_MSG_PING, "{}");
+		(void)v;
+		(void)o;
+		frame_rc = daemon_frame_handle(&st, fr->type,
+			payload, now_ms(), reg, jr, &g_ctl,
+			g_agent_nonce, df_write_fd,
+			(void *)(intptr_t)c->fd);
+		c->helloed = st.helloed;
 		break;
 	default:
 		/* unknown types skip by length (compatibility) */
@@ -496,25 +467,7 @@ static int accept_gated(int listen_fd,
 static void emit_drift_summaries(struct retraced_registry *reg,
 	struct retraced_journal *jr)
 {
-	size_t k;
-
-	for (k = 0; k < reg->count; k++) {
-		struct agent_entry *e = &reg->agents[k];
-		char ev[192];
-
-		if (e->kernel_obs == 0 ||
-		    e->kernel_obs == e->kernel_obs_last)
-			continue;
-		snprintf(ev, sizeof(ev),
-			"{\"name\":\"retrace.drift.summary\",\"agent\":\"%s\",\"kernel_obs\":%llu,\"delta\":%llu}",
-			e->id,
-			(unsigned long long)e->kernel_obs,
-			(unsigned long long)(e->kernel_obs -
-				e->kernel_obs_last));
-		retraced_journal_event(jr, (long)time(NULL),
-			"daemon", 0, ev);
-		e->kernel_obs_last = e->kernel_obs;
-	}
+	daemon_frame_drift_summaries(reg, jr);
 }
 
 int main(int argc, char **argv)
