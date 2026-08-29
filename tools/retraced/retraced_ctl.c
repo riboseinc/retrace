@@ -48,6 +48,59 @@
  */
 int write_frame(int fd, uint16_t type, const char *payload);
 
+int retraced_policy_load(const char *text, char **blob_out,
+	long *epoch_out)
+{
+	JSON_Value *v = json_parse_string(text);
+	JSON_Object *root;
+	const char *blob = text;
+	double epoch = 0;
+
+	*blob_out = NULL;
+	if (epoch_out != NULL)
+		*epoch_out = 0;
+	if (v == NULL)
+		return -1;
+	root = json_value_get_object(v);
+	/* signed policies: the wrapper carries the policy in blob */
+	if (root != NULL && json_object_get_string(root, "blob") != NULL) {
+		JSON_Value *bv = json_parse_string(
+			json_object_get_string(root, "blob"));
+
+		if (bv == NULL) {
+			json_value_free(v);
+			return -1;
+		}
+		json_value_free(v);
+		v = bv;
+		root = json_value_get_object(bv);
+		blob = json_object_get_string(root, "blob");
+	}
+	if (root != NULL) {
+		JSON_Object *pol = json_object_get_object(root,
+			"policy");
+
+		if (pol != NULL)
+			epoch = json_object_get_number(pol, "epoch");
+	}
+	if (epoch < 1.0 ||
+	    (root != NULL &&
+	     json_object_get_array(root, "intercept_scripts")
+		     == NULL)) {
+		json_value_free(v);
+		return -1;
+	}
+	*blob_out = strdup(text);
+	if (*blob_out == NULL) {
+		json_value_free(v);
+		return -1;
+	}
+	if (epoch_out != NULL)
+		*epoch_out = (long)epoch;
+	json_value_free(v);
+	return 0;
+}
+
 void retraced_ctl_set_policy(struct retraced_ctl_ctx *ctx,
 	const char *blob, long epoch)
 {
@@ -147,44 +200,23 @@ void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
 		json_free_serialized_string(s);
 		json_value_free(snap);
 	} else if (strcmp(cmd, "policy_push") == 0) {
-		const char *blob = json_object_get_string(o, "blob");
-		JSON_Value *pv;
-		JSON_Object *po, *proot;
-		double epoch;
+		const char *in_blob = json_object_get_string(o, "blob");
+		char *blob = NULL;
+		long epoch = 0;
 		int pushed;
 
-		if (blob == NULL) {
+		if (in_blob == NULL) {
 			ctl_reply(ctx, "{\"ok\":0,\"error\":\"no blob\"}\n");
 			json_value_free(v);
 			return;
 		}
-		pv = json_parse_string(blob);
-		proot = pv != NULL ? json_value_get_object(pv) : NULL;
-		/* signed policies: validate inside the wrapper's blob */
-		if (proot != NULL &&
-		    json_object_get_string(proot, "blob") != NULL) {
-			JSON_Value *bv = json_parse_string(
-				json_object_get_string(proot, "blob"));
-
-			if (bv != NULL) {
-				json_value_free(pv);
-				pv = bv;
-				proot = json_value_get_object(bv);
-			}
-		}
-		po = proot != NULL ?
-			json_object_get_object(proot, "policy") : NULL;
-		epoch = po != NULL ?
-			json_object_get_number(po, "epoch") : 0.0;
-		if (epoch < 1.0 || json_object_get_array(proot,
-			    "intercept_scripts") == NULL) {
+		if (retraced_policy_load(in_blob, &blob, &epoch) != 0) {
 			ctl_reply(ctx, "{\"ok\":0,\"error\":\"bad policy"
 				" (need policy.epoch + scripts)\"}\n");
-			json_value_free(pv);
 			json_value_free(v);
 			return;
 		}
-		retraced_ctl_set_policy(ctx, blob, (long)epoch);
+		retraced_ctl_set_policy(ctx, blob, epoch);
 		ctx->frozen = 0;
 		free(ctx->thaw_blob);
 		ctx->thaw_blob = strdup(blob);
@@ -194,13 +226,13 @@ void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
 
 			snprintf(ev, sizeof(ev),
 				"{\"name\":\"retrace.policy.pushed\",\"epoch\":%ld,\"agents\":%d}",
-				(long)epoch, pushed);
+				epoch, pushed);
 			retraced_journal_event(ctx->jr, (long)time(NULL),
 				"daemon", 0, ev);
 		}
 		ctl_reply(ctx, "{\"ok\":1,\"epoch\":%ld,\"pushed\":%d}\n",
-			(long)epoch, pushed);
-		json_value_free(pv);
+			epoch, pushed);
+		free(blob);
 	} else if (strcmp(cmd, "freeze") == 0) {
 		char blob[256];
 		long epoch = ctx->policy_epoch + 1;

@@ -14,11 +14,11 @@ if(RETRACE_PLATFORM_WINDOWS)
 	# tls_gate.c carry the POSIX loop; pipe_server.c is the
 	# Windows one (same protocol, same registry/journal/ctl).
 	add_executable(retrace_retraced
-		pipe_server.c registry.c journal.c retraced_ctl.c
+		pipe_server.c daemon_frame.c registry.c journal.c retraced_ctl.c
 		${_parson_source})
 else()
 	add_executable(retrace_retraced
-		main.c registry.c journal.c peer_gate.c retraced_ctl.c
+		main.c daemon_frame.c registry.c journal.c peer_gate.c retraced_ctl.c
 		tls_gate.c ${_parson_source})
 endif()
 set_target_properties(retrace_retraced PROPERTIES

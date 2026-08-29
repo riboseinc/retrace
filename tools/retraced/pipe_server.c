@@ -35,6 +35,7 @@
 #include "registry.h"
 #include "retraced_ctl.h"
 #include "tls_gate.h"
+#include "daemon_frame.h"
 
 #include "parson.h"
 
@@ -49,8 +50,6 @@ struct pipe_conn {
 	char agent_id[RETRACED_AGENT_ID_MAX];
 	int helloed;
 	int spectator;
-	uint64_t kernel_obs;
-	uint64_t kernel_obs_last;
 };
 
 static struct retraced_registry g_reg;
@@ -62,6 +61,12 @@ static struct retraced_ctl_ctx g_ctl;
 static struct conn g_ctl_conns[MAX_AGENTS];
 static HANDLE g_ctl_thread;
 static HANDLE g_ctl_pipe;
+
+/* the transport seam for the shared frame module: pipe-backed */
+static int df_write_pipe(void *io, uint16_t type, const char *payload)
+{
+	return write_frame((HANDLE)io, type, payload);
+}
 
 static long now_ms(void)
 {
@@ -149,15 +154,6 @@ static int recv_frame(HANDLE h, struct retrace_rpc_frame *fr,
 
 /* ---- the protocol state machine (mirrors main.c) ---- */
 
-static void jstr(JSON_Object *o, const char *key, char *dst,
-	size_t cap)
-{
-	const char *v = json_object_get_string(o, key);
-
-	dst[0] = '\0';
-	if (v != NULL)
-		snprintf(dst, cap, "%s", v);
-}
 
 static int handle_agent_frame(struct pipe_conn *c,
 	const struct retrace_rpc_frame *fr, const char *payload)
@@ -167,101 +163,44 @@ static int handle_agent_frame(struct pipe_conn *c,
 
 	switch (fr->type) {
 	case RETRACE_RPC_MSG_HELLO: {
-		char nonce[128], session[128], cmdline[256];
+		struct daemon_conn_state st;
 		struct agent_entry *e;
-		double pid, ppid;
 
-		v = json_parse_string(payload);
-		if (v == NULL)
-			return -1;
-		o = json_value_get_object(v);
-		jstr(o, "nonce", nonce, sizeof(nonce));
-		jstr(o, "session_token", session, sizeof(session));
-		jstr(o, "cmdline", cmdline, sizeof(cmdline));
-		pid = json_object_get_number(o, "pid");
-		ppid = json_object_get_number(o, "ppid");
-		/* no nonce in HELLO: the spectator seat */
-		c->spectator = strcmp(nonce, g_nonce) != 0;
-		e = retraced_registry_hello(&g_reg, NULL,
-			(long)pid, (long)ppid, session, cmdline);
-		json_value_free(v);
+		st.helloed = c->helloed;
+		st.spectator = c->spectator;
+		snprintf(st.agent_id, sizeof(st.agent_id), "%s",
+			c->agent_id);
+		e = daemon_frame_hello(&st, payload, &g_reg, &g_jr,
+			&g_ctl, g_nonce, df_write_pipe, (void *)c->pipe);
 		if (e == NULL) {
 			fprintf(stderr,
 				"retraced: registry full; refusing agent\n");
 			return -1;
 		}
-		snprintf(c->agent_id, sizeof(c->agent_id), "%s", e->id);
-		c->helloed = 1;
-		e->spectator = c->spectator;
-		{
-			char ev[320];
-
-			snprintf(ev, sizeof(ev),
-				"{\"name\":\"retrace.auth.agent\",\"agent\":\"%s\",\"role\":\"%s\",\"nonce\":\"%s\"}",
-				e->id, c->spectator ? "spectator" : "full",
-				c->spectator ? "" : "redacted");
-			retraced_journal_event(&g_jr, (long)time(NULL),
-				"daemon", 0, ev);
-		}
-		{
-			char w[256];
-
-			snprintf(w, sizeof(w),
-				"{\"agent_id\":\"%s\",\"epoch\":%ld,\"role\":\"%s\"}",
-				e->id, (long)g_ctl.policy_epoch,
-				c->spectator ? "spectator" : "full");
-			write_frame(c->pipe, RETRACE_RPC_MSG_WELCOME, w);
-		}
+		c->helloed = st.helloed;
+		c->spectator = st.spectator;
+		snprintf(c->agent_id, sizeof(c->agent_id), "%s",
+			st.agent_id);
 		return 0;
 	}
-	case RETRACE_RPC_MSG_HEARTBEAT: {
-		struct agent_entry *e;
-
-		if (!c->helloed)
-			return 0;
-		EnterCriticalSection(&g_lock);
-		e = retraced_registry_find(&g_reg, c->agent_id);
-		if (e != NULL)
-			e->last_hb_ms = now_ms();
-		LeaveCriticalSection(&g_lock);
-		return 0;
-	}
-	case RETRACE_RPC_MSG_EVENT: {
-		const char *source;
-
-		if (!c->helloed)
-			return 0;
-		v = json_parse_string(payload);
-		if (v == NULL)
-			return 0;
-		o = json_value_get_object(v);
-		EnterCriticalSection(&g_lock);
-		retraced_journal_event(&g_jr, (long)time(NULL),
-			c->agent_id,
-			(uint64_t)json_object_get_number(o, "seq"),
-			payload);
-		/* live drift grading: kernel-lane observations */
-		source = json_object_get_string(o, "source");
-		if (source != NULL && strcmp(source, "kernel") == 0)
-			c->kernel_obs++;
-		LeaveCriticalSection(&g_lock);
-		json_value_free(v);
-		return 0;
-	}
-	case RETRACE_RPC_MSG_POLICY_ACK: {
-		if (!c->helloed)
-			return 0;
-		EnterCriticalSection(&g_lock);
-		retraced_journal_event(&g_jr, (long)time(NULL),
-			c->agent_id, 0, payload);
-		LeaveCriticalSection(&g_lock);
-		return 0;
-	}
+	case RETRACE_RPC_MSG_HEARTBEAT:
+	case RETRACE_RPC_MSG_EVENT:
+	case RETRACE_RPC_MSG_POLICY_ACK:
 	case RETRACE_RPC_MSG_PING:
-		write_frame(c->pipe, RETRACE_RPC_MSG_PING, "{}");
-		return 0;
-	case RETRACE_RPC_MSG_BYE:
-		return 1;
+	case RETRACE_RPC_MSG_BYE: {
+		struct daemon_conn_state st;
+		int rc;
+
+		st.helloed = c->helloed;
+		st.spectator = c->spectator;
+		snprintf(st.agent_id, sizeof(st.agent_id), "%s",
+			c->agent_id);
+		rc = daemon_frame_handle(&st, fr->type, payload,
+			now_ms(), &g_reg, &g_jr, &g_ctl, g_nonce,
+			df_write_pipe, (void *)c->pipe);
+		c->helloed = st.helloed;
+		return rc;
+	}
 	default:
 		return 0;
 	}
@@ -297,26 +236,8 @@ static DWORD WINAPI agent_thread(LPVOID arg)
 
 static void emit_drift_summaries(void)
 {
-	size_t k;
-
-	for (k = 0; k < g_reg.count; k++) {
-		struct agent_entry *e = &g_reg.agents[k];
-		char ev[192];
-
-		if (e->kernel_obs == 0 ||
-		    e->kernel_obs == e->kernel_obs_last)
-			continue;
-		snprintf(ev, sizeof(ev),
-			"{\"name\":\"retrace.drift.summary\",\"agent\":\"%s\",\"kernel_obs\":%llu,\"delta\":%llu}",
-			e->id,
-			(unsigned long long)e->kernel_obs,
-			(unsigned long long)(e->kernel_obs -
-				e->kernel_obs_last));
-		retraced_journal_event(&g_jr, (long)time(NULL),
-			"daemon", 0, ev);
-		e->kernel_obs_last = e->kernel_obs;
-	}
-}
+	daemon_frame_drift_summaries(&g_reg, &g_jr);
+}}
 
 /* ---- the ctl pipe: same line protocol as the UDS ctl ---- */
 
@@ -526,45 +447,28 @@ int retraced_pipe_main(int argc, char **argv)
 	g_ctl.jr = &g_jr;
 	g_ctl.scopes = RETRACED_SCOPE_ALL;
 	if (policy_path != NULL) {
+		/* the shared loading seam (wrapper descent + epochs) */
 		FILE *f = fopen(policy_path, "rb");
-		long sz;
-		char *blob;
+		char text[65536];
+		size_t n = 0;
 
 		if (f != NULL) {
-			fseek(f, 0, SEEK_END);
-			sz = ftell(f);
-			fseek(f, 0, SEEK_SET);
-			blob = (char *)malloc((size_t)sz + 1);
-			if (blob != NULL &&
-			    fread(blob, 1, (size_t)sz, f) ==
-				    (size_t)sz) {
-				JSON_Value *v;
-				JSON_Object *root;
-				double epoch = 0;
-
-				blob[sz] = '\0';
-				v = json_parse_string(blob);
-				root = v != NULL ?
-					json_value_get_object(v) : NULL;
-				if (root != NULL) {
-					JSON_Object *pol =
-						json_object_get_object(root,
-							"policy");
-
-					if (pol != NULL)
-						epoch = json_object_get_number(
-							pol, "epoch");
-				}
-				if (epoch >= 1.0)
-					retraced_ctl_set_policy(&g_ctl, blob,
-						(long)epoch);
-				json_value_free(v);
-				free(blob);
-			}
+			n = fread(text, 1, sizeof(text) - 1, f);
 			fclose(f);
 		}
-	}
+		text[n] = '\0';
+		if (n > 0) {
+			char *blob = NULL;
+			long epoch = 0;
 
+			if (retraced_policy_load(text, &blob, &epoch)
+			    == 0) {
+				retraced_ctl_set_policy(&g_ctl, blob,
+					epoch);
+				free(blob);
+			}
+		}
+	}
 	memset(conns, 0, sizeof(conns));
 
 	/* the ctl pipe: one instance, one client at a time */

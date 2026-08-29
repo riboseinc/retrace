@@ -86,6 +86,16 @@ struct retraced_ctl_ctx {
 
 void retraced_ctl_set_policy(struct retraced_ctl_ctx *ctx,
 	const char *blob, long epoch);
+
+/*
+ * One policy-loading seam (the architecture review's B): descend
+ * a signed-policy wrapper's blob if present, validate
+ * policy.epoch >= 1 and intercept_scripts, and return the blob to
+ * hold for pushes. Returns 0/-1. Callers keep transport-specific
+ * file IO and pushes.
+ */
+int retraced_policy_load(const char *text, char **blob_out,
+	long *epoch_out);
 int retraced_ctl_push_policy(struct retraced_ctl_ctx *ctx,
 	const char *blob);
 void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
