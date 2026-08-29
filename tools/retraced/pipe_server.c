@@ -384,6 +384,8 @@ int retraced_pipe_main(int argc, char **argv)
 	const char *policy_path = NULL;
 	const char *nonce_arg = NULL;
 	const char *nonce_file = NULL;
+	int exit_after_s = 0;
+	long deadline;
 	struct pipe_conn conns[PIPE_AGENTS_MAX];
 	int i;
 
@@ -401,6 +403,9 @@ int retraced_pipe_main(int argc, char **argv)
 		else if (strcmp(argv[i], "--nonce-file") == 0 &&
 			 i + 1 < argc)
 			nonce_file = argv[++i];
+		else if (strcmp(argv[i], "--exit-after") == 0 &&
+			 i + 1 < argc)
+			exit_after_s = atoi(argv[++i]);
 		else {
 			fprintf(stderr,
 				"Usage: retraced [--sock PIPE] [--journal PATH]\n"
@@ -414,6 +419,11 @@ int retraced_pipe_main(int argc, char **argv)
 
 	InitializeCriticalSection(&g_lock);
 	SetConsoleCtrlHandler(on_console_ctrl, TRUE);
+	/* the harness guard: an orphaned test/CI daemon self-ends
+	 * (deadline checked in the accept loop -- pump-free)
+	 */
+	deadline = exit_after_s > 0 ?
+		now_ms() + (long)exit_after_s * 1000 : 0;
 
 	retraced_registry_init(&g_reg);
 	retraced_journal_open(&g_jr, journal_path);
@@ -480,6 +490,7 @@ int retraced_pipe_main(int argc, char **argv)
 	printf("retraced: listening on %s (agents)\n", pipe_name);
 	{
 		long last_sweep = now_ms();
+		long deadline_local = deadline;
 		HANDLE evt = CreateEvent(NULL, TRUE, FALSE, NULL);
 		HANDLE h = make_pipe(pipe_name);
 		OVERLAPPED ov;
@@ -487,7 +498,9 @@ int retraced_pipe_main(int argc, char **argv)
 		memset(&ov, 0, sizeof(ov));
 		ov.hEvent = evt;
 		ConnectNamedPipe(h, &ov);
-		while (!g_stop) {
+		while (!g_stop &&
+		       (deadline_local == 0 ||
+			now_ms() < deadline_local)) {
 			/*
 			 * ONE pending accept at a time (classic pattern):
 			 * the event fires when a client lands; the 250ms

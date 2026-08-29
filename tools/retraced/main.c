@@ -470,6 +470,32 @@ static void emit_drift_summaries(struct retraced_registry *reg,
 	daemon_frame_drift_summaries(reg, jr);
 }
 
+/*
+ * Loop guards (the spin-incident doctrine): any condition that
+ * could make poll() return instantly forever is FATAL, journaled
+ * first -- a daemon that cannot make progress must die loudly,
+ * never spin silently.
+ */
+static struct retraced_journal *g_jr_fatal;
+static volatile sig_atomic_t g_fatal_done;
+
+static void daemon_fatal(const char *why)
+{
+	char ev[192];
+
+	if (g_fatal_done)
+		_exit(2);
+	g_fatal_done = 1;
+	snprintf(ev, sizeof(ev),
+		"{\"name\":\"retrace.daemon.fatal\",\"why\":\"%s\"}",
+		why);
+	if (g_jr_fatal != NULL)
+		retraced_journal_event(g_jr_fatal, (long)time(NULL),
+			"daemon", 0, ev);
+	fprintf(stderr, "retraced: fatal: %s\n", why);
+	_exit(2);
+}
+
 int main(int argc, char **argv)
 {
 	const char *sock_path = "/tmp/retraced.agent.sock";
@@ -486,6 +512,7 @@ int main(int argc, char **argv)
 	const char *drop_group = NULL;
 	int inherit_fd = -1;
 	int unlink_sock = 1;
+	int exit_after_s = 0;
 	struct retraced_registry reg;
 	struct retraced_journal jr;
 	struct conn *conns;
@@ -540,6 +567,9 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[i], "--fd") == 0 &&
 			 i + 1 < argc)
 			inherit_fd = atoi(argv[++i]);
+		else if (strcmp(argv[i], "--exit-after") == 0 &&
+			 i + 1 < argc)
+			exit_after_s = atoi(argv[++i]);
 		else {
 			fprintf(stderr,
 				"Usage: retraced [--sock <path>] [--journal <path>]\n"
@@ -548,6 +578,7 @@ int main(int argc, char **argv)
 				"                 [--tls-listen host:port --tls-cert c\n"
 				"                  --tls-key k --tls-ca ca]\n"
 				"                 [--user u] [--group g] [--fd N]\n"
+			"                 [--exit-after SECONDS]\n"
 				"  --policy: a policy file (header + full\n"
 				"    retrace config) pushed to every agent\n"
 				"    at registration; POLICY_ACKs are\n"
@@ -563,7 +594,10 @@ int main(int argc, char **argv)
 				"    drop exits, never continues elevated)\n"
 				"  --fd N: inherit an already-bound, listening\n"
 				"    agent socket on fd N (socket activation;\n"
-				"    --sock names it for clients only)\n");
+				"    --sock names it for clients only)\n"
+				"  --exit-after SECONDS: self-terminate (tests\n"
+				"    and CI -- an orphaned daemon must never\n"
+				"    outlive its purpose)\n");
 			return 2;
 		}
 	}
@@ -836,10 +870,15 @@ int main(int argc, char **argv)
 			(long)uid, (long)gid);
 	}
 
+	g_jr_fatal = &jr;
+	/* the harness guard: an orphaned test/CI daemon self-ends */
+	if (exit_after_s > 0)
+		alarm(exit_after_s);
 	last_sweep = now_ms();
 	while (!g_stop) {
 		int nfd = 0;
 		int r;
+		static int spin_hits;
 
 		pfds[nfd].fd = listen_fd;
 		pfds[nfd].events = POLLIN;
@@ -878,8 +917,67 @@ int main(int argc, char **argv)
 			}
 		}
 		r = poll(pfds, (nfds_t)nfd, 500);
-		if (r <= 0)
+		if (r <= 0) {
+			spin_hits = 0;	/* timed out: healthy */
 			continue;
+		}
+
+		/*
+		 * Poll-set hygiene (the spin-incident guards): a
+		 * POLLNVAL is a descriptor error poll reports
+		 * INSTANTLY and forever -- left in the set it is a
+		 * 100%-CPU spin. Listeners: fatal (configuration
+		 * error; the startup --fd check should have caught
+		 * it, this is the backstop). Connections: drop.
+		 * POLLERR|POLLHUP without POLLIN route through the
+		 * read path, whose EOF handling drops them.
+		 */
+		{
+			int acted = 0;
+
+			for (i = 0; i < nfd; i++) {
+				if (pfds[i].revents & POLLNVAL) {
+					if (pfds[i].fd == listen_fd ||
+					    pfds[i].fd == g_ctl_listen ||
+					    pfds[i].fd == g_tls_listen)
+						daemon_fatal(
+							"listener POLLNVAL (bad descriptor)");
+					/* connection: find + drop */
+					{
+						int k;
+
+						for (k = 0; k < MAX_AGENTS;
+						     k++) {
+							if (conns[k].fd ==
+							    pfds[i].fd) {
+								close(conns[k].fd);
+								conns[k].fd = -1;
+								conns[k].helloed = 0;
+								break;
+							}
+						}
+						if (pfds[i].fd ==
+						    g_ctl_fd)
+							ctl_drop();
+					}
+					acted = 1;
+				}
+				if (pfds[i].revents & (POLLIN | POLLHUP |
+						       POLLERR))
+					acted = 1;
+			}
+			if (acted)
+				spin_hits = 0;
+			else if (++spin_hits > 10000) {
+				/*
+				 * Backstop: poll reported activity but
+				 * nothing consumed it, ten thousand
+				 * times in a row -- every iteration
+				 * returned instantly. Die loudly.
+				 */
+				daemon_fatal("poll spin backstop");
+			}
+		}
 
 		if (g_ctl_pfd_slot >= 0 &&
 		    (pfds[g_ctl_pfd_slot].revents & POLLIN) &&
