@@ -57,7 +57,10 @@ def frame(mid, payload):
 
 
 def read_frame(sock, timeout=5.0):
-    sock.settimeout(timeout)
+    try:
+        sock.settimeout(timeout)
+    except (AttributeError, OSError):
+        pass  # raw pipe file: blocking is fine (the daemon replies)
     hdr = b""
     while len(hdr) < 12:
         chunk = sock.recv(12 - len(hdr))
@@ -115,16 +118,37 @@ def main():
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         end = time.time() + 5
-        while time.time() < end and not os.path.exists(sock_path):
+        def sock_up():
+            if sock_path.startswith(r"\\\\.\\pipe"):
+                try:
+                    open(sock_path, "r+b", buffering=0).close()
+                    return True
+                except OSError:
+                    return False
+            return os.path.exists(sock_path)
+
+        while time.time() < end and not sock_up():
             time.sleep(0.1)
-        if not os.path.exists(sock_path):
+        def _up():
+            if sock_path.startswith(r"\\.\\pipe\\"):
+                try:
+                    open(sock_path, "r+b", buffering=0).close()
+                    return True
+                except OSError:
+                    return False
+            return os.path.exists(sock_path)
+
+        if not _up():
             print("FAIL: daemon never listened", file=sys.stderr)
             return 1
         with open(nonce_file) as f:
             nonce = f.read().strip()
 
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.connect(sock_path)
+        if sock_path.startswith(r"\\.\pipe\\"):
+            s = open(sock_path, "r+b", buffering=0)
+        else:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.connect(sock_path)
 
         # HELLO -> WELCOME(role full)
         s.sendall(frame(table["HELLO"][0], json.dumps({

@@ -2,6 +2,7 @@ package org.retrace.runtime;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
 import java.nio.ByteBuffer;
@@ -30,18 +31,83 @@ public final class JRetrace implements Closeable {
     private static final int BYE = 6;
     private static final int WELCOME = 16;
 
-    private final SocketChannel channel;
+    private final Chan channel;
     private final String agentId;
     private final AtomicLong seq = new AtomicLong();
     private final AtomicBoolean stop = new AtomicBoolean();
     private final Thread heartbeat;
 
-    private JRetrace(SocketChannel channel, String agentId) {
+    private JRetrace(Chan channel, String agentId) {
         this.channel = channel;
         this.agentId = agentId;
         this.heartbeat = new Thread(this::heartbeatLoop, "jretrace-heartbeat");
         this.heartbeat.setDaemon(true);
         this.heartbeat.start();
+    }
+
+    /* Channel seam: UDS (SocketChannel) on POSIX, the byte-mode
+     * named pipe (RandomAccessFile) on Windows -- Java has no
+     * AF_UNIX there, but a pipe opens as a file and speaks the
+     * same RTRD byte framing. */
+    private interface Chan extends Closeable {
+        void writeAll(byte[] buf, int n) throws IOException;
+
+        byte[] readExact(int n) throws IOException;
+    }
+
+    private static final class UdsChan implements Chan {
+        private final SocketChannel ch;
+
+        UdsChan(SocketChannel ch) {
+            this.ch = ch;
+        }
+
+        public void writeAll(byte[] buf, int n) throws IOException {
+            java.nio.ByteBuffer b = java.nio.ByteBuffer.wrap(buf, 0, n);
+            while (b.hasRemaining())
+                ch.write(b);
+        }
+
+        public byte[] readExact(int n) throws IOException {
+            java.nio.ByteBuffer b = java.nio.ByteBuffer.allocate(n);
+            while (b.hasRemaining()) {
+                if (ch.read(b) < 0)
+                    throw new IOException("eof");
+            }
+            return b.array();
+        }
+
+        public void close() throws IOException {
+            ch.close();
+        }
+    }
+
+    private static final class PipeChan implements Chan {
+        private final RandomAccessFile f;
+
+        PipeChan(String path) throws IOException {
+            f = new RandomAccessFile(path, "rw");
+        }
+
+        public void writeAll(byte[] buf, int n) throws IOException {
+            f.write(buf, 0, n);
+        }
+
+        public byte[] readExact(int n) throws IOException {
+            byte[] buf = new byte[n];
+            int off = 0;
+            while (off < n) {
+                int got = f.read(buf, off, n - off);
+                if (got <= 0)
+                    throw new IOException("eof");
+                off += got;
+            }
+            return buf;
+        }
+
+        public void close() throws IOException {
+            f.close();
+        }
     }
 
     public static JRetrace supervise() throws IOException {
@@ -56,8 +122,15 @@ public final class JRetrace implements Closeable {
         if (nonce == null) {
             nonce = "";
         }
-        SocketChannel ch = SocketChannel.open(StandardProtocolFamily.UNIX);
-        ch.connect(UnixDomainSocketAddress.of(sock));
+        Chan ch;
+        if (sock.startsWith("\\\\\\\\.\\\\pipe\\\\")) {
+            ch = new PipeChan(sock);
+        } else {
+            SocketChannel uds =
+                SocketChannel.open(StandardProtocolFamily.UNIX);
+            uds.connect(UnixDomainSocketAddress.of(sock));
+            ch = new UdsChan(uds);
+        }
         long pid = ProcessHandle.current().pid();
         long ppid = ProcessHandle.current().parent()
             .map(ProcessHandle::pid).orElse(0L);
@@ -79,9 +152,16 @@ public final class JRetrace implements Closeable {
         if (agent == null || agent.isEmpty()) {
             agent = "pending";
         }
-        ch.configureBlocking(false);
-        drainPolicy(ch);
-        ch.configureBlocking(true);
+        /* UDS only: peek a possible POLICY_SET without blocking.
+         * Pipes block, but the agent runs full-role -- the daemon
+         * pushes policy immediately if configured, so a blocking
+         * read is CORRECT there (it arrives or the daemon holds).*/
+        if (ch instanceof UdsChan) {
+            SocketChannel uds = ((UdsChan) ch).ch;
+            uds.configureBlocking(false);
+            drainPolicy(ch);
+            uds.configureBlocking(true);
+        }
         return new JRetrace(ch, agent);
     }
 
@@ -142,14 +222,15 @@ public final class JRetrace implements Closeable {
         }
     }
 
-    private static void drainPolicy(SocketChannel ch) throws IOException {
+    private static void drainPolicy(Chan ch) throws IOException {
+        SocketChannel uds = ((UdsChan) ch).ch;
         ByteBuffer hdr = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN);
-        int n = ch.read(hdr);
+        int n = uds.read(hdr);
         if (n <= 0) {
             return;
         }
         while (hdr.hasRemaining()) {
-            n = ch.read(hdr);
+            n = uds.read(hdr);
             if (n <= 0) {
                 return;
             }
@@ -158,12 +239,12 @@ public final class JRetrace implements Closeable {
         hdr.position(8);
         int len = hdr.getInt();
         ByteBuffer body = ByteBuffer.allocate(Math.max(0, len));
-        while (body.hasRemaining() && ch.read(body) > 0) {
+        while (body.hasRemaining() && uds.read(body) > 0) {
             // drain only
         }
     }
 
-    private static void writeFrame(SocketChannel ch, int mid, String payload)
+    private static void writeFrame(Chan ch, int mid, String payload)
         throws IOException {
         byte[] b = payload.getBytes(StandardCharsets.UTF_8);
         ByteBuffer buf = ByteBuffer.allocate(12 + b.length)
@@ -174,37 +255,21 @@ public final class JRetrace implements Closeable {
         buf.putInt(b.length);
         buf.put(b);
         buf.flip();
-        while (buf.hasRemaining()) {
-            ch.write(buf);
-        }
+        ch.writeAll(buf.array(), buf.limit());
     }
 
-    private static Frame readFrame(SocketChannel ch) throws IOException {
-        ByteBuffer hdr = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN);
-        while (hdr.hasRemaining()) {
-            if (ch.read(hdr) < 0) {
-                throw new IOException("eof");
-            }
-        }
-        hdr.flip();
-        byte[] magic = new byte[4];
-        hdr.get(magic);
-        if (magic[0] != 'R' || magic[1] != 'T' || magic[2] != 'R' ||
-            magic[3] != 'D') {
+    private static Frame readFrame(Chan ch) throws IOException {
+        byte[] head = ch.readExact(12);
+        if ((head[0] != 'R') || (head[1] != 'T') || (head[2] != 'R')
+            || (head[3] != 'D')) {
             throw new IOException("bad magic");
         }
-        hdr.getShort();
-        int mid = Short.toUnsignedInt(hdr.getShort());
-        int len = hdr.getInt();
-        ByteBuffer body = ByteBuffer.allocate(len);
-        while (body.hasRemaining()) {
-            if (ch.read(body) < 0) {
-                throw new IOException("eof");
-            }
-        }
-        body.flip();
-        return new Frame(mid,
-            StandardCharsets.UTF_8.decode(body).toString());
+        int mid = Short.toUnsignedInt(
+            (short) ((head[7] & 0xff) << 8 | (head[6] & 0xff)));
+        int len = (head[8] & 0xff) | (head[9] & 0xff) << 8
+            | (head[10] & 0xff) << 16 | (head[11] & 0xff) << 24;
+        byte[] body = ch.readExact(len);
+        return new Frame(mid, new String(body, StandardCharsets.UTF_8));
     }
 
     private static String jsonObject(Map<String, String> vals) {
