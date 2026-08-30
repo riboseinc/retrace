@@ -443,9 +443,10 @@ static VOID WINAPI svc_handler(DWORD ctrl)
 
 static VOID WINAPI service_main(DWORD argc, char **argv)
 {
-	/* argv[0] is the service name; the binPath flags follow --
-	 * exactly the argv shape retraced_pipe_main parses
-	 */
+	wchar_t **wargv;
+	char **nargv = NULL;
+	int nargs = 0, k;
+
 	g_svc = RegisterServiceCtrlHandlerA(argv[0], svc_handler);
 	if (g_svc == NULL)
 		return;
@@ -453,6 +454,40 @@ static VOID WINAPI service_main(DWORD argc, char **argv)
 	g_svc_st.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	g_svc_st.dwControlsAccepted = SERVICE_ACCEPT_STOP;
 	svc_report(SERVICE_START_PENDING, 1000);
+	/*
+	 * ServiceMain's argv is the SCM's space-split of binPath --
+	 * quotes left embedded, and on some hosts the flags never
+	 * arrive at all (the daemon then serves its DEFAULT pipe
+	 * names and the registered --sock is silently ignored).
+	 * The process's own command line is the truth: parse it
+	 * quote-aware and run the same shape a console launch
+	 * parses.
+	 */
+	wargv = CommandLineToArgvW(GetCommandLineW(), &nargs);
+	if (wargv != NULL && nargs > 1) {
+		nargv = (char **)HeapAlloc(GetProcessHeap(), 0,
+			(size_t)nargs * sizeof(*nargv));
+		if (nargv != NULL) {
+			for (k = 0; k < nargs; k++) {
+				int need = WideCharToMultiByte(CP_UTF8, 0,
+					wargv[k], -1, NULL, 0, NULL,
+					NULL);
+
+				nargv[k] = (char *)HeapAlloc(
+					GetProcessHeap(), 0,
+					(size_t)(need > 0 ? need : 1));
+				if (nargv[k] != NULL && need > 0)
+					WideCharToMultiByte(CP_UTF8, 0,
+						wargv[k], -1, nargv[k],
+						need, NULL, NULL);
+				else if (nargv[k] != NULL)
+					nargv[k][0] = '\0';
+			}
+			argc = (DWORD)nargs;
+			argv = nargv;
+		}
+	}
+	LocalFree(wargv);
 	/* RUNNING before the loop: the loop blocks for the
 	 * service lifetime, and the SCM kills a service that
 	 * never leaves START_PENDING
@@ -460,6 +495,13 @@ static VOID WINAPI service_main(DWORD argc, char **argv)
 	svc_report(SERVICE_RUNNING, 0);
 	g_svc_ret = (DWORD)retraced_pipe_main((int)argc, argv);
 	svc_report(SERVICE_STOPPED, 0);
+	if (nargv != NULL) {
+		for (k = 0; k < nargs; k++) {
+			if (nargv[k] != NULL)
+				HeapFree(GetProcessHeap(), 0, nargv[k]);
+		}
+		HeapFree(GetProcessHeap(), 0, nargv);
+	}
 }
 
 int retraced_pipe_main(int argc, char **argv)

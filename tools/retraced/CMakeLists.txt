@@ -16,6 +16,8 @@ if(RETRACE_PLATFORM_WINDOWS)
 	add_executable(retrace_retraced
 		pipe_server.c daemon_frame.c registry.c journal.c retraced_ctl.c
 		${_parson_source})
+	# CommandLineToArgvW (the service lane's truth-source argv)
+	target_link_libraries(retrace_retraced PRIVATE shell32)
 else()
 	add_executable(retrace_retraced
 		main.c daemon_frame.c registry.c journal.c peer_gate.c retraced_ctl.c
