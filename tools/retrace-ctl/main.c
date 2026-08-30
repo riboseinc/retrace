@@ -170,6 +170,7 @@ static int ctl_roundtrip_pipe(const char *pipe_name,
 }
 #endif
 
+#ifndef _WIN32
 /* one round trip over local UDS */
 static int ctl_roundtrip_uds(const char *sock_path, const char *request)
 {
@@ -291,6 +292,7 @@ out:
 	retraced_tls_free(ctx);
 	return rc;
 }
+#endif /* !_WIN32 */
 
 /* sign-policy: wrapper {sig:{alg,key_id,sig},blob} over the file
  * bytes with Ed25519; the blob string is the exact file text.

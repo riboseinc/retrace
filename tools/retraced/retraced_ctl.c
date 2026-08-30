@@ -30,6 +30,10 @@
  * sink. No socket, no daemon, no poll loop -- unit-testable.
  */
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -312,7 +316,19 @@ void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
 			json_value_free(v);
 			return;
 		}
+#ifdef _WIN32
+		{
+			HANDLE h = OpenProcess(PROCESS_TERMINATE,
+				FALSE, (DWORD)pid);
+
+			if (h != NULL) {
+				TerminateProcess(h, 1);
+				CloseHandle(h);
+			}
+		}
+#else
 		kill((pid_t)pid, SIGTERM);
+#endif
 		{
 			char ev[128];
 
