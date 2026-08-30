@@ -42,6 +42,34 @@ def frame(mid, payload):
     return MAGIC + struct.pack("<HHI", 1, mid, len(b)) + b
 
 
+class PipeFile:
+    """Named-pipe shim for the AF_UNIX socket surface the agent
+    uses (sendall/recv/settimeout/close). Windows Python has no
+    AF_UNIX; a byte-mode pipe opened as a raw file speaks the
+    same RTRD framing. Short reads are fine -- _recv_exact
+    loops. settimeout is a no-op: pipes block, and spectators
+    skip the optional POLICY_SET drain (the doctrine -- policy
+    never reaches observers anyway)."""
+
+    def __init__(self, path):
+        self.f = open(path, "r+b", buffering=0)
+
+    def sendall(self, b):
+        self.f.write(b)
+
+    def recv(self, n):
+        return self.f.read(n)
+
+    def settimeout(self, t):
+        pass
+
+    def close(self):
+        try:
+            self.f.close()
+        except OSError:
+            pass
+
+
 class Agent:
     def __init__(self, sock_path):
         self.sock_path = sock_path
@@ -49,10 +77,29 @@ class Agent:
         self.agent_id = "pending"
         self.seq = 0
         self.stop = False
-
     def connect(self):
+        if self.sock_path.startswith(r"\\.\pipe\\"):
+            self.s = PipeFile(self.sock_path)
+            self._hello(self.s)
+            return
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.connect(self.sock_path)
+        self.s = s
+        self._hello(s)
+        # a POLICY_SET may follow (UDS); observers drop it
+        s.settimeout(0.2)
+        try:
+            hdr = s.recv(12)
+            if len(hdr) == 12:
+                _, _, m2, l2 = struct.unpack("<4sHHI", hdr)
+                while l2:
+                    b = s.recv(l2)
+                    l2 -= len(b)
+        except OSError:
+            pass
+        s.settimeout(None)
+
+    def _hello(self, s):
         # HELLO without a nonce: the spectator seat, on purpose
         s.sendall(frame(HELLO, json.dumps({
             "session_token": "", "nonce": "",
@@ -75,19 +122,6 @@ class Agent:
                 f"{self.welcome.get('role')}; the doctrine says "
                 "observers ride as spectators\n")
         self.agent_id = self.welcome.get("agent_id", "pending")
-        self.s = s
-        # a POLICY_SET may follow; observers drop it
-        s.settimeout(0.2)
-        try:
-            hdr = s.recv(12)
-            if len(hdr) == 12:
-                _, _, m2, l2 = struct.unpack("<4sHHI", hdr)
-                while l2:
-                    b = s.recv(l2)
-                    l2 -= len(b)
-        except OSError:
-            pass
-        s.settimeout(None)
 
     def emit(self, name, **attrs):
         self.seq += 1
