@@ -18,12 +18,13 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "seccomp_apply.h"
 
 #if defined(__linux__) && (defined(__x86_64__) || \
 	defined(__aarch64__))
+
+#include <unistd.h>
 
 #include <sys/prctl.h>
 
