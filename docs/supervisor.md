@@ -104,9 +104,19 @@ Fail-closed everywhere: a missing plane aborts the exec unless
 
 ### Windows service
 
-On Windows, `retraced` registers with the SCM when started as a
-service — stop requests take the graceful shutdown path. Run from a
-console, it behaves exactly as above.
+On Windows, `retraced` is one binary with two launches: started by
+the SCM it dispatches as a service; started from a console it runs
+the accept loop directly. Install it the SCM way:
+
+```powershell
+sc create retraced binPath= "C:\path\retraced.exe --sock \.\pipe\retraced-agent --ctl \.\pipe\retraced-ctl --journal C:\ProgramData\retrace\journal.jsonl" start= auto
+sc start retraced
+```
+
+`SERVICE_CONTROL_STOP` flips the same stop flag the console
+Ctrl handler uses, so `sc stop` rides the graceful journal-flush
+exit; `--exit-after N` still applies as the watchdog belt under
+both launches.
 
 ### The audit trail
 
