@@ -36,10 +36,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <netdb.h>
-#include <unistd.h>
+#endif
 
 #include "../retraced/tls_gate.h"
 
@@ -48,7 +54,11 @@
 #include <openssl/pem.h>
 #endif
 
+#ifdef _WIN32
+#define CTL_DEFAULT "\\\\.\\pipe\\retraced-ctl"
+#else
 #define CTL_DEFAULT "/tmp/retraced.ctl.sock"
+#endif
 
 /* JSON string escape (policy blobs are JSON-in-JSON); caller frees */
 static char *jesc(const char *s)
@@ -121,6 +131,44 @@ static int print_reply(const char *reply)
 		return 1;
 	return 0;
 }
+
+#ifdef _WIN32
+/* one round trip over the ctl named pipe (supervisor/12): the
+ * same newline-JSON line protocol the UDS ctl speaks.
+ */
+static int ctl_roundtrip_pipe(const char *pipe_name,
+	const char *request)
+{
+	char reply[8192];
+	HANDLE h = CreateFileA(pipe_name, GENERIC_READ | GENERIC_WRITE,
+		0, NULL, OPEN_EXISTING, 0, NULL);
+	DWORD put = 0, got = 0;
+
+	if (h == INVALID_HANDLE_VALUE) {
+		fprintf(stderr, "retrace-ctl: cannot reach %s "
+			"(is retraced running with --ctl?)\n", pipe_name);
+		return 2;
+	}
+	if (!WriteFile(h, request, (DWORD)strlen(request), &put,
+		    NULL) || put == 0) {
+		CloseHandle(h);
+		return 2;
+	}
+	if (!ReadFile(h, reply, sizeof(reply) - 1, &got, NULL) ||
+	    got == 0) {
+		CloseHandle(h);
+		fprintf(stderr, "retrace-ctl: no reply\n");
+		return 2;
+	}
+	CloseHandle(h);
+	reply[got] = '\0';
+	fputs(reply, stdout);
+	if (strstr(reply, "\"ok\":1") == NULL &&
+	    strstr(reply, "\"ok\": true") == NULL)
+		return 1;
+	return 0;
+}
+#endif
 
 /* one round trip over local UDS */
 static int ctl_roundtrip_uds(const char *sock_path, const char *request)
@@ -402,8 +450,12 @@ int main(int argc, char **argv)
 	} else {
 		return ctl_usage();
 	}
+#ifdef _WIN32
+	return ctl_roundtrip_pipe(sock_path, req);
+#else
 	if (tls_host != NULL)
 		return ctl_roundtrip_tls(tls_host, tls_cert, tls_key,
 			tls_ca, req);
 	return ctl_roundtrip_uds(sock_path, req);
+#endif
 }
