@@ -50,6 +50,19 @@ void daemon_frame_welcome(const struct daemon_conn_state *st,
 		const char *payload),
 	void *io, struct retraced_journal *jr);
 
+/*
+ * HELLO: validate, register the agent (spectator when the nonce
+ * claim is absent), mint + write WELCOME, journal the auth line.
+ * Returns the registry entry or NULL (registry full).
+ */
+struct agent_entry *daemon_frame_hello(struct daemon_conn_state *st,
+	const char *payload, struct retraced_registry *reg,
+	struct retraced_journal *jr,
+	const struct retraced_ctl_ctx *ctl, const char *daemon_nonce,
+	int (*write_frame)(void *io, uint16_t type,
+		const char *payload),
+	void *io);
+
 /* the heartbeat-grade drift summaries (sweeps + shutdown) */
 void daemon_frame_drift_summaries(struct retraced_registry *reg,
 	struct retraced_journal *jr);
