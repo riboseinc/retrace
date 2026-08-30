@@ -75,9 +75,9 @@ def main():
                   file=sys.stderr)
             return 1
 
-        # the target: notepad-free trivial process under the DLL.
-        # cmd /c exit keeps the run short; the agent thread still
-        # HELLOs, heartbeats, and BYEs on teardown.
+        # the target: a process with a real lifetime -- the agent
+        # thread needs the target alive to connect, HELLO, and
+        # drain (cmd /c exit dies before the connect finishes)
         env = dict(os.environ)
         env.update({
             "RETRACE_SUPERVISOR": "1",
@@ -85,7 +85,7 @@ def main():
             "RETRACE_SUPERVISOR_NONCE": NONCE,
         })
         r = subprocess.run(
-            [win_run, "--lib", dll, "cmd.exe", "/c", "exit", "0"],
+            [win_run, "--lib", dll, "ping", "-n", "4", "127.0.0.1"],
             env=env, capture_output=True, text=True, timeout=60)
         # the target's own exit code is what matters; a win-run
         # usage failure is a harness problem

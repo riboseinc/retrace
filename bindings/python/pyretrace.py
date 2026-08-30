@@ -74,7 +74,7 @@ def _recv_exact(s, n, deadline):
 def _hello(sock_path, nonce):
     """pipe paths speak the byte-mode named pipe (Windows Python
     has no AF_UNIX); UDS paths keep the original path below"""
-    if sock_path.startswith(r"\\.\pipe\\"):
+    if sock_path.startswith("\\\\.\\pipe\\"):
         return _hello_pipe(sock_path, nonce)
     return _hello_uds(sock_path, nonce)
 
