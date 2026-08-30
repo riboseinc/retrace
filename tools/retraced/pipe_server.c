@@ -62,6 +62,7 @@ static struct retraced_ctl_ctx g_ctl;
 static struct conn g_ctl_conns[MAX_AGENTS];
 static HANDLE g_ctl_thread;
 static HANDLE g_ctl_pipe;
+static const char *g_ctl_name = "\\\\.\\pipe\\retraced-ctl";
 
 static int pipe_write_frame(HANDLE h, uint16_t type,
 	const char *payload);
@@ -243,65 +244,6 @@ static void emit_drift_summaries(void)
 {
 	daemon_frame_drift_summaries(&g_reg, &g_jr);
 }
-
-/* ---- the ctl pipe: same line protocol as the UDS ctl ---- */
-
-struct ctl_reply_ctx {
-	HANDLE pipe;
-};
-
-static void ctl_reply_pipe(const char *line, void *user)
-{
-	struct ctl_reply_ctx *ctx = (struct ctl_reply_ctx *)user;
-
-	pipe_write_all(ctx->pipe, line, (DWORD)strlen(line));
-}
-
-static DWORD WINAPI ctl_thread(LPVOID arg)
-{
-	char buf[CTL_LINE_MAX];
-	size_t fill = 0;
-	(void)arg;
-
-	while (!g_stop) {
-		DWORD got = 0;
-
-		if (!ReadFile(g_ctl_pipe, buf + fill,
-			    (DWORD)(sizeof(buf) - 1 - fill), &got,
-			    NULL) || got == 0)
-			break;
-		fill += got;
-		buf[fill] = '\0';
-		{
-			char *nl;
-
-			while ((nl = strchr(buf, '\n')) != NULL) {
-				struct ctl_reply_ctx ctx;
-
-				*nl = '\0';
-				ctx.pipe = g_ctl_pipe;
-				EnterCriticalSection(&g_lock);
-				g_ctl.reply_sink = ctl_reply_pipe;
-				g_ctl.reply_user = &ctx;
-				retraced_ctl_handle_line(&g_ctl, buf);
-				LeaveCriticalSection(&g_lock);
-				memmove(buf, nl + 1,
-					fill - (size_t)(nl + 1 - buf));
-				fill -= (size_t)(nl + 1 - buf);
-			}
-		}
-		if (fill >= sizeof(buf) - 1)
-			fill = 0;
-	}
-	FlushFileBuffers(g_ctl_pipe);
-	DisconnectNamedPipe(g_ctl_pipe);
-	CloseHandle(g_ctl_pipe);
-	g_ctl_pipe = NULL;
-	return 0;
-}
-
-/* ---- accept loop ---- */
-
 /*
  * Explicit DACL (supervisor/12 P1 hardening): the default pipe
  * DACL follows the process token's default, which broader
@@ -373,6 +315,86 @@ static HANDLE make_pipe(const char *name)
 		LocalFree(sd);
 	return h;
 }
+
+
+/* ---- the ctl pipe: same line protocol as the UDS ctl ---- */
+
+struct ctl_reply_ctx {
+	HANDLE pipe;
+};
+
+static void ctl_reply_pipe(const char *line, void *user)
+{
+	struct ctl_reply_ctx *ctx = (struct ctl_reply_ctx *)user;
+
+	pipe_write_all(ctx->pipe, line, (DWORD)strlen(line));
+}
+
+static DWORD WINAPI ctl_thread(LPVOID arg)
+{
+	(void)arg;
+
+	/*
+	 * One pipe instance per controller, until g_stop: the
+	 * single-client shape closed the ctl plane with the first
+	 * disconnect -- the fleet CLI's second command could not
+	 * even connect. Blocking ConnectNamedPipe in this thread
+	 * is fine: daemon exit tears the process down anyway.
+	 */
+	while (!g_stop) {
+		char buf[CTL_LINE_MAX];
+		size_t fill = 0;
+		HANDLE c = make_pipe(g_ctl_name);
+
+		if (c == INVALID_HANDLE_VALUE)
+			break;
+		ConnectNamedPipe(c, NULL);
+		if (g_stop) {
+			CloseHandle(c);
+			break;
+		}
+		g_ctl_pipe = c;
+		for (;;) {
+			DWORD got = 0;
+
+			if (!ReadFile(c, buf + fill,
+				    (DWORD)(sizeof(buf) - 1 - fill),
+				    &got, NULL) || got == 0)
+				break;
+			fill += got;
+			buf[fill] = '\0';
+			{
+				char *nl;
+
+				while ((nl = strchr(buf, '\n')) != NULL) {
+					struct ctl_reply_ctx ctx;
+
+					*nl = '\0';
+					ctx.pipe = c;
+					EnterCriticalSection(&g_lock);
+					g_ctl.reply_sink = ctl_reply_pipe;
+					g_ctl.reply_user = &ctx;
+					retraced_ctl_handle_line(&g_ctl,
+						buf);
+					LeaveCriticalSection(&g_lock);
+					memmove(buf, nl + 1,
+						fill - (size_t)(nl + 1 - buf));
+					fill -= (size_t)(nl + 1 - buf);
+				}
+			}
+			if (fill >= sizeof(buf) - 1)
+				fill = 0;
+		}
+		FlushFileBuffers(c);
+		DisconnectNamedPipe(c);
+		CloseHandle(c);
+		g_ctl_pipe = NULL;
+	}
+	return 0;
+}
+
+/* ---- accept loop ---- */
+
 
 static BOOL WINAPI on_console_ctrl(DWORD type)
 {
@@ -532,10 +554,9 @@ int retraced_pipe_main(int argc, char **argv)
 	memset(conns, 0, sizeof(conns));
 
 	/* the ctl pipe: one instance, one client at a time */
-	g_ctl_pipe = make_pipe(ctl_name);
-	if (g_ctl_pipe != INVALID_HANDLE_VALUE)
-		g_ctl_thread = CreateThread(NULL, 0, ctl_thread,
-			NULL, 0, NULL);
+	g_ctl_name = ctl_name;
+	g_ctl_thread = CreateThread(NULL, 0, ctl_thread,
+		NULL, 0, NULL);
 
 	printf("retraced: listening on %s (agents)\n", pipe_name);
 	{
@@ -607,10 +628,6 @@ int retraced_pipe_main(int argc, char **argv)
 	emit_drift_summaries();
 	LeaveCriticalSection(&g_lock);
 	retraced_journal_close(&g_jr);
-	if (g_ctl_pipe != NULL) {
-		DisconnectNamedPipe(g_ctl_pipe);
-		CloseHandle(g_ctl_pipe);
-	}
 	DeleteCriticalSection(&g_lock);
 	return 0;
 }

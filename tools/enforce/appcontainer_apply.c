@@ -84,16 +84,34 @@ int enforce_appcontainer_apply(const struct enforce_spec *spec,
 		"retrace enforcement container", -1, wdesc,
 		(int)(sizeof(wdesc) / sizeof(wdesc[0])));
 
-	/* create once; reuse when the profile already exists */
-	if (CreateAppContainerProfile(wname, wdisp, wdesc, NULL, 0,
-		    NULL, &sid) != S_OK) {
-		HRESULT hr = DeriveAppContainerSidFromAppContainerName(
-			wname, &sid);
+	/*
+	 * create once; reuse when the profile already exists. The
+	 * toolchain headers disagree on this API's arity (MinGW's
+	 * userenv.h drops the capabilities pointer), so resolve the
+	 * documented seven-argument shape from userenv.dll -- the
+	 * ABI is the truth both headers gesture at.
+	 */
+	{
+		typedef HRESULT WINAPI create_profile_t(PCWSTR,
+			PCWSTR, PCWSTR, PSID, DWORD,
+			const SECURITY_CAPABILITIES *, PSID *);
+		HMODULE uv = GetModuleHandleA("userenv.dll");
+		create_profile_t *create_profile =
+			uv != NULL ? (create_profile_t *)GetProcAddress(
+				uv, "CreateAppContainerProfile") : NULL;
 
-		if (hr != S_OK || sid == NULL) {
-			fprintf(stderr,
-				"retrace-enforce: appcontainer derive failed\n");
-			return -1;
+		if (create_profile == NULL ||
+		    create_profile(wname, wdisp, wdesc, NULL, 0, NULL,
+			    &sid) != S_OK) {
+			HRESULT hr =
+				DeriveAppContainerSidFromAppContainerName(
+					wname, &sid);
+
+			if (hr != S_OK || sid == NULL) {
+				fprintf(stderr,
+					"retrace-enforce: appcontainer derive failed\n");
+				return -1;
+			}
 		}
 	}
 
