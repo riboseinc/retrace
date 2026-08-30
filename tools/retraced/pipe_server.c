@@ -241,6 +241,7 @@ static DWORD WINAPI agent_thread(LPVOID arg)
 	 * conversation
 	 */
 	EnterCriticalSection(&g_lock);
+	daemon_frame_drift_summaries(&g_reg, &g_jr);
 	retraced_journal_flush(&g_jr);
 	LeaveCriticalSection(&g_lock);
 	return 0;

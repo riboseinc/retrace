@@ -1092,8 +1092,12 @@ int main(int argc, char **argv)
 					 * conversation is on disk
 					 * even if the daemon is
 					 * killed before its graceful
-					 * close
+					 * close. The leaver's final
+					 * drift summary rides the
+					 * same flush.
 					 */
+					daemon_frame_drift_summaries(
+						&reg, &jr);
 					retraced_journal_flush(&jr);
 					continue;
 				}
