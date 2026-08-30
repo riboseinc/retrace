@@ -59,10 +59,10 @@ int enforce_appcontainer_apply(const struct enforce_spec *spec,
 	char *const argv[], char *const envp[])
 {
 	PSID sid = NULL;
-	SID_AND_ATTRIBUTES caps[1];
 	STARTUPINFOEXA si;
 	PROCESS_INFORMATION pi;
 	SIZE_T attr_sz = 0;
+	wchar_t wname[256], wdisp[32], wdesc[128];
 	char cmdline[32768];
 	size_t o = 0;
 	int i;
@@ -72,12 +72,23 @@ int enforce_appcontainer_apply(const struct enforce_spec *spec,
 	    argv[0] == NULL)
 		return -1;
 
+	/* the profile APIs are W-only: name/display/description
+	 * ride UTF-16; the narrow spec name converts here once
+	 */
+	if (MultiByteToWideChar(CP_UTF8, 0, spec->ac_name, -1, wname,
+		    (int)(sizeof(wname) / sizeof(wname[0]))) == 0)
+		return -1;
+	MultiByteToWideChar(CP_UTF8, 0, "retrace", -1, wdisp,
+		(int)(sizeof(wdisp) / sizeof(wdisp[0])));
+	MultiByteToWideChar(CP_UTF8, 0,
+		"retrace enforcement container", -1, wdesc,
+		(int)(sizeof(wdesc) / sizeof(wdesc[0])));
+
 	/* create once; reuse when the profile already exists */
-	if (CreateAppContainerProfile(spec->ac_name, "retrace",
-		"retrace enforcement container", NULL, NULL,
-		&sid) != S_OK) {
+	if (CreateAppContainerProfile(wname, wdisp, wdesc, NULL, 0,
+		    NULL, &sid) != S_OK) {
 		HRESULT hr = DeriveAppContainerSidFromAppContainerName(
-			spec->ac_name, &sid);
+			wname, &sid);
 
 		if (hr != S_OK || sid == NULL) {
 			fprintf(stderr,
@@ -85,9 +96,6 @@ int enforce_appcontainer_apply(const struct enforce_spec *spec,
 			return -1;
 		}
 	}
-
-	/* no capabilities: least privilege (no net, no devices) */
-	memset(caps, 0, sizeof(caps));
 
 	for (i = 0; i < (int)spec->ac_read_n; i++)
 		grant_path(sid, spec->ac_read[i], 0);
@@ -127,8 +135,11 @@ int enforce_appcontainer_apply(const struct enforce_spec *spec,
 		return -1;
 	}
 	memset(&pi, 0, sizeof(pi));
+	/* the env block is narrow char ** -- CREATE_UNICODE_ENVIRONMENT
+	 * would tell the child to read it as UTF-16
+	 */
 	if (CreateProcessA(NULL, cmdline, NULL, NULL, FALSE,
-		    EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
+		    EXTENDED_STARTUPINFO_PRESENT,
 		    envp != NULL ? (LPVOID)envp : NULL, NULL,
 		    &si.StartupInfo, &pi) != TRUE) {
 		fprintf(stderr,
