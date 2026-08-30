@@ -49,6 +49,19 @@ if(RETRACE_PLATFORM_WINDOWS)
 			TIMEOUT 180)
 	endif()
 
+	# jretrace over the pipe (JDK-gated as everywhere).
+	find_package(Python3 COMPONENTS Interpreter)
+	if(Python3_Interpreter_FOUND AND TARGET retrace_retraced)
+		add_test(NAME integration-jretrace-win
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_jretrace.py
+				$<TARGET_FILE:retrace_retraced>
+				${CMAKE_SOURCE_DIR}/bindings/jvm/src/main/java)
+		set_tests_properties(integration-jretrace-win PROPERTIES
+			LABELS "integration"
+			TIMEOUT 180)
+	endif()
+
 	# pyretrace over the pipe (the runtime lane's Windows leg).
 	find_package(Python3 COMPONENTS Interpreter)
 	if(Python3_Interpreter_FOUND AND TARGET retrace_retraced)
