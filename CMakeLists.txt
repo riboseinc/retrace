@@ -461,6 +461,27 @@ else()
 	endif()
 endif()
 
+# Build-surface conformance (the v2.56.0-v2.61.0 lesson): these
+# are the everywhere-set -- every platform's tool list must
+# produce them. A list that drifts makes every TARGET-guarded
+# test silently skip and rots TUs no CI leg compiles (five
+# releases shipped a retraced that could not build on Windows).
+# The same move as the function-inventory conformance (v2.37),
+# applied to the build surface: drift fails THIS platform's
+# configure instead of greening its CI.
+foreach(_retrace_everywhere_target
+		retrace_retraced retrace_ctl retrace_enforce
+		retrace_correlate retrace_procmon2retrace
+		retrace_strace2retrace retrace_etw2retrace
+		retrace_profile)
+	if(NOT TARGET ${_retrace_everywhere_target})
+		message(FATAL_ERROR "build-surface drift: target "
+			"${_retrace_everywhere_target} missing on "
+			"${CMAKE_SYSTEM_NAME} -- the everywhere-set "
+			"must build on every platform")
+	endif()
+endforeach()
+
 # VS Code extension is pure TypeScript (no native build).
 add_subdirectory(vscode-extension)
 
