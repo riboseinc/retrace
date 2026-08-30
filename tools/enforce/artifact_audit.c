@@ -11,7 +11,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 #ifdef RETRACE_HAVE_OPENSSL
 #include <openssl/evp.h>

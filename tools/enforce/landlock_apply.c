@@ -15,20 +15,20 @@
  * are 444/445/446 on ALL 64-bit architectures by allocation.
  */
 
-#include <errno.h>
-#include <fcntl.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <string.h>
-#include <sys/syscall.h>
-#include <unistd.h>
 
 #include "landlock_apply.h"
 
 #if defined(__linux__)
 
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/prctl.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 #ifndef __NR_landlock_create_ruleset
 #define __NR_landlock_create_ruleset 444
