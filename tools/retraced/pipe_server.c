@@ -25,6 +25,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <sddl.h>
+#include <winsvc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,10 +63,13 @@ static struct conn g_ctl_conns[MAX_AGENTS];
 static HANDLE g_ctl_thread;
 static HANDLE g_ctl_pipe;
 
+static int pipe_write_frame(HANDLE h, uint16_t type,
+	const char *payload);
+
 /* the transport seam for the shared frame module: pipe-backed */
 static int df_write_pipe(void *io, uint16_t type, const char *payload)
 {
-	return write_frame((HANDLE)io, type, payload);
+	return pipe_write_frame((HANDLE)io, type, payload);
 }
 
 static long now_ms(void)
@@ -105,7 +109,8 @@ static int pipe_write_all(HANDLE h, const void *buf, DWORD n)
 	return 0;
 }
 
-static int write_frame(HANDLE h, uint16_t type, const char *payload)
+static int pipe_write_frame(HANDLE h, uint16_t type,
+	const char *payload)
 {
 	char hdr[RETRACE_RPC_HEADER_SZ];
 	DWORD plen = (DWORD)strlen(payload);
@@ -237,7 +242,7 @@ static DWORD WINAPI agent_thread(LPVOID arg)
 static void emit_drift_summaries(void)
 {
 	daemon_frame_drift_summaries(&g_reg, &g_jr);
-}}
+}
 
 /* ---- the ctl pipe: same line protocol as the UDS ctl ---- */
 
@@ -374,6 +379,51 @@ static BOOL WINAPI on_console_ctrl(DWORD type)
 	(void)type;
 	InterlockedExchange(&g_stop, 1);
 	return TRUE;
+}
+
+/* ---- the SCM service lane (TODO.supervisor/12 P1) ---- */
+
+/*
+ * One binary, two launches: `sc start` lands here through the
+ * dispatcher (which blocks for the service lifetime); a console
+ * launch gets ERROR_FAILED_SERVICE_STARTUP back from the
+ * dispatcher and runs the accept loop itself. STOP maps to the
+ * same g_stop the console Ctrl handler flips -- one graceful
+ * exit path (journal flush included) for both.
+ */
+static SERVICE_STATUS_HANDLE g_svc;
+static SERVICE_STATUS g_svc_st;
+static DWORD g_svc_ret;
+
+static void svc_report(DWORD state, DWORD wait_ms)
+{
+	g_svc_st.dwCurrentState = state;
+	g_svc_st.dwWaitHint = wait_ms;
+	SetServiceStatus(g_svc, &g_svc_st);
+}
+
+static VOID WINAPI svc_handler(DWORD ctrl)
+{
+	if (ctrl == SERVICE_CONTROL_STOP) {
+		svc_report(SERVICE_STOP_PENDING, 5000);
+		InterlockedExchange(&g_stop, 1);
+	}
+}
+
+static VOID WINAPI service_main(DWORD argc, char **argv)
+{
+	/* argv[0] is the service name; the binPath flags follow --
+	 * exactly the argv shape retraced_pipe_main parses
+	 */
+	g_svc = RegisterServiceCtrlHandlerA(argv[0], svc_handler);
+	if (g_svc == NULL)
+		return;
+	memset(&g_svc_st, 0, sizeof(g_svc_st));
+	g_svc_st.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+	g_svc_st.dwControlsAccepted = SERVICE_ACCEPT_STOP;
+	svc_report(SERVICE_START_PENDING, 1000);
+	g_svc_ret = (DWORD)retraced_pipe_main((int)argc, argv);
+	svc_report(SERVICE_STOPPED, 0);
 }
 
 int retraced_pipe_main(int argc, char **argv)
@@ -582,6 +632,14 @@ int write_frame(int fd, uint16_t type, const char *payload)
 
 int main(int argc, char **argv)
 {
+	SERVICE_TABLE_ENTRYA table[2];
+
+	table[0].lpServiceName = "";
+	table[0].lpServiceProc = service_main;
+	table[1].lpServiceName = NULL;
+	table[1].lpServiceProc = NULL;
+	if (StartServiceCtrlDispatcherA(table))
+		return (int)g_svc_ret;
 	return retraced_pipe_main(argc, argv);
 }
 

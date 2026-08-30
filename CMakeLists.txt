@@ -442,6 +442,15 @@ if(RETRACE_PLATFORM_WINDOWS)
 	add_subdirectory(tools/strace2retrace)
 	add_subdirectory(tools/etw2retrace)
 	add_subdirectory(tools/profiler)
+	# the supervisor lane builds everywhere since plan 12 (the
+	# named-pipe transports); enforce carries the AppContainer
+	# backend on Windows. Without these the pipe daemon and the
+	# fleet ctl never compile on CI and every TARGET-guarded
+	# Windows supervisor test silently skips (v2.56.0-v2.61.0
+	# shipped a retraced that could not build -- the lesson).
+	add_subdirectory(tools/retraced)
+	add_subdirectory(tools/retrace-ctl)
+	add_subdirectory(tools/enforce)
 else()
 	add_subdirectory(tools)
 	add_subdirectory(frida-bridge)
