@@ -58,16 +58,14 @@ def main():
     # sit in either -- walk up until it is found
     dll = None
     root = os.path.dirname(win_run)
-    for _ in range(4):
-        for cand in (
-                os.path.join(root, "src", "v2", "retrace.dll"),
-                os.path.join(root, "src", "v2", "Release",
-                             "retrace.dll"),
-                os.path.join(root, "src", "v2", "Debug",
-                             "retrace.dll"),
-                os.path.join(root, "retrace.dll")):
-            if os.path.exists(cand):
-                dll = cand
+    for _ in range(5):
+        for sub in ("src/v2", "src/backends/preload_msvc", "."):
+            for cfg in ("", "Release/", "Debug/"):
+                cand = os.path.join(root, sub, cfg, "retrace.dll")
+                if os.path.exists(cand):
+                    dll = cand
+                    break
+            if dll is not None:
                 break
         if dll is not None:
             break
