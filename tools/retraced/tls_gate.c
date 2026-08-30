@@ -62,25 +62,6 @@ uint32_t retraced_tls_parse_scopes(const char *csv)
 	return s;
 }
 
-uint32_t retraced_tls_scope_for_cmd(const char *cmd)
-{
-	if (cmd == NULL)
-		return 0;
-	if (strcmp(cmd, "status") == 0)
-		return RETRACED_SCOPE_STATUS;
-	if (strcmp(cmd, "ps") == 0)
-		return RETRACED_SCOPE_PS;
-	if (strcmp(cmd, "policy_push") == 0 ||
-	    strcmp(cmd, "freeze") == 0 ||
-	    strcmp(cmd, "thaw") == 0)
-		return RETRACED_SCOPE_POLICY;
-	if (strcmp(cmd, "kill") == 0)
-		return RETRACED_SCOPE_KILL;
-	if (strcmp(cmd, "spawn") == 0)
-		return RETRACED_SCOPE_SPAWN;
-	return 0;
-}
-
 int retraced_tls_listen(const char *hostport)
 {
 	char host[128];

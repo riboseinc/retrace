@@ -98,6 +98,12 @@ int retraced_policy_load(const char *text, char **blob_out,
 	long *epoch_out);
 int retraced_ctl_push_policy(struct retraced_ctl_ctx *ctx,
 	const char *blob);
+/*
+ * the cmd -> claim-bit table behind the scope gate; pure policy,
+ * no TLS types -- every transport links the ctl module
+ */
+uint32_t retraced_tls_scope_for_cmd(const char *cmd);
+
 void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
 	char *line);
 

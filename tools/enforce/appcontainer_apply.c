@@ -12,7 +12,7 @@
 #ifdef _WIN32
 
 #ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0601
+#define _WIN32_WINNT 0x0602
 #endif
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -111,18 +111,18 @@ int enforce_appcontainer_apply(const struct enforce_spec *spec,
 	memset(&si, 0, sizeof(si));
 	si.StartupInfo.cb = sizeof(si);
 	InitializeProcThreadAttributeList(NULL, 1, 0, &attr_sz);
-	si.AttributeList = (LPPROC_THREAD_ATTRIBUTE_LIST)
+	si.lpAttributeList = (LPPROC_THREAD_ATTRIBUTE_LIST)
 		HeapAlloc(GetProcessHeap(), 0, attr_sz);
-	if (si.AttributeList == NULL ||
-	    InitializeProcThreadAttributeList(si.AttributeList, 1, 0,
+	if (si.lpAttributeList == NULL ||
+	    InitializeProcThreadAttributeList(si.lpAttributeList, 1, 0,
 		    &attr_sz) != TRUE ||
-	    UpdateProcThreadAttribute(si.AttributeList, 0,
+	    UpdateProcThreadAttribute(si.lpAttributeList, 0,
 		    PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
 		    sid, GetLengthSid(sid), NULL, NULL) != TRUE) {
 		fprintf(stderr,
 			"retrace-enforce: attribute list failed\n");
-		if (si.AttributeList != NULL)
-			HeapFree(GetProcessHeap(), 0, si.AttributeList);
+		if (si.lpAttributeList != NULL)
+			HeapFree(GetProcessHeap(), 0, si.lpAttributeList);
 		LocalFree(sid);
 		return -1;
 	}
@@ -134,13 +134,13 @@ int enforce_appcontainer_apply(const struct enforce_spec *spec,
 		fprintf(stderr,
 			"retrace-enforce: CreateProcess in container failed: %lu\n",
 			(unsigned long)GetLastError());
-		DeleteProcThreadAttributeList(si.AttributeList);
-		HeapFree(GetProcessHeap(), 0, si.AttributeList);
+		DeleteProcThreadAttributeList(si.lpAttributeList);
+		HeapFree(GetProcessHeap(), 0, si.lpAttributeList);
 		LocalFree(sid);
 		return -1;
 	}
-	DeleteProcThreadAttributeList(si.AttributeList);
-	HeapFree(GetProcessHeap(), 0, si.AttributeList);
+	DeleteProcThreadAttributeList(si.lpAttributeList);
+	HeapFree(GetProcessHeap(), 0, si.lpAttributeList);
 	LocalFree(sid);
 
 	WaitForSingleObject(pi.hProcess, INFINITE);

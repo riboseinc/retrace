@@ -83,7 +83,6 @@ int retraced_tls_write(void *ssl, const void *buf, int n);
 uint32_t retraced_tls_parse_scopes(const char *csv);
 
 /* map a ctl cmd name onto the required scope bit; 0 = unknown */
-uint32_t retraced_tls_scope_for_cmd(const char *cmd);
 
 /* bind+listen a TCP socket on host:port (host may be NULL = any) */
 int retraced_tls_listen(const char *hostport);
