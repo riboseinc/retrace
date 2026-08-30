@@ -342,6 +342,7 @@ retraced --sock /run/retraced/agent.sock --ctl /run/retraced/ctl.sock          -
 retrace-ctl status                     # local: PEERCRED-gated
 retrace-ctl --tls-host fleet.internal:9443 --tls-key k.pem             --tls-cert c.pem --tls-ca ca.pem freeze   # fleet: mTLS + scopes
 retrace-profile enforce app.json --inside inside.json --backend all -o spec.json
+retrace-ctl sign-policy policy.json ed25519_key.pem > signed.json
 retrace-enforce --audit trail.jsonl --audit-key ed.pem spec.json -- ./target
 retrace-enforce --verify-audit trail.jsonl --audit-pubkey ed.pub.pem
 ```
