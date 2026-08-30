@@ -86,7 +86,9 @@ def main():
         if up is None:
             q = run(["sc", "query", SVC])
             print(f"FAIL: service never served the pipe; "
-                  f"last state: {q.stdout[:200]}", file=sys.stderr)
+                  f"sc query rc={q.returncode} "
+                  f"out={q.stdout[:200]!r} "
+                  f"err={q.stderr[:200]!r}", file=sys.stderr)
             return 1
 
         up.write(frame(HELLO, json.dumps({

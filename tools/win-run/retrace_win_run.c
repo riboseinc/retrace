@@ -50,16 +50,26 @@ int main(int argc, char **argv)
 	HMODULE self;
 
 	for (i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "--lib") == 0 && i + 1 < argc) {
-			dll_path = argv[++i];
-			continue;
-		} else if (strcmp(argv[i], "-h") == 0 ||
-			   strcmp(argv[i], "--help") == 0) {
-			usage(stdout);
-			return 0;
-		} else if (argv[i][0] == '-' && argv[i][1] != '\0') {
-			usage(stderr);
-			return 2;
+		/*
+		 * Flags belong to the launcher only BEFORE the
+		 * target: everything after the first positional is
+		 * the child's own command line (ping -n 4 is not
+		 * ours to judge) -- the usage line always said so.
+		 */
+		if (first_target) {
+			if (strcmp(argv[i], "--lib") == 0 &&
+			    i + 1 < argc) {
+				dll_path = argv[++i];
+				continue;
+			} else if (strcmp(argv[i], "-h") == 0 ||
+				   strcmp(argv[i], "--help") == 0) {
+				usage(stdout);
+				return 0;
+			} else if (argv[i][0] == '-' &&
+				   argv[i][1] != '\0') {
+				usage(stderr);
+				return 2;
+			}
 		}
 		if (first_target) {
 			/* quote the target path (spaces in paths) */
