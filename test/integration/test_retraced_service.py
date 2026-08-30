@@ -74,21 +74,23 @@ def main():
 
         # wait RUNNING + pipe up
         up = None
+        last_err = None
         for _ in range(50):
             q = run(["sc", "query", SVC])
             if "RUNNING" in q.stdout:
                 try:
                     up = open(pipe, "r+b", buffering=0)
                     break
-                except OSError:
-                    pass
+                except OSError as e:
+                    last_err = e
             time.sleep(0.2)
         if up is None:
             q = run(["sc", "query", SVC])
             print(f"FAIL: service never served the pipe; "
                   f"sc query rc={q.returncode} "
                   f"out={q.stdout[:200]!r} "
-                  f"err={q.stderr[:200]!r}", file=sys.stderr)
+                  f"err={q.stderr[:200]!r} "
+                  f"pipe_err={last_err!r}", file=sys.stderr)
             return 1
 
         up.write(frame(HELLO, json.dumps({

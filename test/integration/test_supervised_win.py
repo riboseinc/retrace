@@ -53,13 +53,29 @@ def main():
               file=sys.stderr)
         return 0
     daemon, win_run = (os.path.abspath(p) for p in sys.argv[1:3])
-    dll = os.path.join(os.path.dirname(win_run), "..", "..", "src",
-                       "v2", "retrace.dll")
-    dll = os.path.normpath(dll)
-    if not os.path.exists(dll):
-        # alternate layout: beside the launcher
-        alt = os.path.join(os.path.dirname(win_run), "retrace.dll")
-        dll = alt if os.path.exists(alt) else dll
+    # the DLL rides the v2 tree; MSVC multi-config nests it one
+    # level deeper (Release/) than Ninja, and the launcher may
+    # sit in either -- walk up until it is found
+    dll = None
+    root = os.path.dirname(win_run)
+    for _ in range(4):
+        for cand in (
+                os.path.join(root, "src", "v2", "retrace.dll"),
+                os.path.join(root, "src", "v2", "Release",
+                             "retrace.dll"),
+                os.path.join(root, "src", "v2", "Debug",
+                             "retrace.dll"),
+                os.path.join(root, "retrace.dll")):
+            if os.path.exists(cand):
+                dll = cand
+                break
+        if dll is not None:
+            break
+        root = os.path.dirname(root)
+    if dll is None:
+        print("FAIL: retrace.dll not found near retrace-win-run",
+              file=sys.stderr)
+        return 1
 
     work = tempfile.mkdtemp(prefix="sup-win-")
     journal = os.path.join(work, "journal.jsonl")
