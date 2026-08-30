@@ -24,7 +24,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 	# retraced + retrace-win-run + the in-process agent, HELLO
 	# with the nonce (full peer), policy push + ACK.
 	find_package(Python3 COMPONENTS Interpreter)
-	if(Python3_Interpreter_FOUND AND TARGET retrace_win_run)
+	if(Python3_Interpreter_FOUND)
 		add_test(NAME integration-supervised-win
 			COMMAND ${Python3_EXECUTABLE}
 				${CMAKE_SOURCE_DIR}/test/integration/test_supervised_win.py
@@ -39,7 +39,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 	# the real SCM lifecycle (sc create/start/stop/delete) on the
 	# elevated runners.
 	find_package(Python3 COMPONENTS Interpreter)
-	if(Python3_Interpreter_FOUND AND TARGET retrace_retraced)
+	if(Python3_Interpreter_FOUND)
 		add_test(NAME integration-retraced-service
 			COMMAND ${Python3_EXECUTABLE}
 				${CMAKE_SOURCE_DIR}/test/integration/test_retraced_service.py
@@ -51,7 +51,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 
 	# jretrace over the pipe (JDK-gated as everywhere).
 	find_package(Python3 COMPONENTS Interpreter)
-	if(Python3_Interpreter_FOUND AND TARGET retrace_retraced)
+	if(Python3_Interpreter_FOUND)
 		add_test(NAME integration-jretrace-win
 			COMMAND ${Python3_EXECUTABLE}
 				${CMAKE_SOURCE_DIR}/test/integration/test_jretrace.py
@@ -64,7 +64,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 
 	# pyretrace over the pipe (the runtime lane's Windows leg).
 	find_package(Python3 COMPONENTS Interpreter)
-	if(Python3_Interpreter_FOUND AND TARGET retrace_retraced)
+	if(Python3_Interpreter_FOUND)
 		add_test(NAME integration-pyretrace-win
 			COMMAND ${Python3_EXECUTABLE}
 				${CMAKE_SOURCE_DIR}/test/integration/test_pyretrace.py
@@ -78,7 +78,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 	# The kernel-observation agents speak the pipe natively on
 	# Windows (TODO.beyond-libc/03): synthetic ETW lane E2E.
 	find_package(Python3 COMPONENTS Interpreter)
-	if(Python3_Interpreter_FOUND AND TARGET retrace_retraced)
+	if(Python3_Interpreter_FOUND)
 		add_test(NAME integration-etw-agent-win
 			COMMAND ${Python3_EXECUTABLE}
 				${CMAKE_SOURCE_DIR}/test/integration/test_etw_agent.py
@@ -91,7 +91,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 
 	# retrace-ctl over the ctl pipe (the fleet CLI on Windows).
 	find_package(Python3 COMPONENTS Interpreter)
-	if(Python3_Interpreter_FOUND AND TARGET retrace_ctl)
+	if(Python3_Interpreter_FOUND)
 		add_test(NAME integration-ctl-win
 			COMMAND ${Python3_EXECUTABLE}
 				${CMAKE_SOURCE_DIR}/test/integration/test_ctl_win.py
@@ -106,7 +106,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 	# protocol over \\.\pipe\; a python stub walks the full
 	# HELLO/WINDOW/EVENT/BYE exchange as a spectator.
 	find_package(Python3 COMPONENTS Interpreter)
-	if(Python3_Interpreter_FOUND AND TARGET retrace_retraced)
+	if(Python3_Interpreter_FOUND)
 		add_test(NAME integration-retraced-pipe
 			COMMAND ${Python3_EXECUTABLE}
 				${CMAKE_SOURCE_DIR}/test/integration/test_retraced_pipe.py
@@ -120,8 +120,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 	# the Windows backend E2E. Self-skips on non-Windows hosts,
 	# so POSIX CI legs can carry it too if ever moved.
 	find_package(Python3 COMPONENTS Interpreter)
-	if(Python3_Interpreter_FOUND AND TARGET retrace_profile
-	   AND TARGET retrace_enforce)
+	if(Python3_Interpreter_FOUND)
 		add_test(NAME integration-enforce-win
 			COMMAND ${Python3_EXECUTABLE}
 				${CMAKE_SOURCE_DIR}/test/integration/test_enforce_win.py
