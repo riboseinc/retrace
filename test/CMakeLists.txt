@@ -49,6 +49,19 @@ if(RETRACE_PLATFORM_WINDOWS)
 			TIMEOUT 180)
 	endif()
 
+	# pyretrace over the pipe (the runtime lane's Windows leg).
+	find_package(Python3 COMPONENTS Interpreter)
+	if(Python3_Interpreter_FOUND AND TARGET retrace_retraced)
+		add_test(NAME integration-pyretrace-win
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_pyretrace.py
+				$<TARGET_FILE:retrace_retraced>
+				${CMAKE_SOURCE_DIR}/bindings/python)
+		set_tests_properties(integration-pyretrace-win PROPERTIES
+			LABELS "integration"
+			TIMEOUT 120)
+	endif()
+
 	# The kernel-observation agents speak the pipe natively on
 	# Windows (TODO.beyond-libc/03): synthetic ETW lane E2E.
 	find_package(Python3 COMPONENTS Interpreter)

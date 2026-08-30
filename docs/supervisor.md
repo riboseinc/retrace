@@ -38,6 +38,7 @@ retraced [--sock PATH] [--journal PATH] [--policy FILE] [--ctl PATH]
 | `--nonce` / `--nonce-file` | the agent channel nonce; spawners inject it into the target env. No nonce in HELLO ⇒ **spectator** (evidence, never policy) |
 | `--tls-*` | the fleet control plane: TLS 1.3 mutual auth only, all four flags together or none. Controller certs carry claim scopes in a URI SAN (`retrace:scope:status+ps+policy+kill`). No plaintext remote mode exists |
 | `--user` / `--group` | privilege drop after every socket is bound; a failed drop exits (never continues elevated) |
+| `--exit-after N` | self-terminate after N seconds — the harness guard: a daemon orphaned by its test/CI run can never outlive its purpose |
 | `--fd N` | socket activation: serve an already-bound listener (systemd's `LISTEN_FDS` convention maps here). Inherited sockets are never unlinked |
 
 The journal is append-only and hash-chained; control-plane records
@@ -68,7 +69,8 @@ One session, one journal, three lanes:
   kernel *saw*. Both join as spectators (nonceless HELLO on purpose)
   and emit `source: kernel` events. `--synthetic` proves the protocol
   on CI; `--loader` wraps the real bridge (`retrace-ebpf-loader`,
-  `etw2retrace`).
+  `etw2retrace`). On Windows both speak
+  the named pipe natively (pass `--sock \\.\pipe\...`).
 - **runtime** — `pyretrace` / `jretrace`: which module, which line.
   See [runtime agents](runtime-agents.md).
 
@@ -100,6 +102,12 @@ One declared-set, four enforcement planes, graded against each other:
 Fail-closed everywhere: a missing plane aborts the exec unless
 `--allow-missing` (dev only).
 
+### Windows service
+
+On Windows, `retraced` registers with the SCM when started as a
+service — stop requests take the graceful shutdown path. Run from a
+console, it behaves exactly as above.
+
 ### The audit trail
 
 `--audit TRAIL` binds every exec to `(timestamp, pid, spec digest,
@@ -108,6 +116,15 @@ to *which filter was in force when*. With `--audit-key` (Ed25519) each
 record is signed over the exact bytes the chain hash covers;
 `--verify-audit --audit-pubkey` requires a valid signature on every
 record. A tampered, torn, or unwritable trail refuses the exec.
+
+## Policy signing & rotation
+
+`retrace-ctl sign-policy FILE KEY` wraps a policy in an Ed25519
+signature over its exact bytes; the agent verifies against the key
+pinned in `RETRACE_SUPERVISOR_PUBKEY` and refuses invalid or partial
+wrappers fail-closed. For rotation, pin a LIST of PEMs (path
+separator `:` on POSIX, `;` on Windows) — old and new keys overlap,
+so agents verify throughout the transition without redeploying.
 
 ## Where to read next
 

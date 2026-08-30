@@ -72,6 +72,30 @@ def _recv_exact(s, n, deadline):
 
 
 def _hello(sock_path, nonce):
+    """pipe paths speak the byte-mode named pipe (Windows Python
+    has no AF_UNIX); UDS paths keep the original path below"""
+    if sock_path.startswith(r"\\.\pipe\\"):
+        return _hello_pipe(sock_path, nonce)
+    return _hello_uds(sock_path, nonce)
+
+
+def _hello_pipe(sock_path, nonce):
+    s = _PipeFile(sock_path)
+    s.sendall(_frame(_HELLO, json.dumps({
+        "session_token": os.environ.get("RETRACE_SESSION", ""),
+        "nonce": nonce, "pid": os.getpid(), "ppid": 0,
+        "boot_id": "pyruntime", "cmdline": " ".join(sys.argv[:4]),
+        "retrace_version": "pyretrace-1"})))
+    hdr = _recv_exact(s, 12, time.time() + 5)
+    _, _, mid, ln = struct.unpack("<4sHHI", hdr)
+    body = _recv_exact(s, ln, time.time() + 5)
+    if mid != 16:  # WELCOME
+        s.close()
+        raise RuntimeError(f"expected WELCOME, got {mid}")
+    return s, json.loads(body)
+
+
+def _hello_uds(sock_path, nonce):
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.connect(sock_path)
     s.sendall(_frame(_HELLO, json.dumps({
