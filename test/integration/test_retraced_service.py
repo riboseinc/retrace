@@ -84,8 +84,9 @@ def main():
                     pass
             time.sleep(0.2)
         if up is None:
-            print("FAIL: service never served the pipe",
-                  file=sys.stderr)
+            q = run(["sc", "query", SVC])
+            print(f"FAIL: service never served the pipe; "
+                  f"last state: {q.stdout[:200]}", file=sys.stderr)
             return 1
 
         up.write(frame(HELLO, json.dumps({

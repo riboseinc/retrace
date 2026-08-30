@@ -79,6 +79,32 @@ def _hello(sock_path, nonce):
     return _hello_uds(sock_path, nonce)
 
 
+class _PipeFile:
+    """Named-pipe shim for the AF_UNIX socket surface the agent
+    uses (sendall/recv/settimeout/close). Windows Python has no
+    AF_UNIX; a byte-mode pipe opened as a raw file speaks the
+    same RTRD framing. Short reads are fine -- _recv_exact
+    loops. settimeout is a no-op: pipes block."""
+
+    def __init__(self, path):
+        self.f = open(path, "r+b", buffering=0)
+
+    def sendall(self, b):
+        self.f.write(b)
+
+    def recv(self, n):
+        return self.f.read(n)
+
+    def settimeout(self, t):
+        pass
+
+    def close(self):
+        try:
+            self.f.close()
+        except OSError:
+            pass
+
+
 def _hello_pipe(sock_path, nonce):
     s = _PipeFile(sock_path)
     s.sendall(_frame(_HELLO, json.dumps({

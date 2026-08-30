@@ -85,7 +85,8 @@ def main():
             "RETRACE_SUPERVISOR_NONCE": NONCE,
         })
         r = subprocess.run(
-            [win_run, "--lib", dll, "ping", "-n", "4", "127.0.0.1"],
+            [win_run, "--lib", dll, "cmd.exe", "/c", "ping", "-n", "4",
+             "127.0.0.1"],
             env=env, capture_output=True, text=True, timeout=60)
         # the target's own exit code is what matters; a win-run
         # usage failure is a harness problem
