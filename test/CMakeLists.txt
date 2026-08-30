@@ -49,6 +49,19 @@ if(RETRACE_PLATFORM_WINDOWS)
 			TIMEOUT 180)
 	endif()
 
+	# retrace-ctl over the ctl pipe (the fleet CLI on Windows).
+	find_package(Python3 COMPONENTS Interpreter)
+	if(Python3_Interpreter_FOUND AND TARGET retrace_ctl)
+		add_test(NAME integration-ctl-win
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_ctl_win.py
+				$<TARGET_FILE:retrace_retraced>
+				$<TARGET_FILE:retrace_ctl>)
+		set_tests_properties(integration-ctl-win PROPERTIES
+			LABELS "integration"
+			TIMEOUT 120)
+	endif()
+
 	# The named-pipe daemon (TODO.supervisor/12 P0): the same
 	# protocol over \\.\pipe\; a python stub walks the full
 	# HELLO/WINDOW/EVENT/BYE exchange as a spectator.
