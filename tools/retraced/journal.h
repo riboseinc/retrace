@@ -59,6 +59,8 @@ void retraced_journal_close(struct retraced_journal *j);
  * object text; the journal wraps it with ts, agent_id, seq and
  * the chain link. Returns 0 ok, -1 io error.
  */
+void retraced_journal_flush(struct retraced_journal *j);
+
 int retraced_journal_event(struct retraced_journal *j,
 	long ts, const char *agent_id, uint64_t seq,
 	const char *payload);

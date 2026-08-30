@@ -1087,6 +1087,14 @@ int main(int argc, char **argv)
 				if (n <= 0) {
 					close(conns[i].fd);
 					conns[i].fd = -1;
+					/* connection-scoped
+					 * durability: a finished
+					 * conversation is on disk
+					 * even if the daemon is
+					 * killed before its graceful
+					 * close
+					 */
+					retraced_journal_flush(&jr);
 					continue;
 				}
 				conns[i].fill += (size_t)n;

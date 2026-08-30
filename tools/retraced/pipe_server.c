@@ -235,6 +235,14 @@ static DWORD WINAPI agent_thread(LPVOID arg)
 	CloseHandle(c->pipe);
 	c->pipe = NULL;
 	c->live = 0;
+	/* connection-scoped durability (same as the POSIX conn
+	 * end): observations are buffered-class records, and a
+	 * force-killed daemon must not swallow a finished
+	 * conversation
+	 */
+	EnterCriticalSection(&g_lock);
+	retraced_journal_flush(&g_jr);
+	LeaveCriticalSection(&g_lock);
 	return 0;
 }
 
@@ -444,6 +452,11 @@ static VOID WINAPI service_main(DWORD argc, char **argv)
 	g_svc_st.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	g_svc_st.dwControlsAccepted = SERVICE_ACCEPT_STOP;
 	svc_report(SERVICE_START_PENDING, 1000);
+	/* RUNNING before the loop: the loop blocks for the
+	 * service lifetime, and the SCM kills a service that
+	 * never leaves START_PENDING
+	 */
+	svc_report(SERVICE_RUNNING, 0);
 	g_svc_ret = (DWORD)retraced_pipe_main((int)argc, argv);
 	svc_report(SERVICE_STOPPED, 0);
 }

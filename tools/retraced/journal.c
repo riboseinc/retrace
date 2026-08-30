@@ -112,6 +112,12 @@ static FILE *journal_writer(struct retraced_journal *j)
 	return j->f;
 }
 
+void retraced_journal_flush(struct retraced_journal *j)
+{
+	if (j != NULL && j->f != NULL)
+		fflush(j->f);
+}
+
 int retraced_journal_event(struct retraced_journal *j,
 	long ts, const char *agent_id, uint64_t seq,
 	const char *payload)
