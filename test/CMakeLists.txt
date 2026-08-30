@@ -49,6 +49,20 @@ if(RETRACE_PLATFORM_WINDOWS)
 			TIMEOUT 180)
 	endif()
 
+	# The kernel-observation agents speak the pipe natively on
+	# Windows (TODO.beyond-libc/03): synthetic ETW lane E2E.
+	find_package(Python3 COMPONENTS Interpreter)
+	if(Python3_Interpreter_FOUND AND TARGET retrace_retraced)
+		add_test(NAME integration-etw-agent-win
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_etw_agent.py
+				$<TARGET_FILE:retrace_retraced>
+				${CMAKE_SOURCE_DIR}/etw-bridge/retrace-etw-agent)
+		set_tests_properties(integration-etw-agent-win PROPERTIES
+			LABELS "integration"
+			TIMEOUT 120)
+	endif()
+
 	# retrace-ctl over the ctl pipe (the fleet CLI on Windows).
 	find_package(Python3 COMPONENTS Interpreter)
 	if(Python3_Interpreter_FOUND AND TARGET retrace_ctl)

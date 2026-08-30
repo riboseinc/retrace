@@ -20,7 +20,9 @@ set_target_properties(retrace_ctl PROPERTIES
 target_include_directories(retrace_ctl PRIVATE
 	${CMAKE_SOURCE_DIR}/tools/retraced)
 
-if(OpenSSL_FOUND AND NOT RETRACE_PLATFORM_WINDOWS)
+# sign-policy (pure OpenSSL EVP) works everywhere now that
+# tls_gate.c rides only the POSIX build
+if(OpenSSL_FOUND)
 	target_compile_definitions(retrace_ctl PRIVATE
 		RETRACED_HAVE_OPENSSL=1
 		RETRACE_HAVE_OPENSSL=1)
