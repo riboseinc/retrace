@@ -21,6 +21,21 @@
 #include <userenv.h>
 
 /*
+ * mingw-w64's headers do not carry the AppContainer surface
+ * (DeriveAppContainerSidFromAppContainerName and the security
+ * capabilities attribute are absent), so the plane rides the
+ * SDK-complete builds; MinGW gets the same unavailable-stub as
+ * the non-Windows hosts -- its CI runs no ctest anyway.
+ */
+#if !defined(PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES)
+#define RETRACE_NO_APPCONTAINER 1
+#endif
+#endif /* _WIN32 includes */
+
+
+#if defined(_WIN32) && !defined(RETRACE_NO_APPCONTAINER)
+
+/*
  * Grant one path to the container SID: (GR,FX) for reads,
  * (GW,GR,FX) for writes. Failures are reported but never
  * fatal at grant time -- the container's deny-by-default
@@ -180,7 +195,7 @@ int enforce_appcontainer_apply(const struct enforce_spec *spec,
 	return (int)rc;
 }
 
-#else /* !_WIN32 */
+#else /* !_WIN32 or no AppContainer surface */
 
 int enforce_appcontainer_apply(const struct enforce_spec *spec,
 	char *const argv[], char *const envp[])
@@ -191,4 +206,4 @@ int enforce_appcontainer_apply(const struct enforce_spec *spec,
 	return 1;	/* the plane exists only on Windows */
 }
 
-#endif /* _WIN32 */
+#endif /* _WIN32 && AppContainer surface */
