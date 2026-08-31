@@ -321,6 +321,10 @@ retrace_add_unit_test(modify_return_value_int
 # signed POLICY_SET (TODO.supervisor/05): the wrapper format +
 # fail-closed pin (Ed25519 over the exact blob bytes).
 #
+retrace_add_unit_test(agent_ring
+    EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/src/supervisor/agent_ring.c
+    EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/src/supervisor)
+
 retrace_add_unit_test(policy_sig
     EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/src/supervisor/policy_sig.c
     EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/src/supervisor)
