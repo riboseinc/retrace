@@ -81,7 +81,7 @@ class Agent:
         self.seq = 0
         self.stop = False
     def connect(self):
-        if self.sock_path.startswith(r"\\.\pipe\\"):
+        if self.sock_path.startswith("\\\\.\\pipe\\"):
             self.s = PipeFile(self.sock_path)
             self._hello(self.s)
             return

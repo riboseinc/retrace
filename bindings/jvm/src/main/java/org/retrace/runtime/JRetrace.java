@@ -147,7 +147,7 @@ public final class JRetrace implements Closeable {
             nonce = "";
         }
         Chan ch;
-        if (sock.startsWith("\\\\\\\\.\\\\pipe\\\\")) {
+        if (sock.startsWith("\\\\.\\pipe\\")) {
             ch = new PipeChan(sock);
         } else {
             SocketChannel uds =
