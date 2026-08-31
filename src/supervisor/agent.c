@@ -20,6 +20,7 @@
 #include "conf.h"
 #include "parson.h"
 #include "protocol.h"
+#include "agent_ring.h"
 #include "policy_sig.h"
 
 #ifndef _WIN32
@@ -55,21 +56,13 @@
  * path); the escaping fallback heap-points. heap == NULL means
  * inline.
  */
-struct queue_item {
-	char *heap;
-	char inline_buf[AGENT_EVENT_INLINE];
-};
-
 struct agent_state {
 	int armed;
 	char sock_path[108];
 	char agent_id[96];
 
 	pthread_mutex_t mu;
-	struct queue_item queue[AGENT_QUEUE_CAP];
-	size_t q_head;
-	size_t q_count;
-	uint64_t dropped;
+	struct agent_ring ring;
 	uint64_t drops_reported;
 
 	_Atomic uint64_t seq;
@@ -107,53 +100,16 @@ static void agent_atfork_child(void);
  */
 static int queue_push(const char *buf, char *heap_item)
 {
+	int rc;
+
 	pthread_mutex_lock(&g_agent.mu);
-	if (g_agent.q_count >= AGENT_QUEUE_CAP) {
-		g_agent.dropped++;
-		pthread_mutex_unlock(&g_agent.mu);
-		free(heap_item);
-		return -1;
-	}
-	{
-		struct queue_item *slot =
-			&g_agent.queue[(g_agent.q_head + g_agent.q_count) %
-				AGENT_QUEUE_CAP];
-
-		slot->heap = NULL;
-		if (buf != NULL)
-			memcpy(slot->inline_buf, buf,
-				AGENT_EVENT_INLINE);
-		else
-			slot->heap = heap_item;
-	}
-	g_agent.q_count++;
+	rc = buf != NULL ?
+		agent_ring_push_copy(&g_agent.ring, buf,
+			strlen(buf)) :
+		agent_ring_push_heap(&g_agent.ring, heap_item,
+			strlen(heap_item));
 	pthread_mutex_unlock(&g_agent.mu);
-	return 0;
-}
-
-/*
- * Pop the next event: *out views the slot's inline buffer or
- * the heap string; *heap_out is the pointer to free (NULL for
- * inline). Returns 0 popped, -1 empty.
- */
-static int queue_pop(const char **out, char **heap_out)
-{
-	struct queue_item *slot;
-
-	*out = NULL;
-	*heap_out = NULL;
-	pthread_mutex_lock(&g_agent.mu);
-	if (g_agent.q_count == 0) {
-		pthread_mutex_unlock(&g_agent.mu);
-		return -1;
-	}
-	slot = &g_agent.queue[g_agent.q_head];
-	g_agent.q_head = (g_agent.q_head + 1) % AGENT_QUEUE_CAP;
-	g_agent.q_count--;
-	*heap_out = slot->heap;
-	*out = slot->heap != NULL ? slot->heap : slot->inline_buf;
-	pthread_mutex_unlock(&g_agent.mu);
-	return 0;
+	return rc;
 }
 
 /*
@@ -416,7 +372,7 @@ fork_adopt:;
 		}
 		g_agent.connected = 0;
 		g_agent.rfill = 0;
-		g_agent.q_count = 0;
+		g_agent.ring.count = 0;
 		atomic_store(&g_agent.stop, 0);
 		memcpy(g_agent.agent_id, "pending",
 			sizeof("pending"));
@@ -730,16 +686,24 @@ static void drain_queue(void)
 {
 	for (;;) {
 		const char *item;
-		char *heap = NULL;
 
-		if (queue_pop(&item, &heap) != 0)
+		pthread_mutex_lock(&g_agent.mu);
+		item = agent_ring_peek(&g_agent.ring, NULL);
+		pthread_mutex_unlock(&g_agent.mu);
+		if (item == NULL)
 			break;
+		/* peek/pop split: the slot stays occupied for the
+		 * whole send -- a concurrent push cannot overwrite
+		 * the view under the sender (the old pop handed
+		 * the slot back first)
+		 */
 		if (send_frame(RETRACE_RPC_MSG_EVENT, item) != 0) {
 			drop_connection();
-			free(heap);
 			return;
 		}
-		free(heap);
+		pthread_mutex_lock(&g_agent.mu);
+		agent_ring_pop(&g_agent.ring);
+		pthread_mutex_unlock(&g_agent.mu);
 	}
 
 	/*
@@ -750,7 +714,7 @@ static void drain_queue(void)
 	 * drain make room for the marker itself.
 	 */
 	{
-		uint64_t now = g_agent.dropped;
+		uint64_t now = g_agent.ring.dropped;
 
 		if (now != g_agent.drops_reported) {
 			char marker[176];
@@ -967,7 +931,7 @@ static void agent_atfork_child(void)
 	 * (locks held by now-missing threads). Drop the pointers
 	 * and leak -- bounded, fork-children only.
 	 */
-	g_agent.q_count = 0;
+	g_agent.ring.count = 0;
 	atomic_store(&g_agent.thread_spawned, 0);
 	atomic_store(&g_agent.thread_done, 0);
 	atomic_store(&g_agent.stop, 0);
@@ -1101,9 +1065,9 @@ void retrace_agent_deinit(void)
 #else
 	retrace_real_impls.rc_thread_join(&g_agent.tid);
 #endif
-	if (g_agent.dropped > 0)
+	if (g_agent.ring.dropped > 0)
 		log_info("retrace_agent: dropped %llu events (full)",
-			(unsigned long long)g_agent.dropped);
+			(unsigned long long)g_agent.ring.dropped);
 }
 
 #else /* _WIN32: the named-pipe agent (TODO.supervisor/12 P0) */
@@ -1125,16 +1089,8 @@ void retrace_agent_deinit(void)
  * heap fallback can follow the POSIX shape when a target needs
  * it.
  */
-#define WIN_AGENT_QUEUE_CAP 256
-#define WIN_AGENT_ITEM_MAX 768
 #define WIN_AGENT_BACKOFF_MIN_MS 500
 #define WIN_AGENT_BACKOFF_MAX_MS 30000
-
-struct win_queue_item {
-	char *heap;		/* oversize events own their bytes */
-	char buf[WIN_AGENT_ITEM_MAX];
-	size_t len;
-};
 
 static struct {
 	int enabled;
@@ -1146,11 +1102,9 @@ static struct {
 	HANDLE pipe;
 	char agent_id[64];
 	volatile LONG64 seq;
-	volatile LONG64 dropped;
-	volatile LONG64 drops_reported;
+	uint64_t drops_reported;
 	uint64_t policy_epoch;
-	struct win_queue_item q[WIN_AGENT_QUEUE_CAP];
-	size_t q_head, q_tail, q_count;
+	struct agent_ring ring;
 	CRITICAL_SECTION mu;
 	CONDITION_VARIABLE cv;
 } w_agent;
@@ -1251,53 +1205,32 @@ static void w_drop_connection(void);
 
 static int w_queue_push(const char *item, size_t len)
 {
-	int rc = -1;
+	int rc;
 
 	EnterCriticalSection(&w_agent.mu);
-	if (w_agent.q_count < WIN_AGENT_QUEUE_CAP) {
-		struct win_queue_item *slot =
-			&w_agent.q[w_agent.q_tail];
-
-		slot->heap = NULL;
-		if (len > WIN_AGENT_ITEM_MAX - 1) {
-			/* heap fallback (the P0 honesty note,
-			 * retired): oversize events own their bytes
-			 */
-			slot->heap = (char *)malloc(len + 1);
-			if (slot->heap == NULL)
-				goto out;
-			memcpy(slot->heap, item, len);
-			slot->heap[len] = '\0';
-		} else {
-			memcpy(slot->buf, item, len);
-			slot->buf[len] = '\0';
-		}
-		slot->len = len;
-		w_agent.q_tail = (w_agent.q_tail + 1) %
-			WIN_AGENT_QUEUE_CAP;
-		w_agent.q_count++;
-		rc = 0;
-		WakeConditionVariable(&w_agent.cv);
-	}
-out:
+	rc = agent_ring_push_copy(&w_agent.ring, item, len);
 	LeaveCriticalSection(&w_agent.mu);
+	if (rc == 0)
+		WakeConditionVariable(&w_agent.cv);
 	return rc;
 }
 
 static void w_queue_send_one(void)
 {
-	struct win_queue_item *slot = &w_agent.q[w_agent.q_head];
-	const char *item = slot->heap != NULL ? slot->heap :
-		slot->buf;
+	const char *item;
 
+	EnterCriticalSection(&w_agent.mu);
+	item = agent_ring_peek(&w_agent.ring, NULL);
+	LeaveCriticalSection(&w_agent.mu);
+	if (item == NULL)
+		return;
 	if (w_send_frame(RETRACE_RPC_MSG_EVENT, item) != 0) {
 		w_drop_connection();
-	} else if (slot->heap != NULL) {
-		free(slot->heap);
-		slot->heap = NULL;
+		return;
 	}
-	w_agent.q_head = (w_agent.q_head + 1) % WIN_AGENT_QUEUE_CAP;
-	w_agent.q_count--;
+	EnterCriticalSection(&w_agent.mu);
+	agent_ring_pop(&w_agent.ring);
+	LeaveCriticalSection(&w_agent.mu);
 }
 
 static void w_drop_connection(void)
@@ -1435,10 +1368,12 @@ static int w_try_connect(void)
 static void w_drain_queue(void)
 {
 	for (;;) {
-		if (w_agent.q_count == 0)
-			break;
-		if (w_agent.q[w_agent.q_head].heap == NULL &&
-		    w_agent.q[w_agent.q_head].len == 0)
+		const char *item;
+
+		EnterCriticalSection(&w_agent.mu);
+		item = agent_ring_peek(&w_agent.ring, NULL);
+		LeaveCriticalSection(&w_agent.mu);
+		if (item == NULL)
 			break;
 		w_queue_send_one();
 		if (!w_agent.connected)
@@ -1446,20 +1381,24 @@ static void w_drain_queue(void)
 	}
 	/* loss signaling: report the counted delta, never silent */
 	{
-		LONG64 now = InterlockedAdd64(&w_agent.dropped, 0);
+		uint64_t now;
 
+		EnterCriticalSection(&w_agent.mu);
+		now = w_agent.ring.dropped;
+		LeaveCriticalSection(&w_agent.mu);
 		if (now != w_agent.drops_reported) {
 			char marker[256];
-			LONG64 delta = now - w_agent.drops_reported;
+			uint64_t delta = now - w_agent.drops_reported;
 
 			snprintf(marker, sizeof(marker),
 				"{\"agent_id\":\"%s\",\"seq\":0,"
 				"\"ts\":%ld,"
 				"\"name\":\"retrace.agent.dropped\","
-				"\"attrs\":{\"count\":\"%lld\","
-				"\"total\":\"%lld\"}}}",
+				"\"attrs\":{\"count\":\"%llu\","
+				"\"total\":\"%llu\"}}}",
 				w_agent.agent_id, (long)time(NULL),
-				delta, now);
+				(unsigned long long)delta,
+				(unsigned long long)now);
 			if (w_queue_push(marker, strlen(marker)) == 0)
 				w_agent.drops_reported = now;
 		}
@@ -1540,6 +1479,7 @@ int retrace_agent_init(void)
 	if (w_agent.inited)
 		return 0;
 	w_agent.inited = 1;
+	agent_ring_init(&w_agent.ring);
 	w_agent.pipe = INVALID_HANDLE_VALUE;
 	InitializeCriticalSection(&w_agent.mu);
 	InitializeConditionVariable(&w_agent.cv);
@@ -1587,7 +1527,7 @@ void retrace_agent_deinit(void)
 int retrace_agent_emit_event(const char *name,
 	const char *const *kv, size_t n_kv)
 {
-	char item[WIN_AGENT_ITEM_MAX];
+	char item[AGENT_RING_INLINE];
 	size_t o = 0;
 	size_t i;
 	int n;
@@ -1601,42 +1541,27 @@ int retrace_agent_emit_event(const char *name,
 		InterlockedIncrement64(&w_agent.seq),
 		(long)time(NULL), name);
 	if (n <= 0 || (size_t)n >= sizeof(item) - o)
-		goto drop;
+		return -1;
 	o += (size_t)n;
 	for (i = 0; i < n_kv; i++) {
 		n = snprintf(item + o, sizeof(item) - o,
 			"%s\"%s\":\"%s\"", i > 0 ? "," : "", kv[i * 2],
 			kv[i * 2 + 1]);
 		if (n <= 0 || (size_t)n >= sizeof(item) - o)
-			goto drop;
+			return -1;
 		o += (size_t)n;
 	}
 	n = snprintf(item + o, sizeof(item) - o, "},\"source\":\"libc\"}");
 	if (n <= 0 || (size_t)n >= sizeof(item) - o)
-		goto drop;
+		return -1;
 	o += (size_t)n;
-	{
-		size_t need = o;
-		char *big = need > sizeof(item) ?
-			(char *)malloc(need + 1) : NULL;
-
-		if (big != NULL) {
-			memcpy(big, item, o);
-			big[o] = '\0';
-			if (w_queue_push(big, o) == 0) {
-				free(big);
-				return 0;
-			}
-			free(big);
-			goto drop;
-		}
-	}
+	/* every write above is bounded by the slot, so the ring's
+	 * own heap fallback covers nothing here -- the oversized
+	 * event simply refuses at its guard
+	 */
 	if (w_queue_push(item, o) != 0)
-		goto drop;
+		return -1;	/* the ring counted the refusal */
 	return 0;
-drop:
-	InterlockedIncrement64(&w_agent.dropped);
-	return -1;
 }
 
 #endif
