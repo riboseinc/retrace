@@ -156,6 +156,15 @@ static void on_signal(int sig)
 	g_stop = 1;
 }
 
+/* the ctl broadcast's fd adapter: same shape as the
+ * daemon_frame write seam, one int narrower
+ */
+static int ctl_conn_send_fd(void *io, uint16_t type,
+	const char *payload)
+{
+	return write_frame((int)(intptr_t)io, type, payload);
+}
+
 static long now_ms(void)
 {
 	struct timespec ts;
@@ -718,6 +727,7 @@ int main(int argc, char **argv)
 	g_ctl.reg = &reg;
 	g_ctl.jr = &jr;
 	g_ctl.conns = conns;
+	g_ctl.conn_send = ctl_conn_send_fd;
 	g_ctl.reply_sink = ctl_reply_fd;
 	g_ctl.reply_user = &g_ctl_fd;
 	g_ctl.scopes = RETRACED_SCOPE_ALL; /* local UDS default */
@@ -952,6 +962,7 @@ int main(int argc, char **argv)
 							    pfds[i].fd) {
 								close(conns[k].fd);
 								conns[k].fd = -1;
+							conns[k].io = NULL;
 								conns[k].helloed = 0;
 								break;
 							}
@@ -1062,6 +1073,8 @@ int main(int argc, char **argv)
 					 * peer actually sends.
 					 */
 					conns[slot].fd = fd;
+					conns[slot].io =
+						(void *)(intptr_t)fd;
 					conns[slot].fill = 0;
 					conns[slot].agent_id[0] = '\0';
 					conns[slot].helloed = 0;
@@ -1087,6 +1100,7 @@ int main(int argc, char **argv)
 				if (n <= 0) {
 					close(conns[i].fd);
 					conns[i].fd = -1;
+					conns[i].io = NULL;
 					/* connection-scoped
 					 * durability: a finished
 					 * conversation is on disk

@@ -51,12 +51,6 @@
 #include "tls_gate.h"
 #include "parson.h"
 
-/*
- * write_frame lives in main.c's TU (the connection-plane
- * writer); declared here for the policy push
- */
-int write_frame(int fd, uint16_t type, const char *payload);
-
 int retraced_policy_load(const char *text, char **blob_out,
 	long *epoch_out)
 {
@@ -124,10 +118,11 @@ int retraced_ctl_push_policy(struct retraced_ctl_ctx *ctx,
 	int i, pushed = 0;
 
 	for (i = 0; i < MAX_AGENTS; i++) {
-		if (ctx->conns[i].fd >= 0 &&
+		if (ctx->conns[i].io != NULL &&
 		    ctx->conns[i].helloed &&
-		    !ctx->conns[i].spectator) {
-			write_frame(ctx->conns[i].fd,
+		    !ctx->conns[i].spectator &&
+		    ctx->conn_send != NULL) {
+			ctx->conn_send(ctx->conns[i].io,
 				RETRACE_RPC_MSG_POLICY_SET, blob);
 			pushed++;
 		}
