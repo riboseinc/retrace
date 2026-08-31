@@ -86,7 +86,31 @@ public final class JRetrace implements Closeable {
         private final RandomAccessFile f;
 
         PipeChan(String path) throws IOException {
-            f = new RandomAccessFile(path, "rw");
+            /*
+             * The daemon keeps one pending instance; a connect
+             * landing in the gap after it is consumed (and
+             * before its replacement exists) is refused. Retry
+             * briefly -- the same backoff the in-process agent
+             * carries.
+             */
+            RandomAccessFile opened = null;
+            IOException last = null;
+            for (int i = 0; i < 5 && opened == null; i++) {
+                try {
+                    opened = new RandomAccessFile(path, "rw");
+                } catch (IOException e) {
+                    last = e;
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+            if (opened == null)
+                throw last;
+            f = opened;
         }
 
         public void writeAll(byte[] buf, int n) throws IOException {
