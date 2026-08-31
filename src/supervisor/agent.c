@@ -1182,18 +1182,21 @@ static int w_pipe_write(const void *buf, DWORD len)
 
 static int w_send_frame(uint16_t type, const char *payload)
 {
-	char hdr[RETRACE_RPC_HEADER_SZ];
-	DWORD plen = (DWORD)strlen(payload);
-	uint16_t v = 1, t = type;
-	uint32_t l = plen;
+	uint8_t out[RETRACE_RPC_HEADER_SZ + 2048];
+	size_t plen = payload != NULL ? strlen(payload) : 0;
 
-	memcpy(hdr, "RTRD", 4);
-	memcpy(hdr + 4, &v, 2);
-	memcpy(hdr + 6, &t, 2);
-	memcpy(hdr + 8, &l, 4);
-	if (w_pipe_write(hdr, sizeof(hdr)) != 0)
+	/* the shared codec + the same cap as the POSIX agent: an
+	 * over-cap frame would be DROPPED by the daemon's receiver
+	 * (length > RETRACE_RPC_PAYLOAD_MAX) -- truncate instead
+	 * of losing the event whole
+	 */
+	if (plen > 2048)
+		plen = 2048;
+	if (retrace_rpc_frame_encode(out, sizeof(out),
+		RETRACE_RPC_VERSION, type, payload,
+		(uint32_t)plen) != 0)
 		return -1;
-	if (plen > 0 && w_pipe_write(payload, plen) != 0)
+	if (w_pipe_write(out, RETRACE_RPC_HEADER_SZ + plen) != 0)
 		return -1;
 	return 0;
 }
@@ -1226,23 +1229,20 @@ static int w_bytes_avail(void)
 
 static int w_recv_frame(char *payload, size_t cap)
 {
-	char hdr[RETRACE_RPC_HEADER_SZ];
-	uint16_t v, t;
-	uint32_t l;
+	uint8_t hdr[RETRACE_RPC_HEADER_SZ];
+	struct retrace_rpc_frame fr;
 
 	if (w_pipe_read(hdr, sizeof(hdr)) != 0)
 		return -1;
-	if (memcmp(hdr, "RTRD", 4) != 0)
+	if (retrace_rpc_frame_decode(hdr, sizeof(hdr), &fr) != 0)
 		return -1;
-	memcpy(&v, hdr + 4, 2);
-	memcpy(&t, hdr + 6, 2);
-	memcpy(&l, hdr + 8, 4);
-	if (v != 1 || l >= cap)
+	if (fr.version != RETRACE_RPC_VERSION || fr.length >= cap)
 		return -1;
-	if (l > 0 && w_pipe_read(payload, l) != 0)
+	if (fr.length > 0 &&
+	    w_pipe_read(payload, fr.length) != 0)
 		return -1;
-	payload[l] = '\0';
-	return (int)t;
+	payload[fr.length] = '\0';
+	return (int)fr.type;
 }
 
 /* ---- queue (producers enqueue only; thread drains) ---- */
