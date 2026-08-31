@@ -39,12 +39,13 @@
 #include "tls_gate.h"
 
 /*
- * the connection-plane writer, stubbed: pushes are COUNTED,
- * not sent
+ * the broadcast seam, faked: pushes are COUNTED, not sent --
+ * no socket, no daemon, no extern symbol
  */
-int write_frame(int fd, uint16_t type, const char *payload)
+static int fake_conn_send(void *io, uint16_t type,
+	const char *payload)
 {
-	(void)fd;
+	(void)io;
 	(void)type;
 	(void)payload;
 	return 0;
@@ -53,7 +54,6 @@ int write_frame(int fd, uint16_t type, const char *payload)
 static int tests_run;
 static int tests_pass;
 static int tests_fail;
-static int pushes;
 
 #define TEST(name) do { \
 	tests_run++; \
@@ -105,12 +105,12 @@ static void setup(void)
 	memset(conns, 0, sizeof(conns));
 	memset(&reg, 0, sizeof(reg));
 	memset(&jr, 0, sizeof(jr));
-	pushes = 0;
 	retraced_journal_open(&jr, "/dev/null");
 	ctx.conns = conns;
 	ctx.reg = &reg;
 	ctx.jr = &jr;
 	ctx.reply_sink = sink;
+	ctx.conn_send = fake_conn_send;
 	ctx.scopes = RETRACED_SCOPE_ALL; /* local-UDS peer default */
 }
 
@@ -165,6 +165,22 @@ static void test_policy_push_valid(void)
 	CHECK(ctx.policy_blob != NULL);
 	CHECK(ctx.frozen == 0);
 	CHECK(ctx.thaw_blob != NULL);
+
+	/* the broadcast through the seam: a full peer is pushed,
+	 * a spectator is not (evidence always, policy never)
+	 */
+	setup();
+	conns[0].io = (void *)0x1234;
+	conns[0].helloed = 1;
+	conns[0].spectator = 0;
+	conns[1].io = (void *)0x1234;
+	conns[1].helloed = 1;
+	conns[1].spectator = 1;
+	feed(&ctx, "{\"cmd\":\"policy_push\",\"blob\":"
+		   "\"{\\\"policy\\\":{\\\"epoch\\\":8},"
+		   "\\\"intercept_scripts\\\":[{\\\"func_name\\\":\\\"*\\\","
+		   "\\\"actions\\\":[{\\\"action_name\\\":\\\"log_params\\\"}]}]}\"}");
+	CHECK(strstr(reply_buf, "\"pushed\":1") != NULL);
 }
 
 static void test_policy_push_bad(void)

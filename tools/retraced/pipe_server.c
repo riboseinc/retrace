@@ -47,6 +47,7 @@
 
 struct pipe_conn {
 	HANDLE pipe;
+	struct conn *ctl;	/* the broadcast registration */
 	OVERLAPPED ov;
 	int live;
 	char agent_id[RETRACED_AGENT_ID_MAX];
@@ -67,6 +68,13 @@ static const char *g_ctl_name = "\\\\.\\pipe\\retraced-ctl";
 
 static int pipe_write_frame(HANDLE h, uint16_t type,
 	const char *payload);
+
+/* the ctl broadcast's pipe arm */
+static int ctl_conn_send_pipe(void *io, uint16_t type,
+	const char *payload)
+{
+	return pipe_write_frame((HANDLE)io, type, payload);
+}
 
 /* the transport seam for the shared frame module: pipe-backed */
 static int df_write_pipe(void *io, uint16_t type, const char *payload)
@@ -188,6 +196,13 @@ static int handle_agent_frame(struct pipe_conn *c,
 		c->spectator = st.spectator;
 		snprintf(c->agent_id, sizeof(c->agent_id), "%s",
 			st.agent_id);
+		if (c->ctl != NULL) {
+			c->ctl->helloed = c->helloed;
+			c->ctl->spectator = c->spectator;
+			snprintf(c->ctl->agent_id,
+				sizeof(c->ctl->agent_id), "%s",
+				c->agent_id);
+		}
 		return 0;
 	}
 	case RETRACE_RPC_MSG_HEARTBEAT:
@@ -206,6 +221,8 @@ static int handle_agent_frame(struct pipe_conn *c,
 			now_ms(), &g_reg, &g_jr, &g_ctl, g_nonce,
 			df_write_pipe, (void *)c->pipe);
 		c->helloed = st.helloed;
+		if (c->ctl != NULL)
+			c->ctl->helloed = c->helloed;
 		return rc;
 	}
 	default:
@@ -236,6 +253,14 @@ static DWORD WINAPI agent_thread(LPVOID arg)
 	CloseHandle(c->pipe);
 	c->pipe = NULL;
 	c->live = 0;
+	if (c->ctl != NULL) {
+		/* a concurrent push holds the same lock */
+		EnterCriticalSection(&g_lock);
+		c->ctl->io = NULL;
+		c->ctl->helloed = 0;
+		c->ctl = NULL;
+		LeaveCriticalSection(&g_lock);
+	}
 	/* connection-scoped durability (same as the POSIX conn
 	 * end): observations are buffered-class records, and a
 	 * force-killed daemon must not swallow a finished
@@ -600,6 +625,7 @@ int retraced_pipe_main(int argc, char **argv)
 	for (i = 0; i < MAX_AGENTS; i++)
 		g_ctl_conns[i].fd = -1;
 	g_ctl.conns = g_ctl_conns;
+	g_ctl.conn_send = ctl_conn_send_pipe;
 	g_ctl.reg = &g_reg;
 	g_ctl.jr = &g_jr;
 	g_ctl.scopes = RETRACED_SCOPE_ALL;
@@ -664,11 +690,30 @@ int retraced_pipe_main(int argc, char **argv)
 				}
 				if (slot >= 0) {
 					HANDLE th;
+					int cs;
 
 					conns[slot].pipe = h;
 					conns[slot].live = 1;
 					conns[slot].helloed = 0;
 					conns[slot].spectator = 0;
+					conns[slot].ctl = NULL;
+					/* the broadcast
+					 * registration: policy
+					 * reaches pipe agents
+					 */
+					EnterCriticalSection(&g_lock);
+					for (cs = 0; cs < MAX_AGENTS;
+					     cs++) {
+						if (g_ctl_conns[cs].io == NULL) {
+							g_ctl_conns[cs].io = (void *)h;
+							g_ctl_conns[cs].helloed = 0;
+							g_ctl_conns[cs].spectator = 0;
+							g_ctl_conns[cs].agent_id[0] = '\0';
+							conns[slot].ctl = &g_ctl_conns[cs];
+							break;
+						}
+					}
+					LeaveCriticalSection(&g_lock);
 					th = CreateThread(NULL, 0, agent_thread,
 						&conns[slot], 0, NULL);
 					if (th != NULL)
@@ -704,21 +749,6 @@ int retraced_pipe_main(int argc, char **argv)
 	LeaveCriticalSection(&g_lock);
 	retraced_journal_close(&g_jr);
 	DeleteCriticalSection(&g_lock);
-	return 0;
-}
-
-/*
- * write_frame normally lives in main.c's TU (the POSIX daemon);
- * on Windows that file is not linked, and policy broadcast is
- * P0-off (the agent-side pipe port delivers POLICY_SET).
- */
-int write_frame(int fd, uint16_t type, const char *payload);
-
-int write_frame(int fd, uint16_t type, const char *payload)
-{
-	(void)fd;
-	(void)type;
-	(void)payload;
 	return 0;
 }
 

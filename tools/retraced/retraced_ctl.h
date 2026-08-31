@@ -40,6 +40,13 @@
  */
 struct conn {
 	int fd;
+	/*
+	 * The transport's write target: the fd as (intptr_t) on
+	 * POSIX, the pipe HANDLE on Windows (an int cannot carry
+	 * one). The broadcast sends through ctx->conn_send with
+	 * this; fd stays for the POSIX poll loop's own machinery.
+	 */
+	void *io;
 	uint8_t buf[RETRACE_RPC_PAYLOAD_MAX + RETRACE_RPC_HEADER_SZ];
 	size_t fill;
 	char agent_id[RETRACED_AGENT_ID_MAX];
@@ -82,6 +89,15 @@ struct retraced_ctl_ctx {
 	/* the reply sink (one line per command) */
 	void (*reply_sink)(const char *line, void *user);
 	void *reply_user;
+
+	/*
+	 * The broadcast seam: send one frame to a registered
+	 * agent's io. Same shape as the daemon_frame write seam.
+	 * The transport installs it; the unit test installs a
+	 * fake and counts.
+	 */
+	int (*conn_send)(void *io, uint16_t type,
+		const char *payload);
 };
 
 void retraced_ctl_set_policy(struct retraced_ctl_ctx *ctx,
