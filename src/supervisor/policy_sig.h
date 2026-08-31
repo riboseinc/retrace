@@ -43,4 +43,32 @@ int retrace_policy_sig_init(void);
 /* 1 when a key is pinned */
 int retrace_policy_sig_pinned(void);
 
+/*
+ * The POLICY_SET validation ladder -- shared by both agent
+ * halves (the POSIX UDS agent and the Windows pipe agent once
+ * carried a copy each; they drifted). Everything up to the
+ * install: wrapper verification, JSON parse, the policy
+ * header, epoch sanity against the agent's HELD epoch
+ * (idempotent re-delivery vs regression refusal), expiry, and
+ * the intercept_scripts presence. The INSTALL stays with the
+ * caller: it touches process state (config rebuild + the
+ * agent's epoch stamp).
+ *
+ * root_out receives the parsed document's OBJECT -- the shape
+ * installs consume (retrace_config_cache_build, retrace_conf);
+ * on OK the document's ownership passes to the caller's
+ * install, exactly as before the extraction. epoch_out
+ * receives the policy epoch.
+ *
+ * Returns 0 OK, 1 HELD (same epoch: idempotent, ACK and keep
+ * the policy in force), -1 ERR (reason_out filled).
+ */
+#include <stdint.h>
+
+struct json_object_t;
+
+int retrace_policy_validate(const char *payload_wrapped,
+	char *reason_out, size_t reason_cap, uint64_t have_epoch,
+	struct json_object_t **root_out, uint64_t *epoch_out);
+
 #endif /* RETRACE_SUPERVISOR_POLICY_SIG_H_ */

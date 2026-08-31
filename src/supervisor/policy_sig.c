@@ -257,3 +257,105 @@ out:
 	json_value_free(v);
 	return rc;
 }
+
+/*
+ * The validation ladder (see policy_sig.h). Pure given the
+ * agent's held epoch; the install belongs to the caller.
+ */
+static void validate_reason(char *out, size_t cap,
+	const char *msg)
+{
+	if (out != NULL && cap > 0)
+		snprintf(out, cap, "%s", msg);
+}
+
+int retrace_policy_validate(const char *payload_wrapped,
+	char *reason_out, size_t reason_cap, uint64_t have_epoch,
+	struct json_object_t **root_out, uint64_t *epoch_out)
+{
+	char payload_buf[8192];
+	const char *payload_json = payload_wrapped;
+	JSON_Value *v;
+	JSON_Object *root, *pol;
+	double epoch, expires;
+
+	if (root_out != NULL)
+		*root_out = NULL;
+	if (epoch_out != NULL)
+		*epoch_out = 0;
+	if (reason_out != NULL && reason_cap > 0)
+		reason_out[0] = '\0';
+	if (payload_wrapped == NULL) {
+		validate_reason(reason_out, reason_cap,
+			"null payload");
+		return -1;
+	}
+
+	(void)retrace_policy_sig_init();
+	{
+		int src = retrace_policy_sig_check(payload_wrapped,
+			payload_buf, sizeof(payload_buf), reason_out,
+			reason_cap);
+
+		if (src < 0)
+			return -1;
+		payload_json = payload_buf;
+	}
+
+	v = json_parse_string(payload_json);
+	if (v == NULL) {
+		validate_reason(reason_out, reason_cap,
+			"malformed json");
+		return -1;
+	}
+	root = json_value_get_object(v);
+	pol = root != NULL ? json_object_get_object(root, "policy")
+		: NULL;
+	if (pol == NULL) {
+		json_value_free(v);
+		validate_reason(reason_out, reason_cap,
+			"no policy header");
+		return -1;
+	}
+
+	epoch = json_object_get_number(pol, "epoch");
+	expires = json_object_get_number(pol, "expires");
+	if (epoch < 1.0) {
+		json_value_free(v);
+		validate_reason(reason_out, reason_cap,
+			"policy.epoch missing");
+		return -1;
+	}
+	if ((uint64_t)epoch == have_epoch) {
+		/* re-delivery of the HELD epoch (daemon restart,
+		 * fork child re-registration): idempotent -- the
+		 * policy is already in force, the ACK says so
+		 */
+		json_value_free(v);
+		return 1;
+	}
+	if ((uint64_t)epoch < have_epoch) {
+		json_value_free(v);
+		validate_reason(reason_out, reason_cap,
+			"epoch regression refused");
+		return -1;
+	}
+	if (expires > 0.0 && (time_t)expires <= time(NULL)) {
+		json_value_free(v);
+		validate_reason(reason_out, reason_cap,
+			"policy expired");
+		return -1;
+	}
+	if (json_object_get_array(root, "intercept_scripts") == NULL) {
+		json_value_free(v);
+		validate_reason(reason_out, reason_cap,
+			"no intercept_scripts");
+		return -1;
+	}
+
+	if (root_out != NULL)
+		*root_out = root;	/* document: caller installs */
+	if (epoch_out != NULL)
+		*epoch_out = (uint64_t)epoch;
+	return 0;
+}

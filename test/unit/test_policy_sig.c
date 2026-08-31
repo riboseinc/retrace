@@ -17,6 +17,7 @@
 #include <unistd.h>
 
 #include "policy_sig.h"
+#include "parson.h"
 
 /* fixtures: the committed audit keypair (throwaway, tests only) */
 #define PRIV RETRACE_SOURCE_DIR "/test/fixtures/audit_ed25519_key.pem"
@@ -237,6 +238,61 @@ static void test_partial_wrapper_rejected(void)
 	CHECK(strstr(reason, "partial") != NULL);
 }
 
+static const char *VGOOD =
+	"{\"policy\":{\"epoch\":9},\"intercept_scripts\":["
+	"{\"func_name\":\"open\",\"actions\":["
+	"{\"action_name\":\"log_params\"}]}]}";
+
+static void test_ladder_held_is_idempotent(void)
+{
+	char reason[64];
+
+	CHECK(retrace_policy_validate(VGOOD, reason, sizeof(reason),
+		9, NULL, NULL) == 1);
+}
+
+static void test_ladder_regression_refused(void)
+{
+	char reason[64];
+
+	CHECK(retrace_policy_validate(VGOOD, reason, sizeof(reason),
+		10, NULL, NULL) == -1);
+	CHECK(strstr(reason, "regression") != NULL);
+}
+
+static void test_ladder_expired_refused(void)
+{
+	const char *old = "{\"policy\":{\"epoch\":99,"
+			  "\"expires\":1000},"
+			  "\"intercept_scripts\":[]}";
+	char reason[64];
+
+	CHECK(retrace_policy_validate(old, reason, sizeof(reason),
+		0, NULL, NULL) == -1);
+	CHECK(strstr(reason, "expired") != NULL);
+}
+
+static void test_ladder_no_scripts_refused(void)
+{
+	char reason[64];
+
+	CHECK(retrace_policy_validate(
+		"{\"policy\":{\"epoch\":9}}", reason,
+		sizeof(reason), 0, NULL, NULL) == -1);
+	CHECK(strstr(reason, "no intercept_scripts") != NULL);
+}
+
+static void test_ladder_ok_hands_root(void)
+{
+	struct json_object_t *root;
+	uint64_t epoch = 0;
+	char reason[64];
+
+	CHECK(retrace_policy_validate(VGOOD, reason, sizeof(reason),
+		0, &root, &epoch) == 0);
+	CHECK(root != NULL && epoch == 9);
+}
+
 int main(void)
 {
 	printf("policy signature tests:\n");
@@ -247,6 +303,11 @@ int main(void)
 	TEST(tampered_rejected);
 	TEST(partial_wrapper_rejected);
 	TEST(rotation_both_keys_verify);
+	TEST(ladder_held_is_idempotent);
+	TEST(ladder_regression_refused);
+	TEST(ladder_expired_refused);
+	TEST(ladder_no_scripts_refused);
+	TEST(ladder_ok_hands_root);
 
 	printf("%d tests: %d pass, %d fail\n", tests_run, tests_pass,
 		tests_fail);

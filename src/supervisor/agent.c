@@ -511,88 +511,22 @@ static void set_reason(char *dst, size_t cap, const char *msg)
 int retrace_agent_policy_apply(const char *payload_wrapped,
 	char *reason_out, size_t reason_cap)
 {
-	char payload_buf[8192];
-	const char *payload_json = payload_wrapped;
-	JSON_Value *v;
-	JSON_Object *root, *pol;
-	double epoch, expires;
+	struct json_object_t *root;
+	uint64_t epoch;
+	int rc = retrace_policy_validate(payload_wrapped,
+		reason_out, reason_cap, g_agent.policy_epoch,
+		&root, &epoch);
 
-	if (reason_out != NULL && reason_cap > 0)
-		reason_out[0] = '\0';
-	if (payload_wrapped == NULL) {
-		set_reason(reason_out, reason_cap, "null payload");
-		return -1;
-	}
-
-	/*
-	 * Signed policies (TODO.supervisor/05): a wrapper carries
-	 * the exact policy bytes + an Ed25519 signature; with a key
-	 * pinned (RETRACE_SUPERVISOR_PUBKEY) verification is
-	 * fail-closed. Bare policies pass through unchanged.
-	 */
-	(void)retrace_policy_sig_init();
-	{
-		int src = retrace_policy_sig_check(payload_wrapped,
-			payload_buf, sizeof(payload_buf), reason_out,
-			reason_cap);
-
-		if (src < 0)
-			return -1;
-		payload_json = payload_buf;
-	}
-
-	v = json_parse_string(payload_json);
-	if (v == NULL) {
-		set_reason(reason_out, reason_cap, "malformed json");
-		return -1;
-	}
-	root = json_value_get_object(v);
-	pol = root != NULL ? json_object_get_object(root, "policy") : NULL;
-	if (pol == NULL) {
-		json_value_free(v);
-		set_reason(reason_out, reason_cap, "no policy header");
-		return -1;
-	}
-
-	epoch = json_object_get_number(pol, "epoch");
-	expires = json_object_get_number(pol, "expires");
-	if (epoch < 1.0) {
-		json_value_free(v);
-		set_reason(reason_out, reason_cap, "policy.epoch missing");
-		return -1;
-	}
-	if ((uint64_t)epoch == g_agent.policy_epoch) {
-		/* re-delivery of the HELD epoch (daemon restart, fork
-		 * child re-registration): idempotent -- the policy
-		 * is already in force, the ACK says so
-		 */
-		json_value_free(v);
-		return 0;
-	}
-	if ((uint64_t)epoch < g_agent.policy_epoch) {
-		json_value_free(v);
-		set_reason(reason_out, reason_cap,
-			"epoch regression refused");
-		return -1;
-	}
-	if (expires > 0.0 && (time_t)expires <= time(NULL)) {
-		json_value_free(v);
-		set_reason(reason_out, reason_cap, "policy expired");
-		return -1;
-	}
-	if (json_object_get_array(root, "intercept_scripts") == NULL) {
-		json_value_free(v);
-		set_reason(reason_out, reason_cap, "no intercept_scripts");
-		return -1;
-	}
-
+	if (rc != 0)
+		return rc > 0 ? 0 : -1;	/* HELD: idempotent ACK */
 	if (retrace_config_cache_build(root) != 0) {
-		json_value_free(v);
-		set_reason(reason_out, reason_cap, "cache rebuild failed");
+		json_value_free(json_object_get_wrapping_value(root));
+		set_reason(reason_out, reason_cap,
+			"cache rebuild failed");
 		return -1;
 	}
 	retrace_conf = root;
-	g_agent.policy_epoch = (uint64_t)epoch;
+	g_agent.policy_epoch = epoch;
 	return 0;
 }
 
@@ -1379,72 +1313,22 @@ static void w_drop_connection(void)
 int retrace_agent_policy_apply(const char *payload_wrapped,
 	char *reason_out, size_t reason_cap)
 {
-	char payload_buf[8192];
-	const char *payload_json = payload_wrapped;
-	JSON_Value *v;
-	JSON_Object *root, *pol;
-	double epoch;
+	struct json_object_t *root;
+	uint64_t epoch;
+	int rc = retrace_policy_validate(payload_wrapped,
+		reason_out, reason_cap, w_agent.policy_epoch,
+		&root, &epoch);
 
-	if (reason_out != NULL && reason_cap > 0)
-		reason_out[0] = '\0';
-	if (payload_wrapped == NULL) {
-		w_set_reason(reason_out, reason_cap, "null payload");
-		return -1;
-	}
-	(void)retrace_policy_sig_init();
-	{
-		int src = retrace_policy_sig_check(payload_wrapped,
-			payload_buf, sizeof(payload_buf), reason_out,
-			reason_cap);
-
-		if (src < 0)
-			return -1;
-		payload_json = payload_buf;
-	}
-	v = json_parse_string(payload_json);
-	if (v == NULL) {
-		w_set_reason(reason_out, reason_cap, "malformed json");
-		return -1;
-	}
-	root = json_value_get_object(v);
-	pol = root != NULL ? json_object_get_object(root, "policy")
-		: NULL;
-	if (pol == NULL) {
-		json_value_free(v);
-		w_set_reason(reason_out, reason_cap, "no policy header");
-		return -1;
-	}
-	epoch = json_object_get_number(pol, "epoch");
-	if (epoch < 1.0) {
-		json_value_free(v);
-		w_set_reason(reason_out, reason_cap,
-			"policy.epoch missing");
-		return -1;
-	}
-	if ((uint64_t)epoch == w_agent.policy_epoch) {
-		json_value_free(v);
-		return 0;	/* idempotent re-delivery */
-	}
-	if ((uint64_t)epoch < w_agent.policy_epoch) {
-		json_value_free(v);
-		w_set_reason(reason_out, reason_cap,
-			"epoch regression refused");
-		return -1;
-	}
-	if (json_object_get_array(root, "intercept_scripts") == NULL) {
-		json_value_free(v);
-		w_set_reason(reason_out, reason_cap,
-			"no intercept_scripts");
-		return -1;
-	}
+	if (rc != 0)
+		return rc > 0 ? 0 : -1;	/* HELD: idempotent ACK */
 	if (retrace_config_cache_build(root) != 0) {
-		json_value_free(v);
+		json_value_free(json_object_get_wrapping_value(root));
 		w_set_reason(reason_out, reason_cap,
 			"cache rebuild failed");
 		return -1;
 	}
 	retrace_conf = root;
-	w_agent.policy_epoch = (uint64_t)epoch;
+	w_agent.policy_epoch = epoch;
 	return 0;
 }
 
