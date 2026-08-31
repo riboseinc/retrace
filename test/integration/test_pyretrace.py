@@ -23,7 +23,7 @@ import time
 def wait_sock(path, deadline=5.0):
     end = time.time() + deadline
     while time.time() < end:
-        if path.startswith(r"\\.\pipe\\"):
+        if path.startswith("\\\\.\\pipe\\"):
             try:
                 open(path, "r+b", buffering=0).close()
                 return True
@@ -75,7 +75,7 @@ def main():
     daemon, moddir = (os.path.abspath(p) for p in sys.argv[1:3])
 
     work = tempfile.mkdtemp(prefix="pyrt-")
-    sock = (r"\\.\pipe\\retrace-py-e2e" if os.name == "nt"
+    sock = (r"\\.\pipe\retrace-py-e2e" if os.name == "nt"
             else os.path.join(work, "agent.sock"))
     journal = os.path.join(work, "journal.jsonl")
     nonce_file = os.path.join(work, "nonce.txt")
