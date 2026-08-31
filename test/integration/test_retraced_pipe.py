@@ -13,58 +13,16 @@ Usage: test_retraced_pipe.py <retraced>
 """
 import json
 import os
-import struct
 import subprocess
 import sys
 import tempfile
 import time
 
+from rpipe import (frame, recv_frame, open_pipe,
+                   journal_records, taskkill)
+
 MAGIC = b"RTRD"
 HELLO, HEARTBEAT, EVENT, BYE, WELCOME = 1, 2, 4, 6, 16
-
-
-def frame(mid, payload):
-    b = payload.encode()
-    return MAGIC + struct.pack("<HHI", 1, mid, len(b)) + b
-
-
-def recv_exact(f, n):
-    buf = b""
-    while len(buf) < n:
-        chunk = f.read(n - len(buf))
-        if not chunk:
-            raise EOFError
-        buf += chunk
-    return buf
-
-
-def recv_frame(f):
-    hdr = recv_exact(f, 12)
-    _, _, mid, ln = struct.unpack("<4sHHI", hdr)
-    body = recv_exact(f, ln) if ln else b""
-    return mid, json.loads(body) if body else {}
-
-
-def wait_pipe(path, deadline=10.0):
-    end = time.time() + deadline
-    while time.time() < end:
-        try:
-            f = open(path, "r+b", buffering=0)
-            return f
-        except OSError:
-            time.sleep(0.1)
-    return None
-
-
-def journal_records(path):
-    recs = []
-    with open(path, errors="replace") as f:
-        for ln in f.read().splitlines():
-            try:
-                recs.append(json.loads(ln))
-            except json.JSONDecodeError:
-                pass
-    return recs
 
 
 def main():
@@ -85,7 +43,7 @@ def main():
         [daemon, "--sock", pipe, "--journal", journal],
         stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     try:
-        f = wait_pipe(pipe)
+        f = open_pipe(pipe)
         if f is None:
             print("FAIL: daemon never listened on the pipe",
                   file=sys.stderr)

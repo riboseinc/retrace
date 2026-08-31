@@ -16,6 +16,8 @@ import sys
 import tempfile
 import time
 
+from rpipe import (open_pipe as wait_pipe)
+
 PIPE_AGENT = "\\\\.\\pipe\\retrace-sup-agent"
 PIPE_CTL = "\\\\.\\pipe\\retrace-sup-ctl"
 NONCE = "a1b2c3d4e5f60718293a4b5c6d7e8f90"
@@ -30,17 +32,6 @@ def journal_records(path):
             except json.JSONDecodeError:
                 pass
     return recs
-
-
-def wait_pipe(name, deadline=10.0):
-    end = time.time() + deadline
-    while time.time() < end:
-        try:
-            f = open(name, "r+b", buffering=0)
-            return f
-        except OSError:
-            time.sleep(0.1)
-    return None
 
 
 def main():
