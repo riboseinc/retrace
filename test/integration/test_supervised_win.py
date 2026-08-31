@@ -97,6 +97,11 @@ def main():
             "RETRACE_SUPERVISOR": "1",
             "RETRACE_SUPERVISOR_SOCK": PIPE_AGENT,
             "RETRACE_SUPERVISOR_NONCE": NONCE,
+            # cmd/ping are native Win32 -- no CRT calls, so the
+            # ucrt-level hooks never dispatch and the lazy agent
+            # kick never fires. The ntdll layer (the static-CRT
+            # smoke's pattern) sees their CreateFileW.
+            "RETRACE_WIN_NTDLL": "1",
         })
         r = subprocess.run(
             [win_run, "--lib", dll, "cmd.exe", "/c", "ping", "-n", "4",
