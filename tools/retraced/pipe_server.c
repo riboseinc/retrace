@@ -405,6 +405,24 @@ static DWORD WINAPI ctl_thread(LPVOID arg)
 
 /* ---- accept loop ---- */
 
+/*
+ * Arm one pending accept. ConnectNamedPipe returning FALSE
+ * without ERROR_IO_PENDING means a client's CreateFile beat the
+ * arm (ERROR_PIPE_CONNECTED) or the instance is unusable: in
+ * both cases the event NEVER fires, the loop would sleep on it
+ * forever, and every later connect reads ERROR_PIPE_BUSY -- the
+ * slow-leg jretrace refusal. Take the accept door immediately
+ * instead (a broken handle simply fails fast in its thread).
+ */
+static void arm_accept(HANDLE h, OVERLAPPED *ov)
+{
+	if (h == INVALID_HANDLE_VALUE)
+		return;
+	if (!ConnectNamedPipe(h, ov) &&
+	    GetLastError() != ERROR_IO_PENDING)
+		SetEvent(ov->hEvent);
+}
+
 
 static BOOL WINAPI on_console_ctrl(DWORD type)
 {
@@ -625,7 +643,7 @@ int retraced_pipe_main(int argc, char **argv)
 
 		memset(&ov, 0, sizeof(ov));
 		ov.hEvent = evt;
-		ConnectNamedPipe(h, &ov);
+		arm_accept(h, &ov);
 		while (!g_stop &&
 		       (deadline_local == 0 ||
 			now_ms() < deadline_local)) {
@@ -664,7 +682,7 @@ int retraced_pipe_main(int argc, char **argv)
 				ResetEvent(evt);
 				memset(&ov, 0, sizeof(ov));
 				ov.hEvent = evt;
-				ConnectNamedPipe(h, &ov);
+				arm_accept(h, &ov);
 				continue;
 			}
 			if (now_ms() - last_sweep > SWEEP_INTERVAL_MS) {
