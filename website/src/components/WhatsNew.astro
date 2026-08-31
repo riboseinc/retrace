@@ -5,6 +5,48 @@
 
 const shipped = [
   {
+    title: "The Windows lane goes real",
+    detail: "The named-pipe daemon, fleet CLI, and all four agents (libc, kernel-ETW, Python, JVM) now build, link, and pass their integration tests on Windows -- including the SCM service lane (sc create/start/stop with graceful journal flush) and a configure-time conformance guard over the everywhere-build set. Sixteen defects that had shipped dark were burned off in one activation arc.",
+    accent: "control",
+    tag: "v2.62.0",
+  },
+  {
+    title: "Runtime agents: Python and JVM",
+    detail: "pyretrace and jretrace attribute file opens, sockets, and execs to the module and line that issued them -- the layer a libc interposer sees only as an open from pid N. Both are third-party implementations pinned to the same conformance suite as the reference stub.",
+    accent: "see",
+    tag: "v2.53-61",
+  },
+  {
+    title: "Kernel observation, graded live",
+    detail: "eBPF and ETW bridge agents join every session as kernel-lane spectators; the daemon grades kernel observations against libc claims per sweep and streams drift summaries -- the correlate oracle's signal, live.",
+    accent: "see",
+    tag: "v2.52-59",
+  },
+  {
+    title: "Kernel enforcement, audited",
+    detail: "One declared-set, four enforcement planes: Landlock, seccomp, Seatbelt, and AppContainer -- each exec bound to a hash-chained, Ed25519-signed audit trail that fails closed on tamper.",
+    accent: "control",
+    tag: "v2.50-58",
+  },
+  {
+    title: "Signed policy with rotation",
+    detail: "POLICY_SET ships as an Ed25519-signed wrapper over the exact policy bytes; the daemon pins multiple trust keys so rotation overlaps instead of breaking the fleet.",
+    accent: "break",
+    tag: "v2.54-56",
+  },
+  {
+    title: "The fleet CLI over TLS 1.3",
+    detail: "retrace-ctl speaks mutual TLS where every certificate carries its own claim scopes (status, ps, policy, kill) as a URI SAN -- an over-scoped controller is refused and journaled, not merely rejected.",
+    accent: "control",
+    tag: "v2.47-49",
+  },
+  {
+    title: "The supervisor daemon",
+    detail: "retraced: per-host registry, hash-chained journal, formally-versioned control protocol, and the nonce doctrine -- nonceless HELLOs seat as spectators: evidence always, policy never.",
+    accent: "see",
+    tag: "v2.38-46",
+  },
+  {
     title: "Live OTLP streaming",
     detail: "RETRACE_OTLP_ENDPOINT streams OpenTelemetry spans live from inside the traced process -- one env var, no batch pipeline. Spans, security events, and metrics land in Grafana/Jaeger/otelcol as calls happen.",
     accent: "see",
@@ -54,29 +96,26 @@ const shipped = [
   },
 ];
 
+/* The v2.2/v2.3-era roadmap items all shipped (sockets in the
+   inventory, caller-match routing, the ws-stream tool, the
+   frida bridge) -- the open work is below. */
 const roadmap = [
   {
-    title: "Network functions in default intercept set",
-    detail: "socket, connect, send, recv, sendto, recvfrom — currently tracked in issues. Will ship with prototypes for sockaddr inspection.",
-    eta: "v2.2.0",
+    title: "Live eBPF legs on CI",
+    detail: "The eBPF agent runs --synthetic in the matrix; the real loader needs a BPF-capable (self-hosted) runner leg so kernel-lane captures are exercised on every PR, not only locally.",
+    eta: "next",
     accent: "see",
   },
   {
-    title: "Per-return-address routing",
-    detail: "Different scripts for different call sites of the same function. Enables 'fail this open() when called from auth.c, but not from main.c'.",
-    eta: "v2.2.0",
+    title: "Cookbook growth",
+    detail: "The recipe set covers the classic and security-research flows; the gap is fleet-scale stories -- policy rollout, journal forensics, drift triage across hosts.",
+    eta: "ongoing",
     accent: "control",
   },
   {
-    title: "Real-time trace streaming over WebSocket",
-    detail: "Live trace view in the browser — no file roundtrip. Pairs with the built-in HTML viewer for post-hoc analysis.",
-    eta: "v2.3.0",
-    accent: "see",
-  },
-  {
-    title: "Frida backend (optional)",
-    detail: "For binaries where LD_PRELOAD doesn't reach (heavily-stripped, anti-instrumentation). Plugin backend; same JSON config.",
-    eta: "v2.3.0",
+    title: "Distro packaging",
+    detail: "Source builds and the Nix flake exist; system packages (deb, rpm, brew) so operators install retraced the way they install everything else.",
+    eta: "planned",
     accent: "break",
   },
 ];
@@ -84,7 +123,7 @@ const roadmap = [
 const stats = [
   { value: "13",   label: "platforms" },
   { value: "12",   label: "actions" },
-  { value: "291",  label: "functions" },
+  { value: "317",  label: "functions" },
   { value: "21",   label: "cookbook recipes" },
   { value: "0",    label: "external deps" },
 ];
@@ -94,7 +133,7 @@ const stats = [
   <div class="wrap">
     <div class="section-head reveal">
       <div class="eyebrow">Recently shipped · What's next</div>
-      <h2>The project is alive. v2.1.0 landed eight major features.</h2>
+      <h2>The supervisor arc landed: 24 releases, both OSes, one protocol.</h2>
       <p>
         retrace has shipped continuously since 2017. The list below is what landed in the latest
         release and what's queued for the next two. Star
@@ -116,8 +155,8 @@ const stats = [
 
     <div class="shipped-block">
       <header class="block-head reveal">
-        <div class="block-tag accent-control">SHIPPED: v2.7 - v2.37</div>
-        <h3>Thirty-seven releases in -- the recent arc that made retrace a cross-platform security instrument.</h3>
+        <div class="block-tag accent-control">SHIPPED: v2.38 - v2.62</div>
+        <h3>The arc that made retrace a supervised instrument: daemon, fleet control, enforcement, three observation lanes, and the Windows lane made real.</h3>
       </header>
       <div class="shipped-grid">
         {
