@@ -19,6 +19,8 @@ import tempfile
 import textwrap
 import time
 
+from rpipe import (wait_sock, journal_records)
+
 
 CHILD = r"""
 import java.util.Map;
@@ -39,32 +41,6 @@ public class JRetraceSmoke {
     }
 }
 """
-
-
-def wait_sock(path, deadline=5.0):
-    end = time.time() + deadline
-    while time.time() < end:
-        if path.startswith("\\\\.\\pipe\\"):
-            try:
-                open(path, "r+b", buffering=0).close()
-                return True
-            except OSError:
-                pass
-        elif os.path.exists(path):
-            return True
-        time.sleep(0.1)
-    return False
-
-
-def journal_records(path):
-    recs = []
-    with open(path) as f:
-        for ln in f.read().splitlines():
-            try:
-                recs.append(json.loads(ln))
-            except json.JSONDecodeError:
-                pass
-    return recs
 
 
 def jdk_ok():

@@ -18,29 +18,11 @@ import sys
 import tempfile
 import time
 
+from rpipe import (frame, recv_exact, run)
+
 MAGIC = b"RTRD"
 HELLO, BYE, WELCOME = 1, 6, 16
 SVC = "retrace-svc-test"
-
-
-def frame(mid, payload):
-    b = payload.encode()
-    return MAGIC + struct.pack("<HHI", 1, mid, len(b)) + b
-
-
-def recv_exact(f, n):
-    buf = b""
-    while len(buf) < n:
-        c = f.read(n - len(buf))
-        if not c:
-            raise EOFError
-        buf += c
-    return buf
-
-
-def run(cmd, **kw):
-    return subprocess.run(cmd, capture_output=True, text=True,
-                          timeout=60, **kw)
 
 
 def main():
