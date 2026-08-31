@@ -98,7 +98,7 @@ def main():
             "pid": os.getpid(), "ppid": 0, "boot_id": "svc",
             "cmdline": "svc-stub", "retrace_version": "stub"})))
         hdr = recv_exact(up, 12)
-        mid, ln = struct.unpack("<HH", hdr[4:8])[0], \
+        mid, ln = struct.unpack("<H", hdr[6:8])[0], \
             struct.unpack("<I", hdr[8:12])[0]
         if mid != WELCOME:
             print(f"FAIL: no WELCOME ({mid})", file=sys.stderr)
