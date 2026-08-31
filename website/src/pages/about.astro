@@ -53,13 +53,16 @@ import Footer from "../components/Footer.astro";
             already run instead of inventing another one.</p>
           </div>
           <div>
-            <h3>The supervisor (shipped in v2.49)</h3>
+            <h3>The supervisor (v2.38, native on both worlds since v2.62)</h3>
             <p>A per-host daemon (<code>retraced</code>) owns every traced
             process: registry, versioned policy, a hash-chained journal, and
             a fleet CLI over TLS 1.3 with certificate claim scopes — plus
             kernel enforcement on Linux (Landlock + seccomp), macOS
             (Seatbelt), and Windows (AppContainer), each exec bound to a
-            signed audit trail.</p>
+            signed audit trail. On Windows the whole plane speaks
+            named pipes natively — daemon, fleet CLI, and every
+            agent — and the daemon installs as an SCM service
+            with one binary, two launches.</p>
           </div>
         </div>
       </div>
