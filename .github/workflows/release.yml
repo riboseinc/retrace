@@ -428,6 +428,8 @@ jobs:
             artifacts/retrace-*.zip.sha256
             artifacts/retrace-*.deb
             artifacts/retrace-*.deb.sha256
+            artifacts/retrace-*.rpm
+            artifacts/retrace-*.rpm.sha256
             artifacts/libretrace-*.so
             artifacts/libretrace-*.so.sha256
             artifacts/libretrace-*.dylib
