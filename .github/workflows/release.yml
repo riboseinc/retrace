@@ -118,7 +118,7 @@ jobs:
         if: matrix.os == 'linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq cmake ninja-build libssl-dev
+          sudo apt-get install -y -qq cmake ninja-build libssl-dev rpm
 
       - name: Install deps (macOS)
         if: matrix.os == 'macos'
@@ -140,15 +140,19 @@ jobs:
           # tarball carries bin/ + lib/ + include/ (the hand-staged
           # era shipped lib/include only -- every tool was missing)
           (cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME="$PKG" \
-            && cpack -G DEB -D CPACK_PACKAGE_FILE_NAME="$PKG")
+            && cpack -G DEB -D CPACK_PACKAGE_FILE_NAME="$PKG" \
+            && cpack -G RPM -D CPACK_PACKAGE_FILE_NAME="$PKG")
           mv "build/$PKG.tar.gz" "build/$PKG.tar.gz.sha256" .
           mv "build/$PKG.deb" "build/$PKG.deb.sha256" . 2>/dev/null || true
+          mv "build/$PKG.rpm" "build/$PKG.rpm.sha256" . 2>/dev/null || true
           # bare library for curl + LD_PRELOAD use case
           cp "$(ls build/src/v2/libretrace.so.*.*.* | head -1)" "libretrace-${{ matrix.platform }}.so"
           sha256sum "libretrace-${{ matrix.platform }}.so" \
             > "libretrace-${{ matrix.platform }}.so.sha256"
           # a broken package is red at build time, not install time
           dpkg-deb -I "$PKG.deb" >/dev/null && dpkg-deb -c "$PKG.deb" | grep -q libretrace
+          rpm -qp --info "$PKG.rpm" >/dev/null \
+            && rpm2cpio "$PKG.rpm" | cpio -t 2>/dev/null | grep -q libretrace
 
       - name: Stage binary (macOS)
         if: matrix.os == 'macos'
@@ -221,6 +225,8 @@ jobs:
             libretrace-*.dylib.sha256
             retrace-*.deb
             retrace-*.deb.sha256
+            retrace-*.rpm
+            retrace-*.rpm.sha256
             libretrace-*.dll
             libretrace-*.dll.sha256
             retrace-*.zip
