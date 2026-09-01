@@ -163,6 +163,13 @@ if(RETRACE_PLATFORM_OHOS)
 	add_compile_definitions(RETRACE_PLATFORM_OHOS=1)
 endif()
 
+# the install-dirs SSOT: tools referenced BINDIR/DATADIR/DOCDIR
+# and CMAKEDIR needs LIBDIR -- only BINDIR was ever defined,
+# leaving the profiler's schema and the config installs writing
+# to /<name> (first exercised by the packaging module). Before
+# every consumer.
+include(GNUInstallDirs)
+
 set(RETRACE_INSTALL_CMAKEDIR
 	"${CMAKE_INSTALL_LIBDIR}/cmake/retrace-${PROJECT_VERSION}"
 	CACHE PATH "Install path for CMake package config files")
@@ -365,6 +372,7 @@ endif()
 # ---------------------------------------------------------------
 
 # Public headers are installed from include/.
+
 add_subdirectory(include/retrace)
 
 # otlp-c is the live-streaming dependency (TODO.trace-profile/31)
@@ -491,6 +499,9 @@ add_subdirectory(grafana-plugin)
 # Wasm playground (pure C source + HTML, compiled separately).
 add_subdirectory(wasm-playground)
 
+# the packaging module (CPack over the install surface)
+include(${CMAKE_SOURCE_DIR}/cmake/Packaging.cmake)
+
 # ---------------------------------------------------------------
 # Package config
 # ---------------------------------------------------------------
@@ -511,6 +522,9 @@ install(FILES
 	"${CMAKE_CURRENT_BINARY_DIR}/retrace-config.cmake"
 	"${CMAKE_CURRENT_BINARY_DIR}/retrace-config-version.cmake"
 	DESTINATION "${RETRACE_INSTALL_CMAKEDIR}")
+
+install(FILES ${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES
+	DESTINATION share/doc/retrace)
 
 # pkg-config module
 configure_file(
