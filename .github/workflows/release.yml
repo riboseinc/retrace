@@ -133,61 +133,168 @@ jobs:
 
       - name: Stage binary (Linux)
         if: matrix.os == 'linux'
-        env:
-          NOTICES: |
-            retrace third-party notices
-            ===========================
-
-            retrace is BSD-2-Clause licensed.
-
-            This build does NOT link against or include:
-              - MinHook (https://github.com/TsudaKageyu/minhook)
-              - Microsoft Detours (https://github.com/microsoft/Detours)
-
-            The Windows inline-hooking backends (src/backends/win_common/) are
-            implemented from scratch per ADR-0009. The JSON parser (parson) is
-            vendored under src/config/json/parson.{c,h} and retains its MIT
-            license header in those files.
         run: |
           VERSION="$(awk -F\" '/^#define RETRACE_VERSION_STRING/ {print $2}' include/retrace/version.h)"
-          STAGE="retrace-${VERSION}-${{ matrix.platform }}"
-          mkdir -p "$STAGE/lib" "$STAGE/include"
-          cp build/src/v2/libretrace.so* "$STAGE/lib/"
-          cp -r include/retrace/* "$STAGE/include/"
-          cp LICENSE.md README.adoc "$STAGE/"
-          printf '%s\n' "$NOTICES" > "$STAGE/THIRD_PARTY_NOTICES"
-          tar -czf "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" "$STAGE"
-          sha256sum "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
-            > "retrace-${VERSION}-${{ matrix.platform }}.tar.gz.sha256"
-          # Also produce a bare library for curl + LD_PRELOAD use case
+          PKG="retrace-${VERSION}-${{ matrix.platform }}"
+          # the packaging module rides the install surface: the
+          # tarball carries bin/ + lib/ + include/ (the hand-staged
+          # era shipped lib/include only -- every tool was missing)
+          (cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME="$PKG" \
+            && cpack -G DEB -D CPACK_PACKAGE_FILE_NAME="$PKG")
+          mv "build/$PKG.tar.gz" "build/$PKG.tar.gz.sha256" .
+          mv "build/$PKG.deb" "build/$PKG.deb.sha256" . 2>/dev/null || true
+          # bare library for curl + LD_PRELOAD use case
           cp "$(ls build/src/v2/libretrace.so.*.*.* | head -1)" "libretrace-${{ matrix.platform }}.so"
           sha256sum "libretrace-${{ matrix.platform }}.so" \
             > "libretrace-${{ matrix.platform }}.so.sha256"
+          # a broken package is red at build time, not install time
+          dpkg-deb -I "$PKG.deb" >/dev/null && dpkg-deb -c "$PKG.deb" | grep -q libretrace
 
       - name: Stage binary (macOS)
         if: matrix.os == 'macos'
-        env:
-          NOTICES: |
-            retrace third-party notices
-            ===========================
-
-            retrace is BSD-2-Clause licensed.
-
-            The JSON parser (parson) is vendored under
-            src/config/json/parson.{c,h} and retains its MIT license
-            header in those files.
         run: |
           VERSION="$(awk -F\" '/^#define RETRACE_VERSION_STRING/ {print $2}' include/retrace/version.h)"
-          STAGE="retrace-${VERSION}-${{ matrix.platform }}"
-          mkdir -p "$STAGE/lib" "$STAGE/include"
-          cp build/src/v2/libretrace.*.dylib "$STAGE/lib/"
-          cp -r include/retrace/* "$STAGE/include/"
-          cp LICENSE.md README.adoc "$STAGE/"
-          printf '%s\n' "$NOTICES" > "$STAGE/THIRD_PARTY_NOTICES"
-          tar -czf "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" "$STAGE"
-          shasum -a 256 "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
-            > "retrace-${VERSION}-${{ matrix.platform }}.tar.gz.sha256"
-          # Bare library for curl + DYLD_INSERT use case
+          PKG="retrace-${VERSION}-${{ matrix.platform }}"
+          (cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME="$PKG")
+          mv "build/$PKG.tar.gz" "build/$PKG.tar.gz.sha256" .
+          # bare library for curl + DYLD_INSERT use case
+          cp "$(ls build/src/v2/libretrace.*.*.*.dylib | head -1)" "libretrace-${{ matrix.platform }}.dylib"
+          shasum -a 256 "libretrace-${{ matrix.platform }}.dylib" \
+            > "libretrace-${{ matrix.platform }}.dylib.sha256"
+
+      # ----- Windows (MSVC) -----
+      - name: Set up vcpkg (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          if ('${{ matrix.platform }}' -eq 'windows-arm64') {
+            $triplet = 'arm64-windows'
+          } else {
+            $triplet = 'x64-windows'
+          }
+          if (-not (Test-Path vcpkg)) {
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git vcpkg
+          }
+          cd vcpkg
+          if (-not (Test-Path vcpkg.exe)) { .\bootstrap-vcpkg.bat -disableMetrics }
+          "VCPKG_TRIPLET=$triplet" | Out-File -Append $env:GITHUB_ENV
+
+      - name: Configure & build (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $toolchain = "${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake"
+          cmake -B build "-DCMAKE_BUILD_TYPE=Release" `
+            "-DVCPKG_TARGET_TRIPLET=$env:VCPKG_TRIPLET" `
+            "-DCMAKE_TOOLCHAIN_FILE=$toolchain"
+          cmake --build build --config Release
+
+      - name: Stage binary (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path include/retrace/version.h `
+            -Pattern '#define RETRACE_VERSION_STRING "([^"]+)"').Matches.Groups[1].Value
+          $pkg = "retrace-$version-${{ matrix.platform }}"
+          Push-Location build
+          cpack -G ZIP -D CPACK_PACKAGE_FILE_NAME="$pkg"
+          Pop-Location
+          Move-Item "build/$pkg.zip", "build/$pkg.zip.sha256" .
+          # bare library for manual injection use cases
+          $dll = Get-ChildItem -Recurse -Filter retrace.dll |
+            Select-Object -First 1 -ExpandProperty FullName
+          if ($dll) {
+            Copy-Item $dll "retrace-${{ matrix.platform }}.dll"
+            $h = (Get-FileHash "retrace-${{ matrix.platform }}.dll" -Algorithm SHA256).Hash
+            "$h  retrace-${{ matrix.platform }}.dll" | Out-File -Encoding ascii "retrace-${{ matrix.platform }}.dll.sha256"
+          }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-tarball
+          path: |
+            ${{ runner.temp }}/retrace-*.tar.gz
+            ${{ runner.temp }}/retrace-*.tar.gz.sha256
+
+  # ---------------------------------------------------------------
+  # Binary artifacts -- matrix across (OS, arch).
+  # ---------------------------------------------------------------
+  binary:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            runner: ubuntu-22.04
+            os: linux
+          - platform: linux-aarch64
+            runner: ubuntu-22.04-arm
+            os: linux
+          - platform: macos-arm64
+            runner: macos-14
+            os: macos
+          - platform: macos-x86_64
+            runner: macos-15-intel
+            os: macos
+          - platform: windows-x64
+            runner: windows-2022
+            os: windows
+          - platform: windows-arm64
+            runner: windows-11-arm
+            os: windows
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      # ----- POSIX (Linux, macOS) -----
+      - name: Install deps (Linux)
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake ninja-build libssl-dev
+
+      - name: Install deps (macOS)
+        if: matrix.os == 'macos'
+        run: |
+          brew install cmake ninja openssl
+
+      - name: Configure & build (POSIX)
+        if: matrix.os != 'windows'
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: Stage binary (Linux)
+        if: matrix.os == 'linux'
+        run: |
+          VERSION="$(awk -F\" '/^#define RETRACE_VERSION_STRING/ {print $2}' include/retrace/version.h)"
+          PKG="retrace-${VERSION}-${{ matrix.platform }}"
+          # the packaging module rides the install surface: the
+          # tarball carries bin/ + lib/ + include/ (the hand-staged
+          # era shipped lib/include only -- every tool was missing)
+          (cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME="$PKG" \
+            && cpack -G DEB -D CPACK_PACKAGE_FILE_NAME="$PKG")
+          mv "build/$PKG.tar.gz" "build/$PKG.tar.gz.sha256" .
+          mv "build/$PKG.deb" "build/$PKG.deb.sha256" . 2>/dev/null || true
+          # bare library for curl + LD_PRELOAD use case
+          cp "$(ls build/src/v2/libretrace.so.*.*.* | head -1)" "libretrace-${{ matrix.platform }}.so"
+          sha256sum "libretrace-${{ matrix.platform }}.so" \
+            > "libretrace-${{ matrix.platform }}.so.sha256"
+          # a broken package is red at build time, not install time
+          dpkg-deb -I "$PKG.deb" >/dev/null && dpkg-deb -c "$PKG.deb" | grep -q libretrace
+
+      - name: Stage binary (macOS)
+        if: matrix.os == 'macos'
+        run: |
+          VERSION="$(awk -F\" '/^#define RETRACE_VERSION_STRING/ {print $2}' include/retrace/version.h)"
+          PKG="retrace-${VERSION}-${{ matrix.platform }}"
+          (cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME="$PKG")
+          mv "build/$PKG.tar.gz" "build/$PKG.tar.gz.sha256" .
+          # bare library for curl + DYLD_INSERT use case
           cp "$(ls build/src/v2/libretrace.*.*.*.dylib | head -1)" "libretrace-${{ matrix.platform }}.dylib"
           shasum -a 256 "libretrace-${{ matrix.platform }}.dylib" \
             > "libretrace-${{ matrix.platform }}.dylib.sha256"
@@ -259,10 +366,14 @@ jobs:
           path: |
             retrace-*.tar.gz
             retrace-*.tar.gz.sha256
+            retrace-*.deb
+            retrace-*.deb.sha256
             libretrace-*.so
             libretrace-*.so.sha256
             libretrace-*.dylib
             libretrace-*.dylib.sha256
+            libretrace-*.dll
+            libretrace-*.dll.sha256
             retrace-*.zip
             retrace-*.zip.sha256
 
