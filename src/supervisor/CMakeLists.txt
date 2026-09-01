@@ -19,7 +19,17 @@ target_include_directories(retrace_supervisor_proto PUBLIC
 # protocol lib verbatim (DRY) and core's public surfaces
 # (logger, real_impls, reentrance_guard) resolved at final
 # link. POSIX body + WIN32 stubs in one file.
-add_library(retrace_supervisor_agent STATIC agent.c agent_ring.c policy_sig.c)
+# one agent TU per platform (the two-TU split): the halves share
+# only agent.h + the shared modules -- CMake picks like
+# tools/retraced does for its transports
+if(WIN32)
+	set(_retrace_agent_src agent_win.c)
+else()
+	set(_retrace_agent_src agent_posix.c)
+endif()
+
+add_library(retrace_supervisor_agent STATIC
+	${_retrace_agent_src} agent_ring.c policy_sig.c)
 target_include_directories(retrace_supervisor_agent PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 target_link_libraries(retrace_supervisor_agent PUBLIC
