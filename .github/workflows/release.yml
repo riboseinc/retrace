@@ -271,15 +271,11 @@ jobs:
               cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
               cmake --build build
               VERSION=$(awk -F"\"" "/^#define RETRACE_VERSION_STRING/ {print \$2}" include/retrace/version.h)
-              STAGE="retrace-${VERSION}-${{ matrix.platform }}"
-              mkdir -p "$STAGE/lib" "$STAGE/include"
-              cp build/src/v2/libretrace.so* "$STAGE/lib/"
-              cp -r include/retrace/* "$STAGE/include/"
-              cp LICENSE.md README.adoc "$STAGE/"
-              cp THIRD_PARTY_NOTICES.txt "$STAGE/THIRD_PARTY_NOTICES"
-              tar -czf "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" "$STAGE"
-              sha256sum "retrace-${VERSION}-${{ matrix.platform }}.tar.gz" \
-                > "retrace-${VERSION}-${{ matrix.platform }}.tar.gz.sha256"
+              PKG="retrace-${VERSION}-${{ matrix.platform }}"
+              # the packaging module: bin/ + lib/ + include/ (the
+              # hand-staged shape shipped lib/include only)
+              (cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME="$PKG")
+              mv "build/$PKG.tar.gz" "build/$PKG.tar.gz.sha256" .
             '
 
       - name: Upload artifact
