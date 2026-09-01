@@ -139,3 +139,35 @@ See [configuration.md](configuration.md) for the full reference
 and [cookbook/34](cookbook/34-profile-and-jail.md) for the
 recipe-level walkthrough; the runnable loop lives in
 `examples/trace-profile-quickstart/`.
+
+## Packages and release artifacts
+
+Since v2.67.0 the release artifacts are built by the packaging
+module (CPack over the install surface):
+
+- **Every tarball and zip carries `bin/`** — retraced, retrace-ctl,
+  retrace-enforce, the kernel-truth converters, and the profiler ship
+  with the library and headers. (Earlier releases carried `lib/` and
+  `include/` only.)
+- **`.deb` packages** (`retrace-<version>-linux-x86_64.deb`,
+  `-linux-aarch64.deb`) are built and validated on the Linux CI legs:
+
+  ```sh
+  sudo apt install ./retrace-2.67.0-linux-x86_64.deb
+  ```
+
+- **Checksums**: every asset ships a `.sha256` sidecar
+  (`sha256sum -c retrace-2.67.0-linux-x86_64.tar.gz.sha256`).
+- **RPM** is configured in `cmake/Packaging.cmake` for source builds
+  (`cd build && cpack -G RPM`); the hosted CI runners carry no
+  `rpmbuild`, so release-side rpm artifacts await a repository channel.
+- **Building your own** from a checkout:
+
+  ```sh
+  cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  (cd build && cpack -G "TGZ;DEB")
+  ```
+
+The OHOS cross-built artifact remains hand-staged by design: its
+notices carry the self-signing disclaimer OHOS operators need.

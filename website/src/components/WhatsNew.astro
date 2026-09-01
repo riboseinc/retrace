@@ -5,6 +5,24 @@
 
 const shipped = [
   {
+    title: "Packages, and artifacts that carry the tools",
+    detail: "CPack now rides the install surface: every tarball and zip carries bin/ -- retraced, the fleet CLI, enforcement, all the converters (they were missing from releases entirely before) -- and the Linux legs ship dpkg-validated .deb packages. RPM is configured for source builds.",
+    accent: "control",
+    tag: "v2.67.0",
+  },
+  {
+    title: "The agent's last twins, unified",
+    detail: "One frame codec (the Windows arm adopted the shared encoder and its payload cap, closing a silent oversized-event loss), one policy validation ladder in policy_sig.c (the Windows copy had lost the expiry guard), and one pure event ring with drop accounting on both halves.",
+    accent: "see",
+    tag: "v2.63-66",
+  },
+  {
+    title: "Policy crosses the pipe",
+    detail: "The fleet CLI's policy push now reaches Windows pipe agents for the first time -- the broadcast sends through an installed sink over transport-opaque handles, and the codebase's last extern-as-interface retired.",
+    accent: "control",
+    tag: "v2.63.0",
+  },
+  {
     title: "The Windows lane goes real",
     detail: "The named-pipe daemon, fleet CLI, and all four agents (libc, kernel-ETW, Python, JVM) now build, link, and pass their integration tests on Windows -- including the SCM service lane (sc create/start/stop with graceful journal flush) and a configure-time conformance guard over the everywhere-build set. Sixteen defects that had shipped dark were burned off in one activation arc.",
     accent: "control",
@@ -113,9 +131,9 @@ const roadmap = [
     accent: "control",
   },
   {
-    title: "Distro packaging",
-    detail: "Source builds and the Nix flake exist; system packages (deb, rpm, brew) so operators install retraced the way they install everything else.",
-    eta: "planned",
+    title: "Brew + rpm channels",
+    detail: "The .deb ships from the releases (dpkg-validated in CI) and cpack builds rpm from source; the remaining channels are a Homebrew tap and an rpm repository so package managers see updates.",
+    eta: "next",
     accent: "break",
   },
 ];
@@ -155,7 +173,7 @@ const stats = [
 
     <div class="shipped-block">
       <header class="block-head reveal">
-        <div class="block-tag accent-control">SHIPPED: v2.38 - v2.62</div>
+        <div class="block-tag accent-control">SHIPPED: v2.38 - v2.67</div>
         <h3>The arc that made retrace a supervised instrument: daemon, fleet control, enforcement, three observation lanes, and the Windows lane made real.</h3>
       </header>
       <div class="shipped-grid">
