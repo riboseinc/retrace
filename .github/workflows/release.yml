@@ -424,7 +424,11 @@ jobs:
             artifacts/retrace-*.tar.gz.sha256
             artifacts/retrace-*.zip
             artifacts/retrace-*.zip.sha256
+            artifacts/retrace-*.deb
+            artifacts/retrace-*.deb.sha256
             artifacts/libretrace-*.so
             artifacts/libretrace-*.so.sha256
             artifacts/libretrace-*.dylib
             artifacts/libretrace-*.dylib.sha256
+            artifacts/libretrace-*.dll
+            artifacts/libretrace-*.dll.sha256
