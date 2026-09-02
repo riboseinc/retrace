@@ -60,6 +60,33 @@ bit is refused with `scope denied` and the attempt is journaled as
 `retrace.auth.overscope`. Local UDS peers hold all scopes (PEERCRED
 already gated the accept).
 
+## The session tree: retrace-ctl sessions
+
+The registry carries the tree -- session tokens (minted at
+first HELLO, inherited by fork children through the ppid
+chain), parent links, spectator seats. `ps` prints it flat;
+`sessions` prints it as the tree the journal minted:
+
+```sh
+retrace-ctl --sock /tmp/retraced.ctl.sock sessions
+```
+
+```json
+{ "ok": 1, "sessions_count": 2, "sessions": [
+  { "token": "S1", "agents": [
+    { "id": "a1...", "cmdline": "detonation", "pid": 100,
+      "children": [
+        { "id": "a2...", "cmdline": "worker", "pid": 101,
+          "children": [...] } ] },
+    { "id": "a9...", "cmdline": "ebpf", "spectator": 1 } ] },
+  { "token": "S2", "agents": [ ... ] } ] }
+```
+
+Read-only, PS-scope: the same claim bit `ps` needs on a TLS
+fleet. Agents whose parent HELLO has not been seen nest at
+the session root with `parent_hole` marked -- the same
+honesty the journal carries.
+
 ## The observation lanes
 
 One session, one journal, three lanes:

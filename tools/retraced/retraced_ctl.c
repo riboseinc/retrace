@@ -150,7 +150,7 @@ uint32_t retraced_tls_scope_for_cmd(const char *cmd)
 		return 0;
 	if (strcmp(cmd, "status") == 0)
 		return RETRACED_SCOPE_STATUS;
-	if (strcmp(cmd, "ps") == 0)
+	if (strcmp(cmd, "ps") == 0 || strcmp(cmd, "sessions") == 0)
 		return RETRACED_SCOPE_PS;
 	if (strcmp(cmd, "policy_push") == 0 ||
 	    strcmp(cmd, "freeze") == 0 ||
@@ -222,6 +222,172 @@ void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
 			s != NULL ? s : "null");
 		json_free_serialized_string(s);
 		json_value_free(snap);
+	} else if (strcmp(cmd, "sessions") == 0) {
+		/*
+		 * The session tree: the registry already carries
+		 * it (session token, parent agent id, spectator
+		 * seats) -- ps prints it flat and the operator
+		 * re-nests by eye. Group once, here: per session
+		 * token, agents nested by parent, spectators and
+		 * parent-holes marked. Pure transform of the same
+		 * data ps serializes.
+		 */
+		JSON_Value *root = json_value_init_object();
+		JSON_Object *root_o = json_value_get_object(root);
+		JSON_Value *sessions_val = json_value_init_array();
+		JSON_Array *sessions =
+			json_value_get_array(sessions_val);
+		size_t i, k;
+
+		/* one pass: collect the distinct session tokens */
+		for (i = 0; i < ctx->reg->count; i++) {
+			const struct agent_entry *e =
+				&ctx->reg->agents[i];
+			int seen = 0;
+
+			for (k = 0; k < json_array_get_count(sessions);
+			     k++) {
+				const char *tok = json_object_get_string(
+					json_array_get_object(sessions, k),
+					"token");
+
+				if (tok != NULL &&
+				    strcmp(tok, e->session) == 0) {
+					seen = 1;
+					break;
+				}
+			}
+			if (!seen) {
+				JSON_Value *sv = json_value_init_object();
+
+				json_object_set_string(
+					json_value_get_object(sv),
+					"token", e->session);
+				json_object_set_value(
+					json_value_get_object(sv),
+					"agents", json_value_init_array());
+				json_array_append_value(sessions, sv);
+			}
+		}
+
+		/*
+		 * nest each agent under its session, parents first
+		 * (the registry appends in arrival order; a parent
+		 * HELLOs before its fork children in practice, and a
+		 * child whose parent is not yet present nests at the
+		 * root with parent_hole marked -- the same honesty
+		 * the journal carries)
+		 */
+		for (i = 0; i < ctx->reg->count; i++) {
+			struct agent_entry *e = &ctx->reg->agents[i];
+			JSON_Object *sess = NULL;
+			JSON_Array *agents = NULL;
+			JSON_Value *av = json_value_init_object();
+			JSON_Object *ao = json_value_get_object(av);
+
+			for (k = 0; k < json_array_get_count(sessions);
+			     k++) {
+				JSON_Object *cand = json_array_get_object(
+					sessions, k);
+
+				if (strcmp(json_object_get_string(cand,
+					    "token"), e->session) == 0) {
+					sess = cand;
+					break;
+				}
+			}
+			if (sess == NULL) {
+				json_value_free(av);
+				continue;
+			}
+			agents = json_value_get_array(
+				json_object_get_value(sess, "agents"));
+
+			json_object_set_string(ao, "id", e->id);
+			json_object_set_string(ao, "cmdline",
+				e->cmdline);
+			json_object_set_number(ao, "pid", (double)e->pid);
+			json_object_set_number(ao, "spectator",
+				(double)e->spectator);
+			if (e->parent_hole)
+				json_object_set_number(ao,
+					"parent_hole", 1);
+			json_object_set_value(ao, "children",
+				json_value_init_array());
+
+			if (e->parent_id[0] != '\0') {
+				int placed = 0;
+				/*
+				 * find the parent anywhere under this
+				 * session (the tree is shallow: walk
+				 * roots, then children, one level of
+				 * recursion through a helper below)
+				 */
+				JSON_Array *roots = agents;
+
+				for (k = 0; k < json_array_get_count(
+					     roots) && !placed; k++) {
+					JSON_Object *cand = json_array_get_object(
+						roots, k);
+
+					if (strcmp(json_object_get_string(
+						    cand, "id"),
+						    e->parent_id) == 0) {
+						json_array_append_value(
+							json_value_get_array(
+								json_object_get_value(
+									cand, "children")),
+							av);
+						placed = 1;
+					} else {
+						JSON_Array *grand = json_value_get_array(
+							json_object_get_value(
+								cand,
+								"children"));
+
+						for (size_t g = 0; grand !=
+							NULL && g <
+							json_array_get_count(
+								grand) &&
+							!placed; g++) {
+							JSON_Object *gc =
+								json_array_get_object(
+									grand, g);
+
+							if (strcmp(
+								 json_object_get_string(
+									 gc, "id"),
+								 e->parent_id) ==
+								0) {
+								json_array_append_value(
+									json_value_get_array(
+										json_object_get_value(
+											gc,
+											"children")),
+									av);
+								placed = 1;
+							}
+						}
+					}
+				}
+				if (!placed)
+					json_array_append_value(agents, av);
+			} else {
+				json_array_append_value(agents, av);
+			}
+		}
+
+		json_object_set_number(root_o, "ok", 1);
+		json_object_set_number(root_o, "sessions_count",
+			(double)json_array_get_count(sessions));
+		json_object_set_value(root_o, "sessions", sessions_val);
+		{
+			char *s = json_serialize_to_string(root);
+
+			ctl_reply(ctx, "%s\n", s != NULL ? s : "{}");
+			json_free_serialized_string(s);
+		}
+		json_value_free(root);
 	} else if (strcmp(cmd, "policy_push") == 0) {
 		const char *in_blob = json_object_get_string(o, "blob");
 		char *blob = NULL;

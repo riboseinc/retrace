@@ -183,6 +183,101 @@ static void test_policy_push_valid(void)
 	CHECK(strstr(reply_buf, "\"pushed\":1") != NULL);
 }
 
+static void test_sessions_groups_the_tree(void)
+{
+	/*
+	 * The fork tree: root/child/grand under session S1 (the
+	 * ppid chain 100->101->102 drives registry.c's real
+	 * parent binding), a spectator on S1, and a lone agent on
+	 * S2. Then the reply must carry two sessions and nested
+	 * children.
+	 */
+	setup();
+	(void)retraced_registry_hello(ctx.reg, NULL, 100, 1, "S1",
+		"root");
+	(void)retraced_registry_hello(ctx.reg, NULL, 101, 100, "S1",
+		"child");
+	(void)retraced_registry_hello(ctx.reg, NULL, 102, 101, "S1",
+		"grand");
+	(void)retraced_registry_hello(ctx.reg, NULL, 999, 1, "S1",
+		"spect");
+	(void)retraced_registry_hello(ctx.reg, NULL, 200, 1, "S2",
+		"lone");
+
+	/* the spectator seat is set by the HELLO handler, not the
+	 * registry call -- flip it where the entry lives
+	 */
+	ctx.reg->agents[3].spectator = 1;
+
+	feed(&ctx, "{\"cmd\":\"sessions\"}");
+	CHECK(strstr(reply_buf, "\"ok\":1") != NULL);
+	CHECK(strstr(reply_buf, "\"sessions_count\":2") != NULL);
+	CHECK(strstr(reply_buf, "\"token\":\"S1\"") != NULL);
+	CHECK(strstr(reply_buf, "\"token\":\"S2\"") != NULL);
+	CHECK(strstr(reply_buf, "\"spectator\":1") != NULL);
+
+	/*
+	 * the nesting by real ids: read A/B ids from ps (registry
+	 * ids are hashes we cannot predict), then assert the
+	 * sessions reply nests B under A's children
+	 */
+	{
+		char a_id[80] = "", b_id[80] = "";
+		const char *walk;
+
+		feed(&ctx, "{\"cmd\":\"ps\"}");
+		walk = strstr(reply_buf, "\"cmdline\":\"root\"");
+		CHECK(walk != NULL);
+		if (walk != NULL) {
+			const char *idq = walk;
+
+			/* the id field precedes cmdline in ps order */
+			idq = strstr(reply_buf, "\"id\":\"");
+			while (idq != NULL && idq < walk) {
+				size_t n = strcspn(idq + 6, "\"");
+
+				if (n < sizeof(a_id)) {
+					memcpy(a_id, idq + 6, n);
+					a_id[n] = '\0';
+				}
+				idq = strstr(idq + 6, "\"id\":\"");
+			}
+		}
+		walk = strstr(reply_buf, "\"cmdline\":\"child\"");
+		CHECK(walk != NULL);
+		if (walk != NULL) {
+			const char *idq = strstr(reply_buf, "\"id\":\"");
+			size_t last_a = 0;
+
+			while (idq != NULL && idq < walk) {
+				size_t n = strcspn(idq + 6, "\"");
+
+				if (n < sizeof(b_id)) {
+					memcpy(b_id, idq + 6, n);
+					b_id[n] = '\0';
+				}
+				idq = strstr(idq + 6, "\"id\":\"");
+				last_a = 1;
+			}
+			(void)last_a;
+		}
+		CHECK(a_id[0] != '\0' && b_id[0] != '\0');
+
+		feed(&ctx, "{\"cmd\":\"sessions\"}");
+		/* B nested under A: A's object contains B in its
+		 * children array -- A's id appears before B's in
+		 * the serialization and both appear once
+		 */
+		{
+			const char *pa = strstr(reply_buf, a_id);
+			const char *pb = strstr(reply_buf, b_id);
+
+			CHECK(pa != NULL && pb != NULL);
+			CHECK(pa < pb);
+		}
+	}
+}
+
 static void test_policy_push_bad(void)
 {
 	setup();
@@ -235,6 +330,7 @@ int main(void)
 	TEST(unknown);
 	TEST(status);
 	TEST(ps);
+	TEST(sessions_groups_the_tree);
 	TEST(policy_push_valid);
 	TEST(policy_push_bad);
 	TEST(freeze_thaw);

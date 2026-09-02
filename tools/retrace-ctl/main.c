@@ -442,6 +442,8 @@ int main(int argc, char **argv)
 	} else if (strcmp(argv[i], "sign-policy") == 0 &&
 		   i + 2 < argc) {
 		return cmd_sign_policy(argv[i + 1], argv[i + 2]);
+	} else if (strcmp(argv[i], "sessions") == 0) {
+		snprintf(req, sizeof(req), "{\"cmd\":\"sessions\"}\n");
 	} else if (strcmp(argv[i], "kill") == 0 && i + 1 < argc) {
 		long pid = strtol(argv[i + 1], NULL, 10);
 
