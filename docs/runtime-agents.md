@@ -96,6 +96,33 @@ Event names are dotted: the Python agent emits `py.file.read`,
 - The integration tests `test_pyretrace.py` / `test_jretrace.py` show
   the full pattern in ~120 lines each.
 
+## noderetrace -- the Node agent (v2.70.0)
+
+`bindings/node/retrace.js` is the third runtime adapter: the
+same supervise()/emit() surface, UDS on POSIX and the
+byte-mode named pipe on Windows, HELLO with the nonce (full
+peer), heartbeat, BYE at exit.
+
+```js
+const retrace = require('retrace')
+retrace.supervise()                    // joins the env
+retrace.emit('node.custom.event', { key: 'value' })
+```
+
+The runtime's own boundary rides `diagnostics_channel`:
+socket connects (`node.net.connect`), child processes
+(`node.exec.spawn`), and file access (`node.file.read` /
+`node.file.write` -- the fs channels exist on Node 18/20 and
+were reworked from Node 22 on, so those subscriptions are
+guarded and version-dependent; the direct emit() API is the
+stable floor). `node.file.read` observation is therefore an
+explicit Node-version question -- verified on 20 LTS, absent
+on 24 as of this writing.
+
+`test_noderetrace.py` walks the full pattern (~140 lines):
+auth as a full peer, the socket observation, and the direct
+emit, on both transports.
+
 ## Beyond UDS: other lanes
 
 Kernel-observation agents (`retrace-ebpf-agent`,
