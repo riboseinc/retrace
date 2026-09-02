@@ -78,6 +78,38 @@ fd. The 6th+ calls: `modify_return_value_int` sets ret to `-2`,
 `call_count_limit` fires and aborts, `call_real` never runs.
 Effective: `-ENOENT`.
 
+### Fail the first N calls, then recover (retry paths)
+
+The inverse direction -- a *transient* fault -- is `fail_first`:
+the first N invocations return your chosen error with the real
+call never made; every call after runs for real. This is the
+primitive for testing retry logic deterministically:
+
+```json
+{
+  "intercept_scripts": [
+    {
+      "func_name": "open",
+      "actions": [
+        { "action_name": "fail_first",
+          "action_params": { "fails": 2, "retval_int": -11 } },
+        { "action_name": "call_real" },
+        { "action_name": "log_params" }
+      ]
+    }
+  ]
+}
+```
+
+The first two `open` calls see `EAGAIN` (-11) without touching
+the filesystem; the third and onward hit the real `open`. A
+correct retry loop converges on the third call; an untested one
+hangs or crashes -- retrace makes either visible in a single
+run. `fail_first` composes with `call_count_limit` on the same
+function: transient faults on the way in, exhaustion
+eventually.
+
+
 ### Fail network connects
 
 To make every outbound `connect()` fail with `ECONNREFUSED`

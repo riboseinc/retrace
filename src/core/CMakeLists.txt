@@ -44,6 +44,7 @@ set(_core_action_sources
 	actions/basic.c actions/memfuzz.c
 	actions/incomplete_io.c actions/fuzzing_seed.c
 	actions/delay.c actions/call_count_limit.c
+	actions/fail_first.c
 	actions/sandbox.c actions/addr_deny.c
 	actions/filter.c actions/decode_http.c actions/decode_dns.c
 	actions/capture_buffer.c actions/fuzz_dict.c

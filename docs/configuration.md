@@ -356,6 +356,33 @@ Counts are per-function-name across the process. The first
 `call_count_limit` action to fire for a given function claims that
 function's counter.
 
+#### `fail_first`
+
+Fails the first N invocations with a chosen return value, then lets
+every later call through untouched — the transient-fault mirror of
+`call_count_limit` (which fails *after* N). This is the retry-path
+primitive: prove a library survives two `EAGAIN`s, or expose the
+untested infinite retry loop.
+
+```json
+{
+  "action_name": "fail_first",
+  "action_params": { "fails": 2, "retval_int": -11 }
+}
+```
+
+| Param        | Type   | Required | Notes                                              |
+|--------------|--------|----------|----------------------------------------------------|
+| `fails`      | number | yes      | How many leading invocations fail. `0` = inert.    |
+| `retval_int` | number | yes      | The return value the failing calls synthesize.     |
+
+Inside the failing window the action sets `ret_val` and aborts the
+script, so `call_real` never runs; after the window the script
+proceeds normally. Counts are per-function-name, first-to-fire
+claims the counter — same ownership rule as `call_count_limit`,
+and the two compose (transient fault on the way in, exhaustion
+eventually).
+
 #### `sandbox`
 
 File-access policy by path. Two modes:
