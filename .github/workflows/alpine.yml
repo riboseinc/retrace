@@ -119,5 +119,10 @@ jobs:
                     -DCMAKE_C_COMPILER=clang \
                     -DRETRACE_BUILD_TESTS=ON
               ninja -C build
-              ctest --test-dir build --output-on-failure
+              # perf benches under qemu binfmt measure the
+              # emulator, not the code -- and their 60s
+              # timeouts are marginal there (v2.71-era flakes:
+              # bench_script_resolve timed out twice while
+              # passing everywhere native). Skip the label.
+              ctest --test-dir build --output-on-failure -LE perf
             '
