@@ -74,6 +74,20 @@ if(RETRACE_PLATFORM_WINDOWS)
 			LABELS "integration"
 			TIMEOUT 120)
 	endif()
+	# noderetrace over the pipe (node-gated).
+	find_package(Python3 COMPONENTS Interpreter)
+	if(Python3_Interpreter_FOUND)
+		add_test(NAME integration-noderetrace-win
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_noderetrace.py
+				$<TARGET_FILE:retrace_retraced>
+				${CMAKE_SOURCE_DIR}/bindings/node)
+		set_tests_properties(integration-noderetrace-win PROPERTIES
+			LABELS "integration"
+			TIMEOUT 120)
+	endif()
+
+
 
 	# The kernel-observation agents speak the pipe natively on
 	# Windows (TODO.beyond-libc/03): synthetic ETW lane E2E.
@@ -366,6 +380,21 @@ if(Python3_Interpreter_FOUND)
 				PROPERTIES LABELS "integration"
 				TIMEOUT 120)
 		endif()
+	# noderetrace: the Node runtime agent (node-gated as
+	# everywhere; the third adapter after pyretrace/jretrace)
+	find_package(Python3 COMPONENTS Interpreter)
+	if(Python3_Interpreter_FOUND)
+		add_test(NAME integration-noderetrace
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_noderetrace.py
+				$<TARGET_FILE:retrace_retraced>
+				${CMAKE_SOURCE_DIR}/bindings/node)
+		set_tests_properties(integration-noderetrace PROPERTIES
+			LABELS "integration"
+			TIMEOUT 120)
+	endif()
+
+
 	endif()
 
 	# Kernel enforcement compile (TODO.beyond-libc/01):
