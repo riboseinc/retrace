@@ -45,15 +45,21 @@ main();
 
 
 def node_ok():
-    """A usable Node is 18+ (diagnostics_channel stable floor)"""
+    """A usable Node is 18+ (diagnostics_channel stable floor).
+    Any probe trouble -- a preview image with a half-installed
+    toolchain, an unexpected output shape, a timeout -- is a
+    SKIP, never a test failure: the gate's job is to decide
+    whether the runtime exists, not to test the image."""
     try:
         r = subprocess.run(["node", "-e", "console.log(process.versions.node)"],
                            capture_output=True, text=True, timeout=15)
         if r.returncode != 0:
             return False
-        major = int(r.stdout.strip().split(".")[0])
-        return major >= 18
-    except (OSError, ValueError):
+        out = r.stdout.strip()
+        if not out or "." not in out:
+            return False
+        return int(out.split(".")[0]) >= 18
+    except Exception:
         return False
 
 
