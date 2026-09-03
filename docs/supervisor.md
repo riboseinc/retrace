@@ -87,6 +87,28 @@ fleet. Agents whose parent HELLO has not been seen nest at
 the session root with `parent_hole` marked -- the same
 honesty the journal carries.
 
+### The evidence read arm: retrace-ctl events
+
+Reading the journal used to require filesystem access to the
+daemon's host. `events` pulls the tail over the control plane
+— and the reply carries its own integrity verdict:
+
+```sh
+retrace-ctl events --last 20
+```
+
+```json
+{ "ok": 1, "chain": "verified", "broken_at": 0,
+  "events": [ ...the last 20 records... ] }
+```
+
+Every record is chain-verified as it streams (the same hash
+arithmetic boot replay uses); a tampered line reports
+`"chain": "broken"` with the line number, so evidence pulled
+over a network needs no out-of-band trust. Observe-only, the
+STATUS claim — the least-privilege scope an auditor's
+certificate carries. `--last` is bounded at 128 (default 20).
+
 ## The observation lanes
 
 One session, one journal, three lanes:

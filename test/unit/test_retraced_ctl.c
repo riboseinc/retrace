@@ -278,6 +278,85 @@ static void test_sessions_groups_the_tree(void)
 	}
 }
 
+/* the events sink: collect what the daemon would reply */
+static char ev_gather[16384];
+static size_t ev_len;
+
+static void ev_sink_test(const char *line, void *user)
+{
+	(void)user;
+	if (ev_len + strlen(line) + 2 < sizeof(ev_gather)) {
+		memcpy(ev_gather + ev_len, line, strlen(line));
+		ev_len += strlen(line);
+		ev_gather[ev_len++] = '\n';
+	}
+}
+
+static void test_events_reads_and_verifies(void)
+{
+	/*
+	 * The evidence arm: write real records through the REAL
+	 * journal_event path, pull the tail, and assert both the
+	 * content and the chain verdict. Then tamper one line on
+	 * disk and assert the verdict flips -- the integrity
+	 * claim is part of the interface.
+	 */
+	setup();
+	retraced_journal_close(ctx.jr);
+	remove("/tmp/ctl_ev_test.jsonl");
+	retraced_journal_open(ctx.jr, "/tmp/ctl_ev_test.jsonl");
+	retraced_journal_event(ctx.jr, 1000, "agent-a", 1,
+		"{\"name\":\"ev.one\",\"attrs\":{}}");
+	retraced_journal_event(ctx.jr, 1001, "agent-a", 2,
+		"{\"name\":\"ev.two\",\"attrs\":{}}");
+	retraced_journal_event(ctx.jr, 1002, "agent-a", 3,
+		"{\"name\":\"ev.three\",\"attrs\":{}}");
+	retraced_journal_flush(ctx.jr);
+
+	ev_len = 0;
+	ev_gather[0] = '\0';
+	{
+		long chain = -1;
+		int n = retraced_journal_tail(ctx.jr, 2,
+			ev_sink_test, NULL, &chain);
+
+		CHECK(n == 2);
+		CHECK(chain == 0);
+		CHECK(strstr(ev_gather, "ev.two") != NULL);
+		CHECK(strstr(ev_gather, "ev.three") != NULL);
+		CHECK(strstr(ev_gather, "ev.one") == NULL);
+	}
+
+	/* tamper the middle line: the chain must report it */
+	{
+		FILE *f = fopen("/tmp/ctl_ev_test.jsonl", "r");
+		char all[8192];
+		size_t n;
+		char *p;
+
+		n = fread(all, 1, sizeof(all) - 1, f);
+		all[n] = '\0';
+		fclose(f);
+		p = strstr(all, "ev.two");
+		CHECK(p != NULL);
+		if (p != NULL)
+			p[5] = 'X';	/* ev.twX */
+		f = fopen("/tmp/ctl_ev_test.jsonl", "w");
+		fwrite(all, 1, n, f);
+		fclose(f);
+	}
+	{
+		long chain = 0;
+
+		ev_len = 0;
+		ev_gather[0] = '\0';
+		(void)retraced_journal_tail(ctx.jr, 3,
+			ev_sink_test, NULL, &chain);
+		CHECK(chain == 3);	/* line 3's prev no longer matches */
+	}
+	remove("/tmp/ctl_ev_test.jsonl");
+}
+
 static void test_policy_push_bad(void)
 {
 	setup();
@@ -331,6 +410,7 @@ int main(void)
 	TEST(status);
 	TEST(ps);
 	TEST(sessions_groups_the_tree);
+	TEST(events_reads_and_verifies);
 	TEST(policy_push_valid);
 	TEST(policy_push_bad);
 	TEST(freeze_thaw);

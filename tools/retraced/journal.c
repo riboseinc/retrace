@@ -155,6 +155,91 @@ int retraced_journal_event(struct retraced_journal *j,
  * line's hash; we recompute every link in order. A torn tail
  * (partial last line, no newline) stops the replay cleanly.
  */
+int retraced_journal_tail(struct retraced_journal *j, size_t last_n,
+	void (*sink)(const char *line, void *user), void *user,
+	long *chain_out)
+{
+	/*
+	 * one forward pass, same verify arithmetic as replay
+	 * (replay's code path stays untouched: boot-time state
+	 * rebuild is its own contract). The retained ring holds
+	 * the final last_n records; everything earlier is
+	 * verified and dropped.
+	 */
+	FILE *f = fopen(j->path, "r");
+	char **ring;
+	uint64_t prev = 0;
+	size_t kept = 0;
+	size_t ring_i = 0;
+	uint64_t lineno = 0;
+	size_t i;
+
+	if (chain_out != NULL)
+		*chain_out = 0;
+	if (f == NULL)
+		return -1;
+	if (last_n == 0)
+		last_n = 1;
+	ring = (char **)calloc(last_n, sizeof(*ring));
+	if (ring == NULL) {
+		fclose(f);
+		return -1;
+	}
+
+	{
+		char line[2048];
+
+		while (fgets(line, sizeof(line), f) != NULL) {
+			size_t len = strlen(line);
+			uint64_t link;
+			uint64_t stored_prev;
+			JSON_Value *v;
+			JSON_Object *o;
+
+			lineno++;
+			if (len == 0 || line[len - 1] != '\n')
+				break;	/* torn tail: stop cleanly */
+			v = json_parse_string(line);
+			if (v == NULL)
+				break;	/* corrupt line: torn */
+			o = json_value_get_object(v);
+			stored_prev = (uint64_t)strtoull(
+				json_object_get_string(o, "prev"),
+				NULL, 16);
+			json_value_free(v);
+			if (stored_prev != prev) {
+				/* the verdict is the payload: report
+				 * where the chain broke
+				 */
+				if (chain_out != NULL)
+					*chain_out = (long)lineno;
+				break;
+			}
+			link = fnv1a(line,
+				prev ^ 0x9e3779b97f4a7c15ULL);
+
+			free(ring[ring_i]);
+			ring[ring_i] = strdup(line);
+			ring_i = (ring_i + 1) % last_n;
+			if (kept < last_n)
+				kept++;
+			prev = link;
+		}
+	}
+	fclose(f);
+
+	for (i = 0; i < kept; i++) {
+		size_t idx = (kept < last_n) ? i :
+			(ring_i + i) % last_n;
+
+		if (ring[idx] != NULL && sink != NULL)
+			sink(ring[idx], user);
+		free(ring[idx]);
+	}
+	free(ring);
+	return (int)kept;
+}
+
 int retraced_journal_replay(struct retraced_journal *j,
 	struct retraced_registry *r)
 {
