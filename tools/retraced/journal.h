@@ -75,4 +75,20 @@ int retraced_journal_event(struct retraced_journal *j,
 int retraced_journal_replay(struct retraced_journal *j,
 	struct retraced_registry *r);
 
+/*
+ * The evidence read arm (the ctl 'events' command rides this):
+ * stream the journal's records through a sink, verifying the
+ * hash chain exactly as replay does. last_n keeps only the
+ * final N records (earlier ones are verified then skipped);
+ * chain_out receives 0 when every link held, else the 1-based
+ * line number where the chain broke. Returns the number of
+ * records emitted through the sink.
+ *
+ * The integrity verdict travels WITH the evidence: a caller
+ * pulling records over a network reports what it was told.
+ */
+int retraced_journal_tail(struct retraced_journal *j, size_t last_n,
+	void (*sink)(const char *line, void *user), void *user,
+	long *chain_out);
+
 #endif /* RETRACE_TOOLS_JOURNAL_H_ */

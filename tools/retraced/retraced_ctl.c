@@ -150,6 +150,8 @@ uint32_t retraced_tls_scope_for_cmd(const char *cmd)
 		return 0;
 	if (strcmp(cmd, "status") == 0)
 		return RETRACED_SCOPE_STATUS;
+	if (strcmp(cmd, "status") == 0 || strcmp(cmd, "events") == 0)
+		return RETRACED_SCOPE_STATUS;
 	if (strcmp(cmd, "ps") == 0 || strcmp(cmd, "sessions") == 0)
 		return RETRACED_SCOPE_PS;
 	if (strcmp(cmd, "policy_push") == 0 ||
@@ -161,6 +163,30 @@ uint32_t retraced_tls_scope_for_cmd(const char *cmd)
 	if (strcmp(cmd, "spawn") == 0)
 		return RETRACED_SCOPE_SPAWN;
 	return 0;
+}
+
+struct ev_sink_ctx {
+	char *p;
+	size_t left;
+	int first;
+};
+
+static void ev_sink_append(const char *line, void *user)
+{
+	struct ev_sink_ctx *sc = (struct ev_sink_ctx *)user;
+	size_t n;
+
+	if (!sc->first && sc->left > 1) {
+		*sc->p++ = ',';
+		sc->left--;
+	}
+	sc->first = 0;
+	n = strlen(line);
+	if (n > sc->left - 1)
+		n = sc->left - 1;
+	memcpy(sc->p, line, n);
+	sc->p += n;
+	sc->left -= n;
 }
 
 void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
@@ -388,6 +414,56 @@ void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
 			json_free_serialized_string(s);
 		}
 		json_value_free(root);
+	} else if (strcmp(cmd, "events") == 0) {
+		/*
+		 * The evidence read arm: the journal's last records,
+		 * chain verdict riding the reply -- evidence pulled
+		 * over a network carries its own integrity statement.
+		 * last is bounded (<=128, default 20). Observe-only:
+		 * the STATUS claim, the least-privilege scope an
+		 * auditor's certificate needs.
+		 */
+		double last_d = json_object_get_number(o, "last");
+		size_t last_n = last_d > 0 ? (size_t)last_d : 20;
+		long chain = 0;
+		int emitted = 0;
+
+		if (last_n > 128) {
+			ctl_reply(ctx,
+				"{\"ok\":0,\"error\":\"last > 128\"}\n");
+			json_value_free(v);
+			return;
+		}
+		{
+			char *buf;
+			size_t cap = (size_t)emitted * 2100 + 64;
+			struct ev_sink_ctx {
+				char *p;
+				size_t left;
+				int first;
+			} sc;
+			int n;
+
+			buf = (char *)malloc(cap);
+			if (buf == NULL) {
+				ctl_reply(ctx,
+					"{\"ok\":0,\"error\":\"oom\"}\n");
+				json_value_free(v);
+				return;
+			}
+			sc.p = buf;
+			sc.left = cap;
+			sc.first = 1;
+			n = retraced_journal_tail(ctx->jr, last_n,
+				ev_sink_append, &sc, &chain);
+			(void)n;
+			ctl_reply(ctx,
+				"{\"ok\":1,\"chain\":\"%s\",\"broken_at\":%ld,\"events\":[%.*s]}\n",
+				chain == 0 ? "verified" : "broken",
+				chain,
+				(int)(cap - sc.left), buf);
+			free(buf);
+		}
 	} else if (strcmp(cmd, "policy_push") == 0) {
 		const char *in_blob = json_object_get_string(o, "blob");
 		char *blob = NULL;
