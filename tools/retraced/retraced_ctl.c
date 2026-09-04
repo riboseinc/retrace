@@ -165,6 +165,34 @@ uint32_t retraced_tls_scope_for_cmd(const char *cmd)
 	return 0;
 }
 
+/*
+ * Nest `child` under the node whose id is `parent_id`, at any
+ * depth. Returns 1 placed. The session tree's whole point is
+ * depth: worker trees and fork-bomb detonations chain past any
+ * fixed scan level (the depth-2 shortcut this replaced
+ * flattened their tails at the root).
+ */
+static int place_agent(JSON_Object *node, const char *parent_id,
+	JSON_Value *child)
+{
+	JSON_Array *children;
+	size_t i;
+
+	if (strcmp(json_object_get_string(node, "id"), parent_id) == 0) {
+		json_array_append_value(json_value_get_array(
+			json_object_get_value(node, "children")), child);
+		return 1;
+	}
+	children = json_value_get_array(
+		json_object_get_value(node, "children"));
+	for (i = 0; i < json_array_get_count(children); i++) {
+		if (place_agent(json_array_get_object(children, i),
+			    parent_id, child))
+			return 1;
+	}
+	return 0;
+}
+
 struct ev_sink_ctx {
 	char *p;
 	size_t left;
@@ -343,58 +371,13 @@ void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
 
 			if (e->parent_id[0] != '\0') {
 				int placed = 0;
-				/*
-				 * find the parent anywhere under this
-				 * session (the tree is shallow: walk
-				 * roots, then children, one level of
-				 * recursion through a helper below)
-				 */
-				JSON_Array *roots = agents;
 
 				for (k = 0; k < json_array_get_count(
-					     roots) && !placed; k++) {
-					JSON_Object *cand = json_array_get_object(
-						roots, k);
-
-					if (strcmp(json_object_get_string(
-						    cand, "id"),
-						    e->parent_id) == 0) {
-						json_array_append_value(
-							json_value_get_array(
-								json_object_get_value(
-									cand, "children")),
-							av);
-						placed = 1;
-					} else {
-						JSON_Array *grand = json_value_get_array(
-							json_object_get_value(
-								cand,
-								"children"));
-
-						for (size_t g = 0; grand !=
-							NULL && g <
-							json_array_get_count(
-								grand) &&
-							!placed; g++) {
-							JSON_Object *gc =
-								json_array_get_object(
-									grand, g);
-
-							if (strcmp(
-								 json_object_get_string(
-									 gc, "id"),
-								 e->parent_id) ==
-								0) {
-								json_array_append_value(
-									json_value_get_array(
-										json_object_get_value(
-											gc,
-											"children")),
-									av);
-								placed = 1;
-							}
-						}
-					}
+					     agents) && !placed; k++) {
+					placed = place_agent(
+						json_array_get_object(
+							agents, k),
+						e->parent_id, av);
 				}
 				if (!placed)
 					json_array_append_value(agents, av);

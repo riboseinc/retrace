@@ -36,6 +36,7 @@
 #include <stdlib.h>
 
 #include "retraced_ctl.h"
+#include "parson.h"
 #include "tls_gate.h"
 
 /*
@@ -292,6 +293,98 @@ static void ev_sink_test(const char *line, void *user)
 	}
 }
 
+static void test_sessions_deep_chain_nests_at_every_depth(void)
+{
+	/*
+	 * The depth-5 chain through the real ppid arrival order:
+	 * root->a->b->c->d. Assert the ACTUAL nesting by parsing
+	 * the reply -- string-order checks cannot see flattening
+	 * (a sibling serialized after the subtree keeps parent-
+	 * precedes-child true while the tree lies). The depth-2
+	 * walker this test replaced flattened c and d.
+	 */
+	static const char *chain[] = { "root", "a", "b", "c", "d" };
+	JSON_Value *v;
+	JSON_Object *reply;
+	JSON_Array *agents;
+	JSON_Object *node;
+	int i;
+
+	setup();
+	/* hello registers; link_parent is the daemon's REAL next
+	 * step after HELLO (the ppid->parent binding -- see
+	 * main.c's handler). Drive both, exactly as the frame
+	 * handler does; cmdline comes through the entry.
+	 */
+	{
+		struct { long pid, ppid; const char *cmdline; }
+			chain[] = {
+			{ 300, 1, "root" }, { 301, 300, "a" },
+			{ 302, 301, "b" }, { 303, 302, "c" },
+			{ 304, 303, "d" }
+		};
+		size_t c;
+
+		for (c = 0; c < sizeof(chain) / sizeof(chain[0]);
+		     c++) {
+			struct agent_entry *e =
+				retraced_registry_hello(ctx.reg, NULL,
+					chain[c].pid, chain[c].ppid,
+					"S1", chain[c].cmdline);
+
+			if (e != NULL)
+				(void)retraced_registry_link_parent(
+					ctx.reg, e);
+		}
+	}
+
+	feed(&ctx, "{\"cmd\":\"sessions\"}");
+	v = json_parse_string(reply_buf);
+	CHECK(v != NULL);
+	reply = v != NULL ? json_value_get_object(v) : NULL;
+	CHECK(reply != NULL);
+	agents = NULL;
+	if (reply != NULL) {
+		JSON_Array *sessions = json_value_get_array(
+			json_object_get_value(reply, "sessions"));
+
+		CHECK(sessions != NULL);
+		CHECK(json_array_get_count(sessions) == 1);
+		if (sessions != NULL &&
+		    json_array_get_count(sessions) == 1)
+			agents = json_value_get_array(
+				json_object_get_value(
+					json_array_get_object(sessions, 0),
+					"agents"));
+	}
+	/* exactly one root agent: nothing flattened to the top */
+	CHECK(agents != NULL);
+	CHECK(json_array_get_count(agents) == 1);
+
+	node = agents != NULL ? json_array_get_object(agents, 0) :
+		NULL;
+	for (i = 0; i < 5 && node != NULL; i++) {
+		const char *cmdline = json_object_get_string(node,
+			"cmdline");
+
+		CHECK(cmdline != NULL);
+		CHECK(strcmp(cmdline, chain[i]) == 0);
+		if (i + 1 < 5) {
+			JSON_Value *cv = json_object_get_value(node,
+				"children");
+			JSON_Array *children = json_value_get_array(cv);
+
+			CHECK(children != NULL);
+			CHECK(json_array_get_count(children) == 1);
+			node = children != NULL &&
+			    json_array_get_count(children) == 1 ?
+				json_array_get_object(children, 0) : NULL;
+		}
+	}
+	CHECK(i == 5);
+	json_value_free(v);
+}
+
 static void test_events_reads_and_verifies(void)
 {
 	/*
@@ -410,6 +503,7 @@ int main(void)
 	TEST(status);
 	TEST(ps);
 	TEST(sessions_groups_the_tree);
+	TEST(sessions_deep_chain_nests_at_every_depth);
 	TEST(events_reads_and_verifies);
 	TEST(policy_push_valid);
 	TEST(policy_push_bad);
