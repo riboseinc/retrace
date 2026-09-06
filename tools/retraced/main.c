@@ -36,6 +36,9 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/stat.h>
+#ifndef _WIN32
+#include <sys/wait.h>
+#endif
 #include <time.h>
 #include <unistd.h>
 
@@ -155,6 +158,27 @@ static void on_signal(int sig)
 	(void)sig;
 	g_stop = 1;
 }
+
+/*
+ * The reap doctrine (the spawn verb's audit tail): a spawned
+ * workload's departure is a journal record, never silence.
+ * The handler is async-signal-safe by force -- one byte wakes
+ * the loop; the waitpids and the journal writes happen there.
+ */
+#ifndef _WIN32
+static int g_reap_pipe[2] = { -1, -1 };
+
+static void on_sigchld(int sig)
+{
+	ssize_t rc;
+
+	(void)sig;
+	if (g_reap_pipe[1] >= 0) {
+		rc = write(g_reap_pipe[1], "x", 1);
+		(void)rc;
+	}
+}
+#endif
 
 /* the ctl broadcast's fd adapter: same shape as the
  * daemon_frame write seam, one int narrower
@@ -377,6 +401,7 @@ static void handle_agent_frame(struct conn *c,
 static int g_ctl_listen = -1;
 static int g_ctl_fd = -1;
 static int g_ctl_pfd_slot = -1;
+static int g_reap_pfd_slot = -1;
 static char g_ctl_buf[8192];
 static size_t g_ctl_fill;
 /* TLS fleet listener (TODO.supervisor/08 P1 / beyond-libc/05) */
@@ -694,13 +719,29 @@ int main(int argc, char **argv)
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
 	signal(SIGPIPE, SIG_IGN);
-	/* spawned workloads (ctl spawn) must not pile up as
-	 * zombies: SIG_IGN makes the kernel auto-reap. The kill
-	 * ORDER is already journaled (retrace.ctl.kill); exit
-	 * statuses would need a waitpid self-pipe -- not this
-	 * card.
+#ifndef _WIN32
+	/* spawned workloads must never pile up as zombies, and
+	 * their exits must land in the journal: the self-pipe
+	 * routes every SIGCHLD to the poll loop, which reaps and
+	 * records (the daemon's only fork site is the spawn seam,
+	 * so every reaped child is a workload it launched)
 	 */
-	signal(SIGCHLD, SIG_IGN);
+	if (pipe(g_reap_pipe) == 0) {
+		int flags = fcntl(g_reap_pipe[0], F_GETFL, 0);
+
+		(void)fcntl(g_reap_pipe[0], F_SETFL,
+			flags | O_NONBLOCK);
+		(void)fcntl(g_reap_pipe[0], F_SETFD, FD_CLOEXEC);
+		(void)fcntl(g_reap_pipe[1], F_SETFD, FD_CLOEXEC);
+		signal(SIGCHLD, on_sigchld);
+	} else {
+		/* no pipe, no records: fall back to silent auto-reap
+		 * rather than leaking zombies
+		 */
+		g_reap_pipe[0] = g_reap_pipe[1] = -1;
+		signal(SIGCHLD, SIG_IGN);
+	}
+#endif
 
 	retraced_registry_init(&reg);
 	retraced_journal_open(&jr, journal_path);
@@ -984,6 +1025,16 @@ int main(int argc, char **argv)
 				pfds[nfd].events = POLLIN;
 				nfd++;
 			}
+#ifndef _WIN32
+			if (g_reap_pipe[0] >= 0) {
+				pfds[nfd].fd = g_reap_pipe[0];
+				pfds[nfd].events = POLLIN;
+				g_reap_pfd_slot = nfd;
+				nfd++;
+			} else {
+				g_reap_pfd_slot = -1;
+			}
+#endif
 			g_ctl_pfd_slot = ctl_idx;
 			g_tls_pfd_slot = tls_idx;
 		}
@@ -997,6 +1048,53 @@ int main(int argc, char **argv)
 			}
 		}
 		r = poll(pfds, (nfds_t)nfd, 500);
+#ifndef _WIN32
+		if (g_reap_pipe[0] >= 0) {
+			char flush[64];
+			ssize_t rn;
+
+			/* The sweep runs EVERY iteration, not just on
+			 * the pipe's POLLIN: Darwin can deliver the
+			 * SIGCHLD (and wake the pipe) a hair before
+			 * the child is waitable -- the first waitpid
+			 * then reports ECHILD and the byte is spent.
+			 * The 500ms poll timeout is the backstop that
+			 * guarantees the record; the byte only
+			 * accelerates it. The byte count is
+			 * irrelevant -- the waitpid pass reaps every
+			 * dead child.
+			 */
+			while ((rn = read(g_reap_pipe[0], flush,
+			    sizeof(flush))) > 0)
+				;
+			for (;;) {
+				int status;
+				pid_t pid = waitpid((pid_t)-1, &status,
+					WNOHANG);
+				if (pid <= 0)
+					break;
+				{
+					int signaled = WIFSIGNALED(status);
+					int code = signaled ?
+						WTERMSIG(status) :
+						WEXITSTATUS(status);
+					char ev[160];
+
+					snprintf(ev, sizeof(ev),
+						"{\"name\":\"retrace.ctl.exit\","
+						"\"pid\":%ld,\"how\":\"%s\",\"code\":%d}",
+						(long)pid,
+						signaled ? "signaled"
+							 : "exited",
+						code);
+					retraced_journal_event(&jr,
+						(long)time(NULL), "daemon",
+						0, ev);
+				}
+			}
+		}
+#endif
+
 		if (r <= 0) {
 			spin_hits = 0;	/* timed out: healthy */
 			continue;
@@ -1116,6 +1214,8 @@ int main(int argc, char **argv)
 			    (cfd->revents & (POLLIN | POLLHUP)))
 				handle_ctl_readable(conns, &reg, &jr);
 		}
+
+
 
 		if (pfds[0].revents & POLLIN) {
 			int fd = accept_gated(listen_fd, &jr);
