@@ -42,6 +42,15 @@ static int payload_is_durable(const char *payload)
 		"\"name\":\"retrace.policy.",
 		"\"name\":\"retrace.session.",
 		"\"name\":\"retrace.journal.",
+		/* Control-plane audit (the reap cycle's lesson,
+		 * phase-3's shape): a journaled ORDER, LAUNCH, or
+		 * DEPARTURE is an audit decision -- a live auditor
+		 * must not wait for an unrelated flush. An exit
+		 * record rides NO traffic (the child is gone), so
+		 * without this it sat buffered forever on an idle
+		 * daemon.
+		 */
+		"\"name\":\"retrace.ctl.",
 		/* Live drift grading (03 P1): a kernel-obs delta is
 		 * the daemon's own heartbeat-grade of sub-libc
 		 * escapes -- audit-class, never buffered away.

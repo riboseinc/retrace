@@ -169,8 +169,38 @@ def main():
         return fail("kill not journaled")
     print("kill ok: reaped and audited")
 
+    # ---- the departure itself is an audit record -----------
+    ev = wait_journal(journal, "retrace.ctl.exit",
+                      lambda e: e.get("pid") == pid, 5.0)
+    if ev is None:
+        stop_daemon(d, ctl_sock)
+        return fail("no retrace.ctl.exit for the killed workload")
+    if ev.get("how") != "signaled":
+        stop_daemon(d, ctl_sock)
+        return fail(f"killed workload departed as {ev.get('how')!r}")
+    print(f"exit ok: departure journaled ({ev.get('how')}/"
+          f"{ev.get('code')})")
+
+    # ---- a workload that leaves ON ITS OWN is recorded too --
+    rc, out = ctl(ctl_bin, ctl_sock, "spawn",
+                  "--preload", lib, "--", target, "2")
+    if rc != 0 or not json.loads(out).get("ok"):
+        stop_daemon(d, ctl_sock)
+        return fail(f"self-exiting spawn refused: {out!r}")
+    pid2 = json.loads(out)["pid"]
+    ev = wait_journal(journal, "retrace.ctl.exit",
+                      lambda e: e.get("pid") == pid2, 15.0)
+    if ev is None:
+        stop_daemon(d, ctl_sock)
+        return fail("self-exiting workload never journaled its exit")
+    if ev.get("how") != "exited" or ev.get("code") != 0:
+        stop_daemon(d, ctl_sock)
+        return fail(f"natural exit recorded as {ev.get('how')!r}/"
+                    f"{ev.get('code')!r}")
+    print("exit ok: natural departure journaled (exited/0)")
+
     stop_daemon(d, ctl_sock)
-    print("PASS: spawn joined, visible, audited, reaped")
+    print("PASS: spawn joined, visible, audited, reaped, recorded")
     return 0
 
 

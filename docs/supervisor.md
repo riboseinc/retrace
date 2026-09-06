@@ -78,8 +78,12 @@ act, then the child's agent HELLOs with the nonce and takes a **full**
 seat (`retrace.auth.agent`, role `full` -- never a spectator: the
 nonce traveled with the fork). The spawned pid shows up in `ps` like
 any agent, and `kill PID` reaps it through the same control plane.
-SIGCHLD is ignored daemon-side, so reaped workloads never linger as
-zombies. POSIX only -- on Windows the verb answers honestly
+The **departure is journaled too**: a SIGCHLD self-pipe routes every
+child death to the daemon's poll loop, which reaps and records
+`retrace.ctl.exit {pid, how: exited|signaled, code}` -- a workload
+that crashes, is killed, or leaves on its own is never a silent gap,
+and reaped workloads never linger as zombies. POSIX only -- on
+Windows the verb answers honestly
 (`not on this platform -- use retrace-win-run`): injection there is
 retrace-win-run's machinery, not a stub.
 
