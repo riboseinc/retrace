@@ -36,6 +36,7 @@
 #include <stdlib.h>
 
 #include "retraced_ctl.h"
+#include "ctl_verbs.h"
 #include "parson.h"
 #include "tls_gate.h"
 
@@ -552,6 +553,26 @@ static void test_spawn_scope_denied(void)
 	CHECK(strstr(reply_buf, "\"error\":\"scope denied\"") != NULL);
 }
 
+/*
+ * Table conformance: the SSOT list expanded here -- every verb
+ * must carry a nonzero claim scope (a zero-scope row would
+ * silently grant nothing to every cert) and must ANSWER (a
+ * verb that falls through to "unknown cmd" is a list/handler
+ * drift; the handler-less row is a compile error, this catches
+ * the rest)
+ */
+static void test_verb_table_conformance(void)
+{
+#define VERB_PROBE(n, c, s, a, h)					      \
+	setup();							      \
+	feed(&ctx, "{\"cmd\":\"" #n "\"}");				      \
+	CHECK(strstr(reply_buf, "unknown cmd") == NULL);		      \
+	CHECK(retraced_tls_scope_for_cmd(#n) != 0);
+
+	RETRACED_CTL_VERBS(VERB_PROBE)
+#undef VERB_PROBE
+}
+
 int main(void)
 {
 	printf("retraced ctl plane tests:\n");
@@ -572,6 +593,7 @@ int main(void)
 	TEST(spawn_no_cb_refuses);
 	TEST(spawn_no_argv);
 	TEST(spawn_scope_denied);
+	TEST(verb_table_conformance);
 
 	printf("%d tests: %d pass, %d fail\n", tests_run, tests_pass,
 		tests_fail);

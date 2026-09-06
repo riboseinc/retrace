@@ -48,6 +48,7 @@
 #endif
 
 #include "../retraced/tls_gate.h"
+#include "../retraced/ctl_verbs.h"
 
 #ifdef RETRACE_HAVE_OPENSSL
 #include <openssl/evp.h>
@@ -356,16 +357,20 @@ static int cmd_sign_policy(const char *file, const char *key_path)
 
 static int ctl_usage(void)
 {
+	/* the verb lines derive from the same SSOT list the
+	 * daemon dispatches on (ctl_verbs.h) -- the usage can no
+	 * longer drift behind the verb surface
+	 */
+#define USAGE_LINE(n, c, s, a, h)					      \
+	fprintf(stderr, "  %-14s%-26s%s\n", #c, a, h);
+
 	fprintf(stderr,
 		"usage: retrace-ctl [--sock PATH] COMMAND\n"
 		"       retrace-ctl --tls-host H:P --tls-cert C --tls-key K\n"
-		"                   --tls-ca CA COMMAND\n"
-		"  status                 daemon info, agent count\n"
-		"  ps                     registry table (JSON)\n"
-		"  policy-push FILE       push a policy to all agents\n"
-		"  freeze                 hold every agent (wildcard freeze)\n"
-		"  thaw                   restore the pre-freeze policy\n"
-		"  kill PID               SIGTERM one target\n"
+		"                   --tls-ca CA COMMAND\n");
+	RETRACED_CTL_VERBS(USAGE_LINE)
+#undef USAGE_LINE
+	fprintf(stderr,
 		"  sign-policy FILE KEY   emit a signed wrapper to stdout\n"
 		"  --tls-*: fleet mTLS (all four required together)\n");
 	return 2;
