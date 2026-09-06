@@ -55,10 +55,34 @@ retrace-ctl --tls-host H:P --tls-cert PEM --tls-key PEM --tls-ca CA COMMAND
 ```
 
 Commands: `status`, `ps`, `policy-push FILE`, `freeze`, `thaw`, `kill
-PID`. Every command maps to a claim scope; a peer whose cert lacks the
+PID`, `spawn [--preload LIB] -- ARGV...`. Every command maps to a claim scope; a peer whose cert lacks the
 bit is refused with `scope denied` and the attempt is journaled as
 `retrace.auth.overscope`. Local UDS peers hold all scopes (PEERCRED
 already gated the accept).
+
+### The launch arm: retrace-ctl spawn
+
+The threat model's "host process control -- spawn": the daemon forks
+the workload armed to join **itself** -- supervisor env, the agent
+socket, the nonce ("handed to spawners"), EAGER connect, and the
+preload the caller chose:
+
+```sh
+retrace-ctl --sock /tmp/retraced.ctl.sock \
+    spawn --preload /usr/lib/libretrace.so -- /usr/bin/detonation arg
+```
+
+One command, the whole audit chain: the launch is journaled
+(`retrace.ctl.spawn`, with the pid and argv0) *before* the child can
+act, then the child's agent HELLOs with the nonce and takes a **full**
+seat (`retrace.auth.agent`, role `full` -- never a spectator: the
+nonce traveled with the fork). The spawned pid shows up in `ps` like
+any agent, and `kill PID` reaps it through the same control plane.
+SIGCHLD is ignored daemon-side, so reaped workloads never linger as
+zombies. POSIX only -- on Windows the verb answers honestly
+(`not on this platform -- use retrace-win-run`): injection there is
+retrace-win-run's machinery, not a stub.
+
 
 ## The session tree: retrace-ctl sessions
 

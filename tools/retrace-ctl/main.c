@@ -444,6 +444,53 @@ int main(int argc, char **argv)
 		return cmd_sign_policy(argv[i + 1], argv[i + 2]);
 	} else if (strcmp(argv[i], "sessions") == 0) {
 		snprintf(req, sizeof(req), "{\"cmd\":\"sessions\"}\n");
+	} else if (strcmp(argv[i], "spawn") == 0 && i + 1 < argc) {
+		/* spawn --preload <path> -- argv0 argv1 ...
+		 * everything after -- is the workload
+		 */
+		const char *preload = NULL;
+		int j = i + 1;
+
+
+		while (j < argc && strcmp(argv[j], "--preload") == 0 &&
+		       j + 2 < argc) {
+			preload = argv[j + 1];
+			j += 2;
+		}
+		if (j >= argc || strcmp(argv[j], "--") != 0) {
+			return ctl_usage();
+		}
+		{
+			char blob[1024];
+			size_t o = 0;
+			int k;
+
+			o += (size_t)snprintf(blob + o,
+				sizeof(blob) - o,
+				"{\"cmd\":\"spawn\",\"argv\":[");
+			for (k = j + 1; k < argc && o < sizeof(blob) - 64;
+			     k++) {
+				/* json-escape conservative: the
+				 * workload argv in these flows is
+				 * plain paths
+				 */
+				o += (size_t)snprintf(blob + o,
+					sizeof(blob) - o, "%s\"%s\"",
+					k > j + 1 ? "," : "", argv[k]);
+			}
+			o += (size_t)snprintf(blob + o, sizeof(blob) - o,
+				"]");
+			if (preload != NULL)
+				o += (size_t)snprintf(blob + o,
+					sizeof(blob) - o,
+					",\"preload\":\"%s\"", preload);
+			if (o < sizeof(blob) - 2) {
+				blob[o++] = '}';
+				blob[o] = '\0';
+			}
+			snprintf(req, sizeof(req), "%s\n", blob);
+		}
+		i = argc;
 	} else if (strcmp(argv[i], "events") == 0) {
 		long last = 20;
 

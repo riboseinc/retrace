@@ -398,6 +398,67 @@ static void ctl_drop(void)
 	g_ctl.scopes = RETRACED_SCOPE_ALL;
 }
 
+/*
+ * The spawn seam (POSIX): fork a workload armed to join this
+ * daemon -- the supervisor env, the agent socket, the nonce
+ * (the threat model's "handed to spawners"), and the preload
+ * the caller chose. The ctl loop is single-threaded; fork
+ * from here is clean. The child never returns: exec replaces.
+ */
+static const char *g_agent_sock_for_spawn;
+
+static long ctl_spawn_posix(const char *const *argv,
+	const char *preload, char *err_out, size_t err_cap)
+{
+	pid_t pid;
+
+	if (argv == NULL || argv[0] == NULL) {
+		snprintf(err_out, err_cap, "empty argv");
+		return -1;
+	}
+	pid = fork();
+	if (pid < 0) {
+		snprintf(err_out, err_cap, "fork: %s",
+			strerror(errno));
+		return -1;
+	}
+	if (pid == 0) {
+		/* the child: arm it exactly as --nonce-file
+		 * documents, then become the workload
+		 */
+		char preload_var[64];
+
+		setenv("RETRACE_SUPERVISOR", "1", 1);
+		setenv("RETRACE_SUPERVISOR_SOCK",
+			g_agent_sock_for_spawn != NULL ?
+			g_agent_sock_for_spawn : "", 1);
+		setenv("RETRACE_SUPERVISOR_NONCE",
+			g_agent_nonce, 1);
+		/* EAGER: the agent thread only boots on the first
+		 * queued event (or here) -- a spawned workload with
+		 * no denials would never HELLO, never join ps
+		 */
+		setenv("RETRACE_SUPERVISOR_EAGER", "1", 1);
+		if (preload != NULL && preload[0] != '\0') {
+#ifdef __APPLE__
+			snprintf(preload_var, sizeof(preload_var),
+				"DYLD_INSERT_LIBRARIES");
+#else
+			snprintf(preload_var, sizeof(preload_var),
+				"LD_PRELOAD");
+#endif
+			setenv(preload_var, preload, 1);
+		}
+		execvp(argv[0], (char *const *)argv);
+		/* exec failed: the daemon cannot journal from a
+		 * forked child -- die loudly enough for the
+		 * spawner to see
+		 */
+		_exit(127);
+	}
+	return (long)pid;
+}
+
 static void handle_ctl_readable(struct conn *conns,
 	struct retraced_registry *reg, struct retraced_journal *jr)
 {
@@ -633,6 +694,13 @@ int main(int argc, char **argv)
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
 	signal(SIGPIPE, SIG_IGN);
+	/* spawned workloads (ctl spawn) must not pile up as
+	 * zombies: SIG_IGN makes the kernel auto-reap. The kill
+	 * ORDER is already journaled (retrace.ctl.kill); exit
+	 * statuses would need a waitpid self-pipe -- not this
+	 * card.
+	 */
+	signal(SIGCHLD, SIG_IGN);
 
 	retraced_registry_init(&reg);
 	retraced_journal_open(&jr, journal_path);
@@ -728,6 +796,8 @@ int main(int argc, char **argv)
 	g_ctl.jr = &jr;
 	g_ctl.conns = conns;
 	g_ctl.conn_send = ctl_conn_send_fd;
+	g_agent_sock_for_spawn = sock_path;
+	g_ctl.spawn_cb = ctl_spawn_posix;
 	g_ctl.reply_sink = ctl_reply_fd;
 	g_ctl.reply_user = &g_ctl_fd;
 	g_ctl.scopes = RETRACED_SCOPE_ALL; /* local UDS default */

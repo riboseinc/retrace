@@ -317,6 +317,23 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 120)
 
+	# retrace-ctl spawn (the threat model's host process
+	# control): the daemon forks the workload armed to join
+	# itself; one command yields the journaled launch, the
+	# full-role HELLO, ps visibility, and a ctl kill.
+	if(NOT WIN32)
+	add_test(NAME integration-supervisor-spawn
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_supervisor_spawn.py
+			$<TARGET_FILE:retrace_retraced>
+			$<TARGET_FILE:retrace_ctl>
+			$<TARGET_FILE:retrace_v2>
+			$<TARGET_FILE:retrace_test_policy_target>)
+	set_tests_properties(integration-supervisor-spawn PROPERTIES
+		LABELS "integration"
+		TIMEOUT 90)
+	endif()
+
 	# The kernel-observation agent (TODO.beyond-libc/03):
 	# eBPF lane as a spectator peer; synthetic source proves
 	# the pipe on CI (no BPF privileges).

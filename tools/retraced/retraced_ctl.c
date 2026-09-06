@@ -447,6 +447,78 @@ void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
 				(int)(cap - sc.left), buf);
 			free(buf);
 		}
+	} else if (strcmp(cmd, "spawn") == 0) {
+		/*
+		 * The reserved verb (the threat model's host
+		 * process control): launch a workload armed to
+		 * join THIS daemon -- supervisor env, agent
+		 * socket, nonce, preload -- and journal the
+		 * action with argv, kill's audit pattern
+		 * extended. SPAWN claim required (the scope gate
+		 * above); the transport's spawn seam does the
+		 * launching (NULL on Windows: injection is
+		 * retrace-win-run's machinery, not a stub here).
+		 */
+		JSON_Array *argv_a = json_object_get_array(o, "argv");
+		const char *preload =
+			json_object_get_string(o, "preload");
+
+		if (ctx->spawn_cb == NULL) {
+			ctl_reply(ctx,
+				"{\"ok\":0,\"error\":\"spawn: not on this platform -- use retrace-win-run\"}\n");
+			json_value_free(v);
+			return;
+		}
+		if (argv_a == NULL || json_array_get_count(argv_a) == 0) {
+			ctl_reply(ctx,
+				"{\"ok\":0,\"error\":\"no argv\"}\n");
+			json_value_free(v);
+			return;
+		}
+		{
+			char *argv_buf[129];
+			char err[96];
+			size_t n = json_array_get_count(argv_a);
+			size_t ai;
+			long pid;
+
+			if (n > 128) {
+				ctl_reply(ctx,
+					"{\"ok\":0,\"error\":\"argv > 128\"}\n");
+				json_value_free(v);
+				return;
+			}
+			for (ai = 0; ai < n; ai++)
+				argv_buf[ai] = (char *)
+					json_array_get_string(argv_a, ai);
+			argv_buf[n] = NULL;
+			err[0] = '\0';
+			pid = ctx->spawn_cb(
+				(const char *const *)argv_buf, preload,
+				err, sizeof(err));
+			if (pid <= 0) {
+				ctl_reply(ctx,
+					"{\"ok\":0,\"error\":\"spawn failed%s%s\"}\n",
+					err[0] != '\0' ? ": " : "", err);
+				json_value_free(v);
+				return;
+			}
+			{
+				char ev[256];
+
+				snprintf(ev, sizeof(ev),
+					"{\"name\":\"retrace.ctl.spawn\",\"pid\":%ld,\"argv0\":\"%s\"}",
+					pid,
+					json_array_get_string(argv_a, 0) !=
+						NULL ?
+						json_array_get_string(
+							argv_a, 0) : "");
+				retraced_journal_event(ctx->jr,
+					(long)time(NULL), "daemon", 0, ev);
+			}
+			ctl_reply(ctx, "{\"ok\":1,\"pid\":%ld}\n",
+				pid);
+		}
 	} else if (strcmp(cmd, "policy_push") == 0) {
 		const char *in_blob = json_object_get_string(o, "blob");
 		char *blob = NULL;
