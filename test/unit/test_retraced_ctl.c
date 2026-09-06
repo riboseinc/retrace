@@ -494,6 +494,64 @@ static void test_scope_denied(void)
 	CHECK(ctx.frozen == 0);
 }
 
+/*
+ * the spawn seam, faked: the handler's job is parsing,
+ * reply shape, and the journal call -- the fork is the
+ * transport's business (main.c), integration-tested there
+ */
+static char spawn_seen_argv0[64];
+static char spawn_seen_preload[64];
+
+static long fake_spawn_cb(const char *const *argv,
+	const char *preload, char *err_out, size_t err_cap)
+{
+	(void)err_cap;
+	err_out[0] = '\0';
+	snprintf(spawn_seen_argv0, sizeof(spawn_seen_argv0), "%s",
+		argv[0]);
+	snprintf(spawn_seen_preload, sizeof(spawn_seen_preload), "%s",
+		preload != NULL ? preload : "");
+	return 4242;
+}
+
+static void test_spawn_launches(void)
+{
+	setup();
+	ctx.spawn_cb = fake_spawn_cb;
+	feed(&ctx,
+	     "{\"cmd\":\"spawn\",\"argv\":[\"/bin/work\",\"-v\"],"
+	     "\"preload\":\"/opt/libretrace.so\"}");
+	CHECK(strstr(reply_buf, "\"ok\":1,\"pid\":4242") != NULL);
+	CHECK(strcmp(spawn_seen_argv0, "/bin/work") == 0);
+	CHECK(strcmp(spawn_seen_preload, "/opt/libretrace.so") == 0);
+}
+
+static void test_spawn_no_cb_refuses(void)
+{
+	/* the platform without a fork seam answers honestly */
+	setup();
+	feed(&ctx, "{\"cmd\":\"spawn\",\"argv\":[\"/bin/work\"]}");
+	CHECK(strstr(reply_buf, "not on this platform") != NULL);
+	CHECK(strstr(reply_buf, "\"ok\":0") != NULL);
+}
+
+static void test_spawn_no_argv(void)
+{
+	setup();
+	ctx.spawn_cb = fake_spawn_cb;
+	feed(&ctx, "{\"cmd\":\"spawn\"}");
+	CHECK(strstr(reply_buf, "\"error\":\"no argv\"") != NULL);
+}
+
+static void test_spawn_scope_denied(void)
+{
+	setup();
+	ctx.spawn_cb = fake_spawn_cb;
+	ctx.scopes = RETRACED_SCOPE_STATUS;
+	feed(&ctx, "{\"cmd\":\"spawn\",\"argv\":[\"/bin/work\"]}");
+	CHECK(strstr(reply_buf, "\"error\":\"scope denied\"") != NULL);
+}
+
 int main(void)
 {
 	printf("retraced ctl plane tests:\n");
@@ -510,6 +568,10 @@ int main(void)
 	TEST(freeze_thaw);
 	TEST(kill_no_pid);
 	TEST(scope_denied);
+	TEST(spawn_launches);
+	TEST(spawn_no_cb_refuses);
+	TEST(spawn_no_argv);
+	TEST(spawn_scope_denied);
 
 	printf("%d tests: %d pass, %d fail\n", tests_run, tests_pass,
 		tests_fail);

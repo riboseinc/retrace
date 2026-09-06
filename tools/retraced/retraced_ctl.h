@@ -98,6 +98,18 @@ struct retraced_ctl_ctx {
 	 */
 	int (*conn_send)(void *io, uint16_t type,
 		const char *payload);
+
+	/*
+	 * The spawn seam (the doctrine's reserved verb): launch a
+	 * workload armed to join this daemon -- the supervisor
+	 * env, the agent socket, the nonce, the preload. POSIX
+	 * installs fork+exec; Windows leaves it NULL and the
+	 * command answers with the win-run pointer (injection is
+	 * that tool's machinery). argv is NUL-terminated strings;
+	 * preload may be NULL.
+	 */
+	long (*spawn_cb)(const char *const *argv,
+		const char *preload, char *err_out, size_t err_cap);
 };
 
 void retraced_ctl_set_policy(struct retraced_ctl_ctx *ctx,
