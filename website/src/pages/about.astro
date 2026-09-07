@@ -95,13 +95,17 @@ import Footer from "../components/Footer.astro";
         kernel via eBPF/ETW, runtime via Python and JVM agents) with drift
         graded live, and declared-sets compile into kernel enforcement on
         every desktop OS — each exec leaving a signed, verifiable audit
-        record.</p>
+        record. The CLI's launch arm completes the lifecycle: spawn forks
+        a workload that joins the daemon itself, and every departure —
+        killed, crashed, or a clean exit — lands in the journal as its
+        own record.</p>
         <div class="pill-row">
           <span class="pill">detonation farms</span>
           <span class="pill">specimen freeze + black-box pull</span>
           <span class="pill">versioned policy epochs</span>
           <span class="pill">session trees → one trace</span>
           <span class="pill">fleet CLI over TLS</span>
+          <span class="pill">spawn + audited departures</span>
           <span class="pill">kernel enforcement, audited</span>
         </div>
       </div>
