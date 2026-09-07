@@ -110,6 +110,15 @@ struct retraced_ctl_ctx {
 	 */
 	long (*spawn_cb)(const char *const *argv,
 		const char *preload, char *err_out, size_t err_cap);
+
+	/*
+	 * The connection's framing state: partial bytes a peer
+	 * left mid-line, carried across reads. The transport feeds
+	 * chunks (retraced_ctl_feed); bytes, lines, and verbs are
+	 * this module's pipeline.
+	 */
+	char rbuf[8192];
+	size_t rfill;
 };
 
 void retraced_ctl_set_policy(struct retraced_ctl_ctx *ctx,
@@ -134,5 +143,18 @@ uint32_t retraced_tls_scope_for_cmd(const char *cmd);
 
 void retraced_ctl_handle_line(struct retraced_ctl_ctx *ctx,
 	char *line);
+
+/*
+ * The byte layer: one transport chunk in, whole lines out.
+ * Feeds the framing buffer, splits on newlines, dispatches
+ * each complete line. Returns 0 fed; -1 when a line exceeds
+ * the buffer -- the transport drops the peer (a daemon must
+ * not die to an oversized line).
+ */
+int retraced_ctl_feed(struct retraced_ctl_ctx *ctx,
+	const char *data, size_t n);
+
+/* empty the framing state: a fresh accept or a dropped peer */
+void retraced_ctl_conn_reset(struct retraced_ctl_ctx *ctx);
 
 #endif /* RETRACE_TOOLS_RETRACED_CTL_H_ */

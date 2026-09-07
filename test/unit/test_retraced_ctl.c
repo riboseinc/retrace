@@ -75,14 +75,26 @@ static int tests_fail;
 
 static char reply_buf[4096];
 static size_t reply_len;
+static char replies_all[4096];	/* every reply, concatenated */
+static int replies_count;
 
 static void sink(const char *line, void *user)
 {
 	(void)user;
-	reply_len = 0;
-	while (*line != '\0' && reply_len + 1 < sizeof(reply_buf))
-		reply_buf[reply_len++] = *line++;
-	reply_buf[reply_len] = '\0';
+	size_t o = 0;
+
+	while (*line != '\0' && o + 1 < sizeof(reply_buf))
+		reply_buf[o++] = *line++;
+	reply_buf[o] = '\0';
+	reply_len = o;
+	{
+		char *dst = replies_all;
+
+		while (*line != '\0' && replies_count < 128)
+			line++;	/* already consumed above */
+		(void)dst;
+		(void)line;
+	}
 }
 
 static void feed(struct retraced_ctl_ctx *ctx, const char *line)
@@ -93,6 +105,16 @@ static void feed(struct retraced_ctl_ctx *ctx, const char *line)
 	reply_buf[0] = '\0';
 	reply_len = 0;
 	retraced_ctl_handle_line(ctx, buf);
+}
+
+/* the byte layer: transport chunks in, one reply counter */
+static int feed_count;
+
+static void counting_sink(const char *line, void *user)
+{
+	(void)user;
+	feed_count++;
+	snprintf(reply_buf, sizeof(reply_buf), "%s", line);
 }
 
 static struct retraced_ctl_ctx ctx;
@@ -554,6 +576,80 @@ static void test_spawn_scope_denied(void)
 }
 
 /*
+ * The framing tests (the byte layer's own test class -- the
+ * reason feed exists): a line split across reads is ONE
+ * command; two commands in one chunk are TWO; a partial line
+ * stays silent until its newline arrives; a line that exceeds
+ * the buffer is refused for the transport to drop.
+ */
+static void test_feed_splits_lines_across_chunks(void)
+{
+	setup();
+	ctx.reply_sink = counting_sink;
+	feed_count = 0;
+	{
+		char a[16], b[8];
+
+		snprintf(a, sizeof(a), "{\"cmd\":\"sta");
+		snprintf(b, sizeof(b), "tus\"}\n");
+		CHECK(retraced_ctl_feed(&ctx, a, strlen(a)) == 0);
+		CHECK(feed_count == 0);
+		CHECK(retraced_ctl_feed(&ctx, b, strlen(b)) == 0);
+	}
+	CHECK(feed_count == 1);
+	CHECK(strstr(reply_buf, "\"ok\":1") != NULL);
+}
+
+static void test_feed_two_commands_one_chunk(void)
+{
+	setup();
+	ctx.reply_sink = counting_sink;
+	feed_count = 0;
+	{
+		char chunk[64];
+
+		snprintf(chunk, sizeof(chunk),
+			"{\"cmd\":\"status\"}\n{\"cmd\":\"ps\"}\n");
+		CHECK(retraced_ctl_feed(&ctx, chunk, strlen(chunk)) == 0);
+	}
+	CHECK(feed_count == 2);
+}
+
+static void test_feed_partial_without_newline_is_silent(void)
+{
+	setup();
+	ctx.reply_sink = counting_sink;
+	feed_count = 0;
+	{
+		char part[24], whole[24];
+
+		snprintf(part, sizeof(part), "{\"cmd\":\"status\"}");
+		snprintf(whole, sizeof(whole), "{\"cmd\":\"status\"}\n");
+		CHECK(retraced_ctl_feed(&ctx, part, strlen(part)) == 0);
+		CHECK(feed_count == 0);
+		retraced_ctl_conn_reset(&ctx);
+		CHECK(retraced_ctl_feed(&ctx, whole,
+			    strlen(whole)) == 0);
+	}
+	CHECK(feed_count == 1);
+}
+
+static void test_feed_oversized_line_refused(void)
+{
+	static char big[9000];
+
+	setup();
+	memset(big, 'A', sizeof(big));
+	CHECK(retraced_ctl_feed(&ctx, big, sizeof(big)) == -1);
+	/* after a drop the framing state is empty: a fresh
+	 * connection parses normally
+	 */
+	retraced_ctl_conn_reset(&ctx);
+	feed(&ctx, "{\"cmd\":\"status\"}");
+	CHECK(strstr(reply_buf, "\"ok\":1") != NULL);
+}
+
+/*
  * Table conformance: the SSOT list expanded here -- every verb
  * must carry a nonzero claim scope (a zero-scope row would
  * silently grant nothing to every cert) and must ANSWER (a
@@ -594,6 +690,10 @@ int main(void)
 	TEST(spawn_no_argv);
 	TEST(spawn_scope_denied);
 	TEST(verb_table_conformance);
+	TEST(feed_splits_lines_across_chunks);
+	TEST(feed_two_commands_one_chunk);
+	TEST(feed_partial_without_newline_is_silent);
+	TEST(feed_oversized_line_refused);
 
 	printf("%d tests: %d pass, %d fail\n", tests_run, tests_pass,
 		tests_fail);
