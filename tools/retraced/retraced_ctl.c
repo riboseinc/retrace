@@ -703,3 +703,46 @@ static void verb_kill(struct retraced_ctl_ctx *ctx,
 	ctl_reply(ctx, "{\"ok\":1,\"pid\":%ld}\n", pid);
 }
 
+
+/*
+ * The byte layer (the seam, cut through): a transport chunk in,
+ * whole lines out. The partial-line state lives in the ctx --
+ * bytes, lines, and verbs are one module's pipeline, and the
+ * transport owns transport things (fds, TLS reads, poll).
+ * Returns 0 fed; -1 when a line exceeds the buffer -- the
+ * caller drops the connection, never the daemon.
+ */
+int retraced_ctl_feed(struct retraced_ctl_ctx *ctx,
+	const char *data, size_t n)
+{
+	if (data == NULL)
+		return 0;
+	while (n > 0) {
+		size_t room = sizeof(ctx->rbuf) - 1 - ctx->rfill;
+		char *nl;
+
+		if (room == 0)
+			return -1;	/* line exceeds the buffer */
+		if (n < room)
+			room = n;
+		memcpy(ctx->rbuf + ctx->rfill, data, room);
+		ctx->rfill += room;
+		ctx->rbuf[ctx->rfill] = '\0';
+		data += room;
+		n -= room;
+		while ((nl = strchr(ctx->rbuf, '\n')) != NULL) {
+			*nl = '\0';
+			retraced_ctl_handle_line(ctx, ctx->rbuf);
+			memmove(ctx->rbuf, nl + 1,
+				ctx->rfill -
+					(size_t)(nl + 1 - ctx->rbuf));
+			ctx->rfill -= (size_t)(nl + 1 - ctx->rbuf);
+		}
+	}
+	return 0;
+}
+
+void retraced_ctl_conn_reset(struct retraced_ctl_ctx *ctx)
+{
+	ctx->rfill = 0;
+}

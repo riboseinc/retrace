@@ -402,8 +402,6 @@ static int g_ctl_listen = -1;
 static int g_ctl_fd = -1;
 static int g_ctl_pfd_slot = -1;
 static int g_reap_pfd_slot = -1;
-static char g_ctl_buf[8192];
-static size_t g_ctl_fill;
 /* TLS fleet listener (TODO.supervisor/08 P1 / beyond-libc/05) */
 static int g_tls_listen = -1;
 static struct retraced_tls_ctx *g_tls_ctx;
@@ -418,7 +416,7 @@ static void ctl_drop(void)
 		close(g_ctl_fd);
 		g_ctl_fd = -1;
 	}
-	g_ctl_fill = 0;
+	retraced_ctl_conn_reset(&g_ctl);
 	/* local UDS peers regain full scope on next accept */
 	g_ctl.scopes = RETRACED_SCOPE_ALL;
 }
@@ -484,39 +482,25 @@ static long ctl_spawn_posix(const char *const *argv,
 	return (long)pid;
 }
 
-static void handle_ctl_readable(struct conn *conns,
-	struct retraced_registry *reg, struct retraced_journal *jr)
+static void handle_ctl_readable(void)
 {
+	char buf[2048];
 	ssize_t n;
-	char *nl;
 
-	(void)conns;
-	(void)reg;
-	(void)jr;
 	if (g_ctl_ssl != NULL)
-		n = (ssize_t)retraced_tls_read(g_ctl_ssl,
-			g_ctl_buf + g_ctl_fill,
-			(int)(sizeof(g_ctl_buf) - 1 - g_ctl_fill));
+		n = (ssize_t)retraced_tls_read(g_ctl_ssl, buf,
+			(int)sizeof(buf));
 	else
-		n = read(g_ctl_fd, g_ctl_buf + g_ctl_fill,
-			sizeof(g_ctl_buf) - 1 - g_ctl_fill);
+		n = read(g_ctl_fd, buf, sizeof(buf));
 	if (n <= 0) {
 		ctl_drop();
 		return;
 	}
-	g_ctl_fill += (size_t)n;
-	g_ctl_buf[g_ctl_fill] = '\0';
-	while ((nl = strchr(g_ctl_buf, '\n')) != NULL) {
-		*nl = '\0';
-		retraced_ctl_handle_line(&g_ctl, g_ctl_buf);
-		memmove(g_ctl_buf, nl + 1,
-			g_ctl_fill - (size_t)(nl + 1 - g_ctl_buf));
-		g_ctl_fill -= (size_t)(nl + 1 - g_ctl_buf);
-	}
-	if (g_ctl_fill >= sizeof(g_ctl_buf) - 1) {
-		/* oversized line: drop the connection, not the daemon */
+	/* the module owns bytes->lines; a line that exceeds its
+	 * buffer drops the connection, not the daemon
+	 */
+	if (retraced_ctl_feed(&g_ctl, buf, (size_t)n) != 0)
 		ctl_drop();
-	}
 }
 
 /*
@@ -1162,7 +1146,7 @@ int main(int argc, char **argv)
 		    (pfds[g_ctl_pfd_slot].revents & POLLIN) &&
 		    g_ctl_fd < 0) {
 			g_ctl_fd = accept_gated(g_ctl_listen, &jr);
-			g_ctl_fill = 0;
+			retraced_ctl_conn_reset(&g_ctl);
 			g_ctl_ssl = NULL;
 			g_ctl.scopes = RETRACED_SCOPE_ALL;
 		}
@@ -1188,7 +1172,7 @@ int main(int argc, char **argv)
 				} else {
 					g_ctl_fd = tfd;
 					g_ctl_ssl = ssl;
-					g_ctl_fill = 0;
+					retraced_ctl_conn_reset(&g_ctl);
 					g_ctl.scopes = peer.scopes;
 					snprintf(ev, sizeof(ev),
 						"{\"name\":\"retrace.auth.tls\",\"cn\":\"%s\",\"scopes\":%u}",
@@ -1212,7 +1196,7 @@ int main(int argc, char **argv)
 			}
 			if (cfd != NULL &&
 			    (cfd->revents & (POLLIN | POLLHUP)))
-				handle_ctl_readable(conns, &reg, &jr);
+				handle_ctl_readable();
 		}
 
 
