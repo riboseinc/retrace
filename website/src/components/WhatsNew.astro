@@ -5,6 +5,36 @@
 
 const shipped = [
   {
+    title: "Departures are journal records",
+    detail: "The reap doctrine: a SIGCHLD self-pipe routes every spawned workload's death to the daemon's poll loop, which reaps and journals retrace.ctl.exit {pid, how, code}. A specimen that crashes, is killed, or leaves on its own is never a silent gap in the audit trail -- and never a zombie either.",
+    accent: "control",
+    tag: "v2.78.0",
+  },
+  {
+    title: "One list, every surface",
+    detail: "The control plane's verbs were four hand-synced edits (dispatch chain, scope gate, CLI builder, usage text -- which had already drifted). Now one X-macro list is the SSOT: the daemon's dispatch table, every TLS claim scope, and the CLI's own usage derive from it. A verb is one line plus one handler. The extraction also caught a real defect: every events reply was truncating at 64 bytes.",
+    accent: "control",
+    tag: "v2.77.0",
+  },
+  {
+    title: "The launch arm: retrace-ctl spawn",
+    detail: "One command forks a workload armed to join the daemon itself -- supervisor env, the nonce, an eager agent, the caller's preload. The launch is journaled before the child can act, and the child takes a full seat: never a spectator, because the nonce traveled with the fork. Launch, life, and kill now all ride the control plane.",
+    accent: "control",
+    tag: "v2.76.0",
+  },
+  {
+    title: "Session trees at any depth",
+    detail: "The sessions walker goes recursive: worker trees and fork-bomb detonations chain past any fixed scan level, and depth stops lying at level 4. The tree the registry carries is the tree the CLI prints, at every depth.",
+    accent: "see",
+    tag: "v2.75.0",
+  },
+  {
+    title: "mmap and munmap, intercepted",
+    detail: "The prototypes the very first upstream PR (#414) asked for, on today's rails: memory maps are now first-class intercepted calls -- arguments, returns, and the ability to fail or fuzz them like every other boundary crossing.",
+    accent: "break",
+    tag: "v2.74.0",
+  },
+  {
     title: "The evidence plane: retrace-ctl events",
     detail: "The journal's tail over the control plane, with the hash-chain verdict riding the reply -- evidence pulled over a network carries its own integrity statement, and a tampered line names its own line number. STATUS-scoped by design: an auditor reads evidence without touching even the registry. The fleet CLI is now control AND evidence.",
     accent: "control",
