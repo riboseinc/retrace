@@ -1,0 +1,25 @@
+{
+  "policy": { "epoch": 1 },
+  "intercept_scripts": [
+    {
+      "func_name": "*",
+      "actions": [
+        {
+          "action_name": "sandbox",
+          "action_params": {
+            "allow_paths": [
+              "/usr/lib/",
+              "/usr/share/",
+              "/lib/",
+              "/etc/ld.so.cache",
+              "/tmp/decoy/",
+              "/tmp/detonation/"
+            ],
+            "decoy_dir": "/tmp/decoy"
+          }
+        },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}

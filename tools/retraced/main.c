@@ -1327,8 +1327,15 @@ int main(int argc, char **argv)
 	if (g_tls_listen >= 0)
 		close(g_tls_listen);
 	retraced_tls_free(g_tls_ctx);
-	if (unlink_sock)
+	if (unlink_sock) {
+		/* the ctl socket dies with the daemon: a stale file
+		 * connects a CLI to a dead inode -- and the next
+		 * boot's wait-for-socket lies
+		 */
 		unlink(sock_path);
+		if (ctl_path != NULL)
+			unlink(ctl_path);
+	}
 	free(conns);
 	return 0;
 }

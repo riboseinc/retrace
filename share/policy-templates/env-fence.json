@@ -1,0 +1,24 @@
+{
+  "policy": { "epoch": 1 },
+  "intercept_scripts": [
+    {
+      "func_name": "*",
+      "actions": [
+        {
+          "action_name": "sandbox",
+          "action_params": {
+            "deny_env": [
+              "AWS_SESSION_TOKEN",
+              "AWS_SECRET_ACCESS_KEY",
+              "GITHUB_TOKEN",
+              "GITLAB_TOKEN",
+              "OPENAI_API_KEY",
+              "SSH_AUTH_SOCK"
+            ]
+          }
+        },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}

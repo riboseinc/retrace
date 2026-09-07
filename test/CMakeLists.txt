@@ -334,6 +334,20 @@ if(Python3_Interpreter_FOUND)
 		TIMEOUT 90)
 	endif()
 
+	# The shipped policy templates (TODO.supervisor/09 P1):
+	# every file under share/policy-templates/ must push onto a
+	# fresh daemon -- format drift in either direction dies red.
+	# Push-only (no spawn): runs on the Windows pipe too.
+	add_test(NAME integration-policy-templates
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_policy_templates.py
+			$<TARGET_FILE:retrace_retraced>
+			$<TARGET_FILE:retrace_ctl>
+			${CMAKE_SOURCE_DIR}/share/policy-templates)
+	set_tests_properties(integration-policy-templates PROPERTIES
+		LABELS "integration"
+		TIMEOUT 60)
+
 	# The kernel-observation agent (TODO.beyond-libc/03):
 	# eBPF lane as a spectator peer; synthetic source proves
 	# the pipe on CI (no BPF privileges).

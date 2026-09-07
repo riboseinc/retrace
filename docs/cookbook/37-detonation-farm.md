@@ -74,6 +74,12 @@ retrace-ctl --sock ctl.sock policy-push cut-net.json
 Epochs only move forward: a captured POLICY_SET replayed at a
 cell is refused.
 
+Common holds ship ready to push under `share/policy-templates/`
+— read-only-workload, no-network, env-fence, decoy-farm — each a
+complete policy-push artifact with the epoch ladder documented
+in its README. Start from a template and tighten from there
+instead of hand-writing the first fence.
+
 ## Where the events go
 
 Every denial, scrub, and policy ack lands in the daemon's
