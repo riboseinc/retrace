@@ -1,0 +1,37 @@
+{
+  "policy": { "epoch": 1 },
+  "intercept_scripts": [
+    {
+      "func_name": "socket",
+      "actions": [
+        { "action_name": "modify_return_value_int",
+          "action_params": { "value": -1 } }
+      ]
+    },
+    {
+      "func_name": "connect",
+      "actions": [
+        { "action_name": "modify_return_value_int",
+          "action_params": { "value": -1 } }
+      ]
+    },
+    {
+      "func_name": "*",
+      "actions": [
+        {
+          "action_name": "sandbox",
+          "action_params": {
+            "deny_env": [
+              "AWS_SESSION_TOKEN",
+              "AWS_SECRET_ACCESS_KEY",
+              "GITHUB_TOKEN",
+              "GITLAB_TOKEN",
+              "OPENAI_API_KEY"
+            ]
+          }
+        },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}

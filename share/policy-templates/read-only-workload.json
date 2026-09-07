@@ -1,0 +1,23 @@
+{
+  "policy": { "epoch": 1 },
+  "intercept_scripts": [
+    {
+      "func_name": "*",
+      "actions": [
+        {
+          "action_name": "sandbox",
+          "action_params": {
+            "deny_classes": ["write"],
+            "deny_paths": [
+              "/etc/shadow",
+              "/etc/sudoers",
+              "/etc/ssh/",
+              "/root/.ssh/"
+            ]
+          }
+        },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}
