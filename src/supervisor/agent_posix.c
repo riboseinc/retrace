@@ -21,6 +21,7 @@
 #include "parson.h"
 #include "protocol.h"
 #include "agent_ring.h"
+#include "redact.h"
 #include "policy_sig.h"
 
 #include <dlfcn.h>
@@ -336,6 +337,8 @@ int retrace_agent_emit_event(const char *name,
 		if (retrace_agent_format_event_stack(stackbuf,
 			    sizeof(stackbuf), g_agent.agent_id, seq,
 			    name, kv, n_kv) == 0) {
+			if (retrace_redact_active())
+				retrace_redact_apply(stackbuf);
 			(void)queue_push(stackbuf, NULL);
 			goto fork_adopt;
 		}
@@ -345,6 +348,11 @@ int retrace_agent_emit_event(const char *name,
 	if (payload == NULL) {
 		return -1;
 	}
+	/* the evidence seam's second exit: the same transform the
+	 * logger applies, before the queue owns the bytes
+	 */
+	if (retrace_redact_active())
+		retrace_redact_apply(payload);
 	(void)queue_push(NULL, payload);
 fork_adopt:;
 
