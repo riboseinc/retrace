@@ -42,9 +42,13 @@ install_checkpatch() {
 	if [ ! -e "${CHECKPATCH_INSTALL}/checkpatch.pl" ]; then
 		mkdir -p "${CHECKPATCH_INSTALL}"
 		cd "${CHECKPATCH_INSTALL}"
-		wget https://raw.githubusercontent.com/torvalds/linux/master/scripts/checkpatch.pl
+		# raw.githubusercontent rate-limits (429) bursty CI
+		# merges -- a download flake must not fail a patch check
+		wget --tries=5 --retry-on-http-error=429 --waitretry=5 \
+			https://raw.githubusercontent.com/torvalds/linux/master/scripts/checkpatch.pl
 		chmod a+x checkpatch.pl
-		wget https://raw.githubusercontent.com/torvalds/linux/master/scripts/spelling.txt
+		wget --tries=5 --retry-on-http-error=429 --waitretry=5 \
+			https://raw.githubusercontent.com/torvalds/linux/master/scripts/spelling.txt
 		patch -p0 < "$SPWD"/checkpatch.pl.patch
 		echo "invalid.struct.name" > const_structs.checkpatch
 		printf '%s\n' "JSON_Object" "JSON_Array" "JSON_Value" \
