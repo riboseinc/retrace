@@ -103,7 +103,7 @@ static int load_policy(const char *path)
 
 	f = fopen(path, "rb");
 	if (f == NULL) {
-		fprintf(stderr, "retraced: cannot open policy path\n",
+		fprintf(stderr, "retraced: cannot open policy path %s\n",
 			path);
 		return -1;
 	}
@@ -112,8 +112,8 @@ static int load_policy(const char *path)
 	fseek(f, 0, SEEK_SET);
 	if (sz <= 0 || sz > POLICY_MAX_BYTES) {
 		fprintf(stderr,
-			"retraced: policy path bad size %ld (max %d)\n",
-			path, sz, POLICY_MAX_BYTES);
+			"retraced: policy %s bad size %ld (max %d)\n",
+			path, sz, (int)POLICY_MAX_BYTES);
 		fclose(f);
 		return -1;
 	}
@@ -123,7 +123,7 @@ static int load_policy(const char *path)
 		return -1;
 	}
 	if (fread(g_ctl.policy_blob, 1, (size_t)sz, f) != (size_t)sz) {
-		fprintf(stderr, "retraced: policy path read failed\n",
+		fprintf(stderr, "retraced: policy %s read failed\n",
 			path);
 		free(g_ctl.policy_blob);
 		g_ctl.policy_blob = NULL;
@@ -140,7 +140,7 @@ static int load_policy(const char *path)
 		if (retraced_policy_load(g_ctl.policy_blob, &blob,
 			    &epoch) != 0) {
 			fprintf(stderr,
-				"retraced: policy path: policy.epoch >= 1 + intercept_scripts required\n",
+				"retraced: policy %s: policy.epoch >= 1 + intercept_scripts required\n",
 				path);
 			free(blob);
 			return -1;

@@ -139,6 +139,35 @@ static void test_csv_form(void)
 	apply_expect("API_KEY=k1 hunter2", "*** ***");
 }
 
+static void test_short_tokens_never_grow(void)
+{
+	/* a 1-char token at the END of the buffer: the
+	 * replacement must not write past it (the CodeQL catch)
+	 */
+	char buf[8];
+
+	set1("a*");
+	snprintf(buf, sizeof(buf), "%s", "ab");
+	retrace_redact_apply(buf);
+	CHECK(strcmp(buf, "**") == 0);
+	snprintf(buf, sizeof(buf), "%s", "ab");
+	/* exact-fit buffer, DELIMITED 1-char token at the very
+	 * end: same-length star, nothing written past the NUL
+	 */
+	set1("x*");
+	buf[0] = 'q';
+	buf[1] = ' ';
+	buf[2] = 'x';
+	buf[3] = '\0';
+	retrace_redact_apply(buf);
+	CHECK(buf[0] == 'q' && buf[1] == ' ' && buf[2] == '*' &&
+		buf[3] == '\0');
+	set1("za");
+	snprintf(buf, sizeof(buf), "%s", "za");
+	retrace_redact_apply(buf);
+	CHECK(strcmp(buf, "**") == 0);
+}
+
 static void test_budget_bounds_replacement(void)
 {
 	char in[512];
@@ -161,6 +190,7 @@ int main(void)
 	TEST(literal_and_multiple);
 	TEST(delimiters_shape_tokens);
 	TEST(csv_form);
+	TEST(short_tokens_never_grow);
 	TEST(budget_bounds_replacement);
 	printf("%d tests: %d fail\n", tests_run, tests_fail);
 	return tests_fail == 0 ? 0 : 1;
