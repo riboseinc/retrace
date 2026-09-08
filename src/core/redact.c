@@ -163,19 +163,29 @@ void retrace_redact_apply(char *buf)
 			}
 		}
 		if (hit) {
-			/* replace the token with ***: shift the tail
-			 * (incl. NUL) left and rescan after it
+			/*
+			 * Replace the token with stars -- and never
+			 * GROW the buffer: the evidence buffers are
+			 * exact-size (heap'd log text, the agent's
+			 * inline slot), so a 3-char replacement for a
+			 * shorter token would write past the end (the
+			 * CodeQL catch). Short tokens take as many
+			 * stars as they have chars.
 			 */
-			char *dst = tok + 3;
-			size_t tail = xstrlen(cur);
+			size_t reps = tok_len < 3 ? tok_len : 3;
+			size_t j;
 
-			for (size_t j = 0; j <= tail; j++)
-				dst[j] = cur[j];
-			tok[0] = '*';
-			tok[1] = '*';
-			tok[2] = '*';
+			if (reps < tok_len) {
+				/* shrink: shift the tail (incl. NUL) */
+				size_t tail = xstrlen(cur);
+
+				for (j = 0; j <= tail; j++)
+					tok[reps + j] = cur[j];
+			}
+			for (j = 0; j < reps; j++)
+				tok[j] = '*';
 			budget--;
-			cur = dst;
+			cur = tok + reps;
 		}
 	}
 }
