@@ -54,7 +54,7 @@ retrace-ctl [--sock PATH] COMMAND
 retrace-ctl --tls-host H:P --tls-cert PEM --tls-key PEM --tls-ca CA COMMAND
 ```
 
-Commands: `status`, `ps`, `policy-push FILE`, `freeze`, `thaw`, `kill
+Commands: `status`, `ps`, `drift`, `policy-push FILE`, `freeze`, `thaw`, `kill
 PID`, `spawn [--preload LIB] -- ARGV...`. Every command maps to a claim scope; a peer whose cert lacks the
 bit is refused with `scope denied` and the attempt is journaled as
 `retrace.auth.overscope`. Local UDS peers hold all scopes (PEERCRED
@@ -114,6 +114,29 @@ Read-only, PS-scope: the same claim bit `ps` needs on a TLS
 fleet. Agents whose parent HELLO has not been seen nest at
 the session root with `parent_hole` marked -- the same
 honesty the journal carries.
+
+### The two-layer read arm: retrace-ctl drift
+
+Kernel-lane observers (eBPF/ETW spectators) feed the registry
+their observations; the daemon journals drift summaries on its
+sweeps. `drift` answers the same numbers over the control
+plane, rolled up per session: the libc-layer agents, the
+observers' seats, the kernel-observation totals, and the
+not-yet-summarized delta -- the operator's live window onto
+sub-libc escapes, no filesystem access to the daemon's host.
+
+```sh
+retrace-ctl --sock /tmp/retraced.ctl.sock drift
+```
+
+```json
+{ "ok": 1, "sessions_count": 1, "sessions": [
+  { "token": "S1", "libc": ["boot.97009.1"],
+    "spectators": 1, "kernel_obs": 42, "delta": 7 } ] }
+```
+
+Read-only, PS-scope: the same claim bit `ps` needs on a TLS
+fleet.
 
 ### The evidence read arm: retrace-ctl events
 

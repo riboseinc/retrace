@@ -576,6 +576,63 @@ static void test_spawn_scope_denied(void)
 }
 
 /*
+ * The two-layer read: a libc agent and a kernel observer on
+ * one session fold into ONE rollup -- observers' kernel_obs
+ * totals and live deltas, the libc seats listed -- and a
+ * second session stays separate.
+ */
+static void test_drift_rolls_sessions(void)
+{
+	struct agent_entry *a, *k1, *k2;
+
+	setup();
+	a = retraced_registry_hello(ctx.reg, "libc-a", 100, 1,
+		"S1", "detonation");
+	k1 = retraced_registry_hello(ctx.reg, "ebpf-1", 101, 1,
+		"S1", "ebpf");
+	k2 = retraced_registry_hello(ctx.reg, "ebpf-2", 102, 1,
+		"S2", "ebpf");
+	CHECK(a != NULL && k1 != NULL && k2 != NULL);
+	k1->spectator = 1;
+	k1->kernel_obs = 40;
+	k1->kernel_obs_last = 33;
+	k2->spectator = 1;
+	k2->kernel_obs = 5;
+	feed(&ctx, "{\"cmd\":\"drift\"}");
+	{
+		JSON_Value *v = json_parse_string(reply_buf);
+		JSON_Array *sess;
+		JSON_Object *s1 = NULL, *s2 = NULL;
+		size_t i;
+
+		CHECK(v != NULL);
+		sess = json_value_get_array(
+			json_object_get_value(json_value_get_object(v),
+				"sessions"));
+		CHECK(json_array_get_count(sess) == 2);
+		for (i = 0; i < 2; i++) {
+			JSON_Object *o = json_array_get_object(sess, i);
+
+			if (strcmp(json_object_get_string(o, "token"),
+				    "S1") == 0)
+				s1 = o;
+			else
+				s2 = o;
+		}
+		CHECK(s1 != NULL && s2 != NULL);
+		CHECK(json_object_get_number(s1, "kernel_obs") == 40);
+		CHECK(json_object_get_number(s1, "delta") == 7);
+		CHECK(json_object_get_number(s1, "spectators") == 1);
+		CHECK(json_array_get_count(
+			json_value_get_array(json_object_get_value(
+				s1, "libc"))) == 1);
+		CHECK(json_object_get_number(s2, "kernel_obs") == 5);
+		CHECK(json_object_get_number(s2, "delta") == 5);
+		json_value_free(v);
+	}
+}
+
+/*
  * The framing tests (the byte layer's own test class -- the
  * reason feed exists): a line split across reads is ONE
  * command; two commands in one chunk are TWO; a partial line
@@ -694,6 +751,7 @@ int main(void)
 	TEST(feed_two_commands_one_chunk);
 	TEST(feed_partial_without_newline_is_silent);
 	TEST(feed_oversized_line_refused);
+	TEST(drift_rolls_sessions);
 
 	printf("%d tests: %d pass, %d fail\n", tests_run, tests_pass,
 		tests_fail);
