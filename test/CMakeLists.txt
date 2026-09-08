@@ -334,6 +334,17 @@ if(Python3_Interpreter_FOUND)
 		TIMEOUT 90)
 	endif()
 
+	# Evidence redaction (TODO.impl/01): with patterns, no
+	# secret survives the log; without, verbatim (zero-delta);
+	# the env form is honored and scoped.
+	add_test(NAME integration-redaction
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_redaction.py
+			$<TARGET_FILE:retrace_v2>)
+	set_tests_properties(integration-redaction PROPERTIES
+		LABELS "integration"
+		TIMEOUT 60)
+
 	# The shipped policy templates (TODO.supervisor/09 P1):
 	# every file under share/policy-templates/ must push onto a
 	# fresh daemon -- format drift in either direction dies red.

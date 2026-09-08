@@ -13,6 +13,7 @@ set(_core_sources
 	thread_context.c reentrance_guard.c cleanup.c
 	script_resolver.c action_runner.c config_cache.c
 	sockaddr_inspect.c
+	redact.c
 	caller_match.c
 	caller_cache.c
 	log_ring.c

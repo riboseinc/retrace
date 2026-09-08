@@ -33,6 +33,7 @@
 #include "real_impls.h"
 #include "log_ring.h"
 #include "log_flusher.h"
+#include "redact.h"
 
 /* The sink registry (see retrace_log_sink_register, logger.h).
  * Fixed-capacity by design: a handful of feature sinks, zero
@@ -329,6 +330,16 @@ static int logger_emit_entry(const struct LogEntry *entry, void *ctx)
 
 	if (entry == NULL || entry->text == NULL)
 		return 0;
+
+	/*
+	 * Redaction seam (TODO.impl/01): the ONE transform point
+	 * for every logger consumer -- stdout, logfile, and every
+	 * registered sink (OTLP rides here). In-place is safe: the
+	 * emit callback is the text's last reader (the ring frees
+	 * it right after). Zero-delta when no patterns compiled.
+	 */
+	if (retrace_redact_active())
+		retrace_redact_apply(entry->text);
 
 	if (g_logger_config.stdout_ena &&
 	    retrace_real_impls.fprintf &&

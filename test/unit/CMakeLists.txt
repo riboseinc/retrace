@@ -297,6 +297,12 @@ retrace_add_unit_test(script_resolver)
 retrace_add_unit_test(sockaddr_inspect)
 
 #
+# Evidence redaction (TODO.impl/01). The transform is pure C --
+# no engine, no LD_PRELOAD.
+#
+retrace_add_unit_test(redact)
+
+#
 # addr_deny action unit tests (TODO.complete/15). The action is
 # looked up by name via retrace_actions_get(); ThreadContext is
 # constructed inline. No engine, no LD_PRELOAD.

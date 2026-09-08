@@ -5,6 +5,7 @@
  */
 
 #include "agent.h"
+#include "redact.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -515,6 +516,11 @@ int retrace_agent_emit_event(const char *name,
 	 * own heap fallback covers nothing here -- the oversized
 	 * event simply refuses at its guard
 	 */
+	/* the evidence seam (redaction): the same transform the
+	 * logger applies, before the queue owns the bytes
+	 */
+	if (retrace_redact_active())
+		retrace_redact_apply(item);
 	if (w_queue_push(item, o) != 0)
 		return -1;	/* the ring counted the refusal */
 	return 0;

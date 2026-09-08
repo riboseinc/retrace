@@ -111,6 +111,7 @@ job.
 | 33 | [Detect filesystem escapes from a virtualized environment](33-detect-vfs-escapes.md) | `retrace-correlate` | Join an inside (VFS) stream against an outside (retrace) stream; report host-filesystem touches the VFS never saw. |
 | 34 | [Profile a binary, then jail it to the profile](34-profile-and-jail.md) | `retrace-profile` | Reduce a trace to what a binary does, grade it against kernel truth, and emit a runtime deny-by-default file-access jail. |
 | 35 | [Dictionary-driven string fuzzing](35-dictionary-fuzz.md) | `fuzz_str` | Replace string parameters with dictionary tokens, deterministically per seed. |
+| 40 | [Redact secrets from evidence](40-redact-evidence.md) | config | Patterns of tokens that never leave the process: one transform at the evidence fan-out covers stdout, files, OTLP, and the journal. |
 
 For an overview of when to reach for each tool, see
 [docs/tools.md](../tools.md).

@@ -26,6 +26,7 @@
 
 #include "conf.h"
 #include "real_impls.h"
+#include "redact.h"
 #include "logger.h"
 
 #define ENVAR_JSON_CONFIG_FN "RETRACE_JSON_CONFIG"
@@ -153,6 +154,29 @@ parse_json:
 	/* finally set the config root object */
 	json_object_clear(retrace_conf);
 	retrace_conf = json_value_get_object(json_conf_val);
+
+	/*
+	 * Evidence redaction (TODO.impl/01): the config is the
+	 * SSOT for patterns; the env form fills in when the key is
+	 * absent (config-less runs).
+	 */
+	if (json_object_get_array(retrace_conf, "redact") != NULL) {
+		JSON_Array *ra = json_object_get_array(retrace_conf,
+			"redact");
+		size_t rn = json_array_get_count(ra);
+		const char *views[32];
+		size_t ri;
+
+		for (ri = 0; ri < rn && ri < 32; ri++)
+			views[ri] = json_array_get_string(ra, ri);
+		retrace_redact_set(views, rn < 32 ? rn : 32);
+	} else {
+		const char *csv = retrace_real_impls.getenv(
+			"RETRACE_REDACT");
+
+		if (csv != NULL)
+			retrace_redact_set_csv(csv);
+	}
 
 	return 0;
 
