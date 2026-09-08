@@ -496,6 +496,8 @@ int main(int argc, char **argv)
 			snprintf(req, sizeof(req), "%s\n", blob);
 		}
 		i = argc;
+	} else if (strcmp(argv[i], "drift") == 0) {
+		snprintf(req, sizeof(req), "{\"cmd\":\"drift\"}\n");
 	} else if (strcmp(argv[i], "events") == 0) {
 		long last = 20;
 

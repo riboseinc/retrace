@@ -746,3 +746,99 @@ void retraced_ctl_conn_reset(struct retraced_ctl_ctx *ctx)
 {
 	ctx->rfill = 0;
 }
+
+/*
+ * The two-layer verdict, read live (TODO.beyond-libc/03 P1's
+ * operator window): per session, the libc-layer agents, the
+ * kernel observers' seat count, and the observers' kernel-
+ * observation totals plus the not-yet-summarized delta -- the
+ * same numbers retrace.drift.summary journals, answerable over
+ * the control plane with no filesystem access to the daemon's
+ * host. Read-only, PS-scoped.
+ */
+static void verb_drift(struct retraced_ctl_ctx *ctx,
+	JSON_Object *o)
+{
+	JSON_Value *root = json_value_init_object();
+	JSON_Object *root_o = json_value_get_object(root);
+	JSON_Value *sessions_val = json_value_init_array();
+	JSON_Array *sessions = json_value_get_array(sessions_val);
+	size_t i, k;
+
+	(void)o;
+	for (i = 0; i < ctx->reg->count; i++) {
+		const struct agent_entry *e = &ctx->reg->agents[i];
+		int seen = 0;
+
+		for (k = 0; k < json_array_get_count(sessions); k++) {
+			const char *tok = json_object_get_string(
+				json_array_get_object(sessions, k),
+				"token");
+
+			if (tok != NULL &&
+			    strcmp(tok, e->session) == 0) {
+				seen = 1;
+				break;
+			}
+		}
+		if (!seen) {
+			JSON_Value *sv = json_value_init_object();
+			JSON_Object *so = json_value_get_object(sv);
+
+			json_object_set_string(so, "token", e->session);
+			json_object_set_value(so, "libc",
+				json_value_init_array());
+			json_object_set_number(so, "spectators", 0);
+			json_object_set_number(so, "kernel_obs", 0);
+			json_object_set_number(so, "delta", 0);
+			json_array_append_value(sessions, sv);
+		}
+	}
+	for (i = 0; i < ctx->reg->count; i++) {
+		const struct agent_entry *e = &ctx->reg->agents[i];
+		JSON_Object *so = NULL;
+
+		for (k = 0; k < json_array_get_count(sessions); k++) {
+			JSON_Object *cand = json_array_get_object(
+				sessions, k);
+
+			if (strcmp(json_object_get_string(cand, "token"),
+				    e->session) == 0) {
+				so = cand;
+				break;
+			}
+		}
+		if (so == NULL)
+			continue;
+		if (e->spectator) {
+			json_object_set_number(so, "spectators",
+				json_object_get_number(so,
+					"spectators") + 1);
+			json_object_set_number(so, "kernel_obs",
+				json_object_get_number(so,
+					"kernel_obs") +
+				(double)e->kernel_obs);
+			json_object_set_number(so, "delta",
+				json_object_get_number(so, "delta") +
+				(double)(e->kernel_obs -
+					e->kernel_obs_last));
+		} else {
+			json_array_append_string(
+				json_value_get_array(
+					json_object_get_value(so,
+						"libc")),
+				e->id);
+		}
+	}
+	json_object_set_number(root_o, "ok", 1);
+	json_object_set_number(root_o, "sessions_count",
+		(double)json_array_get_count(sessions));
+	json_object_set_value(root_o, "sessions", sessions_val);
+	{
+		char *s = json_serialize_to_string(root);
+
+		ctl_reply(ctx, "%s\n", s != NULL ? s : "{}");
+		json_free_serialized_string(s);
+	}
+	json_value_free(root);
+}

@@ -27,7 +27,9 @@
 	X(sessions, sessions, PS, "",				      \
 	  "the session tree (nested JSON)")			      \
 	X(events, events, STATUS, "[--last N]",		      \
-	  "journal tail + chain verdict")			      \
+	  "journal tail + chain verdict")		      \
+	X(drift, drift, PS, "",				      \
+	  "kernel observations per session (two-layer)")			      \
 	X(policy_push, policy-push, POLICY, "FILE",		      \
 	  "push a policy to all agents")			      \
 	X(freeze, freeze, POLICY, "",				      \
