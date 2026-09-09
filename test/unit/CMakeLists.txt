@@ -798,6 +798,18 @@ set_tests_properties(unit-test-snap2inside PROPERTIES
     ENVIRONMENT "SNAP2INSIDE_HOME=/home/testuser")
 set_tests_properties(unit-test-snap2inside PROPERTIES LABELS "unit")
 
+# docker2inside (TODO.impl/02): the image's own filesystem is
+# the declared set -- layers, whiteouts, opaque dirs, and PAX
+# long names all exercised by the fixture.
+#
+add_test(NAME unit-test-docker2inside
+    COMMAND ${CMAKE_COMMAND}
+    -DTOOL=$<TARGET_FILE:retrace_docker2inside>
+    -DFIXTURE=${CMAKE_SOURCE_DIR}/test/fixtures/docker-image.tar
+    -DEXPECTED=${CMAKE_SOURCE_DIR}/test/fixtures/docker2inside.expected.json
+    -P ${CMAKE_SOURCE_DIR}/test/fixtures/run_converter.cmake)
+set_tests_properties(unit-test-docker2inside PROPERTIES LABELS "unit")
+
 add_test(NAME unit-test-flatpak2inside
     COMMAND ${CMAKE_COMMAND}
     -DTOOL=$<TARGET_FILE:retrace_flatpak2inside>

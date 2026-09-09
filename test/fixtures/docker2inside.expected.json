@@ -1,0 +1,45 @@
+{
+    "profile": {
+        "accesses": [
+            {
+                "path": "etc\/new.cfg",
+                "class": "read",
+                "hits": 1
+            },
+            {
+                "path": "usr\/",
+                "class": "read",
+                "hits": 1
+            },
+            {
+                "path": "usr\/bin\/",
+                "class": "read",
+                "hits": 1
+            },
+            {
+                "path": "usr\/bin\/app",
+                "class": "read",
+                "hits": 1
+            },
+            {
+                "path": "usr\/share\/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\/",
+                "class": "read",
+                "hits": 1
+            },
+            {
+                "path": "usr\/share\/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\/notes.txt",
+                "class": "read",
+                "hits": 1
+            },
+            {
+                "path": "var\/",
+                "class": "read",
+                "hits": 1
+            }
+        ],
+        "net": []
+    },
+    "notes": [
+        "layers_applied=2 whiteouts=2 paths=7"
+    ]
+}
