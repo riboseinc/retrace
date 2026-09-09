@@ -345,6 +345,17 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 60)
 
+	# The replay slice (TODO.impl/03): a time-seeded faulted run
+	# reproduces byte-identically from the record; a tampered
+	# record names its drift.
+	add_test(NAME integration-replay
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_replay.py
+			$<TARGET_FILE:retrace_v2>)
+	set_tests_properties(integration-replay PROPERTIES
+		LABELS "integration"
+		TIMEOUT 60)
+
 	# The shipped policy templates (TODO.supervisor/09 P1):
 	# every file under share/policy-templates/ must push onto a
 	# fresh daemon -- format drift in either direction dies red.

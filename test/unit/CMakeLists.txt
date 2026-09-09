@@ -303,6 +303,22 @@ retrace_add_unit_test(sockaddr_inspect)
 retrace_add_unit_test(redact)
 
 #
+# The replay slice (TODO.impl/03): record persists the seed and
+# outcomes; replay forces the recorded seed back.
+#
+retrace_add_unit_test(replay)
+# the replay module's mode is write-once per process: one
+# phase per invocation, two registrations
+add_test(NAME unit-test-replay-phase-replay
+	COMMAND ${CMAKE_BINARY_DIR}/test/unit/test_replay replay)
+set_tests_properties(unit-test-replay-phase-replay PROPERTIES
+	LABELS "unit")
+add_test(NAME unit-test-replay-phase-off
+	COMMAND ${CMAKE_BINARY_DIR}/test/unit/test_replay off)
+set_tests_properties(unit-test-replay-phase-off PROPERTIES
+	LABELS "unit")
+
+#
 # addr_deny action unit tests (TODO.complete/15). The action is
 # looked up by name via retrace_actions_get(); ThreadContext is
 # constructed inline. No engine, no LD_PRELOAD.
