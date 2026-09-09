@@ -14,6 +14,7 @@ set(_core_sources
 	script_resolver.c action_runner.c config_cache.c
 	sockaddr_inspect.c
 	redact.c
+	replay.c
 	caller_match.c
 	caller_cache.c
 	log_ring.c

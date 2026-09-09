@@ -29,6 +29,7 @@
 #include "action_utils.h"
 #include "logger.h"
 #include "real_impls.h"
+#include "replay.h"
 #include "data_types.h"
 
 #include "fuzz_dict.h"
@@ -46,14 +47,21 @@ static void fuzz_seed_init(const JSON_Object *action_params)
 		return;
 	initialized = 1;
 
+	/*
+	 * Seed resolution: explicit fuzz_seed param >
+	 * RETRACE_FUZZ_SEED env > time. The replay seam
+	 * (TODO.impl/03) sits at the END of resolution: record
+	 * persists whatever was chosen; replay forces the
+	 * RECORDED seed back -- the time fallback never
+	 * re-rolls, so a recorded run reproduces exactly.
+	 */
 	if (action_params != NULL &&
 	    json_object_has_value(action_params, "fuzz_seed")) {
 		double fuzz_seed;
 
 		fuzz_seed = json_object_get_number(action_params,
 			"fuzz_seed");
-
-		srand(fuzz_seed);
+		srand(retrace_replay_seed((unsigned int)fuzz_seed));
 	} else if (retrace_real_impls.getenv(
 		"RETRACE_FUZZ_SEED") != NULL) {
 		/*
@@ -63,11 +71,13 @@ static void fuzz_seed_init(const JSON_Object *action_params)
 		 * reproducibility path (a reproducer is config +
 		 * this env var).
 		 */
-		srand((unsigned int)retrace_real_impls.atoi(
-			retrace_real_impls.getenv(
-				"RETRACE_FUZZ_SEED")));
+		srand(retrace_replay_seed(
+			(unsigned int)retrace_real_impls.atoi(
+				retrace_real_impls.getenv(
+					"RETRACE_FUZZ_SEED"))));
 	} else {
-		srand(retrace_real_impls.time(NULL));
+		srand(retrace_replay_seed(
+			(unsigned int)retrace_real_impls.time(NULL)));
 	}
 }
 
@@ -108,8 +118,12 @@ static int ia_memory_fuzz
 		t_ctx->ret_val = (long) NULL;
 
 		log_info("Failed memory fuzz");
-	} else
+		retrace_replay_note(t_ctx->prototype->name, "memfuzz",
+			"fail");
+	} else {
 		log_info("Passed memory fuzz");
+		retrace_replay_note(t_ctx->prototype->name, "memfuzz", "ok");
+	}
 
 	/* 0 indicates successful processing */
 	return 0;
@@ -243,6 +257,7 @@ static int ia_fuzz_str
 		token);
 
 	log_info("param '%s' fuzzed to '%s'", param_name, token);
+	retrace_replay_note(t_ctx->prototype->name, "fuzz_str", token);
 
 	/* 0 indicates successful processing */
 	return 0;

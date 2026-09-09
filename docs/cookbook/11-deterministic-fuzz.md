@@ -98,3 +98,20 @@ in the same order — exact reproduction.
 
 - [09 — Fuzz malloc failures](09-fuzz-malloc.md)
 - [10 — Partial I/O (short reads/writes)](10-incomplete-io.md)
+
+## Record and replay (the seedless determinism)
+
+Pin a run you never pinned: record persists the resolved seed
+(the time fallback included) plus every synthesized outcome;
+replay forces the recorded seed back and verifies each outcome
+against the record -- the 3am failure reproduces at 9am with
+zero divergence, no seed juggling.
+
+```sh
+RETRACE_REPLAY_OUT=/tmp/run.rec DYLD_INSERT_LIBRARIES=... ./flaky   # 3am
+RETRACE_REPLAY_IN=/tmp/run.rec  DYLD_INSERT_LIBRARIES=... ./flaky   # 9am
+# replay: N matched, 0 diverged
+```
+
+A tampered or stale record names its drift line (`recorded 'x'
+got 'y'`), so a reproducer is either exact or loudly wrong.

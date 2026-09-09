@@ -36,6 +36,7 @@
 #include "conf.h"
 #include "arch_spec.h"
 #include "logger.h"
+#include "replay.h"
 #include "otlp_live.h"
 #include "agent.h"
 #include "funcs.h"
@@ -186,6 +187,8 @@ static void retrace_destructor(void)
 	}
 	retrace_call_hash_deinit();
 	retrace_agent_deinit();
+	/* the replay verdict rides the log while it still can */
+	retrace_replay_report();
 	/* logger BEFORE otlp_live: the flusher's final drain must
 	 * pass through the otlp sink while its door is still open
 	 * (the tail ships); otlp_live_deinit then closes the door,
