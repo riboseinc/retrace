@@ -34,11 +34,11 @@ def main():
     daemon, ctl_bin = (os.path.abspath(p) for p in sys.argv[1:3])
 
     # key generation needs the openssl CLI: probe trouble is a
-    # skip, never a failure (the noderetrace gate's rule)
-    probe = subprocess.run(["openssl", "version"],
-                           stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL)
-    if probe.returncode != 0:
+    # skip, never a failure (a MISSING binary raises, not
+    # returns nonzero -- which(); the noderetrace gate's rule)
+    import shutil
+
+    if shutil.which("openssl") is None:
         print("SKIP: openssl CLI not available on this leg")
         return 0
 

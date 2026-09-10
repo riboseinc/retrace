@@ -4,19 +4,22 @@
 # like retraced until plan 12 (named pipes). TLS client path
 # (TODO.supervisor/08 P1) reuses tools/retraced/tls_gate.c.
 
+# verify-journal links journal_sign + journal + registry on
+# EVERY platform (the OpenSSL-less build carries the honest
+# stub); tls_gate.c stays POSIX-only (socket headers).
+set(_ctl_common_sources
+	main.c
+	${CMAKE_SOURCE_DIR}/tools/retraced/journal_sign.c
+	${CMAKE_SOURCE_DIR}/tools/retraced/journal.c
+	${CMAKE_SOURCE_DIR}/tools/retraced/registry.c
+	${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
+
 if(RETRACE_PLATFORM_WINDOWS)
-	# supervisor/12: the fleet CLI over the ctl named pipe. The
-	# TLS client and sign-policy ride the POSIX build for now
-	# (tls_gate.c pulls POSIX socket headers).
-	add_executable(retrace_ctl main.c)
+	add_executable(retrace_ctl ${_ctl_common_sources})
 else()
 	add_executable(retrace_ctl
-		main.c
-		${CMAKE_SOURCE_DIR}/tools/retraced/tls_gate.c
-		${CMAKE_SOURCE_DIR}/tools/retraced/journal_sign.c
-		${CMAKE_SOURCE_DIR}/tools/retraced/journal.c
-		${CMAKE_SOURCE_DIR}/tools/retraced/registry.c
-		${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
+		${_ctl_common_sources}
+		${CMAKE_SOURCE_DIR}/tools/retraced/tls_gate.c)
 endif()
 set_target_properties(retrace_ctl PROPERTIES
 	OUTPUT_NAME retrace-ctl)
@@ -24,7 +27,8 @@ set_target_properties(retrace_ctl PROPERTIES
 target_include_directories(retrace_ctl PRIVATE
 	${CMAKE_SOURCE_DIR}/tools/retraced
 	${CMAKE_SOURCE_DIR}/src/config/json
-	${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+	${CMAKE_SOURCE_DIR}/test/property/parson_stub
+	${CMAKE_SOURCE_DIR}/src/core)
 
 # sign-policy (pure OpenSSL EVP) works everywhere now that
 # tls_gate.c rides only the POSIX build
