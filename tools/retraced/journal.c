@@ -330,3 +330,59 @@ int retraced_journal_replay(struct retraced_journal *j,
 	(void)saw_torn;
 	return 0;
 }
+
+int retraced_journal_chain_file(const char *path, size_t stop_at,
+	uint64_t *head_out, size_t *lines_out, size_t *broken_at)
+{
+	FILE *f = fopen(path, "r");
+	char line[2048];
+	uint64_t prev = 0;
+	size_t lines = 0;
+
+	*broken_at = 0;
+	if (head_out != NULL)
+		*head_out = 0;
+	if (lines_out != NULL)
+		*lines_out = 0;
+	if (f == NULL)
+		return -1;
+	while (stop_at == 0 || lines < stop_at) {
+		if (fgets(line, sizeof(line), f) == NULL)
+			break;
+		char prev_hex[32];
+		size_t n = strlen(line);
+		uint64_t link;
+
+		lines++;
+		/* each line carries the PREVIOUS line's link; verify
+		 * it, then compute this line's (replay's arithmetic)
+		 */
+		{
+			const char *p = strstr(line, "\"prev\":\"");
+
+			if (p == NULL) {
+				*broken_at = lines;
+				break;
+			}
+			snprintf(prev_hex, sizeof(prev_hex), "%s", p + 8);
+			prev_hex[16] = '\0';
+			if (strtoull(prev_hex, NULL, 16) != prev) {
+				*broken_at = lines;
+				break;
+			}
+		}
+		(void)n;
+		/* the writer hashes the line WITH its newline
+		 * (journal_event snprintfs the full line first) --
+		 * tail does the same; hash exactly what is stored
+		 */
+		link = fnv1a(line, prev ^ 0x9e3779b97f4a7c15ULL);
+		prev = link;
+	}
+	fclose(f);
+	if (lines_out != NULL)
+		*lines_out = lines;
+	if (head_out != NULL)
+		*head_out = prev;
+	return *broken_at == 0 ? 0 : -1;
+}

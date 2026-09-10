@@ -47,6 +47,7 @@
 #include "peer_gate.h"
 #include "retraced_ctl.h"
 #include "tls_gate.h"
+#include "journal_sign.h"
 #include "daemon_frame.h"
 
 #include "parson.h"
@@ -581,6 +582,7 @@ int main(int argc, char **argv)
 	const char *journal_path = "retraced-journal.jsonl";
 	const char *policy_path = NULL;
 	const char *ctl_path = NULL;
+	const char *signing_key = NULL;
 	const char *nonce_arg = NULL;
 	const char *nonce_file = NULL;
 	const char *tls_listen = NULL;
@@ -612,6 +614,9 @@ int main(int argc, char **argv)
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--sock") == 0 && i + 1 < argc)
 			sock_path = argv[++i];
+		else if (strcmp(argv[i], "--signing-key") == 0 &&
+			 i + 1 < argc)
+			signing_key = argv[++i];
 		else if (strcmp(argv[i], "--journal") == 0 &&
 			 i + 1 < argc)
 			journal_path = argv[++i];
@@ -1323,6 +1328,27 @@ int main(int argc, char **argv)
 	}
 	emit_drift_summaries(&reg, &jr);
 	retraced_journal_close(&jr);
+#ifdef RETRACE_HAVE_OPENSSL
+	/* the seal (TODO.impl/07): ed25519 over the closed chain's
+	 * head+count -- an external auditor's trust anchor, riding
+	 * the journal as its own chained record
+	 */
+	if (signing_key != NULL) {
+		char rec[512];
+		char err[96];
+
+		if (retraced_journal_sign_file(signing_key,
+			    jr.path, rec, sizeof(rec), err,
+			    sizeof(err)) == 0) {
+			retraced_journal_event(&jr,
+				(long)time(NULL), "daemon", 0, rec);
+			printf("retraced: journal sealed\n");
+		} else {
+			fprintf(stderr,
+				"retraced: journal NOT sealed: %s\n", err);
+		}
+	}
+#endif
 	ctl_drop();
 	if (g_tls_listen >= 0)
 		close(g_tls_listen);

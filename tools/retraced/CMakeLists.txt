@@ -21,7 +21,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 else()
 	add_executable(retrace_retraced
 		main.c daemon_frame.c registry.c journal.c peer_gate.c retraced_ctl.c
-		tls_gate.c ${_parson_source})
+		tls_gate.c journal_sign.c ${_parson_source})
 endif()
 set_target_properties(retrace_retraced PROPERTIES
 	OUTPUT_NAME retraced)
@@ -36,8 +36,11 @@ target_link_libraries(retrace_retraced PRIVATE
 	retrace_supervisor_proto)
 
 if(OpenSSL_FOUND AND NOT RETRACE_PLATFORM_WINDOWS)
+	# RETRACE_HAVE_OPENSSL: the shared spelling (journal_sign
+	# gates on it); RETRACED_HAVE_OPENSSL predates it
 	target_compile_definitions(retrace_retraced PRIVATE
-		RETRACED_HAVE_OPENSSL=1)
+		RETRACED_HAVE_OPENSSL=1
+		RETRACE_HAVE_OPENSSL=1)
 	target_link_libraries(retrace_retraced PRIVATE OpenSSL::SSL)
 	target_include_directories(retrace_retraced PRIVATE
 		${OPENSSL_INCLUDE_DIR})

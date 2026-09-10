@@ -12,13 +12,19 @@ if(RETRACE_PLATFORM_WINDOWS)
 else()
 	add_executable(retrace_ctl
 		main.c
-		${CMAKE_SOURCE_DIR}/tools/retraced/tls_gate.c)
+		${CMAKE_SOURCE_DIR}/tools/retraced/tls_gate.c
+		${CMAKE_SOURCE_DIR}/tools/retraced/journal_sign.c
+		${CMAKE_SOURCE_DIR}/tools/retraced/journal.c
+		${CMAKE_SOURCE_DIR}/tools/retraced/registry.c
+		${CMAKE_SOURCE_DIR}/src/config/json/parson.c)
 endif()
 set_target_properties(retrace_ctl PROPERTIES
 	OUTPUT_NAME retrace-ctl)
 
 target_include_directories(retrace_ctl PRIVATE
-	${CMAKE_SOURCE_DIR}/tools/retraced)
+	${CMAKE_SOURCE_DIR}/tools/retraced
+	${CMAKE_SOURCE_DIR}/src/config/json
+	${CMAKE_SOURCE_DIR}/test/property/parson_stub)
 
 # sign-policy (pure OpenSSL EVP) works everywhere now that
 # tls_gate.c rides only the POSIX build

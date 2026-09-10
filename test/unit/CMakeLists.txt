@@ -307,6 +307,19 @@ retrace_add_unit_test(redact)
 # outcomes; replay forces the recorded seed back.
 #
 retrace_add_unit_test(replay)
+
+#
+# The standalone journal chain primitive (TODO.impl/07): the
+# signer and the verifier both ride its walk.
+#
+# journal.c+registry.c ride along as sources; parson comes via
+# the harness's retrace_core link (duplicate symbols otherwise)
+retrace_add_unit_test(journal_chain
+	EXTRA_SOURCES
+	${CMAKE_SOURCE_DIR}/tools/retraced/journal.c
+	${CMAKE_SOURCE_DIR}/tools/retraced/registry.c
+	EXTRA_INCLUDES
+	${CMAKE_SOURCE_DIR}/tools/retraced)
 # the replay module's mode is write-once per process: one
 # phase per invocation, two registrations
 add_test(NAME unit-test-replay-phase-replay

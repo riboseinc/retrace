@@ -218,6 +218,31 @@ Ctrl handler uses, so `sc stop` rides the graceful journal-flush
 exit; `--exit-after N` still applies as the watchdog belt under
 both launches.
 
+### Journal signing: the seal
+
+Hash chains prove the journal's LOCAL continuity; the seal
+gives an external auditor the trust anchor. Boot the daemon
+with `--signing-key` (a PEM ed25519 key) and every graceful
+close appends a `retrace.journal.signed` record -- ed25519
+over the closed chain's head and line count, itself
+chain-linked. Verification is the CLI's local verb:
+
+```sh
+openssl genpkey -algorithm ed25519 -out k.pem
+openssl pkey -in k.pem -pubout -out pub.pem
+retraced --journal j.jsonl --signing-key k.pem ...
+retrace-ctl verify-journal j.jsonl --pubkey pub.pem
+# verified + signed (ed25519, N lines)
+```
+
+Tamper any byte and the chain names its line before the seal
+is even consulted; swap the seal or the key and the signature
+mismatch names itself. An unclean shutdown leaves an unsigned
+tail -- visible as the missing close marker and seal, exactly
+the honesty the journal already carries. (Rotation intervals
+that chain seals across segments ride the lifecycle card,
+TODO.impl/10.)
+
 ### The audit trail
 
 `--audit TRAIL` binds every exec to `(timestamp, pid, spec digest,

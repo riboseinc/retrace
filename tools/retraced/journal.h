@@ -91,4 +91,14 @@ int retraced_journal_tail(struct retraced_journal *j, size_t last_n,
 	void (*sink)(const char *line, void *user), void *user,
 	long *chain_out);
 
+/*
+ * Standalone chain verdict over a journal FILE (TODO.impl/07):
+ * recompute every link in order and report the head + line
+ * count, with the first broken line number (0 = verified). The
+ * signing/verification module and the CLI both ride this --
+ * one chain-check arithmetic, three consumers.
+ */
+int retraced_journal_chain_file(const char *path, size_t stop_at,
+	uint64_t *head_out, size_t *lines_out, size_t *broken_at);
+
 #endif /* RETRACE_TOOLS_JOURNAL_H_ */
