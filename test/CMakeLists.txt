@@ -356,6 +356,18 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 60)
 
+	# Journal signing (TODO.impl/07): the daemon seals at
+	# graceful close; verify-journal walks the chain AND checks
+	# the ed25519 seal. Three verdicts.
+	add_test(NAME integration-journal-sign
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_journal_sign.py
+			$<TARGET_FILE:retrace_retraced>
+			$<TARGET_FILE:retrace_ctl>)
+	set_tests_properties(integration-journal-sign PROPERTIES
+		LABELS "integration"
+		TIMEOUT 90)
+
 	# The shipped policy templates (TODO.supervisor/09 P1):
 	# every file under share/policy-templates/ must push onto a
 	# fresh daemon -- format drift in either direction dies red.

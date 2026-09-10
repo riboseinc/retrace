@@ -48,6 +48,7 @@
 #endif
 
 #include "../retraced/tls_gate.h"
+#include "../retraced/journal_sign.h"
 #include "../retraced/ctl_verbs.h"
 
 #ifdef RETRACE_HAVE_OPENSSL
@@ -355,6 +356,23 @@ static int cmd_sign_policy(const char *file, const char *key_path)
 #endif
 }
 
+/* verify-journal (TODO.impl/07): local, like sign-policy -- the
+ * auditor's hand: chain + ed25519 seal in one verdict
+ */
+static int cmd_verify_journal(const char *file,
+	const char *pubkey_path)
+{
+	char verdict[192];
+
+	if (retraced_journal_verify_file(file, pubkey_path, verdict,
+		    sizeof(verdict)) == 0) {
+		printf("%s\n", verdict);
+		return 0;
+	}
+	fprintf(stderr, "retrace-ctl: %s\n", verdict);
+	return 1;
+}
+
 static int ctl_usage(void)
 {
 	/* the verb lines derive from the same SSOT list the
@@ -372,6 +390,7 @@ static int ctl_usage(void)
 #undef USAGE_LINE
 	fprintf(stderr,
 		"  sign-policy FILE KEY   emit a signed wrapper to stdout\n"
+		"  verify-journal FILE --pubkey PEM  chain + ed25519 seal verdict\n"
 		"  --tls-*: fleet mTLS (all four required together)\n");
 	return 2;
 }
@@ -447,6 +466,18 @@ int main(int argc, char **argv)
 	} else if (strcmp(argv[i], "sign-policy") == 0 &&
 		   i + 2 < argc) {
 		return cmd_sign_policy(argv[i + 1], argv[i + 2]);
+	} else if (strcmp(argv[i], "verify-journal") == 0 &&
+		   i + 1 < argc) {
+		const char *pub = NULL;
+		int j;
+
+		for (j = i + 2; j + 1 < argc; j += 2) {
+			if (strcmp(argv[j], "--pubkey") == 0)
+				pub = argv[j + 1];
+		}
+		if (pub == NULL)
+			return ctl_usage();
+		return cmd_verify_journal(argv[i + 1], pub);
 	} else if (strcmp(argv[i], "sessions") == 0) {
 		snprintf(req, sizeof(req), "{\"cmd\":\"sessions\"}\n");
 	} else if (strcmp(argv[i], "spawn") == 0 && i + 1 < argc) {
