@@ -14,17 +14,12 @@ import sys
 import tempfile
 
 TARGET_SRC = r"""
-#include <stdlib.h>
-#include <stdio.h>
+#include <fcntl.h>
 int main(void)
 {
 	int i;
-	for (i = 0; i < 20; i++) {
-		char *p = malloc(8);
-		printf("%d:%s ", i, p ? "a" : "F");
-		free(p);
-	}
-	printf("\n");
+	for (i = 0; i < 20; i++)
+	 open("/dev/null", O_RDONLY);
 	return 0;
 }
 """
@@ -61,11 +56,19 @@ def main():
                        os.path.join(work, "t.c")]).returncode:
         print("FAIL: cannot compile target", file=sys.stderr)
         return 1
+    # fuzz_str on open: a MAIN-THREAD-only seam. memory_fuzz on
+    # malloc is racy by construction -- the logger flusher's
+    # own interposed mallocs consume the shared rand() stream
+    # in a thread-interleaved order (the macos-14 lesson).
+    with open(os.path.join(work, "tokens.txt"), "w") as f:
+        f.write("AAA\nBBB\nCCC\n")
     with open(os.path.join(work, "fz.json"), "w") as f:
-        f.write('{"intercept_scripts":[{"func_name":"malloc",'
-                '"actions":[{"action_name":"memory_fuzz",'
-                '"action_params":{"fail_rate":0.3}},'
-                '{"action_name":"call_real"}]}]}')
+        f.write('{"intercept_scripts":[{"func_name":"open",'
+                '"actions":[{"action_name":"fuzz_str",'
+                '"action_params":{"param_name":"path",'
+                '"dict":"%s"}},'
+                '{"action_name":"call_real"}]}]}'
+                % (os.path.join(work, "tokens.txt")))
 
     rec = os.path.join(work, "rec")
     out1 = run(lib, {"RETRACE_REPLAY_OUT": rec}, work)
@@ -77,11 +80,11 @@ def main():
     out2 = run(lib, {"RETRACE_REPLAY_IN": rec}, work)
 
     def decisions(out):
-        # the target's prints interleave with the JSON log --
-        # pull the decision sequence itself
+        # the mutated-path sequence, extracted from the log in
+        # order (the target prints nothing itself)
         import re
 
-        return re.findall(r"\d+:[aF]", out)
+        return re.findall(r"fuzzed to '(\w+)'", out)
 
     if decisions(out1) != decisions(out2):
         print("FAIL: replay decisions differ:",
@@ -98,11 +101,12 @@ def main():
     # tamper one outcome: the drift must be NAMED
     lines = open(rec).read().split("\n")
     for i, l in enumerate(lines):
-        if l.endswith(" memfuzz ok"):
-            lines[i] = l[: -len("ok")] + "fail"
+        if l.endswith("fuzz_str AAA"):
+            lines[i] = l[: -len("AAA")] + "BBB"
             break
     else:
-        print("FAIL: no memfuzz outcome to tamper", file=sys.stderr)
+        print("FAIL: no fuzz_str outcome to tamper",
+              file=sys.stderr)
         return 1
     open(rec, "w").write("\n".join(lines))
     out3 = run(lib, {"RETRACE_REPLAY_IN": rec}, work)
