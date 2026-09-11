@@ -236,7 +236,13 @@ recommended path.)
 On Linux, an ASAN-instrumented target under `LD_PRELOAD`
 composes: the binary's linked runtime owns the allocator and
 retrace's fault injection surfaces as clean `NULL`/`errno`
-paths — exactly what a retry path should handle. On macOS the
+paths — exactly what a retry path should handle. When anything
+rides `LD_PRELOAD`, ASAN demands its runtime FIRST:
+
+```sh
+RT=$(cc -print-file-name=libclang_rt.asan-$(uname -m).so.1)
+LD_PRELOAD="$RT:/usr/lib/libretrace.so" ./asan-target
+``` On macOS the
 combination is a dyld-level conflict (fatal at init, every
 ordering); see the matrix in [platforms.md](../platforms.md).
 The `sanitizer-compat` integration test guards both cells.

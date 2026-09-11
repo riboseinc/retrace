@@ -84,7 +84,19 @@ def main():
     if sys.platform == "darwin":
         env["DYLD_INSERT_LIBRARIES"] = lib
     else:
-        env["LD_PRELOAD"] = lib
+        # the documented rule (platforms.md): with any LD_PRELOAD
+        # set, ASAN requires ITS runtime first -- "ASan runtime
+        # does not come first in initial library list" is the
+        # failure this prevents. retrace rides second.
+        arch = os.uname().machine
+        rt = subprocess.run(
+            ["cc", "-print-file-name=",
+             f"libclang_rt.asan-{arch}.so.1"],
+            stdout=subprocess.PIPE).stdout.decode().strip()
+        if not os.path.exists(rt):
+            print(f"SKIP: ASAN runtime not found ({rt})")
+            return 0
+        env["LD_PRELOAD"] = rt + ":" + lib
     p = subprocess.run([os.path.join(work, "t")], env=env,
                        stdout=subprocess.PIPE,
                        stderr=subprocess.STDOUT, timeout=30)
