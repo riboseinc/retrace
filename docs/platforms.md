@@ -121,7 +121,7 @@ test `sanitizer-compat` is its tripwire):
 | Target built with | Linux (LD_PRELOAD) | macOS (DYLD_INSERT) |
 |---|---|---|
 | `-fsanitize=address` | **Supported** — the binary's linked runtime owns the allocator; retrace rides above it (fault injection surfaces as clean `NULL`/`errno` paths) | **Fatal at dyld init** (SIGILL) |
-| arm64 + gcc-11 (ubuntu-22.04-arm) | **Hangs** — the runtime-first ordering loads, then the interposed allocator deadlocks; do not combine there | (fatal, as above) |
+| gcc-11 toolchains (ubuntu 22.04, both arches) | **Hangs** — the runtime-first ordering loads, then the interposed allocator deadlocks; the boundary is the toolchain, not the arch (gcc-13/14 legs pass). Do not combine there | (fatal, as above) |
 | `-fsanitize=thread` | Same class as ASAN | Fatal at dyld init (SIGILL) |
 | `-fsanitize=undefined` | Supported (no allocator interposition) | Fatal (SIGSEGV) |
 
