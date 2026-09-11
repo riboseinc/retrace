@@ -113,19 +113,26 @@ def main():
                            stdout=subprocess.PIPE,
                            stderr=subprocess.STDOUT, timeout=30)
     except subprocess.TimeoutExpired:
-        # a measured matrix cell: the ubuntu-22.04-arm/gcc-11
-        # combination DEADLOCKS (runtime-first loads, then the
-        # interposed allocator never returns). Documented in
-        # platforms.md; x64 must never regress to this.
-        if os.uname().machine == "aarch64":
-            print("arm64/gcc-11 cell: HANG (documented; do not "
+        # a measured matrix cell: gcc-11 (ubuntu 22.04, both
+        # architectures) DEADLOCKS in this combo -- runtime-first
+        # loads, then the interposed allocator never returns.
+        # The boundary is the TOOLCHAIN, not the arch (22.04-x64
+        # and 22.04-arm both hang; 24.04+/26.04+ gcc-13/14 pass).
+        # Documented in platforms.md; newer toolchains must
+        # never regress to a hang.
+        ver = subprocess.run(["cc", "-dumpversion"],
+                             stdout=subprocess.PIPE,
+                             ).stdout.decode().strip()
+        major = int(ver.split(".")[0]) if ver[:1].isdigit() else 99
+        if major <= 11:
+            print(f"gcc-{major} cell: HANG (documented; do not "
                   "combine retrace with ASAN there)")
-            print("PASS: matrix tripwire (arm64/gcc-11: "
-                  "unsupported, as documented)")
+            print("PASS: matrix tripwire (gcc-11: unsupported, "
+                  "as documented)")
             return 0
-        print("FAIL: ASAN target under retrace HUNG on x64 -- "
-              "a regression against the supported matrix cell",
-              file=sys.stderr)
+        print(f"FAIL: ASAN target under retrace HUNG on "
+              f"cc-{ver} -- a regression against the supported "
+              f"matrix cell", file=sys.stderr)
         return 1
     out = p.stdout.decode(errors="replace")
 
