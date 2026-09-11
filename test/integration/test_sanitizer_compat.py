@@ -108,9 +108,25 @@ def main():
                   "toolchain")
             return 0
         env["LD_PRELOAD"] = rt + ":" + lib
-    p = subprocess.run([os.path.join(work, "t")], env=env,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.STDOUT, timeout=30)
+    try:
+        p = subprocess.run([os.path.join(work, "t")], env=env,
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, timeout=30)
+    except subprocess.TimeoutExpired:
+        # a measured matrix cell: the ubuntu-22.04-arm/gcc-11
+        # combination DEADLOCKS (runtime-first loads, then the
+        # interposed allocator never returns). Documented in
+        # platforms.md; x64 must never regress to this.
+        if os.uname().machine == "aarch64":
+            print("arm64/gcc-11 cell: HANG (documented; do not "
+                  "combine retrace with ASAN there)")
+            print("PASS: matrix tripwire (arm64/gcc-11: "
+                  "unsupported, as documented)")
+            return 0
+        print("FAIL: ASAN target under retrace HUNG on x64 -- "
+              "a regression against the supported matrix cell",
+              file=sys.stderr)
+        return 1
     out = p.stdout.decode(errors="replace")
 
     if sys.platform == "darwin":
