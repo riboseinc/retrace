@@ -87,14 +87,25 @@ def main():
         # the documented rule (platforms.md): with any LD_PRELOAD
         # set, ASAN requires ITS runtime first -- "ASan runtime
         # does not come first in initial library list" is the
-        # failure this prevents. retrace rides second.
+        # failure this prevents. retrace rides second. The
+        # runtime's name is toolchain-dependent (clang:
+        # libclang_rt.asan-<arch>.so.1; gcc: libasan.so.6), and
+        # -print-file-name echoes a DIRECTORY when the name is
+        # unknown -- a file check, not an exists check.
         arch = os.uname().machine
-        rt = subprocess.run(
-            ["cc", "-print-file-name=",
-             f"libclang_rt.asan-{arch}.so.1"],
-            stdout=subprocess.PIPE).stdout.decode().strip()
-        if not os.path.exists(rt):
-            print(f"SKIP: ASAN runtime not found ({rt})")
+        rt = None
+        for name in (f"libclang_rt.asan-{arch}.so.1",
+                     "libasan.so.6"):
+            cand = subprocess.run(
+                ["cc", f"-print-file-name={name}"],
+                stdout=subprocess.PIPE,
+            ).stdout.decode().strip()
+            if os.path.isfile(cand):
+                rt = cand
+                break
+        if rt is None:
+            print("SKIP: ASAN runtime not found for this "
+                  "toolchain")
             return 0
         env["LD_PRELOAD"] = rt + ":" + lib
     p = subprocess.run([os.path.join(work, "t")], env=env,
