@@ -230,3 +230,13 @@ recommended path.)
 - [11 — Deterministic fuzzing seed](11-deterministic-fuzz.md)
 - [tools/logpp](../../tools/logpp/) — text pretty-printer
 - [tools/flamegraph](../../tools/flamegraph/) — SVG profile
+
+## Sanitizer builds under retrace
+
+On Linux, an ASAN-instrumented target under `LD_PRELOAD`
+composes: the binary's linked runtime owns the allocator and
+retrace's fault injection surfaces as clean `NULL`/`errno`
+paths — exactly what a retry path should handle. On macOS the
+combination is a dyld-level conflict (fatal at init, every
+ordering); see the matrix in [platforms.md](../platforms.md).
+The `sanitizer-compat` integration test guards both cells.

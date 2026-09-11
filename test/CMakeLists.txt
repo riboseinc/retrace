@@ -368,6 +368,17 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 90)
 
+	# The sanitizer compatibility tripwire (TODO.impl/05): the
+	# test IS the matrix's evidence -- Linux proves the combo,
+	# macOS asserts the documented dyld incompatibility.
+	add_test(NAME integration-sanitizer-compat
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_sanitizer_compat.py
+			$<TARGET_FILE:retrace_v2>)
+	set_tests_properties(integration-sanitizer-compat PROPERTIES
+		LABELS "integration"
+		TIMEOUT 60)
+
 	# The shipped policy templates (TODO.supervisor/09 P1):
 	# every file under share/policy-templates/ must push onto a
 	# fresh daemon -- format drift in either direction dies red.

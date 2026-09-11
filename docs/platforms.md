@@ -113,6 +113,31 @@ read_only root, cap_drop ALL, write-class paths as rw binds,
 network off when the profile shows none. Runnable demo:
 `examples/packaging-audit/`.
 
+## Sanitizer-instrumented targets
+
+The fuzzing persona's matrix (TODO.impl/05; the integration
+test `sanitizer-compat` is its tripwire):
+
+| Target built with | Linux (LD_PRELOAD) | macOS (DYLD_INSERT) |
+|---|---|---|
+| `-fsanitize=address` | **Supported** — the binary's linked runtime owns the allocator; retrace rides above it (fault injection surfaces as clean `NULL`/`errno` paths) | **Fatal at dyld init** (SIGILL) |
+| `-fsanitize=thread` | Same class as ASAN | Fatal at dyld init (SIGILL) |
+| `-fsanitize=undefined` | Supported (no allocator interposition) | Fatal (SIGSEGV) |
+
+The macOS column is a dyld-level conflict, not a configuration
+one: every insertion ordering (retrace only, ASAN runtime
+first, retrace first) dies before `main`, with or without a
+retrace config — the sanitizer runtimes assume they are the
+only interposed dylib. On macOS, trace sanitizer-instrumented
+builds via the kernel lane (`retrace-ebpf-agent`'s sibling
+model) or rebuild the target without instrumentation; do not
+combine `DYLD_INSERT_LIBRARIES` with sanitizer runtimes.
+
+On Linux the classic rule applies when BOTH preload: sanitizer
+runtime first, retrace second. A plain `-fsanitize` build (no
+`ASAN_PRELOAD` juggling) needs nothing — `LD_PRELOAD` alone
+composes.
+
 ## The jail everywhere
 
 ```sh
