@@ -44,6 +44,7 @@
 #include "translate.h"
 
 #include "arch_spec.h"
+#include "engine.h"
 #include "real_impls.h"
 #include "logger.h"
 
@@ -150,6 +151,7 @@ static void
 ptrace_set_ret_val(void *arch_spec_ctx, intptr_t ret_val)
 {
 	struct retrace_ptrace_frame *frame = arch_spec_ctx;
+	struct ThreadContext *thread_ctx = NULL;
 
 	if (!frame->skip_real) {
 		/* The call was allowed; only an explicit later modify
@@ -167,10 +169,22 @@ ptrace_set_ret_val(void *arch_spec_ctx, intptr_t ret_val)
 	 * understands the latter (ADR-0016 §4).
 	 */
 	if (ret_val == -1) {
-		int e = errno;
+		/* Prefer the errno recorded at deny time: by the
+		 * engine tail, logging has clobbered the live one
+		 * (observed: ENOSYS from the logging path on
+		 * ubuntu-24 CI).
+		 */
+		int e;
 
-		if (e <= 0 || e >= 4096)
-			e = EPERM;
+		thread_ctx = retrace_thread_context_get();
+		if (thread_ctx != NULL && thread_ctx->ret_errno > 0 &&
+		    thread_ctx->ret_errno < 4096)
+			e = thread_ctx->ret_errno;
+		else {
+			e = errno;
+			if (e <= 0 || e >= 4096)
+				e = EPERM;
+		}
 		frame->forced_retval = -e;
 	} else {
 		frame->forced_retval = (long) ret_val;

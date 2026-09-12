@@ -142,7 +142,7 @@ static void test_installed_ops_dispatch_and_clear(void)
 	CHECK(stub_ret_val == -7);
 
 	CHECK(retrace_as_call_real(tc, NULL, NULL, NULL, 0) == 42);
-	CHECK(retrace_as_setup_params(tc, NULL, NULL, &cnt) == 1);
+	CHECK(retrace_as_setup_params(tc, NULL, NULL, NULL, &cnt) == 1);
 
 	retrace_as_ops_set(NULL);
 	CHECK(retrace_as_ops_get() == &retrace_as_ops_default);
@@ -204,11 +204,16 @@ static void test_deny_translates_errno_convention(void)
 	install_ptrace_lane();
 	retrace_as_cancel_sched_real(tc, &f);
 
-	/* the sandbox deny shape: ret_val -1, errno EACCES */
-	errno = EACCES;
+	/* the sandbox deny shape: ret_val -1, ret_errno EACCES --
+	 * recorded at deny time (the live errno is clobbered by
+	 * the logging before the engine tail; CI-observed)
+	 */
+	tc->ret_errno = EACCES;
+	errno = ENOSYS;
 	retrace_as_set_ret_val(tc, &f, -1);
 	CHECK(f.skip_real == 1);
 	CHECK(f.forced_retval == -EACCES);
+	tc->ret_errno = 0;
 	remove_ptrace_lane();
 }
 
@@ -219,6 +224,7 @@ static void test_deny_errno_clobber_falls_back_to_eperm(void)
 	install_ptrace_lane();
 	retrace_as_cancel_sched_real(tc, &f);
 
+	tc->ret_errno = 0;
 	errno = 0;
 	retrace_as_set_ret_val(tc, &f, -1);
 	CHECK(f.forced_retval == -EPERM);

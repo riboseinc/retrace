@@ -486,6 +486,7 @@ static int deny(struct ThreadContext *t_ctx, const char *why,
 	}
 
 	errno = EACCES;
+	t_ctx->ret_errno = EACCES;
 	t_ctx->ret_val = deny_ret(t_ctx);
 	return -1;
 }
