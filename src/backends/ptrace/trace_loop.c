@@ -66,7 +66,6 @@
 #include <sys/uio.h>
 #include <sys/wait.h>
 #include <elf.h>      /* NT_PRSTATUS */
-#include <sys/user.h> /* struct user_regs_struct on x86_64 */
 #endif
 
 #ifndef WIFSTOPPED
@@ -221,50 +220,44 @@ retrace_ptrace_trace_loop(struct retrace_engine *eng, pid_t child_pid)
 				retrace_as_ops_set(NULL);
 
 				if (frame.skip_real) {
-					log_info("ptrace lane: skip %s -> %ld",
-						frame.syscall_name,
-						frame.forced_retval);
-					/* Force the syscall to return
-					 * forced_retval without running.
-					 * Per-arch skip contracts:
-					 *  - x86_64: orig_rax = -1 is the
-					 *    kernel's explicit "tracer set
-					 *    the result" carve-out
-					 *    (do_syscall_64: "else if (nr
-					 *    != -1)" leaves rax alone).
-					 *  - aarch64: PTRACE_SET_SYSCALL
-					 *    with -1 skips execution and
-					 *    delivers x0; without that
-					 *    request, mark x8 invalid and
-					 *    rewrite x0 at the exit stop.
+					/*
+					 * Deny/skip via a BENIGN syscall:
+					 * rewrite the syscall number to
+					 * getpid (harmless, allowed by
+					 * every seccomp policy) and
+					 * deliver the forced value at the
+					 * syscall-EXIT stop. The classic
+					 * arch-specific tricks
+					 * (x86_64 orig_rax = -1, aarch64
+					 * PTRACE_SET_SYSCALL) rely on
+					 * kernel carve-outs that container
+					 * seccomp filters preempt -- an
+					 * invalid number becomes
+					 * -ENOSYS before the carve-out
+					 * runs (observed on the alpine
+					 * container leg: skip -13
+					 * delivered as ENOSYS). One
+					 * mechanism, both arches.
 					 */
-					retrace_ptrace_set_retval(
-					  regset_buf, iov.iov_len, frame.forced_retval);
-					if (frame.arch == RETRACE_PTRACE_ARCH_X86_64) {
-#ifdef __x86_64__
-						struct user_regs_struct *r =
-						  (struct user_regs_struct *) regset_buf;
+					long benign = retrace_ptrace_syscall_number(
+						frame.arch, "getpid");
 
-						r->orig_rax = (unsigned long long) -1;
-						r->rax =
-						  (unsigned long long) frame.forced_retval;
-#endif
-					} else if (frame.arch ==
-						   RETRACE_PTRACE_ARCH_AARCH64) {
-#if defined(__aarch64__) && defined(PTRACE_SET_SYSCALL)
-						if (ptrace(PTRACE_SET_SYSCALL,
-							   child_pid, 0,
-							   (void *) (long) -1) < 0)
-							return -1;
-#elif defined(__aarch64__)
+					if (benign < 0) {
+						/* no table entry: the
+						 * entry stop cannot be
+						 * made safe -- let the
+						 * syscall run (allow)
+						 */
+						log_err("ptrace lane: no benign syscall for skip");
+					} else {
 						retrace_ptrace_set_syscall_nr(
-						  regset_buf, iov.iov_len, -1);
+						  regset_buf, iov.iov_len,
+						  benign);
 						frame.exit_override = 1;
 						frame.exit_retval =
 						  frame.forced_retval;
-#endif
+						write_regset(child_pid, &iov);
 					}
-					write_regset(child_pid, &iov);
 				} else {
 					int    have_write = 0;
 					size_t i;

@@ -58,16 +58,23 @@ those functions assumes the preload frame.
 
 2. **Actions execute at the syscall-entry stop by register
    rewrite.** The ptrace trace loop swaps in the ptrace ops
-   around its `retrace_engine_wrapper()` call. Denial/skip =
-   the existing mechanism: rewrite the return register and
-   (x86_64) `orig_rax = -1`, continue with `PTRACE_SYSCALL` —
-   the kernel jumps straight to syscall-exit. No seccomp filter
-   is installed in the tracee: seccomp/landlock compilation of
-   a declared set is the `enforce` lane's tool and must run
-   before exec; this is live, per-call policy on the observation
-   lane, decided by the same JSON scripts. MECE: one lane
-   compiles declared-sets into the target, the other applies
-   scripts at each boundary.
+   around its `retrace_engine_wrapper()` call. Denial/skip
+   rewrites the syscall number to a benign syscall (getpid —
+   harmless, universally allowed) and delivers the forced value
+   at the syscall-EXIT stop. The arch-specific tricks
+   (x86_64 `orig_rax = -1`, aarch64 `PTRACE_SET_SYSCALL`)
+   rely on kernel carve-outs that container seccomp filters
+   preempt: an invalid number is answered with `-ENOSYS` by the
+   filter before the carve-out runs (CI-observed on the alpine
+   container leg: a forced `-13` delivered as ENOSYS; bare
+   kernels deliver it correctly). One mechanism, both arches,
+   immune to seccomp. No seccomp filter is installed in the
+   tracee: seccomp/landlock compilation of a declared set is
+   the `enforce` lane's tool and must run before exec; this is
+   live, per-call policy on the observation lane, decided by
+   the same JSON scripts. MECE: one lane compiles declared-sets
+   into the target, the other applies scripts at each
+   boundary.
 
 3. **On the syscall lane, the kernel IS the real
    implementation.** The ptrace ops map the engine's lifecycle
