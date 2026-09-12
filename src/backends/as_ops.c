@@ -70,7 +70,22 @@ void
 retrace_as_set_ret_val(struct ThreadContext *thread_ctx,
 	void *arch_spec_ctx, intptr_t ret_val)
 {
-	lane_ops_for(thread_ctx)->set_ret_val(arch_spec_ctx, ret_val);
+	const struct retrace_as_ops *ops = lane_ops_for(thread_ctx);
+
+	/*
+	 * The -1 + errno libc convention crosses to the kernel's
+	 * -errno only on lanes that speak the syscall convention
+	 * (an installed lane override). Translate HERE, where both
+	 * the lane and the deny-time ret_errno are visible and
+	 * un-clobbered; the default (preload) lane keeps the libc
+	 * convention and its same-process errno.
+	 */
+	if (ops != &retrace_as_ops_default && ret_val == -1 &&
+	    thread_ctx != NULL && thread_ctx->ret_errno > 0 &&
+	    thread_ctx->ret_errno < 4096)
+		ret_val = -(intptr_t) thread_ctx->ret_errno;
+
+	ops->set_ret_val(arch_spec_ctx, ret_val);
 }
 
 int
