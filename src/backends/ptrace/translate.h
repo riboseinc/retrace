@@ -43,6 +43,7 @@
 #include "syscall_table.h"
 
 #include <stddef.h>
+#include <sys/types.h>
 
 /* Maximum syscall args the engine examines for any one call. */
 #define RETRACE_PTRACE_MAX_ARGS 6
@@ -57,6 +58,12 @@
  */
 struct retrace_ptrace_frame {
 	retrace_ptrace_arch_t arch;
+
+	/*
+	 * The traced process: as_ops ptrace reads pointer params
+	 * from its address space (ADR-0016 §3).
+	 */
+	pid_t tracee_pid;
 
 	/* Syscall number (orig_rax on x86_64, x8 on aarch64). */
 	long syscall_nr;
@@ -78,6 +85,13 @@ struct retrace_ptrace_frame {
 	 */
 	int  skip_real;
 	long forced_retval;
+
+	/* A modify after the call was allowed: the kernel runs the
+	 * syscall, and the loop rewrites the retval register at the
+	 * syscall-exit stop (ADR-0016 §3).
+	 */
+	int  exit_override;
+	long exit_retval;
 };
 
 /* Detect the host's ptrace architecture at runtime. Returns
@@ -106,5 +120,12 @@ int retrace_ptrace_write_regs(void				*regset_buf,
  * Used when the engine asks the loop to skip the real syscall.
  */
 int retrace_ptrace_set_retval(void *regset_buf, size_t regset_len, long retval);
+
+/* Set the syscall-number register (orig_rax on x86_64, x8 on
+ * aarch64) inside `regset_buf`. Used to invalidate a syscall the
+ * engine denied on arches without an orig_rax-style skip
+ * carve-out.
+ */
+int retrace_ptrace_set_syscall_nr(void *regset_buf, size_t regset_len, long nr);
 
 #endif /* RETRACE_BACKENDS_PTRACE_TRANSLATE_H */

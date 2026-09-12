@@ -663,6 +663,18 @@ if(RETRACE_PLATFORM_LINUX)
 endif()
 
 #
+# As-ops seam unit tests (ADR-0016 / TODO.impl/06): the dispatcher
+# (default fallback, installed-table dispatch) and the syscall-lane
+# mapping (deny -> -errno, DEFERRED sentinel, exit override) are
+# pure-frame semantics -- the E2E rides them against a live tracee.
+#
+if(RETRACE_PLATFORM_LINUX)
+    retrace_add_unit_test(as_ops
+        EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/src/backends/ptrace)
+    target_link_libraries(retrace_test_as_ops PRIVATE retrace_backend_ptrace)
+endif()
+
+#
 # Audit scan-engine unit tests (TODO.complete/26). audit_scan_trace
 # drives the policy matcher across a trace and collects findings --
 # false negatives here mean missed violations in compliance reports.

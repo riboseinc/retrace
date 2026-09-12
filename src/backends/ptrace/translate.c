@@ -193,6 +193,33 @@ retrace_ptrace_write_regs(void				    *regset_buf,
 }
 
 int
+retrace_ptrace_set_syscall_nr(void *regset_buf, size_t regset_len, long nr)
+{
+	if (regset_buf == NULL)
+		return -1;
+
+#ifdef RETRACE_HAVE_X86_64
+	if (regset_len >= sizeof(retrace_x86_64_regs)) {
+		retrace_x86_64_regs *r = (retrace_x86_64_regs *) regset_buf;
+
+		r->orig_rax = (unsigned long long) nr;
+		return 0;
+	}
+#endif
+#ifdef RETRACE_HAVE_AARCH64
+	if (regset_len >= sizeof(retrace_aarch64_regs)) {
+		retrace_aarch64_regs *r = (retrace_aarch64_regs *) regset_buf;
+
+		r->regs[8] = (unsigned long) nr;
+		return 0;
+	}
+#endif
+
+	(void) nr;
+	return -1;
+}
+
+int
 retrace_ptrace_set_retval(void *regset_buf, size_t regset_len, long retval)
 {
 	if (regset_buf == NULL)

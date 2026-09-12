@@ -717,6 +717,7 @@ static int ia_call_real
 				t_ctx->prototype->params_cnt);
 		} else {
 			t_ctx->ret_val = retrace_as_call_real(
+				t_ctx->arch_spec_ctx,
 				t_ctx->real_impl,
 				t_ctx->params,
 				t_ctx->params_cnt);

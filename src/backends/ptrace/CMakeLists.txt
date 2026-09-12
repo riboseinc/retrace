@@ -13,7 +13,8 @@ set(_ptrace_sources
 	backend.c
 	trace_loop.c
 	translate.c
-	syscall_table.c)
+	syscall_table.c
+	as_ptrace.c)
 
 add_library(retrace_backend_ptrace OBJECT ${_ptrace_sources})
 

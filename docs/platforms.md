@@ -26,7 +26,13 @@ Kernel truth: `strace -f -e trace=%file -o strace.log ./app`
 then `retrace-strace2retrace -o kernel.json strace.log`; grade
 with `retrace-profile --libc trace.json --kernel kernel.json`.
 Statically-linked targets: `retrace attach <pid>` (ptrace
-backend) instead of the preload.
+backend) instead of the preload. The syscall lane runs the same
+JSON action scripts as the preload (ADR-0016): `sandbox` denies
+paths at the syscall stop (a denied `open("/etc/shadow")`
+surfaces as `EACCES` in the tracee), `modify_return_value_int`
+faults returns, `log_params` logs with strings read from the
+tracee. String-arg rewrite and non-string derefs are not on
+this lane (the ADR's out-of-scope list). Cookbook recipe 42.
 
 ## macOS
 

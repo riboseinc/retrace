@@ -379,6 +379,19 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 60)
 
+	# Syscall-lane actions E2E (TODO.impl/06, ADR-0016): a
+	# static victim denied open("/etc/shadow") at the ptrace
+	# syscall stop, /etc/hostname allowed, deny evidenced in
+	# the logger stream. Self-skips off Linux / without a
+	# static toolchain.
+	add_test(NAME integration-ptrace-deny
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_ptrace_deny.py
+			$<TARGET_FILE:retrace_v2>)
+	set_tests_properties(integration-ptrace-deny PROPERTIES
+		LABELS "integration"
+		TIMEOUT 120)
+
 	# The reference compose stack (TODO.impl/16): CI validates
 	# the compose file; the full up/down flow is the README's
 	# laptop path (verified live on this stack's bring-up).
