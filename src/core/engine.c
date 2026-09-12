@@ -335,40 +335,26 @@ const struct FuncPrototype *retrace_proto_cached(
 }
 
 
-/*
- * Dispatch depth for the as-ops lane override (ADR-0016): only
- * the OUTERMOST engine entry on a thread honors the installed
- * lane ops. A nested entry means the tracer's own interposed
- * libc ran inside an active dispatch -- those frames belong to
- * the trampoline lane and must dispatch through the default
- * ops (the ptrace trace loop's engine call is always outermost
- * on its thread).
- */
-static _Thread_local int tl_dispatch_depth;
-
-int retrace_engine_dispatch_depth(void)
-{
-	return tl_dispatch_depth;
-}
-
 void retrace_engine_wrapper(char *func_name,
 	void *arch_spec_ctx)
 {
 	void *real_impl;
 	struct real_cache_el *name_slot = NULL;
-	struct ThreadContext *thread_ctx;
+	struct ThreadContext *thread_ctx = NULL;
 	const JSON_Object *i_script;
 	const JSON_Array *i_scripts;
 	char clean_name[64]; /* MAXLEN_FUNC_NAME; funcs.h not included here */
-
-	tl_dispatch_depth++;
 
 	func_name = strip_darwin_extsn(func_name, clean_name,
 		sizeof(clean_name));
 
 	name_slot = name_slot_lookup(func_name, &real_impl);
 	if (!retrace_inited) {
-		retrace_as_sched_real(arch_spec_ctx, real_impl);
+		/* No context exists yet (and none may be allocatable
+		 * here): the default ops. No lane override can be
+		 * installed before the engine initializes.
+		 */
+		retrace_as_sched_real(NULL, arch_spec_ctx, real_impl);
 		goto out;
 	}
 	retrace_win_diag("enter", func_name, 0);
@@ -380,6 +366,12 @@ void retrace_engine_wrapper(char *func_name,
 			func_name);
 		goto out;
 	}
+	/* Lane bookkeeping (ADR-0016): the as-ops dispatcher
+	 * honors thread_ctx->lane_ops only for the outermost
+	 * dispatch on this context -- nested entries are the
+	 * tracer's own interposed libc, trampoline frames.
+	 */
+	thread_ctx->dispatch_depth++;
 	retrace_win_diag("ctx", func_name, 0);
 
 	if (real_impl == NULL) {
@@ -389,12 +381,12 @@ void retrace_engine_wrapper(char *func_name,
 		 * signaling an error for CRT funcs
 		 * The caller will probably crash anyway...
 		 */
-		retrace_as_set_ret_val(arch_spec_ctx, -1);
+		retrace_as_set_ret_val(thread_ctx, arch_spec_ctx, -1);
 		goto out;
 	}
 
 	/* set default to call real impl */
-	retrace_as_sched_real(arch_spec_ctx, real_impl);
+	retrace_as_sched_real(thread_ctx, arch_spec_ctx, real_impl);
 
 	/* Reentrance guard: nested libc calls from inside an action
 	 * would recurse unbounded. Bail if the current thread is
@@ -452,7 +444,8 @@ void retrace_engine_wrapper(char *func_name,
 	 * it can be dangerous to call orig with partial params
 	 */
 	thread_ctx->params_cnt = ENGINE_MAXCOUNT_PARAMS;
-	if (!retrace_as_setup_params(thread_ctx->arch_spec_ctx,
+	if (!retrace_as_setup_params(thread_ctx,
+		thread_ctx->arch_spec_ctx,
 		thread_ctx->prototype,
 		thread_ctx->params,
 		&thread_ctx->params_cnt)) {
@@ -483,21 +476,23 @@ void retrace_engine_wrapper(char *func_name,
 	retrace_win_diag("script", func_name, 0);
 
 	/* we have script, do not call real impl by default */
-	retrace_as_cancel_sched_real(arch_spec_ctx);
+	retrace_as_cancel_sched_real(thread_ctx, arch_spec_ctx);
 
 	retrace_win_diag("actions", func_name, 0);
 	retrace_action_runner_run(thread_ctx, func_name, i_script);
 	retrace_win_diag("actions-done", func_name, thread_ctx->ret_val);
 
 	/* write back to arch spec. portion */
-	retrace_as_set_ret_val(arch_spec_ctx, thread_ctx->ret_val);
+	retrace_as_set_ret_val(thread_ctx, arch_spec_ctx,
+		thread_ctx->ret_val);
 
 clean_up:
 	/* mark hi-level intercept done */
 	retrace_win_diag("clean", func_name, 0);
 	retrace_thread_context_clear(thread_ctx);
 out:
-	tl_dispatch_depth--;
+	if (thread_ctx != NULL)
+		thread_ctx->dispatch_depth--;
 }
 
 int retrace_engine_init(void)

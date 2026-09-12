@@ -215,7 +215,8 @@ retrace_ptrace_trace_loop(struct retrace_engine *eng, pid_t child_pid)
 				 * no-real-impl bail would deny them.
 				 */
 				retrace_as_ops_set(&retrace_as_ops_ptrace);
-				retrace_engine_wrapper((char *) frame.syscall_name, &frame);
+				retrace_engine_wrapper(
+					(char *) frame.syscall_name, &frame);
 				retrace_as_ops_set(NULL);
 
 				if (frame.skip_real) {
