@@ -1,0 +1,74 @@
+# The reference supervisor stack (TODO.impl/16): one compose
+# up brings the whole story -- otelcol, the daemon, and a
+# supervised detonation whose denials land live in the
+# collector and chained in the journal.
+#
+# Point RETRACE_BUILD at a build tree (default: ../../build);
+# RETRACE_NONCE fixes the channel nonce for reproducible
+# stacks (the quickstart's deterministic-run pattern).
+#
+#   docker compose up -d
+#   docker compose exec retraced retrace-ctl --sock /sockets/c.sock ps
+#   docker compose exec retraced retrace-ctl --sock /sockets/c.sock drift
+#   docker compose exec retraced cat /evidence/journal.jsonl
+#   docker compose down
+
+name: retrace-supervisor
+
+services:
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.108.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otelcol.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  retraced:
+    image: ubuntu:24.04
+    volumes:
+      - ${RETRACE_BUILD:-../../build}:/build:ro
+      - ./policy.json:/policy.json:ro
+      - sockets:/sockets
+      - evidence:/evidence
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cp /build/tools/retraced/retraced /tmp/retraced
+        cp /build/tools/retrace-ctl/retrace-ctl /tmp/retrace-ctl
+        chmod +x /tmp/retraced /tmp/retrace-ctl
+        exec /tmp/retraced --sock /sockets/a.sock --ctl /sockets/c.sock \
+          --journal /evidence/journal.jsonl --policy /policy.json \
+          --nonce "${RETRACE_NONCE:?set RETRACE_NONCE}"
+
+  detonation:
+    image: ubuntu:24.04
+    depends_on:
+      - retraced
+    volumes:
+      - ${RETRACE_BUILD:-../../build}:/build:ro
+      - sockets:/sockets
+    environment:
+      RETRACE_SUPERVISOR: "1"
+      RETRACE_SUPERVISOR_EAGER: "1"
+      RETRACE_SUPERVISOR_SOCK: /sockets/a.sock
+      RETRACE_SUPERVISOR_NONCE: ${RETRACE_NONCE:?set RETRACE_NONCE}
+      RETRACE_OTLP_ENDPOINT: http://otelcol:4318
+      RETRACE_LOGGER_DEF_ENA: "0"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cp /build/src/v2/libretrace.so /lib/libretrace.so
+        # one long-lived process whose OWN libc opens hit the
+        # pushed policy: tail --retry -f reopens in-process,
+        # forever (sub-second forks would race the eager
+        # connect; bash's read -t rides select -- the fortify
+        # fdelt class aborts under interposition)
+        LD_PRELOAD=/lib/libretrace.so exec tail --retry -F /etc/shadow
+
+volumes:
+  sockets:
+  evidence:

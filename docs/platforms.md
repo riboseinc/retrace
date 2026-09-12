@@ -103,6 +103,8 @@ retrace-snap2inside -o inside.json snapcraft.yaml
 # read:/write: path lists become accesses ($HOME expanded)
 retrace-flatpak2inside -o inside.json manifest.json   # JSON form
 retrace-docker2inside  -o inside.json image.tar        # docker save
+# and the whole supervisor story as one `docker compose up`:
+# examples/supervisor-compose (otelcol + retraced + specimen)
 retrace-profile capture -o profile.json -- ./app
 retrace-profile --libc profile.json --inside inside.json
 ```
