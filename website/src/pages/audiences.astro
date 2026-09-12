@@ -73,10 +73,27 @@ const audiences = [
       { label: "Docs: quickstart", href: "/retrace/docs/#quickstart" },
     ],
   },
+  {
+    id: "developer",
+    accent: "control",
+    verb: "Debug",
+    who: "Developers & reverse engineers",
+    why: "retrace's root persona: the bug is in the boundary between your code and libc. Step through every call with arguments and returns, diff two runs, and pin the fault that only fires at 3am.",
+    steps: [
+      { t: "Trace with arguments", c: "retrace trace open,malloc,getenv -- ./app", d: "Dereferenced strings, sizes, returns — JSON per call." },
+      { t: "Diff two runs", c: "retrace-diff run1.json run2.json --threshold 5", d: "Which calls appear, vanish, or slow down between builds." },
+      { t: "Pin the 3am fault", c: "RETRACE_REPLAY_OUT=run.rec ./flaky && RETRACE_REPLAY_IN=run.rec ./flaky", d: "The time-seeded run records; the replay reproduces it exactly — or names its drift." },
+    ],
+    trail: [
+      { label: "Cookbook: the debugging set", href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/README.md" },
+      { label: "Recipe 27: replay a trace", href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/27-replay-debug.md" },
+      { label: "Recipe 41: cross-arch samples", href: "https://github.com/riboseinc/retrace/blob/main/docs/cookbook/41-qemu-cross-arch.md" },
+    ],
+  },
 ];
 ---
 
-<Layout title="Audiences — who retrace is for" description="Four audiences, four trails: security research, fuzzing, audit, and operations.">
+<Layout title="Audiences — who retrace is for" description="Five audiences, five trails: security research, fuzzing, audit, operations, and debugging.">
   <Nav />
   <main id="top">
     <section class="hero">
