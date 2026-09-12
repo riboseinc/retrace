@@ -66,6 +66,7 @@ int main(int argc, char **argv)
 {
 	pid_t child;
 	int status;
+	int attempt;
 
 	if (argc != 2)
 		return 2;
@@ -74,11 +75,19 @@ int main(int argc, char **argv)
 	if (child == 0)
 		execl(argv[1], argv[1], (char *) 0);
 
-	/* the child loops; attach takes it over at the next stop.
-	 * retrace_attach_process enters the trace loop and returns
-	 * when the tracee exits.
+	/* The child loops; attach takes it over at the next stop.
+	 * PTRACE_ATTACH can transiently fail while the child is
+	 * mid-execve (EPERM; observed on the alpine/musl leg) --
+	 * retry briefly. retrace_attach_process enters the trace
+	 * loop and returns when the tracee exits.
 	 */
-	if (retrace_attach_process(child) != 0) {
+	for (attempt = 0; attempt < 100; attempt++) {
+		if (retrace_attach_process(child) == 0)
+			break;
+		usleep(10000);
+	}
+	if (attempt == 100) {
+		kill(child, 9);
 		waitpid(child, &status, 0);
 		return 3;
 	}

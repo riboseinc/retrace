@@ -47,6 +47,16 @@ struct ThreadContext {
 	 */
 	intptr_t ret_val;
 
+	/*
+	 * The errno PAIRED with ret_val == -1 at deny time
+	 * (sandbox sets EACCES). The preload lanes need nothing --
+	 * same-process errno reaches the caller. The syscall lane
+	 * (ADR-0016 §4) translates -1 to -errno and the live errno
+	 * is clobbered by the time the engine tail runs; this is
+	 * the untampered original.
+	 */
+	int ret_errno;
+
 	struct FuncParam params[ENGINE_MAXCOUNT_PARAMS];
 
 	/* valid param cnt */
