@@ -107,13 +107,15 @@ those functions assumes the preload frame.
    convention), and records the paired errno on the context
    (`ret_errno`) — by the time the engine tail runs, the deny's
    own logging has clobbered the live errno (CI-observed:
-   ENOSYS surfacing where EACCES was denied). The ptrace
-   `set_ret_val` translates `-1` to `-ret_errno`, falling back
-   to the live errno and then to `-EPERM` — the raw-syscall
-   return convention a static tracee's libc wrapper understands.
-   The recording is lane-agnostic (the preload lanes ignore it;
-   their same-process errno already reaches the caller); only
-   the translation lives in the ops implementation.
+   ENOSYS surfacing where EACCES was denied). The translation
+   `-1 -> -ret_errno` happens at the dispatcher seam, where
+   both the active lane and the un-clobbered ret_errno are
+   visible, and applies only when a lane override is installed
+   — the preload lanes keep the libc convention and their
+   same-process errno. The ptrace ops retain the live-errno
+   then `-EPERM` fallback for a `-1` with no recorded errno —
+   the raw-syscall return convention a static tracee's libc
+   wrapper understands.
 
 5. **Syscall-class ↔ action-name mapping is the existing
    syscall table.** Actions key on canonical names ("open",
