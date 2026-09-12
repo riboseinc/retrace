@@ -17,6 +17,7 @@ set(_core_sources
 	replay.c
 	caller_match.c
 	caller_cache.c
+	filter_dsl.c
 	log_ring.c
 	log_flusher.c
 	otlp_allocator.c

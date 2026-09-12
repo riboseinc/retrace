@@ -316,6 +316,41 @@ value to half of what the real call returned.
 
 Actions that shape the run as a whole — gating, throttling, denying.
 
+#### `filter`
+
+Aborts the script (skipping subsequent actions) when the
+condition does not hold — the gate that turns "log everything"
+into "log what I'm hunting". Two forms.
+
+The expression form (`expr`): a small predicate language over
+the call — params by name, numbers, quoted strings, the
+builtins `func` / `ret` / `caller`, globs (`~`, `!~`), the
+comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), and `and` /
+`or` / `not` with parentheses. See
+[cookbook recipe 43](cookbook/43-filter-expr.md) for the full
+grammar and semantics.
+
+```json
+{
+  "action_name": "filter",
+  "action_params": { "expr": "path ~ "*.log"" }
+}
+```
+
+The legacy form (`param_name` / `op` / `value`): one
+comparison on one named param.
+
+| Param        | Type   | Required        | Notes                              |
+|--------------|--------|-----------------|------------------------------------|
+| `expr`       | string | one of the two  | The expression form.               |
+| `param_name` | string | with `expr`     | Legacy single-comparison form.     |
+| `op`         | string | legacy form     | `==`, `!=`, `>`, `<`, `>=`, `<=`.  |
+| `value`      | number | legacy form     | The comparison value.              |
+
+A filter expression is compiled once and validated at config
+load: a bad expression REFUSES the whole config file at boot
+with a reason and character offset — never a silent no-match.
+
 #### `delay`
 
 Injects N milliseconds of latency before the call returns. Useful

@@ -668,6 +668,18 @@ endif()
 # mapping (deny -> -errno, DEFERRED sentinel, exit override) are
 # pure-frame semantics -- the E2E rides them against a live tracee.
 #
+#
+# Filter DSL unit tests (TODO.impl/08): STANDALONE -- the parser
+# and evaluator against fakes, no engine link (the card-06
+# lesson: engine-linked test binaries interpose themselves).
+# Includes the property suite (seeded random trees, truth by
+# construction).
+#
+retrace_add_unit_test(filter_dsl
+    STANDALONE
+    EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/src/core/filter_dsl.c
+    EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/src/core ${_unit_arch_include})
+
 if(RETRACE_PLATFORM_LINUX)
     # STANDALONE: compiles the dispatcher + the syscall-lane table
     # against fakes -- no engine link, no constructor, no

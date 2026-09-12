@@ -67,6 +67,80 @@
 #include "logger.h"
 #include "real_impls.h"
 #include "action_utils.h"
+#include "filter_dsl.h"
+
+/*
+ * Compiled-predicate cache (TODO.impl/08). The `expr` param is
+ * compiled ONCE and cached on the expr string's identity + a
+ * content guard -- the same revalidation lesson as sandbox's
+ * compiled set (a freed JSON tree's memory can be recycled
+ * into a new string at the same address).
+ */
+struct filter_expr_cache_el {
+	const char *expr_ptr;
+	size_t expr_len;
+	char first;
+	char last;
+	struct retrace_filter_ast *ast;
+};
+
+#define FILTER_EXPR_CACHE_MAX 16
+
+static struct filter_expr_cache_el expr_cache[FILTER_EXPR_CACHE_MAX];
+static size_t expr_cache_cnt;
+
+static struct retrace_filter_ast *expr_cache_get(const char *expr)
+{
+	size_t len = retrace_real_impls.strlen(expr);
+	size_t i;
+
+	for (i = 0; i < expr_cache_cnt; i++) {
+		struct filter_expr_cache_el *el = &expr_cache[i];
+
+		if (el->expr_ptr == expr && el->expr_len == len &&
+		    el->first == expr[0] && el->last == expr[len - 1])
+			return el->ast;
+	}
+	return NULL;
+}
+
+static struct retrace_filter_ast *expr_compile_cached(const char *expr)
+{
+	char err[128];
+	size_t len = retrace_real_impls.strlen(expr);
+	struct retrace_filter_ast *ast;
+	struct filter_expr_cache_el *el;
+
+	ast = retrace_filter_compile(expr, err, sizeof(err));
+	if (ast == NULL) {
+		/*
+		 * config validation should have caught this; a bad
+		 * expr reaching here fails CLOSED (never matches)
+		 */
+		log_err("filter: bad expr '%s': %s", expr, err);
+		return NULL;
+	}
+
+	if (expr_cache_cnt == FILTER_EXPR_CACHE_MAX) {
+		/* recycle the oldest slot */
+		el = &expr_cache[0];
+		retrace_filter_free(el->ast);
+		memmove(expr_cache, expr_cache + 1,
+			(FILTER_EXPR_CACHE_MAX - 1) * sizeof(expr_cache[0]));
+		el = &expr_cache[FILTER_EXPR_CACHE_MAX - 1];
+		expr_cache_cnt--;
+	} else {
+		el = &expr_cache[expr_cache_cnt];
+	}
+
+	el->expr_ptr = expr;
+	el->expr_len = len;
+	el->first = expr[0];
+	el->last = expr[len - 1];
+	el->ast = ast;
+	expr_cache_cnt++;
+	return ast;
+}
 
 static int eval_op(long actual, const char *op, long expected)
 {
@@ -101,6 +175,36 @@ static int ia_filter(struct ThreadContext *t_ctx,
 	if (action_params == NULL) {
 		log_err("filter: action_params required");
 		return -1;
+	}
+
+	/*
+	 * Expression form (TODO.impl/08): a small predicate
+	 * language over params, func, ret, and globs. Compiled
+	 * once, evaluated per call. No expr: the legacy
+	 * single-comparison triple below, unchanged.
+	 */
+	{
+		const char *expr = json_object_get_string(action_params,
+							  "expr");
+
+		if (expr != NULL) {
+			struct retrace_filter_ast *ast = expr_cache_get(expr);
+			const char *func = t_ctx->prototype != NULL ?
+				t_ctx->prototype->name : NULL;
+
+			if (ast == NULL) {
+				ast = expr_compile_cached(expr);
+				if (ast == NULL)
+					return -1;	/* fail closed */
+			}
+
+			if (retrace_filter_eval(ast, t_ctx, func)) {
+				log_dbg("filter: expr matched -- continuing");
+				return 0;
+			}
+			log_dbg("filter: expr not matched -- aborting script");
+			return -1;
+		}
 	}
 
 	param_name = json_object_get_string(action_params, "param_name");
