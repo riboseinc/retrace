@@ -669,9 +669,19 @@ endif()
 # pure-frame semantics -- the E2E rides them against a live tracee.
 #
 if(RETRACE_PLATFORM_LINUX)
+    # STANDALONE: compiles the dispatcher + the syscall-lane table
+    # against fakes -- no engine link, no constructor, no
+    # interposition (engine-linked, the test's own printfs run the
+    # default "*" script's actions and clang+musl -O corrupted the
+    # harness; the E2E covers the live path).
     retrace_add_unit_test(as_ops
-        EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/src/backends/ptrace)
-    target_link_libraries(retrace_test_as_ops PRIVATE retrace_backend_ptrace)
+        STANDALONE
+        EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/src/backends/as_ops.c
+                      ${CMAKE_SOURCE_DIR}/src/backends/ptrace/as_ptrace.c
+        EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/src/backends/ptrace
+                       ${CMAKE_SOURCE_DIR}/src/backends
+                       ${CMAKE_SOURCE_DIR}/src/core
+                       ${_unit_arch_include})
 endif()
 
 #
