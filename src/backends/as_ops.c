@@ -25,84 +25,87 @@
 
 /*
  * The as-ops dispatcher (ADR-0016). The retrace_as_* entry points
- * the engine calls are thin forwarders: they read a thread-local
- * current table and delegate. The default table is the built
- * preload backend's (retrace_as_ops_default, defined in its
- * arch_spec_bottom.c); the ptrace trace loop swaps in the
- * syscall-lane table around its engine dispatch.
+ * the engine and actions call are thin forwarders: they select
+ * the ops table from the calling thread's context and delegate.
+ * The default table is the built preload backend's
+ * (retrace_as_ops_default, defined in its arch_spec_bottom.c);
+ * a lane installs its table on the context around its engine
+ * dispatch (the ptrace trace loop does).
  *
- * Cost on the preload lanes: one TLS load + an indirect call per
- * engine entry -- noise against the microseconds actions take
- * (the F2 dispatch lesson).
+ * Selection is deliberately context-driven, NOT thread-local:
+ * threads spawned mid-boot (the logger flusher) have broken TLV
+ * under DYLD_INSERT on macOS, and the ThreadContext is already
+ * per-thread. The dispatch_depth member gates nesting -- a
+ * nested entry is the tracer's own interposed libc carrying a
+ * trampoline frame, which must keep the default ops.
  */
 
 #include "arch_spec.h"
+#include "engine.h"
 
-/*
- * Lane overrides apply only to the OUTERMOST engine dispatch on
- * a thread (ADR-0016): nested entries are the tracer's own
- * interposed libc inside an active dispatch -- trampoline-lane
- * frames that must keep the default ops. Declared in engine.c.
- */
-extern int retrace_engine_dispatch_depth(void);
+static const struct retrace_as_ops *
+lane_ops_for(const struct ThreadContext *thread_ctx)
+{
+	if (thread_ctx != NULL && thread_ctx->lane_ops != NULL &&
+	    thread_ctx->dispatch_depth <= 1)
+		return thread_ctx->lane_ops;
+	return &retrace_as_ops_default;
+}
 
-static _Thread_local const struct retrace_as_ops *tl_as_current;
+void
+retrace_as_sched_real(struct ThreadContext *thread_ctx,
+	void *arch_spec_ctx, void *real_impl)
+{
+	lane_ops_for(thread_ctx)->sched_real(arch_spec_ctx, real_impl);
+}
+
+void
+retrace_as_cancel_sched_real(struct ThreadContext *thread_ctx,
+	void *arch_spec_ctx)
+{
+	lane_ops_for(thread_ctx)->cancel_sched_real(arch_spec_ctx);
+}
+
+void
+retrace_as_set_ret_val(struct ThreadContext *thread_ctx,
+	void *arch_spec_ctx, intptr_t ret_val)
+{
+	lane_ops_for(thread_ctx)->set_ret_val(arch_spec_ctx, ret_val);
+}
+
+int
+retrace_as_setup_params(struct ThreadContext *thread_ctx,
+	void *arch_spec_ctx,
+	const struct FuncPrototype *proto,
+	struct FuncParam params[],
+	int *params_cnt)
+{
+	return lane_ops_for(thread_ctx)->setup_params(
+		arch_spec_ctx, proto, params, params_cnt);
+}
+
+intptr_t
+retrace_as_call_real(struct ThreadContext *thread_ctx,
+	void *arch_spec_ctx,
+	const void *real_impl,
+	const struct FuncParam params[],
+	int params_cnt)
+{
+	return lane_ops_for(thread_ctx)->call_real(
+		arch_spec_ctx, real_impl, params, params_cnt);
+}
 
 void
 retrace_as_ops_set(const struct retrace_as_ops *ops)
 {
-	tl_as_current = ops;
+	struct ThreadContext *thread_ctx = retrace_thread_context_get();
+
+	if (thread_ctx != NULL)
+		thread_ctx->lane_ops = ops;
 }
 
 const struct retrace_as_ops *
 retrace_as_ops_get(void)
 {
-	/* depth 0 = direct call (no engine entry): the installed
-	 * table applies. depth 1 = outermost engine dispatch: the
-	 * lane's own frame. depth >= 2 = a nested entry -- the
-	 * tracer's own interposed libc inside an active dispatch:
-	 * trampoline frames, default ops.
-	 */
-	if (tl_as_current != NULL &&
-	    retrace_engine_dispatch_depth() <= 1)
-		return tl_as_current;
-	return &retrace_as_ops_default;
-}
-
-void
-retrace_as_sched_real(void *arch_spec_ctx, void *real_impl)
-{
-	retrace_as_ops_get()->sched_real(arch_spec_ctx, real_impl);
-}
-
-void
-retrace_as_cancel_sched_real(void *arch_spec_ctx)
-{
-	retrace_as_ops_get()->cancel_sched_real(arch_spec_ctx);
-}
-
-void
-retrace_as_set_ret_val(void *arch_spec_ctx, intptr_t ret_val)
-{
-	retrace_as_ops_get()->set_ret_val(arch_spec_ctx, ret_val);
-}
-
-int
-retrace_as_setup_params(void			*arch_spec_ctx,
-			const struct FuncPrototype *proto,
-			struct FuncParam	params[],
-			int			*params_cnt)
-{
-	return retrace_as_ops_get()->setup_params(
-		arch_spec_ctx, proto, params, params_cnt);
-}
-
-intptr_t
-retrace_as_call_real(void			*arch_spec_ctx,
-		     const void		*real_impl,
-		     const struct FuncParam params[],
-		     int			params_cnt)
-{
-	return retrace_as_ops_get()->call_real(
-		arch_spec_ctx, real_impl, params, params_cnt);
+	return lane_ops_for(retrace_thread_context_get());
 }

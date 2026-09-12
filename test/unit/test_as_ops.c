@@ -26,15 +26,15 @@
 /*
  * Unit: the as-ops seam (ADR-0016).
  *
- * Part 1 -- the dispatcher: retrace_as_ops_set(NULL) falls back to
- * the per-platform default (the trampoline ops); an installed table
- * takes over every verb until cleared.
+ * Part 1 -- the dispatcher: with no lane installed on the
+ * thread context the default (trampoline) ops serve; an
+ * installed table takes over every verb until cleared.
  *
  * Part 2 -- the syscall-lane mapping (pure, no tracee): cancel
- * denies with -ENOSYS, set_ret_val translates the libc convention
- * (-1 + errno) to the kernel's (-errno), the DEFERRED sentinel
- * suppresses a bogus exit override on an allowed call, and
- * call_real re-allows. These are the semantics the E2E
+ * denies with -ENOSYS, set_ret_val translates the libc
+ * convention (-1 + errno) to the kernel's (-errno), the DEFERRED
+ * sentinel suppresses a bogus exit override on an allowed call,
+ * and call_real re-allows. These are the semantics the E2E
  * (test_ptrace_deny.py) rides end to end.
  */
 
@@ -44,6 +44,7 @@
 
 #include "arch_spec.h"
 #include "as_ptrace.h"
+#include "engine.h"
 
 #include "../../src/backends/ptrace/translate.h"
 
@@ -117,6 +118,8 @@ static const struct retrace_as_ops stub_ops = {
 	.call_real = stub_call
 };
 
+static struct ThreadContext *tc;
+
 static void test_default_ops_when_unset(void)
 {
 	CHECK(retrace_as_ops_get() == &retrace_as_ops_default);
@@ -131,18 +134,35 @@ static void test_installed_ops_dispatch_and_clear(void)
 	CHECK(retrace_as_ops_get() == &stub_ops);
 
 	sched_ctx_seen = NULL;
-	retrace_as_sched_real(&dummy, NULL);
+	retrace_as_sched_real(tc, &dummy, NULL);
 	CHECK(sched_ctx_seen == &dummy);
 
 	stub_ret_val = 0;
-	retrace_as_set_ret_val(&dummy, -7);
+	retrace_as_set_ret_val(tc, &dummy, -7);
 	CHECK(stub_ret_val == -7);
 
-	CHECK(retrace_as_call_real(NULL, NULL, NULL, 0) == 42);
-	CHECK(retrace_as_setup_params(&dummy, NULL, NULL, &cnt) == 1);
+	CHECK(retrace_as_call_real(tc, NULL, NULL, NULL, 0) == 42);
+	CHECK(retrace_as_setup_params(tc, NULL, NULL, &cnt) == 1);
 
 	retrace_as_ops_set(NULL);
 	CHECK(retrace_as_ops_get() == &retrace_as_ops_default);
+}
+
+static void test_nested_depth_uses_default(void)
+{
+	int dummy;
+
+	retrace_as_ops_set(&stub_ops);
+	tc->dispatch_depth = 2; /* nested: tracer's own libc */
+
+	retrace_as_sched_real(tc, &dummy, NULL);
+	/* stub would have recorded &dummy; the DEFAULT ops ran
+	 * instead (no crash, no stub state change)
+	 */
+	CHECK(sched_ctx_seen != &dummy);
+
+	tc->dispatch_depth = 0;
+	retrace_as_ops_set(NULL);
 }
 
 /* --- syscall-lane mapping (pure frame, no tracee) -------------------- */
@@ -156,95 +176,103 @@ static struct retrace_ptrace_frame mkframe(void)
 	return f;
 }
 
+static void install_ptrace_lane(void)
+{
+	retrace_as_ops_set(&retrace_as_ops_ptrace);
+}
+
+static void remove_ptrace_lane(void)
+{
+	retrace_as_ops_set(NULL);
+}
+
 static void test_cancel_denies_with_enosys(void)
 {
 	struct retrace_ptrace_frame f = mkframe();
 
-	retrace_as_ops_set(&retrace_as_ops_ptrace);
-	retrace_as_cancel_sched_real(&f);
+	install_ptrace_lane();
+	retrace_as_cancel_sched_real(tc, &f);
 	CHECK(f.skip_real == 1);
 	CHECK(f.forced_retval == -ENOSYS);
-	retrace_as_ops_set(NULL);
+	remove_ptrace_lane();
 }
 
 static void test_deny_translates_errno_convention(void)
 {
 	struct retrace_ptrace_frame f = mkframe();
 
-	retrace_as_ops_set(&retrace_as_ops_ptrace);
-	retrace_as_cancel_sched_real(&f);
+	install_ptrace_lane();
+	retrace_as_cancel_sched_real(tc, &f);
 
 	/* the sandbox deny shape: ret_val -1, errno EACCES */
 	errno = EACCES;
-	retrace_as_set_ret_val(&f, -1);
+	retrace_as_set_ret_val(tc, &f, -1);
 	CHECK(f.skip_real == 1);
 	CHECK(f.forced_retval == -EACCES);
-	retrace_as_ops_set(NULL);
+	remove_ptrace_lane();
 }
 
 static void test_deny_errno_clobber_falls_back_to_eperm(void)
 {
 	struct retrace_ptrace_frame f = mkframe();
 
-	retrace_as_ops_set(&retrace_as_ops_ptrace);
-	retrace_as_cancel_sched_real(&f);
+	install_ptrace_lane();
+	retrace_as_cancel_sched_real(tc, &f);
 
 	errno = 0;
-	retrace_as_set_ret_val(&f, -1);
+	retrace_as_set_ret_val(tc, &f, -1);
 	CHECK(f.forced_retval == -EPERM);
-	retrace_as_ops_set(NULL);
+	remove_ptrace_lane();
 }
 
 static void test_call_real_allows_and_defers(void)
 {
 	struct retrace_ptrace_frame f = mkframe();
+	intptr_t sentinel;
 
-	retrace_as_ops_set(&retrace_as_ops_ptrace);
-	retrace_as_cancel_sched_real(&f);
+	install_ptrace_lane();
+	retrace_as_cancel_sched_real(tc, &f);
 
-	CHECK(retrace_as_call_real(&f, NULL, NULL, 0) > 0); /* sentinel */
+	sentinel = retrace_as_call_real(tc, &f, NULL, NULL, 0);
+	CHECK(sentinel > 0);
 	CHECK(f.skip_real == 0);
 
 	/* the engine tail's write of the sentinel must NOT become an
 	 * exit override
 	 */
-	{
-		intptr_t sentinel = retrace_as_call_real(&f, NULL, NULL, 0);
-
-		retrace_as_set_ret_val(&f, sentinel);
-		CHECK(f.exit_override == 0);
-	}
+	retrace_as_set_ret_val(tc, &f, sentinel);
+	CHECK(f.exit_override == 0);
 
 	/* a real modify after the allow DOES override, at the exit */
-	retrace_as_set_ret_val(&f, 3);
+	retrace_as_set_ret_val(tc, &f, 3);
 	CHECK(f.exit_override == 1);
 	CHECK(f.exit_retval == 3);
-	retrace_as_ops_set(NULL);
+	remove_ptrace_lane();
 }
 
 static void test_modify_without_call_real_forces_value(void)
 {
 	struct retrace_ptrace_frame f = mkframe();
 
-	retrace_as_ops_set(&retrace_as_ops_ptrace);
-	retrace_as_cancel_sched_real(&f);
+	install_ptrace_lane();
+	retrace_as_cancel_sched_real(tc, &f);
 
-	retrace_as_set_ret_val(&f, -5);
+	retrace_as_set_ret_val(tc, &f, -5);
 	CHECK(f.skip_real == 1);
 	CHECK(f.forced_retval == -5);
 	CHECK(f.exit_override == 0);
-	retrace_as_ops_set(NULL);
+	remove_ptrace_lane();
 }
 
 static void test_sched_real_allows(void)
 {
 	struct retrace_ptrace_frame f = mkframe();
 
-	retrace_as_ops_set(&retrace_as_ops_ptrace);
-	retrace_as_cancel_sched_real(&f);
-	retrace_as_sched_real(&f, NULL);
+	install_ptrace_lane();
+	retrace_as_cancel_sched_real(tc, &f);
+	retrace_as_sched_real(tc, &f, NULL);
 	CHECK(f.skip_real == 0);
-	retrace_as_ops_set(NULL);
+	remove_ptrace_lane();
 }
 
 int
@@ -252,8 +280,12 @@ main(void)
 {
 	printf("as-ops seam (ADR-0016)\n");
 
+	tc = retrace_thread_context_get();
+	CHECK(tc != NULL);
+
 	TEST(default_ops_when_unset);
 	TEST(installed_ops_dispatch_and_clear);
+	TEST(nested_depth_uses_default);
 	TEST(cancel_denies_with_enosys);
 	TEST(deny_translates_errno_convention);
 	TEST(deny_errno_clobber_falls_back_to_eperm);

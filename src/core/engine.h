@@ -34,6 +34,8 @@
 /* for varags */
 #define ENGINE_MAXCOUNT_PARAMS 32
 
+struct retrace_as_ops;
+
 struct ThreadContext {
 	const struct FuncPrototype *prototype;
 
@@ -52,9 +54,26 @@ struct ThreadContext {
 
 	void *arch_spec_ctx;
 	void *ret_addr;
+
+	/*
+	 * Lane override (ADR-0016): the ops table this thread's
+	 * OUTERMOST dispatch runs under. The ptrace trace loop
+	 * installs its table around its engine call and clears it
+	 * after. Deliberately NOT thread-local storage: threads
+	 * spawned mid-boot (the logger flusher) have broken TLV
+	 * under DYLD_INSERT on macOS, and this context is already
+	 * per-thread. dispatch_depth gates nesting: a nested entry
+	 * is the tracer's own interposed libc -- a trampoline
+	 * frame that must keep the default ops.
+	 */
+	const struct retrace_as_ops *lane_ops;
+	int dispatch_depth;
 };
 
 extern int retrace_inited;
+
+/* The current thread's context (allocated on first use). */
+struct ThreadContext *retrace_thread_context_get(void);
 
 /*
  * Windows boot (src/core/main.c): DllMain calls this -- MSVC has

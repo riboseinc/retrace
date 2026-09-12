@@ -106,23 +106,31 @@ struct retrace_as_ops {
  */
 extern const struct retrace_as_ops retrace_as_ops_default;
 
-/* point this thread's engine dispatch at another lane's ops
- * (NULL restores the default). The ptrace trace loop brackets
- * its retrace_engine_wrapper() call with set/clear.
+/*
+ * Point the CURRENT thread's engine dispatch at another lane's
+ * ops (NULL restores the default). The ptrace trace loop
+ * brackets its retrace_engine_wrapper() call with set/clear.
+ * Resolves through the thread's context; a NULL context (boot)
+ * is a no-op -- no lane can be installed before the engine
+ * initializes.
  */
 void retrace_as_ops_set(const struct retrace_as_ops *ops);
 
 /* the ops the current thread dispatches through (never NULL) */
 const struct retrace_as_ops *retrace_as_ops_get(void);
 
+struct ThreadContext;
+
 /* schedules real_impl to run after retrace_engine_wrapper */
-void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl);
+void retrace_as_sched_real(struct ThreadContext *thread_ctx,
+	void *arch_spec_ctx, void *real_impl);
 //int retrace_as_sched_real(void *arch_spec_ctx, const char *func_name);
 
 void *retrace_as_get_real_safe(const char *real_impl);
 
 /* cancels real_impl to run after retrace_engine_wrapper */
-void retrace_as_cancel_sched_real(void *arch_spec_ctx);
+void retrace_as_cancel_sched_real(
+	struct ThreadContext *thread_ctx, void *arch_spec_ctx);
 
 /* should be called by retrace_engine_wrapper to setup params,
  * upon successful completion, *params_cnt will hold number of
@@ -130,6 +138,7 @@ void retrace_as_cancel_sched_real(void *arch_spec_ctx);
  * Returns 0 in case of failure.
  */
 int retrace_as_setup_params(
+	struct ThreadContext *thread_ctx,
 	void *arch_spec_ctx,
 	const struct FuncPrototype *proto,
 	struct FuncParam params[],
@@ -138,7 +147,8 @@ int retrace_as_setup_params(
 /* calls real_impls passing params accordingly to params_meta
  * (intptr_t return: a real impl may return a pointer -- LLP64)
  */
-intptr_t retrace_as_call_real(void *arch_spec_ctx,
+intptr_t retrace_as_call_real(struct ThreadContext *thread_ctx,
+	void *arch_spec_ctx,
 	const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt);
@@ -173,7 +183,8 @@ intptr_t retrace_as_call_real_variadic(const void *real_impl,
 	int named_count);
 
 /* schedules real_impl to run after retrace_engine_wrapper */
-void retrace_as_set_ret_val(void *arch_spec_ctx,
+void retrace_as_set_ret_val(struct ThreadContext *thread_ctx,
+	void *arch_spec_ctx,
 	intptr_t ret_val);
 
 int retrace_as_init(void);
