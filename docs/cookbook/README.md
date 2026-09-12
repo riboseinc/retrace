@@ -114,6 +114,7 @@ job.
 | 40 | [Redact secrets from evidence](40-redact-evidence.md) | config | Patterns of tokens that never leave the process: one transform at the evidence fan-out covers stdout, files, OTLP, and the journal. |
 | 41 | [Cross-arch detonation: arm64 samples on an x64 farm](41-qemu-cross-arch.md) | `qemu-aarch64-static` | The sample's arch is evidence: qemu-user + the aarch64 preload, with the kernel-lane caveat spelled out. |
 | 42 | [Stop a static sample: policy on the syscall lane](42-static-lane-deny.md) | ptrace | `retrace attach` runs the same sandbox scripts at the syscall stop — a static detonation gets contained, not just watched. |
+| 43 | [Log only what you're hunting: the filter expression](43-filter-expr.md) | `filter` | `path ~ "*.log" and not ret < 0` — queries as config, compiled once, bad syntax refused at boot. |
 
 For an overview of when to reach for each tool, see
 [docs/tools.md](../tools.md).

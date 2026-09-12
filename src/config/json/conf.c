@@ -25,6 +25,8 @@
 #include <errno.h>
 
 #include "conf.h"
+
+#include "filter_dsl.h"
 #include "real_impls.h"
 #include "redact.h"
 #include "logger.h"
@@ -176,6 +178,71 @@ parse_json:
 
 		if (csv != NULL)
 			retrace_redact_set_csv(csv);
+	}
+
+	/*
+	 * Filter expressions (TODO.impl/08): a bad expression is a
+	 * CONFIG ERROR, not a silent no-match -- refuse the whole
+	 * file (the parse-failure contract) so the operator sees it
+	 * at boot.
+	 */
+	{
+		JSON_Array *scripts = json_object_get_array(retrace_conf,
+						  "intercept_scripts");
+		size_t si;
+
+		for (si = 0; scripts != NULL &&
+			    si < json_array_get_count(scripts); si++) {
+			JSON_Object *script = json_array_get_object(
+				scripts, si);
+			JSON_Array *acts = script != NULL ?
+				json_object_get_array(script, "actions") :
+				NULL;
+			size_t ai;
+
+			for (ai = 0; acts != NULL &&
+				    ai < json_array_get_count(acts);
+			     ai++) {
+				JSON_Object *act = json_array_get_object(
+					acts, ai);
+				const char *name = act != NULL ?
+					json_object_get_string(act,
+						"action_name") : NULL;
+				JSON_Object *params = act != NULL ?
+					json_object_get_object(act,
+						"action_params") : NULL;
+				const char *expr;
+
+				if (name == NULL || params == NULL ||
+				    retrace_real_impls.strcmp(name,
+						"filter") != 0)
+					continue;
+
+				expr = json_object_get_string(params,
+					"expr");
+				if (expr == NULL)
+					continue;
+
+				{
+					char err[128];
+					struct retrace_filter_ast *ast =
+						retrace_filter_compile(
+							expr, err,
+							sizeof(err));
+
+					if (ast == NULL) {
+						log_err("script for '%s': "
+							"filter expr '%s': %s",
+							json_object_get_string(
+								script,
+								"func_name"),
+							expr, err);
+						return -1;
+					}
+					retrace_filter_free(ast);
+				}
+			}
+		}
 	}
 
 	return 0;

@@ -392,6 +392,17 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 120)
 
+	# The filter expression language (TODO.impl/08): only
+	# matching calls reach the log; a bad expression refuses
+	# the config at boot. Runs on every preload lane.
+	add_test(NAME integration-filter-expr
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_filter_expr.py
+			$<TARGET_FILE:retrace_v2>)
+	set_tests_properties(integration-filter-expr PROPERTIES
+		LABELS "integration"
+		TIMEOUT 60)
+
 	# The reference compose stack (TODO.impl/16): CI validates
 	# the compose file; the full up/down flow is the README's
 	# laptop path (verified live on this stack's bring-up).
