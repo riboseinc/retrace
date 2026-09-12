@@ -48,6 +48,7 @@
 #include "translate.h"
 
 #include "engine.h"
+#include "logger.h"
 #include "arch_spec.h"
 
 #include "as_ptrace.h"
@@ -220,6 +221,9 @@ retrace_ptrace_trace_loop(struct retrace_engine *eng, pid_t child_pid)
 				retrace_as_ops_set(NULL);
 
 				if (frame.skip_real) {
+					log_dbg("ptrace lane: skip %s -> %ld",
+						frame.syscall_name,
+						frame.forced_retval);
 					/* Force the syscall to return
 					 * forced_retval without running.
 					 * Per-arch skip contracts:
