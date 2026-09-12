@@ -48,6 +48,9 @@
 #include "translate.h"
 
 #include "engine.h"
+#include "arch_spec.h"
+
+#include "as_ptrace.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -98,8 +101,9 @@
 static int
 set_sysgood_options(pid_t pid)
 {
-	long rc =
-	  ptrace(PTRACE_SETOPTIONS, pid, 0, (void *) (uintptr_t) PTRACE_O_TRACESYSGOOD);
+	long opts = PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEEXEC;
+	long rc = ptrace(PTRACE_SETOPTIONS, pid, 0, (void *) (uintptr_t) opts);
+
 	if (rc < 0) {
 		fprintf(
 		  stderr, "retrace: ptrace: PTRACE_SETOPTIONS failed: %s\n", strerror(errno));
@@ -167,6 +171,10 @@ retrace_ptrace_trace_loop(struct retrace_engine *eng, pid_t child_pid)
 		return -1;
 
 	for (;;) {
+		struct retrace_ptrace_frame frame;
+		unsigned char regset_buf[512]; /* ample for either arch */
+		struct iovec  iov;
+
 		while (waitpid(child_pid, &status, 0) < 0) {
 			if (errno != EINTR)
 				return -1;
@@ -181,47 +189,76 @@ retrace_ptrace_trace_loop(struct retrace_engine *eng, pid_t child_pid)
 
 		int stopsig = WSTOPSIG(status);
 		int is_syscall_stop = (stopsig & RETRACE_SYSCALL_STOP_BIT) != 0;
+		unsigned int ptrace_event = (unsigned int) status >> 16;
 
 		if (is_syscall_stop && !in_syscall) {
 			/* Syscall ENTRY. */
-			struct retrace_ptrace_frame frame;
-			unsigned char regset_buf[512]; /* ample for either arch */
-			struct iovec  iov;
-
 			memset(&frame, 0, sizeof(frame));
 			frame.arch = retrace_ptrace_detect_arch();
+			frame.tracee_pid = child_pid;
 
 			if (read_regset(child_pid, &iov, regset_buf, sizeof(regset_buf)) ==
 			      0 &&
 			    retrace_ptrace_read_regs(&frame, regset_buf, iov.iov_len) == 0 &&
-			    frame.syscall_name != NULL) {
-				/* Dispatch to the engine. The engine may:
-				 *   - leave args alone (allow)
-				 *   - set arg_modified[]+arg_out[] (rewrite)
-				 *   - set skip_real + forced_retval (skip)
+			    frame.syscall_name != NULL &&
+			    retrace_proto_cached(frame.syscall_name) != NULL) {
+				/* Dispatch to the engine under the
+				 * syscall-lane ops (ADR-0016): the
+				 * engine may
+				 *   - allow (kernel runs the syscall)
+				 *   - deny/fault (skip_real + retval)
+				 *   - override the result at exit
+				 * Syscalls without a prototype
+				 * (exit_group, rt_sigaction, ...)
+				 * skip the engine entirely -- there is
+				 * no script for them, and the engine's
+				 * no-real-impl bail would deny them.
 				 */
+				retrace_as_ops_set(&retrace_as_ops_ptrace);
 				retrace_engine_wrapper((char *) frame.syscall_name, &frame);
+				retrace_as_ops_set(NULL);
 
 				if (frame.skip_real) {
 					/* Force the syscall to return
 					 * forced_retval without running.
-					 * On x86_64 we rewrite orig_rax to
-					 * -1 so the kernel skips dispatch;
-					 * on aarch64 the loop's next stop
-					 * will be syscall-exit. Either way
-					 * we set the retval register.
+					 * Per-arch skip contracts:
+					 *  - x86_64: orig_rax = -1 is the
+					 *    kernel's explicit "tracer set
+					 *    the result" carve-out
+					 *    (do_syscall_64: "else if (nr
+					 *    != -1)" leaves rax alone).
+					 *  - aarch64: PTRACE_SET_SYSCALL
+					 *    with -1 skips execution and
+					 *    delivers x0; without that
+					 *    request, mark x8 invalid and
+					 *    rewrite x0 at the exit stop.
 					 */
 					retrace_ptrace_set_retval(
 					  regset_buf, iov.iov_len, frame.forced_retval);
-#ifdef __x86_64__
 					if (frame.arch == RETRACE_PTRACE_ARCH_X86_64) {
+#ifdef __x86_64__
 						struct user_regs_struct *r =
 						  (struct user_regs_struct *) regset_buf;
+
 						r->orig_rax = (unsigned long long) -1;
 						r->rax =
 						  (unsigned long long) frame.forced_retval;
-					}
 #endif
+					} else if (frame.arch ==
+						   RETRACE_PTRACE_ARCH_AARCH64) {
+#if defined(__aarch64__) && defined(PTRACE_SET_SYSCALL)
+						if (ptrace(PTRACE_SET_SYSCALL,
+							   child_pid, 0,
+							   (void *) (long) -1) < 0)
+							return -1;
+#elif defined(__aarch64__)
+						retrace_ptrace_set_syscall_nr(
+						  regset_buf, iov.iov_len, -1);
+						frame.exit_override = 1;
+						frame.exit_retval =
+						  frame.forced_retval;
+#endif
+					}
 					write_regset(child_pid, &iov);
 				} else {
 					int    have_write = 0;
@@ -248,8 +285,34 @@ retrace_ptrace_trace_loop(struct retrace_engine *eng, pid_t child_pid)
 		}
 
 		if (is_syscall_stop && in_syscall) {
-			/* Syscall EXIT. Just continue. */
+			/* Syscall EXIT. A modify-after-allow
+			 * (ADR-0016 §3) rewrites the result here;
+			 * the kernel's value otherwise stands.
+			 */
+			if (frame.exit_override) {
+				if (read_regset(child_pid, &iov, regset_buf,
+						sizeof(regset_buf)) == 0) {
+					retrace_ptrace_set_retval(
+						regset_buf, iov.iov_len,
+						frame.exit_retval);
+					write_regset(child_pid, &iov);
+				}
+				frame.exit_override = 0;
+			}
 			in_syscall = 0;
+			if (ptrace(PTRACE_SYSCALL, child_pid, 0, 0) < 0)
+				return -1;
+			continue;
+		}
+
+		if (stopsig == SIGTRAP &&
+		    ptrace_event == PTRACE_EVENT_EXEC) {
+			/* The exec boundary. Forwarding this trap would
+			 * kill the tracee -- it is a ptrace artifact,
+			 * not the tracee's signal. Suppress and keep
+			 * syscall-stepping (attach-then-exec and
+			 * mid-run execve both land here).
+			 */
 			if (ptrace(PTRACE_SYSCALL, child_pid, 0, 0) < 0)
 				return -1;
 			continue;

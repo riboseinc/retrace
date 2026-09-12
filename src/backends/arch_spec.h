@@ -64,6 +64,57 @@ struct FuncParam {
 extern void retrace_engine_wrapper(char *func_name,
 	void *arch_spec_ctx);
 
+/*
+ * Frame-adapter ops (ADR-0016). The engine drives frames only
+ * through these five verbs; each lane supplies one ops table:
+ * the preload backends publish the default (the SysV trampoline
+ * frame), the ptrace backend publishes the syscall-lane adapter
+ * (the kernel IS the real impl -- ADR-0016 §3). The public
+ * retrace_as_* functions below dispatch through a thread-local
+ * current table, falling back to the default, so two lanes can
+ * coexist in one library without frames carrying vtables.
+ */
+struct retrace_as_ops {
+	/* schedule the real impl (ptrace: allow the kernel to run) */
+	void (*sched_real)(void *arch_spec_ctx, void *real_impl);
+
+	/* cancel the scheduled real impl (ptrace: skip the syscall) */
+	void (*cancel_sched_real)(void *arch_spec_ctx);
+
+	/* synthesize the return value (ptrace: -1 maps to -errno) */
+	void (*set_ret_val)(void *arch_spec_ctx, intptr_t ret_val);
+
+	/* extract params from the frame (ptrace: materialize pointer
+	 * params from the tracee's address space)
+	 */
+	int (*setup_params)(void *arch_spec_ctx,
+		const struct FuncPrototype *proto,
+		struct FuncParam params[],
+		int *params_cnt);
+
+	/* invoke the real impl now (ptrace: allow; the kernel runs
+	 * it at the continue -- no in-process call)
+	 */
+	intptr_t (*call_real)(void *arch_spec_ctx,
+		const void *real_impl,
+		const struct FuncParam params[],
+		int params_cnt);
+};
+
+/* the per-platform default ops -- defined by the built preload
+ * backend's arch_spec_bottom.c (arch_spec_win.c on Windows)
+ */
+extern const struct retrace_as_ops retrace_as_ops_default;
+
+/* point this thread's engine dispatch at another lane's ops
+ * (NULL restores the default). The ptrace trace loop brackets
+ * its retrace_engine_wrapper() call with set/clear.
+ */
+void retrace_as_ops_set(const struct retrace_as_ops *ops);
+
+/* the ops the current thread dispatches through (never NULL) */
+const struct retrace_as_ops *retrace_as_ops_get(void);
+
 /* schedules real_impl to run after retrace_engine_wrapper */
 void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl);
 //int retrace_as_sched_real(void *arch_spec_ctx, const char *func_name);
@@ -87,7 +138,8 @@ int retrace_as_setup_params(
 /* calls real_impls passing params accordingly to params_meta
  * (intptr_t return: a real impl may return a pointer -- LLP64)
  */
-intptr_t retrace_as_call_real(const void *real_impl,
+intptr_t retrace_as_call_real(void *arch_spec_ctx,
+	const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt);
 

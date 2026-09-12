@@ -21,3 +21,5 @@ via a new ADR that references the old.
 | [0011](0011-v1-removal-at-v2.1.0.md) | Remove v1 source at v2.1.0 | accepted |
 | [0013](0013-engine-mece-split.md) | Engine MECE split | accepted |
 | [0014](0014-public-api-matches-implementation.md) | Public API matches the implementation | accepted |
+| [0015](0015-retire-legacy-rpc.md) | Retire the legacy rpc/ subsystem | accepted |
+| [0016](0016-syscall-lane-actions-ops-seam.md) | Syscall-lane actions: the arch-spec seam made polymorphic | accepted |

@@ -335,6 +335,22 @@ const struct FuncPrototype *retrace_proto_cached(
 }
 
 
+/*
+ * Dispatch depth for the as-ops lane override (ADR-0016): only
+ * the OUTERMOST engine entry on a thread honors the installed
+ * lane ops. A nested entry means the tracer's own interposed
+ * libc ran inside an active dispatch -- those frames belong to
+ * the trampoline lane and must dispatch through the default
+ * ops (the ptrace trace loop's engine call is always outermost
+ * on its thread).
+ */
+static _Thread_local int tl_dispatch_depth;
+
+int retrace_engine_dispatch_depth(void)
+{
+	return tl_dispatch_depth;
+}
+
 void retrace_engine_wrapper(char *func_name,
 	void *arch_spec_ctx)
 {
@@ -345,13 +361,15 @@ void retrace_engine_wrapper(char *func_name,
 	const JSON_Array *i_scripts;
 	char clean_name[64]; /* MAXLEN_FUNC_NAME; funcs.h not included here */
 
+	tl_dispatch_depth++;
+
 	func_name = strip_darwin_extsn(func_name, clean_name,
 		sizeof(clean_name));
 
 	name_slot = name_slot_lookup(func_name, &real_impl);
 	if (!retrace_inited) {
 		retrace_as_sched_real(arch_spec_ctx, real_impl);
-		return;
+		goto out;
 	}
 	retrace_win_diag("enter", func_name, 0);
 
@@ -360,7 +378,7 @@ void retrace_engine_wrapper(char *func_name,
 		log_err(
 			"%s() intercept failed - could not get context",
 			func_name);
-		return;
+		goto out;
 	}
 	retrace_win_diag("ctx", func_name, 0);
 
@@ -372,7 +390,7 @@ void retrace_engine_wrapper(char *func_name,
 		 * The caller will probably crash anyway...
 		 */
 		retrace_as_set_ret_val(arch_spec_ctx, -1);
-		return;
+		goto out;
 	}
 
 	/* set default to call real impl */
@@ -384,7 +402,7 @@ void retrace_engine_wrapper(char *func_name,
 	 */
 	if (retrace_reentrance_guard_active(thread_ctx)) {
 		retrace_win_diag("guard-bail", func_name, 0);
-		return;
+		goto out;
 	}
 
 	retrace_reentrance_guard_enter(thread_ctx, real_impl,
@@ -478,6 +496,8 @@ clean_up:
 	/* mark hi-level intercept done */
 	retrace_win_diag("clean", func_name, 0);
 	retrace_thread_context_clear(thread_ctx);
+out:
+	tl_dispatch_depth--;
 }
 
 int retrace_engine_init(void)

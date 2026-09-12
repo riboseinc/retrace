@@ -44,6 +44,11 @@ if(RETRACE_PLATFORM_WINDOWS)
 else()
 	add_library(retrace_backends OBJECT registry.c)
 endif()
+# The as-ops dispatcher (ADR-0016): shared by every lane. Needs
+# core's PUBLIC include set (arch_spec.h -> data_types.h) and the
+# arch macros dir it propagates.
+target_sources(retrace_backends PRIVATE as_ops.c)
+target_link_libraries(retrace_backends PRIVATE retrace_core)
 target_link_libraries(retrace_backends PUBLIC retrace_headers)
 if(RETRACE_PLATFORM_WINDOWS)
 	target_link_libraries(retrace_backends INTERFACE ws2_32)

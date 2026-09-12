@@ -267,10 +267,12 @@ static int as_calc_params_specifiers(const char *fmt_string)
 }
 #endif
 
-intptr_t retrace_as_call_real(const void *real_impl,
+static intptr_t retrace_as_trampoline_call_real(
+	void *arch_spec_ctx, const void *real_impl,
 	const struct FuncParam params[],
 	int params_cnt)
 {
+	(void) arch_spec_ctx;
 	return retrace_as_call_real_dispatch(real_impl, params, params_cnt);
 }
 
@@ -283,7 +285,7 @@ void retrace_as_abort(void *arch_spec_ctx, long ret_val)
 	wrapper_frame_top->ret_val = ret_val;
 }
 
-void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl)
+static void retrace_as_trampoline_sched_real(void *arch_spec_ctx, void *real_impl)
 {
 	struct WrapperSystemVFrame *wrapper_frame_top;
 
@@ -292,7 +294,7 @@ void retrace_as_sched_real(void *arch_spec_ctx, void *real_impl)
 	wrapper_frame_top->real_impl = real_impl;
 }
 
-int retrace_as_setup_params(
+static int retrace_as_trampoline_setup_params(
 	void *arch_spec_ctx,
 	const struct FuncPrototype *proto,
 	struct FuncParam params[],
@@ -544,12 +546,12 @@ void retrace_as_intercept_done(void *arch_spec_ctx,
 	((struct WrapperSystemVFrame *) arch_spec_ctx)->call_real_flag = 0;
 }
 
-void retrace_as_cancel_sched_real(void *arch_spec_ctx)
+static void retrace_as_trampoline_cancel_sched_real(void *arch_spec_ctx)
 {
 	((struct WrapperSystemVFrame *) arch_spec_ctx)->call_real_flag = 0;
 }
 
-void retrace_as_set_ret_val(void *arch_spec_ctx,
+static void retrace_as_trampoline_set_ret_val(void *arch_spec_ctx,
 	long ret_val)
 {
 	((struct WrapperSystemVFrame *) arch_spec_ctx)->ret_val = ret_val;
@@ -611,3 +613,17 @@ void *retrace_as_get_real_safe(const char *real_impl)
 	fallback = dlsym(RTLD_NEXT, real_impl);
 	return fallback;
 }
+
+/*
+ * The default as-ops table (ADR-0016): the trampoline frame.
+ * Published for the shared dispatcher in as_ops.c; the engine
+ * reaches it through retrace_as_ops_get() when no lane override
+ * is installed.
+ */
+const struct retrace_as_ops retrace_as_ops_default = {
+	.sched_real = retrace_as_trampoline_sched_real,
+	.cancel_sched_real = retrace_as_trampoline_cancel_sched_real,
+	.set_ret_val = retrace_as_trampoline_set_ret_val,
+	.setup_params = retrace_as_trampoline_setup_params,
+	.call_real = retrace_as_trampoline_call_real
+};

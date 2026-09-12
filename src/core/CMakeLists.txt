@@ -123,8 +123,8 @@ target_include_directories(retrace_core
 		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/backends>            # arch_spec.h
 		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/config/json>         # conf.h, parson.h (the v2 plan/04 decouples)
 		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>                 # retrace/retrace.h (public_api.c)
+		${_retrace_arch_include}                                       # macros.h per-platform -- PUBLIC because the public arch_spec.h includes it
 	PRIVATE
-		${_retrace_arch_include}                                       # macros.h per-platform
 		${CMAKE_SOURCE_DIR}/src/supervisor                             # agent.h (main.c boot hook)
 		${CMAKE_CURRENT_SOURCE_DIR}/prototypes
 		${CMAKE_CURRENT_SOURCE_DIR}/actions
