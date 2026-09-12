@@ -1,0 +1,17 @@
+{
+  "policy": { "epoch": 1 },
+  "intercept_scripts": [
+    {
+      "func_name": "open",
+      "actions": [
+        {
+          "action_name": "sandbox",
+          "action_params": {
+            "deny_paths": ["/etc/shadow", "/etc/gshadow"]
+          }
+        },
+        { "action_name": "call_real" }
+      ]
+    }
+  ]
+}

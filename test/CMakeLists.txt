@@ -379,6 +379,17 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 60)
 
+	# The reference compose stack (TODO.impl/16): CI validates
+	# the compose file; the full up/down flow is the README's
+	# laptop path (verified live on this stack's bring-up).
+	add_test(NAME integration-compose
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_compose.py
+			${CMAKE_SOURCE_DIR}/examples)
+	set_tests_properties(integration-compose PROPERTIES
+		LABELS "integration"
+		TIMEOUT 60)
+
 	# The shipped policy templates (TODO.supervisor/09 P1):
 	# every file under share/policy-templates/ must push onto a
 	# fresh daemon -- format drift in either direction dies red.
