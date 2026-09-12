@@ -183,6 +183,11 @@ def main():
         print(f"FAIL: /etc/shadow was not denied "
               f"(kernel-is-real-impl mapping broken):\n{out[-1000:]}",
               file=sys.stderr)
+        if os.path.exists(log):
+            with open(log, "r", errors="replace") as f:
+                ev = f.read().replace("\\/", "/")
+            tail = ev[-1500:]
+            print(f"EVIDENCE-TAIL:\n{tail}", file=sys.stderr)
         return 1
     if not allowed:
         print(f"FAIL: /etc/hostname was denied too "
