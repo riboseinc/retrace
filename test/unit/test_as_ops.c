@@ -287,7 +287,10 @@ main(void)
 	printf("as-ops seam (ADR-0016)\n");
 
 	tc = retrace_thread_context_get();
-	CHECK(tc != NULL);
+	if (tc == NULL) {
+		printf("FAIL: no thread context\n");
+		return 1;
+	}
 
 	TEST(default_ops_when_unset);
 	TEST(installed_ops_dispatch_and_clear);
