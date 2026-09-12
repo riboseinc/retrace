@@ -489,10 +489,17 @@ void retrace_engine_wrapper(char *func_name,
 clean_up:
 	/* mark hi-level intercept done */
 	retrace_win_diag("clean", func_name, 0);
+	/* clear() zeroes dispatch_depth with the rest of the
+	 * context -- the count for THIS dispatch is consumed here;
+	 * only the early bails below owe a decrement.
+	 */
 	retrace_thread_context_clear(thread_ctx);
+	goto done;
 out:
 	if (thread_ctx != NULL)
 		thread_ctx->dispatch_depth--;
+done:
+	;
 }
 
 int retrace_engine_init(void)

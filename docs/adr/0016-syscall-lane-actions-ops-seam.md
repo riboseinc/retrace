@@ -42,12 +42,19 @@ those functions assumes the preload frame.
    supplies a `const` ops instance; the per-backend definitions
    rename to trampoline-qualified statics
    (`retrace_as_trampoline_sched_real`, ...) and publish
-   `retrace_as_ops_default`. A shared dispatcher
-   (`as_ops.c`) defines the public `retrace_as_*` symbols: it
-   reads a thread-local current-ops pointer, falling back to the
-   per-platform default when unset. Cost: one TLS load and an
-   indirect call on a path measured in microseconds — noise
-   (the F2 lesson: 22 ns dispatch tail).
+   `retrace_as_ops_default`. A shared dispatcher (`as_ops.c`)
+   defines the public `retrace_as_*` symbols: the verbs take the
+   calling `ThreadContext` as their leading argument and select
+   the table from `ctx->lane_ops`, falling back to the
+   per-platform default when unset. Cost: one context-field
+   check and an indirect call on a path measured in
+   microseconds — noise (the F2 lesson: 22 ns dispatch tail).
+
+   Deliberately NOT thread-local storage: threads spawned
+   mid-boot (the logger flusher) carry broken TLV under
+   DYLD_INSERT on macOS, and any `_Thread_local` in the engine
+   path aborts with `_tlv_bootstrap`. The ThreadContext is
+   already per-thread and boot-safe.
 
 2. **Actions execute at the syscall-entry stop by register
    rewrite.** The ptrace trace loop swaps in the ptrace ops
@@ -97,12 +104,16 @@ those functions assumes the preload frame.
 
 4. **Deny maps to the kernel's errno convention.** `sandbox`'s
    deny sets `errno = EACCES` and `ret_val = -1` (the libc
-   convention). The ptrace `set_ret_val` translates `-1` to
-   `-errno` (falling back to `-EPERM` if errno was clobbered to
-   0 by intervening logging) — the raw-syscall return convention
-   a static tracee's libc wrapper understands. This translation
-   lives in the ops implementation, not in the action: the
-   action stays lane-agnostic.
+   convention), and records the paired errno on the context
+   (`ret_errno`) — by the time the engine tail runs, the deny's
+   own logging has clobbered the live errno (CI-observed:
+   ENOSYS surfacing where EACCES was denied). The ptrace
+   `set_ret_val` translates `-1` to `-ret_errno`, falling back
+   to the live errno and then to `-EPERM` — the raw-syscall
+   return convention a static tracee's libc wrapper understands.
+   The recording is lane-agnostic (the preload lanes ignore it;
+   their same-process errno already reaches the caller); only
+   the translation lives in the ops implementation.
 
 5. **Syscall-class ↔ action-name mapping is the existing
    syscall table.** Actions key on canonical names ("open",
@@ -143,12 +154,12 @@ guard, unbounded recursion (the same signature as the historic
 macOS lldb stack overflow).
 
 The dispatcher therefore honors a lane override only when the
-engine dispatch depth on the thread is 0 (a direct call -- the
-unit-test contract) or 1 (the lane's own frame, always the
-outermost entry on its thread). Depth >= 2 is a nested entry:
-trampoline lane, default ops. The depth counter lives in the
-engine wrapper; the dispatcher reads it through
-`retrace_engine_dispatch_depth()`.
+dispatch depth on the thread's context is <= 1 (0 = a direct
+call — the unit-test contract; 1 = the lane's own frame, always
+the outermost entry on its thread). Depth >= 2 is a nested
+entry: trampoline lane, default ops. The depth counter and the
+lane pointer both live on the ThreadContext — per-thread state
+without TLS (see Decision 1's boot-safety note).
 
 ## Trace-loop gating
 
