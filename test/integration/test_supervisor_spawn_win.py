@@ -114,7 +114,7 @@ def diag(label, h, journal, pid=None, dlog=None):
     if dlog is not None:
         try:
             with open(dlog, "r", errors="replace") as f:
-                tail = f.readlines()[-15:]
+                tail = f.readlines()[-30:]
             for ln in tail:
                 print(f"DIAG {label}: daemon {ln.rstrip()}",
                       file=sys.stderr)
@@ -137,10 +137,12 @@ def main():
 
     dlog = os.path.join(work, "daemon.log")
     dlog_h = open(dlog, "w")
+    env = dict(os.environ)
+    env["RETRACED_TRACE"] = "1"
     d = subprocess.Popen(
         [daemon, "--sock", PIPE_AGENT, "--ctl", PIPE_CTL,
          "--journal", journal, "--nonce", NONCE],
-        stdout=dlog_h, stderr=subprocess.STDOUT)
+        stdout=dlog_h, stderr=subprocess.STDOUT, env=env)
     try:
         h = ctl_verbs(PIPE_CTL)
         if h is None:

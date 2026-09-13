@@ -81,6 +81,11 @@ static struct {
 	DWORD pid;
 } g_win_children[WIN_CHILDREN_MAX];
 static const char *g_agent_pipe_for_spawn;
+/*
+ * RETRACED_TRACE=1: the sweep narrates (loop liveness, table,
+ * raw wait results) -- the E2E's forensics switch
+ */
+static int g_trace;
 
 static int pipe_write_frame(HANDLE h, uint16_t type,
 	const char *payload);
@@ -572,9 +577,20 @@ static void win_reap_sweep(void)
 
 		if (g_win_children[i].h == NULL)
 			continue;
-		if (WaitForSingleObject(g_win_children[i].h, 0) !=
-		    WAIT_OBJECT_0)
-			continue;	/* still running */
+		{
+			DWORD w = WaitForSingleObject(
+				g_win_children[i].h, 0);
+
+			if (w != WAIT_OBJECT_0) {
+				if (g_trace)
+					printf("retraced: reap wait pid "
+						"%lu w=%lu\n",
+						(unsigned long)
+							g_win_children[i].pid,
+						(unsigned long)w);
+				continue;	/* not signaled */
+			}
+		}
 		if (GetExitCodeProcess(g_win_children[i].h, &code)) {
 			char ev[160];
 
@@ -914,6 +930,11 @@ int retraced_pipe_main(int argc, char **argv)
 	}
 
 	InitializeCriticalSection(&g_lock);
+	{
+		const char *tr = getenv("RETRACED_TRACE");
+
+		g_trace = tr != NULL && tr[0] == '1';
+	}
 	SetConsoleCtrlHandler(on_console_ctrl, TRUE);
 	/* the harness guard: an orphaned test/CI daemon self-ends
 	 * (deadline checked in the accept loop -- pump-free)
@@ -1011,6 +1032,21 @@ int retraced_pipe_main(int argc, char **argv)
 					15000);
 				win_reap_sweep();
 				LeaveCriticalSection(&g_lock);
+				if (g_trace) {
+					int kids = 0;
+					int k;
+
+					for (k = 0; k < WIN_CHILDREN_MAX;
+					     k++)
+						if (g_win_children[k].h !=
+						    NULL)
+							kids++;
+					printf("retraced: sweep t=%ld "
+						"agents=%zu kids=%d\n",
+						now_ms() / 1000,
+						g_reg.count, kids);
+					fflush(stdout);
+				}
 				last_sweep = now_ms();
 			}
 			/*
