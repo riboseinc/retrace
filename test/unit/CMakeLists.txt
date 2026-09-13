@@ -320,6 +320,23 @@ retrace_add_unit_test(journal_chain
 	${CMAKE_SOURCE_DIR}/tools/retraced/registry.c
 	EXTRA_INCLUDES
 	${CMAKE_SOURCE_DIR}/tools/retraced)
+
+#
+# Journal lifecycle unit tests (TODO.impl/10): rotation makes a
+# numbered segment series (one chain split across files), the
+# cross-segment links verify, retention prunes oldest segments
+# as chained records, tampering fails closed.
+#
+retrace_add_unit_test(journal_rotation
+	STANDALONE
+	EXTRA_SOURCES
+	${CMAKE_SOURCE_DIR}/tools/retraced/journal.c
+	${CMAKE_SOURCE_DIR}/tools/retraced/registry.c
+	${CMAKE_SOURCE_DIR}/src/config/json/parson.c
+	EXTRA_INCLUDES
+	${CMAKE_SOURCE_DIR}/tools/retraced
+	${CMAKE_SOURCE_DIR}/src/config/json
+	${CMAKE_SOURCE_DIR}/test/property/parson_stub)
 # the replay module's mode is write-once per process: one
 # phase per invocation, two registrations
 add_test(NAME unit-test-replay-phase-replay

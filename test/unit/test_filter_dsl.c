@@ -87,6 +87,22 @@ static int fake_snprintf(char *s, size_t n, const char *f, ...)
 	return rc;
 }
 
+/*
+ * the ThreadContext resolver asks the caller-cache for symbol
+ * names; the standalone fake answers a fixed symbol for a
+ * magic address (dladdr plumbing is caller_match's domain)
+ */
+#include "posix_compat.h"
+int retrace_caller_cache_lookup(void *ret_addr, rc_dl_info_t *out)
+{
+	memset(out, 0, sizeof(*out));
+	if (ret_addr == (void *) 0x1234) {
+		out->dli_sname = "do_open_magic";
+		return 1;
+	}
+	return 0;
+}
+
 /* ---- glob --------------------------------------------------------------- */
 
 static void test_glob_basics(void)
@@ -229,6 +245,19 @@ static void test_eval_basics(void)
 	CHECK(evals("ret == 5", mkcall(5, 0, NULL, "x"), "x") == 1);
 	/* unknown param: no match, never an error */
 	CHECK(evals("zz == 1", mkcall(1, 0, NULL, "open"), "open") == 0);
+	/* caller: resolved through the (faked) symbol cache.
+	 * mkcall returns a static context (memset per call), so
+	 * the address is set on the handle between evals.
+	 */
+	{
+		struct ThreadContext *c = mkcall(0, 0, NULL, "open");
+
+		c->ret_addr = (void *) 0x1234;
+		CHECK(evals("caller ~ \"do_*\"", c, "open") == 1);
+		CHECK(evals("caller ~ \"close*\"", c, "open") == 0);
+		c->ret_addr = NULL;
+		CHECK(evals("caller ~ \"*\"", c, "open") == 0);
+	}
 	/* precedence: and binds tighter than or */
 	CHECK(evals("a == 1 or a == 2 and b == 3",
 		    mkcall(1, 0, NULL, "f"), "f") == 1);

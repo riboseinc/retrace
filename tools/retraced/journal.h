@@ -35,7 +35,7 @@
 #include "registry.h"
 
 struct retraced_journal {
-	char path[512];
+	char path[512];		/* the LIVE segment's path */
 	uint64_t prev_hash;
 	uint64_t lines;
 	/* replay statistics (plan 02's tests assert these) */
@@ -48,11 +48,76 @@ struct retraced_journal {
 	 */
 	FILE *f;
 	int clean_close;
+
+	/*
+	 * Rotation (TODO.impl/10): the base path names the SERIES;
+	 * segments are `<base>.<NNNN>` numbered from 0. The chain
+	 * CONTINUES across segments -- each new segment's genesis
+	 * link carries the predecessor's final head -- so the
+	 * whole history stays one verifiable chain split across
+	 * files. Retention prunes OLDEST segments only, and each
+	 * prune is itself a chained record in the live segment:
+	 * gaps are auditable, never silent. Rotation unset =
+	 * exactly the single-file journal of old.
+	 */
+	char base[512];
+	uint64_t rotate_bytes;	/* 0 = no size trigger */
+	long rotate_seconds;	/* 0 = no time trigger */
+	uint64_t budget_bytes;	/* 0 = unlimited retention */
+	uint64_t seg_bytes;	/* the live segment's appends */
+	long last_rotate_ts;
+	int segment_seq;	/* the live segment's number */
+	/*
+	 * the close/open markers are themselves events: no
+	 * nested rotation (unbounded recursion)
+	 */
+	int rotating;
 };
 
 int retraced_journal_open(struct retraced_journal *j,
 	const char *path);
 void retraced_journal_close(struct retraced_journal *j);
+
+/*
+ * Rotation + retention (TODO.impl/10). Call BEFORE the first
+ * event (open() is fine; the first append resolves the live
+ * segment). rotate_bytes/rotate_seconds are triggers (0 =
+ * off); budget_bytes caps the PRUNED segments' total (0 =
+ * unlimited) -- the live segment is never pruned.
+ */
+void retraced_journal_set_rotation(struct retraced_journal *j,
+	uint64_t rotate_bytes, long rotate_seconds,
+	uint64_t budget_bytes);
+
+/*
+ * The live segment path for seq `n` of series `base` (writes
+ * at most cap bytes). `<base>.<NNNN>`.
+ */
+void retraced_journal_segment_path(const char *base, int seq,
+	char *out, size_t cap);
+
+/*
+ * Does segment file `path` exist (and its size, when non-NULL)?
+ * Portable probing: no dirent -- segment names are OURS,
+ * deterministically numbered.
+ */
+int retraced_journal_segment_exists(const char *path,
+	long long *size_out);
+
+/*
+ * The lowest existing segment number for `base` under `hi`
+ * (retention prunes from here). Returns -1 when none exist.
+ */
+int retraced_journal_segment_lo(const char *base, int hi);
+
+/*
+ * The surviving segment range [lo, hi] for `base` (-1 when
+ * none). Retention removes the OLDEST segments, so the series
+ * is contiguous from lo to hi; discovery probes from the top
+ * (numbered names are ours, so probing is deterministic).
+ */
+int retraced_journal_segment_range(const char *base,
+	int *lo_out, int *hi_out);
 
 /*
  * Append one event line. `payload` is the EVENT message's JSON
@@ -99,6 +164,24 @@ int retraced_journal_tail(struct retraced_journal *j, size_t last_n,
  * one chain-check arithmetic, three consumers.
  */
 int retraced_journal_chain_file(const char *path, size_t stop_at,
+	uint64_t *head_out, size_t *lines_out, size_t *broken_at);
+
+/*
+ * The chain link of one stored line given its predecessor --
+ * the SSOT arithmetic (FNV-1a over the line incl. newline,
+ * seeded by prev ^ the mix constant). Replay, chain_file, the
+ * signer, and the ctl's query all share this; nothing
+ * re-derives it.
+ */
+uint64_t retraced_journal_line_hash(const char *line,
+	uint64_t prev);
+
+/*
+ * The segment variant of chain_file (TODO.impl/10): verify one
+ * rotated segment starting from its predecessor's final head.
+ */
+int retraced_journal_chain_file_from(const char *path,
+	uint64_t start_prev, size_t stop_at,
 	uint64_t *head_out, size_t *lines_out, size_t *broken_at);
 
 #endif /* RETRACE_TOOLS_JOURNAL_H_ */

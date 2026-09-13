@@ -49,6 +49,9 @@
 
 #include "../retraced/tls_gate.h"
 #include "../retraced/journal_sign.h"
+#include "../retraced/journal.h"
+#include "journal_query.h"
+#include "journal_query.h"
 #include "../retraced/ctl_verbs.h"
 
 #ifdef RETRACE_HAVE_OPENSSL
@@ -359,17 +362,176 @@ static int cmd_sign_policy(const char *file, const char *key_path)
 /* verify-journal (TODO.impl/07): local, like sign-policy -- the
  * auditor's hand: chain + ed25519 seal in one verdict
  */
-static int cmd_verify_journal(const char *file,
-	const char *pubkey_path)
+/* events --journal BASE [--query EXPR] (TODO.impl/10): the
+ * offline read arm -- stream matching records from the segment
+ * series, chain-verified on the way through
+ */
+static void event_sink(const char *line, void *user)
+{
+	(void) user;
+	fputs(line, stdout);
+}
+
+static int cmd_events_local(const char *base, const char *query)
+{
+	struct retrace_filter_ast *ast = NULL;
+	long n;
+
+	if (query != NULL) {
+		char err[128];
+
+		ast = retrace_filter_compile(query, err, sizeof(err));
+		if (ast == NULL) {
+			fprintf(stderr, "retrace-ctl: bad query: %s\n",
+				err);
+			return 2;
+		}
+	}
+
+	n = retraced_journal_query(base, ast, event_sink, NULL);
+	retrace_filter_free(ast);
+	if (n < 0) {
+		fprintf(stderr,
+			"retrace-ctl: journal chain broken or unreadable\n");
+		return 1;
+	}
+	fprintf(stderr, "%ld record%s\n", n, n == 1 ? "" : "s");
+	return 0;
+}
+
+/* the declared genesis link of a segment: its first line's
+ * "prev" (what the segment says it continues from)
+ */
+static uint64_t segment_genesis_prev(const char *path)
+{
+	FILE *f = fopen(path, "r");
+	char line[2048];
+	const char *p;
+
+	if (f == NULL)
+		return 0;
+	if (fgets(line, sizeof(line), f) == NULL) {
+		fclose(f);
+		return 0;
+	}
+	fclose(f);
+	p = strstr(line, "\"prev\":\"");
+	if (p == NULL)
+		return 0;
+	return (uint64_t) strtoull(p + 8, NULL, 16);
+}
+
+static int verify_one(const char *path, const char *pubkey_path,
+	int *rc)
 {
 	char verdict[192];
 
-	if (retraced_journal_verify_file(file, pubkey_path, verdict,
-		    sizeof(verdict)) == 0) {
-		printf("%s\n", verdict);
-		return 0;
+	/* without a pubkey: the chain walk verdict only (unsigned
+	 * journals are legitimate; the seal path needs a key)
+	 */
+	if (pubkey_path == NULL) {
+		uint64_t head;
+		size_t lines;
+		size_t broken;
+
+		if (retraced_journal_chain_file(path, 0, &head, &lines,
+			    &broken) != 0) {
+			fprintf(stderr,
+				"retrace-ctl: %s: chain broken at line %zu\n",
+				path, broken);
+			*rc = 1;
+			return 1;
+		}
+		printf("%s: chain ok, %zu lines, head %016llx\n",
+			path, lines, (unsigned long long) head);
+		return 1;
 	}
-	fprintf(stderr, "retrace-ctl: %s\n", verdict);
+
+	if (retraced_journal_verify_file(path, pubkey_path, verdict,
+		    sizeof(verdict)) != 0) {
+		fprintf(stderr, "retrace-ctl: %s\n", verdict);
+		*rc = 1;
+		return 1;
+	}
+	printf("%s\n", verdict);
+	return 1;
+}
+
+static int cmd_verify_journal(const char *file,
+	const char *pubkey_path)
+{
+	int rc = 0;
+	int lo, hi, seq;
+	uint64_t carry = 0;
+	int have_carry = 0;
+
+	/* the segment series (TODO.impl/10): each segment's chain
+	 * verifies INTERNALLY from its own declared genesis link;
+	 * the declared link is then checked against the
+	 * predecessor's final head -- a match is the live
+	 * cross-segment chain, a mismatch on the OLDEST surviving
+	 * segment is retention (a chained prune record lives in
+	 * the successor), a mismatch mid-series is corruption.
+	 */
+	if (retraced_journal_segment_range(file, &lo, &hi) == 0) {
+		int segments = 0;
+
+		for (seq = lo; seq <= hi; seq++) {
+			char p[600];
+			uint64_t declared;
+			uint64_t head;
+			size_t lines, broken;
+
+			retraced_journal_segment_path(file, seq, p,
+				sizeof(p));
+			if (!retraced_journal_segment_exists(p, NULL))
+				continue;
+
+			declared = segment_genesis_prev(p);
+			if (retraced_journal_chain_file_from(p,
+				    declared, 0, &head, &lines, &broken)
+				    != 0) {
+				fprintf(stderr,
+					"retrace-ctl: %s: chain broken at line %zu\n",
+					p, broken);
+				rc = 1;
+			}
+			if (have_carry && declared != carry) {
+				if (seq == lo) {
+					printf("%s: chain ok, %zu lines"
+					       " (pruned predecessor)\n",
+						p, lines);
+				} else {
+					fprintf(stderr,
+						"retrace-ctl: %s: genesis link mismatch (corruption)\n",
+						p);
+					rc = 1;
+				}
+			} else {
+				printf("%s: chain ok, %zu lines, "
+				       "head %016llx\n", p, lines,
+					(unsigned long long) head);
+			}
+			carry = head;
+			have_carry = 1;
+			segments++;
+		}
+
+		if (segments > 1)
+			printf("%d segments verified\n", segments);
+		if (segments == 0) {
+			fprintf(stderr,
+				"retrace-ctl: no journal at %s\n", file);
+			return 1;
+		}
+		return rc;
+	}
+
+	/* no numbered segments: the plain base file IS the journal */
+	if (retraced_journal_segment_exists(file, NULL))
+		return verify_one(file, pubkey_path, &rc) ? rc : 1;
+
+	fprintf(stderr, "retrace-ctl: no journal at %s\n", file);
 	return 1;
 }
 
@@ -390,7 +552,8 @@ static int ctl_usage(void)
 #undef USAGE_LINE
 	fprintf(stderr,
 		"  sign-policy FILE KEY   emit a signed wrapper to stdout\n"
-		"  verify-journal FILE --pubkey PEM  chain + ed25519 seal verdict\n"
+		"  verify-journal FILE [--pubkey PEM]  chain (+ ed25519 seal) verdict\n"
+		"  events --journal BASE --query EXPR  offline journal query (filter DSL)\n"
 		"  --tls-*: fleet mTLS (all four required together)\n");
 	return 2;
 }
@@ -475,8 +638,9 @@ int main(int argc, char **argv)
 			if (strcmp(argv[j], "--pubkey") == 0)
 				pub = argv[j + 1];
 		}
-		if (pub == NULL)
-			return ctl_usage();
+		/* --pubkey optional: without it the verdict is the
+		 * chain walk only (the sealed variant needs a key)
+		 */
 		return cmd_verify_journal(argv[i + 1], pub);
 	} else if (strcmp(argv[i], "sessions") == 0) {
 		snprintf(req, sizeof(req), "{\"cmd\":\"sessions\"}\n");
@@ -531,15 +695,34 @@ int main(int argc, char **argv)
 		snprintf(req, sizeof(req), "{\"cmd\":\"drift\"}\n");
 	} else if (strcmp(argv[i], "events") == 0) {
 		long last = 20;
+		const char *qjournal = NULL;
+		const char *query = NULL;
 
-		if (i + 2 < argc && strcmp(argv[i + 1], "--last") == 0) {
-			last = strtol(argv[i + 2], NULL, 10);
-			if (last <= 0)
-				last = 20;
-			if (last > 128)
-				last = 128;
-			i += 2;
+		while (i + 2 < argc) {
+			if (strcmp(argv[i + 1], "--last") == 0) {
+				last = strtol(argv[i + 2], NULL, 10);
+				if (last <= 0)
+					last = 20;
+				if (last > 128)
+					last = 128;
+				i += 2;
+			} else if (strcmp(argv[i + 1], "--journal") == 0) {
+				qjournal = argv[i + 2];
+				i += 2;
+			} else if (strcmp(argv[i + 1], "--query") == 0) {
+				query = argv[i + 2];
+				i += 2;
+			} else {
+				break;
+			}
 		}
+
+		/* the offline arm (TODO.impl/10): query the journal
+		 * segments directly -- the same expression language
+		 * the config's filters speak
+		 */
+		if (qjournal != NULL)
+			return cmd_events_local(qjournal, query);
 		snprintf(req, sizeof(req),
 			"{\"cmd\":\"events\",\"last\":%ld}\n", last);
 	} else if (strcmp(argv[i], "kill") == 0 && i + 1 < argc) {
