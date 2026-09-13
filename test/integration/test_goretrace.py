@@ -64,12 +64,20 @@ def main():
     # resolution) -- a real retrace-vs-Go gap, out of this
     # card's lane-demonstration scope and recorded on the card.
     lane_cfg = os.path.join(work, "lane.json")
+    # the scope is cgo-traffic, cross-platform: `write` rides
+    # darwin Go's libSystem path (its runtime issues raw
+    # syscalls on Linux, so write never hits libc there);
+    # malloc/free ride CGO's argument marshaling on BOTH. All
+    # three are out-param-free (the full inventory under a cgo
+    # binary trips value-result hazards -- getsockopt EFAULT,
+    # interposed getaddrinfo breaks resolution).
+    lane_fns = ("write", "malloc", "free")
     with open(lane_cfg, "w") as f:
         f.write(json.dumps({"intercept_scripts": [{
-            "func_name": "write",
+            "func_name": fn,
             "actions": [{"action_name": "log_params"},
                         {"action_name": "call_real"}],
-        }]}))
+        } for fn in lane_fns]}))
 
     d = subprocess.Popen(
         [daemon, "--sock", sock, "--journal", journal,
@@ -150,14 +158,16 @@ def main():
         if libc_lane:
             try:
                 with open(libc_log, errors="replace") as f:
-                    n_write = f.read().count('"func": "write"')
+                    logtxt = f.read()
             except OSError:
-                n_write = 0
-            if n_write == 0:
+                logtxt = ""
+            n_hit = sum(logtxt.count(f'"func": "{fn}"')
+                        for fn in lane_fns)
+            if n_hit == 0:
                 print("FAIL: libc lane silent (no interposed "
-                      "writes)", file=sys.stderr)
+                      "cgo traffic)", file=sys.stderr)
                 return 1
-            print(f"libc lane: {n_write} interposed writes "
+            print(f"libc lane: {n_hit} interposed calls "
                   "beside the runtime lane")
 
         print("goretrace: request+response+marker journaled; "
