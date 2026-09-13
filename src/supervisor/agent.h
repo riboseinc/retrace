@@ -51,6 +51,19 @@ void retrace_agent_deinit(void);
 void retrace_agent_kick(void);
 
 /*
+ * The boot-time eager join (TODO.impl/11): when the arming
+ * asked for EAGER, the agent thread spawns HERE -- at the end
+ * of core boot, after retrace_inited -- so a workload that
+ * makes no interceptable call still joins (the daemon's spawn
+ * seam arms EAGER for exactly that). Per-platform form: POSIX
+ * stays kick-driven (kick owns the dlsym/atfork sequence, only
+ * safe inside the engine's reentrancy guard); Windows owns the
+ * boot form (the DllMain loader lock defers the thread until
+ * attach completes). No-op when unarmed or lazy.
+ */
+void retrace_agent_boot(void);
+
+/*
  * The stack fast-path formatter for EVENT payloads (exported
  * for unit tests): returns 0 on success, -1 when the payload
  * needs escaping or exceeds cap (the heap path handles those).

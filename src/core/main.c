@@ -161,6 +161,13 @@ static void retrace_main(void)
 	log_dbg("retrace init success");
 
 	retrace_inited = 1;
+
+	/* the boot-time eager join: AFTER retrace_inited (the
+	 * agent thread's sends must see a whole engine). No-op
+	 * when unarmed or lazy -- the lazy path still boots at
+	 * the first dispatch kick.
+	 */
+	retrace_agent_boot();
 }
 
 static void hash_print_cb(uint64_t hash, void *ctx)
