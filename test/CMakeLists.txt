@@ -20,6 +20,16 @@ if(RETRACE_PLATFORM_WINDOWS)
 		target_link_libraries(retrace_static_smoke PRIVATE retrace_headers)
 	endif()
 
+	# The audited-launch E2E's workload (TODO.impl/11): alive
+	# for the EAGER join, then a known exit code.
+	if(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|amd64|ARM64|arm64")
+		add_executable(retrace_spawn_target smoke/spawn_target.c)
+		set_target_properties(retrace_spawn_target PROPERTIES
+			OUTPUT_NAME retrace-spawn-target
+			RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/smoke")
+		target_link_libraries(retrace_spawn_target PRIVATE retrace_headers)
+	endif()
+
 	# The supervised loop on Windows (TODO.supervisor/12 P0):
 	# retraced + retrace-win-run + the in-process agent, HELLO
 	# with the nonce (full peer), policy push + ACK.
@@ -33,6 +43,33 @@ if(RETRACE_PLATFORM_WINDOWS)
 		set_tests_properties(integration-supervised-win PROPERTIES
 			LABELS "integration"
 			TIMEOUT 180)
+
+		# The audited launch plane (TODO.impl/11): the POSIX
+		# spawn E2E's twin -- spawn (inject + nonce env) ->
+		# join -> known exit code -> kill, all journaled on
+		# the pipe transport.
+		if(TARGET retrace_spawn_target)
+			# the DLL: on Windows the preload backend IS the
+			# library (one injectable retrace.dll)
+			if(TARGET retrace_backend_preload_msvc)
+				set(_spw_dll $<TARGET_FILE:retrace_backend_preload_msvc>)
+			elseif(TARGET retrace_backend_preload_mingw)
+				set(_spw_dll $<TARGET_FILE:retrace_backend_preload_mingw>)
+			else()
+				set(_spw_dll "")
+			endif()
+			if(NOT _spw_dll STREQUAL "")
+			add_test(NAME integration-supervisor-spawn-win
+				COMMAND ${Python3_EXECUTABLE}
+					${CMAKE_SOURCE_DIR}/test/integration/test_supervisor_spawn_win.py
+					$<TARGET_FILE:retrace_retraced>
+					${_spw_dll}
+					$<TARGET_FILE:retrace_spawn_target>)
+			set_tests_properties(integration-supervisor-spawn-win PROPERTIES
+				LABELS "integration"
+				TIMEOUT 180)
+			endif()
+		endif()
 	endif()
 
 	# retraced as a Windows SERVICE (TODO.supervisor/12 P1):
