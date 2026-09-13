@@ -314,6 +314,19 @@ retrace_add_unit_test(replay)
 #
 # journal.c+registry.c ride along as sources; parson comes via
 # the harness's retrace_core link (duplicate symbols otherwise)
+#
+# Campaign model unit tests (TODO.impl/09): STANDALONE -- the
+# manifest validated whole and the matrix expansion's
+# deterministic sample-major order (the order IS the spec).
+#
+retrace_add_unit_test(campaign_model
+    STANDALONE
+    EXTRA_SOURCES ${CMAKE_SOURCE_DIR}/tools/campaign/model.c
+                  ${CMAKE_SOURCE_DIR}/src/config/json/parson.c
+    EXTRA_INCLUDES ${CMAKE_SOURCE_DIR}/tools/campaign
+                   ${CMAKE_SOURCE_DIR}/src/config/json
+                   ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
+
 retrace_add_unit_test(journal_chain
 	EXTRA_SOURCES
 	${CMAKE_SOURCE_DIR}/tools/retraced/journal.c

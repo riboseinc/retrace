@@ -116,6 +116,7 @@ job.
 | 42 | [Stop a static sample: policy on the syscall lane](42-static-lane-deny.md) | ptrace | `retrace attach` runs the same sandbox scripts at the syscall stop — a static detonation gets contained, not just watched. |
 | 43 | [Log only what you're hunting: the filter expression](43-filter-expr.md) | `filter` | `path ~ "*.log" and not ret < 0` — queries as config, compiled once, bad syntax refused at boot. |
 | 44 | [Months of evidence: journal rotation, retention, query](44-journal-lifecycle.md) | retraced | A numbered segment series, one chain split across files; retention prunes as chained records; queries speak the filter language. |
+| 45 | [Farms run thousands: the campaign runner](45-campaign.md) | `retrace-campaign` | A manifest to a matrix of runs — samples × policies × repeats — with pid-keyed verdicts and indexed evidence. |
 
 For an overview of when to reach for each tool, see
 [docs/tools.md](../tools.md).

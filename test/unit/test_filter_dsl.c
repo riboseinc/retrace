@@ -240,6 +240,18 @@ static void test_eval_basics(void)
 		    "open") == 1);
 	CHECK(evals("s ~ \"*.log\"", mkcall(0, 0, "app.txt", "open"),
 		    "open") == 0);
+	/* string equality: like-typed operands, no coercion */
+	CHECK(evals("s == \"exact\"", mkcall(0, 0, "exact", "f"),
+		    "f") == 1);
+	CHECK(evals("s == \"exact\"", mkcall(0, 0, "other", "f"),
+		    "f") == 0);
+	CHECK(evals("s != \"exact\"", mkcall(0, 0, "other", "f"),
+		    "f") == 1);
+	CHECK(evals("s == \"exact\" and a == 1",
+		    mkcall(1, 0, "exact", "f"), "f") == 1);
+	/* a mix (number op string literal) is false, never error */
+	CHECK(evals("a == \"1\"", mkcall(1, 0, NULL, "f"), "f")
+		== 0);
 	CHECK(evals("func ~ \"open*\"", mkcall(0, 0, NULL, "openat"),
 		    "openat") == 1);
 	CHECK(evals("ret == 5", mkcall(5, 0, NULL, "x"), "x") == 1);

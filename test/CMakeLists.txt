@@ -405,6 +405,20 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 60)
 
+	# Campaign orchestration (TODO.impl/09): a 3x2 fixture
+	# matrix against a real daemon -- 6 sessions, verdicts,
+	# journal parity, indexed evidence.
+	add_test(NAME integration-campaign
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_campaign.py
+			$<TARGET_FILE:retrace_retraced>
+			$<TARGET_FILE:retrace_ctl>
+			$<TARGET_FILE:retrace_campaign>
+			$<TARGET_FILE:retrace_v2>)
+	set_tests_properties(integration-campaign PROPERTIES
+		LABELS "integration"
+		TIMEOUT 180)
+
 	# The filter expression language (TODO.impl/08): only
 	# matching calls reach the log; a bad expression refuses
 	# the config at boot. Runs on every preload lane.
