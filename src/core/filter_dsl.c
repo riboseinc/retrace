@@ -858,6 +858,31 @@ eval_node(const struct fnode *n, struct resolve_ctx *rc)
 			break;
 		}
 
+		/* == and != compare like-typed operands: resolve
+		 * both as strings first -- a string on either
+		 * side makes it a string comparison (a mix, like
+		 * 3 == "x", is false: no coercion surprises)
+		 */
+		if (op == FO_EQ || op == FO_NE) {
+			const char *lstr = NULL;
+			const char *rstr = NULL;
+			int l_is_str = operand_lookup(lhs, rc, 1,
+				&lstr, NULL);
+			int r_is_str = operand_lookup(rhs, rc, 1,
+				&rstr, NULL);
+
+			if (l_is_str && r_is_str) {
+				if (lstr == NULL || rstr == NULL)
+					return lstr == rstr ? op == FO_EQ
+						: op == FO_NE;
+				return (strcmp(lstr, rstr) == 0) ==
+					(op == FO_EQ);
+			}
+			/* fall through to numeric when neither side
+			 * is a string
+			 */
+		}
+
 		if (!operand_lookup(lhs, rc, 0, NULL, &l) ||
 		    !operand_lookup(rhs, rc, 0, NULL, &r))
 			return 0;	/* unknown / not numeric: no match */
