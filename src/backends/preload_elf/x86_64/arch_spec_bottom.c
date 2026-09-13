@@ -25,6 +25,8 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 
+#include "real_linkmap.h"
+
 #include "engine.h"
 #include "real_impls.h"
 #include "logger.h"
@@ -353,9 +355,18 @@ __attribute__((weak)) void *_dl_sym(void *handle, const char *symbol,
  */
 void *retrace_as_get_real_safe(const char *real_impl)
 {
-	if (_dl_sym != NULL)
-		return _dl_sym(RTLD_NEXT, real_impl, __func__);
-	return dlsym(RTLD_NEXT, real_impl);
+	void *p;
+
+	if (_dl_sym != NULL) {
+		p = _dl_sym(RTLD_NEXT, real_impl, __func__);
+		if (p != NULL)
+			return p;
+		return retrace_as_real_from_linkmap(real_impl);
+	}
+	p = dlsym(RTLD_NEXT, real_impl);
+	if (p != NULL)
+		return p;
+	return retrace_as_real_from_linkmap(real_impl);
 }
 
 /*
