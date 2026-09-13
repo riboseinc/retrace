@@ -15,6 +15,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 	# Windows one (same protocol, same registry/journal/ctl).
 	add_executable(retrace_retraced
 		pipe_server.c daemon_frame.c registry.c journal.c retraced_ctl.c
+		drift_hits.c
 		${CMAKE_SOURCE_DIR}/src/backends/win_common/inject.c
 		${_parson_source})
 	# CommandLineToArgvW (the service lane's truth-source argv);
@@ -25,7 +26,7 @@ if(RETRACE_PLATFORM_WINDOWS)
 else()
 	add_executable(retrace_retraced
 		main.c daemon_frame.c registry.c journal.c peer_gate.c retraced_ctl.c
-		tls_gate.c journal_sign.c ${_parson_source})
+		drift_hits.c tls_gate.c journal_sign.c ${_parson_source})
 endif()
 set_target_properties(retrace_retraced PROPERTIES
 	OUTPUT_NAME retraced)

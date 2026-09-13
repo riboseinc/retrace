@@ -14,6 +14,8 @@
 
 #include "daemon_frame.h"
 
+#include "drift_hits.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -52,6 +54,47 @@ void daemon_frame_welcome(const struct daemon_conn_state *st,
 		st->agent_id, st->spectator ? "spectator" : "full",
 		st->spectator ? "" : "redacted");
 	retraced_journal_event(jr, (long)time(NULL), "daemon", 0, ev);
+}
+
+/*
+ * The drift key extractors: attr names end in their role
+ * ("path", "func") across the lane spellings -- retrace.jail.
+ * path, pyretrace's attrs, the ebpf bridge's own -- so one
+ * suffix rule beats a spelling list (a new lane naming its
+ * attrs well needs no matcher change: the OCP line).
+ */
+static const char *drift_attr_suffix(JSON_Object *attrs,
+	const char *suffix)
+{
+	size_t n, i;
+
+	if (attrs == NULL)
+		return NULL;
+	n = json_object_get_count(attrs);
+	for (i = 0; i < n; i++) {
+		const char *k = json_object_get_name(attrs, i);
+		size_t kl = strlen(k);
+		size_t sl = strlen(suffix);
+
+		if (kl >= sl && strcmp(k + kl - sl, suffix) == 0)
+			return json_object_get_string(
+				attrs, k);
+	}
+	return NULL;
+}
+
+static const char *drift_attr_path(JSON_Object *attrs)
+{
+	return drift_attr_suffix(attrs, "path");
+}
+
+static const char *drift_attr_func(JSON_Object *attrs)
+{
+	const char *v = drift_attr_suffix(attrs, "func");
+
+	if (v == NULL)
+		v = drift_attr_suffix(attrs, "syscall");
+	return v;
 }
 
 void daemon_frame_drift_summaries(struct retraced_registry *reg,
@@ -105,6 +148,7 @@ int daemon_frame_handle(struct daemon_conn_state *st, uint16_t type,
 	}
 	case RETRACE_RPC_MSG_EVENT: {
 		const char *source;
+		struct agent_entry *ev_agent = NULL;
 
 		if (!st->helloed)
 			return 0;
@@ -125,12 +169,58 @@ int daemon_frame_handle(struct daemon_conn_state *st, uint16_t type,
 		 */
 		source = json_object_get_string(o, "source");
 		if (source != NULL && strcmp(source, "kernel") == 0) {
-			struct agent_entry *e =
-				retraced_registry_find(reg,
-					st->agent_id);
+			ev_agent = retraced_registry_find(reg,
+				st->agent_id);
+			if (ev_agent != NULL)
+				ev_agent->kernel_obs++;
+		}
+		/*
+		 * Hit-level grading (TODO.impl/18): the matcher
+		 * names WHAT escaped beside the counts. Claims =
+		 * libc-source events; observations = kernel-source
+		 * events; a nameless observation is never a hit
+		 * (its count already rides kernel_obs).
+		 */
+		if (source != NULL) {
+			const char *op = NULL;
+			const char *path = NULL;
+			JSON_Object *attrs =
+				json_object_get_object(o, "attrs");
+			long pid = 0;
 
-			if (e != NULL)
-				e->kernel_obs++;
+			if (ev_agent == NULL)
+				ev_agent = retraced_registry_find(reg,
+					st->agent_id);
+			if (ev_agent != NULL)
+				pid = ev_agent->pid;
+			if (strcmp(source, "kernel") == 0) {
+				op = json_object_get_string(attrs,
+					"syscall");
+				path = drift_attr_path(attrs);
+			} else if (strcmp(source, "libc") == 0) {
+				op = drift_attr_func(attrs);
+				path = drift_attr_path(attrs);
+				if (op == NULL)
+					op = json_object_get_string(o,
+						"name");
+			}
+			if (strcmp(source, "kernel") == 0) {
+				if (retrace_drift_observe(pid, op,
+					    path)) {
+					char ev[288];
+
+					snprintf(ev, sizeof(ev),
+						"{\"name\":\"retrace.drift.hit\","
+						"\"op\":\"%s\",\"path\":\"%s\"}",
+						op != NULL ? op : "",
+						path != NULL ? path : "");
+					retraced_journal_event(jr,
+						(long)time(NULL),
+						"daemon", 0, ev);
+				}
+			} else if (strcmp(source, "libc") == 0) {
+				retrace_drift_claim(pid, op, path);
+			}
 		}
 		json_value_free(v);
 		return 0;
