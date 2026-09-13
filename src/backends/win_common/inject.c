@@ -14,8 +14,9 @@
 
 #include <stddef.h>
 
-DWORD retrace_win_inject_run(const char *cmdline, const char *dll_path,
-	DWORD *child_exit_code)
+DWORD retrace_win_inject_spawn(const char *cmdline,
+	const char *dll_path, const char *env_block,
+	HANDLE *child_out)
 {
 	STARTUPINFOA si;
 	PROCESS_INFORMATION pi;
@@ -31,7 +32,9 @@ DWORD retrace_win_inject_run(const char *cmdline, const char *dll_path,
 	ZeroMemory(&pi, sizeof(pi));
 
 	if (!CreateProcessA(NULL, (LPSTR)cmdline, NULL, NULL, FALSE,
-			    CREATE_SUSPENDED, NULL, NULL, &si, &pi))
+			    CREATE_SUSPENDED,
+			    env_block != NULL ? (LPVOID)env_block : NULL,
+			    NULL, &si, &pi))
 		return 0;
 
 	remote_buf = VirtualAllocEx(pi.hProcess, NULL,
@@ -79,21 +82,10 @@ DWORD retrace_win_inject_run(const char *cmdline, const char *dll_path,
 
 	ResumeThread(pi.hThread);
 	CloseHandle(pi.hThread);
-	/* Keep the process handle: the caller waits for the child. */
-	{
-		HANDLE wait = pi.hProcess;
-
-		WaitForSingleObject(wait, INFINITE);
-		/*
-		 * Forward the child's exit code: launchers exit with
-		 * it, so a crashed child is no longer masked by
-		 * win-run's own success (TODO.trace-profile/27 round
-		 * 5 evidence: exit 0 while the child died silently).
-		 */
-		if (child_exit_code != NULL)
-			GetExitCodeProcess(wait, child_exit_code);
-		CloseHandle(wait);
-	}
+	if (child_out != NULL)
+		*child_out = pi.hProcess;	/* the caller reaps */
+	else
+		CloseHandle(pi.hProcess);
 	return pi.dwProcessId;
 
 fail:
@@ -105,4 +97,26 @@ fail:
 	CloseHandle(pi.hThread);
 	CloseHandle(pi.hProcess);
 	return 0;
+}
+
+DWORD retrace_win_inject_run(const char *cmdline, const char *dll_path,
+	DWORD *child_exit_code)
+{
+	/*
+	 * The launcher shape composes the spawn: wait, forward the
+	 * exit code (a crashed child must not be masked by
+	 * win-run's own success -- TODO.trace-profile/27 round 5),
+	 * and release the handle nobody else holds.
+	 */
+	HANDLE child = NULL;
+	DWORD pid = retrace_win_inject_spawn(cmdline, dll_path, NULL,
+		&child);
+
+	if (pid == 0)
+		return 0;
+	WaitForSingleObject(child, INFINITE);
+	if (child_exit_code != NULL)
+		GetExitCodeProcess(child, child_exit_code);
+	CloseHandle(child);
+	return pid;
 }

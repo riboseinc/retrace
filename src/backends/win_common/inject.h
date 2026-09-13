@@ -36,6 +36,20 @@ extern "C" {
 DWORD retrace_win_inject_run(const char *cmdline, const char *dll_path,
 	DWORD *child_exit_code);
 
+/*
+ * The non-blocking split (TODO.impl/11): launch suspended,
+ * inject, resume -- and RETURN without waiting. The daemon's
+ * spawn seam uses this so the poll loop can reap the child
+ * later (GetExitCodeProcess is SIGCHLD's Windows analogue).
+ * `env_block` is a Windows environment-strings blob
+ * ("NAME=VALUE\0...\0\0") or NULL to inherit. On success
+ * returns the pid and, when child_out is non-NULL, leaves the
+ * PROCESS handle for the caller (it closes it after reaping).
+ */
+DWORD retrace_win_inject_spawn(const char *cmdline,
+	const char *dll_path, const char *env_block,
+	HANDLE *child_out);
+
 #ifdef __cplusplus
 }
 #endif

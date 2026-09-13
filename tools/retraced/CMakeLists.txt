@@ -15,9 +15,13 @@ if(RETRACE_PLATFORM_WINDOWS)
 	# Windows one (same protocol, same registry/journal/ctl).
 	add_executable(retrace_retraced
 		pipe_server.c daemon_frame.c registry.c journal.c retraced_ctl.c
+		${CMAKE_SOURCE_DIR}/src/backends/win_common/inject.c
 		${_parson_source})
-	# CommandLineToArgvW (the service lane's truth-source argv)
+	# CommandLineToArgvW (the service lane's truth-source argv);
+	# inject.c is the spawn seam's launch arm (TODO.impl/11)
 	target_link_libraries(retrace_retraced PRIVATE shell32)
+	target_include_directories(retrace_retraced PRIVATE
+		${CMAKE_SOURCE_DIR}/src/backends/win_common)
 else()
 	add_executable(retrace_retraced
 		main.c daemon_frame.c registry.c journal.c peer_gate.c retraced_ctl.c

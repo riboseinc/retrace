@@ -498,8 +498,9 @@ static void verb_spawn(struct retraced_ctl_ctx *ctx,
 	 * action with argv, kill's audit pattern
 	 * extended. SPAWN claim required (the scope gate
 	 * above); the transport's spawn seam does the
-	 * launching (NULL on Windows: injection is
-	 * retrace-win-run's machinery, not a stub here).
+	 * launching (POSIX: fork+exec with the
+	 * supervisor env; Windows: the win-run
+	 * injection machinery).
 	 */
 	JSON_Array *argv_a = json_object_get_array(o, "argv");
 	const char *preload =

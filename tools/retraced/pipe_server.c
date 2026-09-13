@@ -33,6 +33,7 @@
 #include <time.h>
 
 #include "journal.h"
+#include "inject.h"
 #include "protocol.h"
 #include "registry.h"
 #include "retraced_ctl.h"
@@ -65,6 +66,21 @@ static struct conn g_ctl_conns[MAX_AGENTS];
 static HANDLE g_ctl_thread;
 static HANDLE g_ctl_pipe;
 static const char *g_ctl_name = "\\\\.\\pipe\\retraced-ctl";
+
+/*
+ * Spawned workloads (TODO.impl/11): the reaped-children table.
+ * POSIX has SIGCHLD + waitpid; Windows' analogue is holding
+ * each child's PROCESS handle and polling it on the sweep --
+ * the journal record is the same either way (the reap
+ * doctrine). The daemon's only spawn site is the ctl seam, so
+ * every handle here is a workload this daemon launched.
+ */
+#define WIN_CHILDREN_MAX 128
+static struct {
+	HANDLE h;
+	DWORD pid;
+} g_win_children[WIN_CHILDREN_MAX];
+static const char *g_agent_pipe_for_spawn;
 
 static int pipe_write_frame(HANDLE h, uint16_t type,
 	const char *payload);
@@ -271,6 +287,220 @@ static DWORD WINAPI agent_thread(LPVOID arg)
 	retraced_journal_flush(&g_jr);
 	LeaveCriticalSection(&g_lock);
 	return 0;
+}
+
+/* ---- spawn + reap (TODO.impl/11): the audited plane ----- */
+
+/*
+ * Quote one argv word for a Windows command line so the
+ * target's CommandLineToArgvW argv round-trips: a run of n
+ * backslashes doubles only when a quote or the closing quote
+ * follows, and an embedded quote is escaped. The whole word
+ * is wrapped so paths with spaces survive.
+ */
+static size_t
+argv_quote(const char *arg, char *out, size_t cap)
+{
+	const char *p = arg;
+	size_t o = 0;
+
+	if (cap < 3)
+		return 0;
+	out[o++] = '"';
+	while (*p != '\0') {
+		size_t bs = 0;
+		size_t k;
+		size_t emit;
+
+		while (p[bs] == '\\')
+			bs++;
+		p += bs;
+		if (*p == '"') {
+			/* 2n backslashes, then an escaped quote */
+			for (k = 0; k < 2 * bs; k++) {
+				if (o + 2 >= cap)
+					return 0;
+				out[o++] = '\\';
+			}
+			if (o + 2 >= cap)
+				return 0;
+			out[o++] = '\\';
+			out[o++] = '"';
+			p++;
+			continue;
+		}
+		/* trailing backslashes double (closing quote next) */
+		emit = (*p == '\0') ? 2 * bs : bs;
+		for (k = 0; k < emit; k++) {
+			if (o + 2 >= cap)
+				return 0;
+			out[o++] = '\\';
+		}
+		if (*p != '\0') {
+			if (o + 2 >= cap)
+				return 0;
+			out[o++] = *p++;
+		}
+	}
+	if (o + 1 >= cap)
+		return 0;
+	out[o++] = '"';
+	out[o] = '\0';
+	return o;
+}
+
+static long ctl_spawn_win(const char *const *argv,
+	const char *preload, char *err_out, size_t err_cap)
+{
+	char cmdline[1024];
+	char env[1024];
+	char dll_buf[MAX_PATH];
+	const char *dll_path;
+	int i;
+	size_t o;
+	DWORD pid;
+	HANDLE child = NULL;
+
+	if (argv == NULL || argv[0] == NULL) {
+		snprintf(err_out, err_cap, "empty argv");
+		return -1;
+	}
+
+	/* the command line: quoted words, space-separated */
+	o = 0;
+	for (i = 0; argv[i] != NULL; i++) {
+		size_t w = argv_quote(argv[i], cmdline + o,
+			sizeof(cmdline) - o);
+
+		if (w == 0) {
+			snprintf(err_out, err_cap, "argv too long");
+			return -1;
+		}
+		o += w;
+		if (argv[i + 1] != NULL && o + 1 < sizeof(cmdline))
+			cmdline[o++] = ' ';
+	}
+	cmdline[o] = '\0';
+
+	/*
+	 * The environment: arm the workload exactly as the POSIX
+	 * seam does -- supervisor role, the agent pipe (its
+	 * connection target), the nonce (the threat model's
+	 * "handed to spawners"), EAGER (join without waiting for
+	 * a queued event). Injection replaces LD_PRELOAD.
+	 *
+	 * The blob is NUL-separated NAME=VALUE strings with a
+	 * double-NUL terminator -- built one segment at a time
+	 * because *printf stops at the first NUL of its format.
+	 */
+	{
+		size_t n = 0;
+		int k;
+
+		static const char *const names[] = {
+			"RETRACE_SUPERVISOR",
+			"RETRACE_SUPERVISOR_SOCK",
+			"RETRACE_SUPERVISOR_NONCE",
+			"RETRACE_SUPERVISOR_EAGER",
+		};
+		const char *vals[4];
+
+		vals[0] = "1";
+		vals[1] = g_agent_pipe_for_spawn != NULL ?
+			g_agent_pipe_for_spawn : "";
+		vals[2] = g_nonce;
+		vals[3] = "1";
+		for (k = 0; k < 4; k++) {
+			size_t l = strlen(names[k]) + 1 +
+				strlen(vals[k]) + 1;
+
+			if (n + l + 1 > sizeof(env)) {
+				snprintf(err_out, err_cap, "env too long");
+				return -1;
+			}
+			n += (size_t)snprintf(env + n, sizeof(env) - n,
+				"%s=%s", names[k], vals[k]);
+			env[n++] = '\0';
+		}
+		env[n] = '\0';		/* the terminator */
+	}
+
+	dll_path = preload != NULL && preload[0] != '\0' ?
+		preload : NULL;
+	if (dll_path == NULL) {
+		/* default: the retrace.dll beside this daemon */
+		char *slash;
+
+		GetModuleFileNameA(NULL, dll_buf, sizeof(dll_buf));
+		slash = strrchr(dll_buf, '\\');
+		if (slash != NULL) {
+			snprintf(slash + 1,
+				sizeof(dll_buf) -
+					(size_t)(slash + 1 - dll_buf),
+				"retrace.dll");
+			dll_path = dll_buf;
+		} else {
+			dll_path = "retrace.dll";
+		}
+	}
+
+	pid = retrace_win_inject_spawn(cmdline, dll_path, env,
+		&child);
+	if (pid == 0) {
+		snprintf(err_out, err_cap,
+			"launch/inject failed (GetLastError %lu)",
+			(unsigned long)GetLastError());
+		return -1;
+	}
+
+	/* register for the reap sweep */
+	for (i = 0; i < WIN_CHILDREN_MAX; i++) {
+		if (g_win_children[i].h == NULL) {
+			g_win_children[i].h = child;
+			g_win_children[i].pid = pid;
+			return (long)pid;
+		}
+	}
+	/* table full: close and refuse honestly */
+	CloseHandle(child);
+	snprintf(err_out, err_cap, "child table full");
+	return -1;
+}
+
+/*
+ * SIGCHLD's analogue: poll every held child; journal each
+ * departure (how/code). Windows exit codes carry NTSTATUS for
+ * fatal exits -- recorded verbatim ("exited"), the honest
+ * mapping; the verdict layer reads the code.
+ */
+static void win_reap_sweep(void)
+{
+	int i;
+
+	for (i = 0; i < WIN_CHILDREN_MAX; i++) {
+		DWORD code = 0;
+
+		if (g_win_children[i].h == NULL)
+			continue;
+		if (WaitForSingleObject(g_win_children[i].h, 0) !=
+		    WAIT_OBJECT_0)
+			continue;	/* still running */
+		if (GetExitCodeProcess(g_win_children[i].h, &code)) {
+			char ev[160];
+
+			snprintf(ev, sizeof(ev),
+				"{\"name\":\"retrace.ctl.exit\","
+				"\"pid\":%lu,\"how\":\"exited\","
+				"\"code\":%lu}",
+				(unsigned long)g_win_children[i].pid,
+				(unsigned long)code);
+			retraced_journal_event(&g_jr,
+				(long)time(NULL), "daemon", 0, ev);
+		}
+		CloseHandle(g_win_children[i].h);
+		g_win_children[i].h = NULL;
+		g_win_children[i].pid = 0;
+	}
 }
 
 /* ---- drift summaries (the same heartbeat-grade) ---- */
@@ -624,6 +854,8 @@ int retraced_pipe_main(int argc, char **argv)
 	 */
 	for (i = 0; i < MAX_AGENTS; i++)
 		g_ctl_conns[i].fd = -1;
+	g_agent_pipe_for_spawn = pipe_name;
+	g_ctl.spawn_cb = ctl_spawn_win;
 	g_ctl.conns = g_ctl_conns;
 	g_ctl.conn_send = ctl_conn_send_pipe;
 	g_ctl.reg = &g_reg;
@@ -735,6 +967,7 @@ int retraced_pipe_main(int argc, char **argv)
 				emit_drift_summaries();
 				retraced_registry_sweep(&g_reg, now_ms(),
 					15000);
+				win_reap_sweep();
 				LeaveCriticalSection(&g_lock);
 				last_sweep = now_ms();
 			}
@@ -743,9 +976,13 @@ int retraced_pipe_main(int argc, char **argv)
 		CloseHandle(h);
 	}
 
-	/* graceful stop: flush the routine tail */
+	/* graceful stop: flush the routine tail + the final reap
+	 * (a fast-exiting workload's record must not wait on a
+	 * sweep that will never come)
+	 */
 	EnterCriticalSection(&g_lock);
 	emit_drift_summaries();
+	win_reap_sweep();
 	LeaveCriticalSection(&g_lock);
 	retraced_journal_close(&g_jr);
 	DeleteCriticalSection(&g_lock);
