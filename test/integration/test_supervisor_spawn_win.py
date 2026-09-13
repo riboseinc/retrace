@@ -89,7 +89,7 @@ def ctl_verbs(name, timeout=10.0):
     return h
 
 
-def diag(label, h, journal, pid=None, dlog=None):
+def diag(label, h, journal, pid=None, dlog=None, daemon_pid=None):
     """failure forensics: what the journal holds (raw lines --
     a malformed line the parser dropped is visible), whether
     the daemon still answers, and whether the pid still lives"""
@@ -108,6 +108,15 @@ def diag(label, h, journal, pid=None, dlog=None):
         alive = str(pid) in (r.stdout or "")
         print(f"DIAG {label}: pid {pid} alive={alive}",
               file=sys.stderr)
+        # probe honesty: the daemon is known-alive -- if it
+        # reads dead too, tasklist filtering lies here
+        if daemon_pid is not None:
+            r2 = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {daemon_pid}"],
+                capture_output=True, text=True)
+            print(f"DIAG {label}: daemon {daemon_pid} alive="
+                  f"{str(daemon_pid) in (r2.stdout or '')}",
+                  file=sys.stderr)
     if h is not None:
         st = pipe_roundtrip(h, json.dumps({"cmd": "status"}))
         print(f"DIAG {label}: status={st}", file=sys.stderr)
@@ -205,7 +214,14 @@ def main():
                 os.path.isdir(markers) else []
             print(f"DIAG exit-missing: markers={marks}",
                   file=sys.stderr)
-            diag("exit-missing", h, journal, pid, dlog)
+            for name in ("tick.txt", "exiting.txt"):
+                path = os.path.join(markers, name)
+                if os.path.exists(path):
+                    with open(path) as f:
+                        print(f"DIAG exit-missing: {name}="
+                              f"{f.read().strip()}",
+                              file=sys.stderr)
+            diag("exit-missing", h, journal, pid, dlog, d.pid)
             return 1
         if exited.get("code") != 7:
             print(f"FAIL: exit code {exited.get('code')} != 7",
