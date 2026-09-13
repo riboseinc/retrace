@@ -120,7 +120,9 @@ def main():
             "RETRACE_SUPERVISOR": "1",
             "RETRACE_SUPERVISOR_SOCK": sock,
             "RETRACE_SUPERVISOR_NONCE": nonce,
-            "RETRACE_SUPERVISOR_EAGER": "1",
+            # LAZY join (no EAGER): the first SSL dispatch
+            # kicks the agent -- python 3.10's boot raced the
+            # EAGER thread's cond init on older glibc
             preload_var: rtlib,
             "RETRACE_JSON_CONFIG": cfg,
             "RETRACE_TLS_KEYLOG": keylog,
