@@ -1046,7 +1046,11 @@ int retraced_pipe_main(int argc, char **argv)
 			 * accept (client churn) must not starve the reap
 			 * cadence (round 4's missing exit record).
 			 */
+			if (g_trace)
+				trace_event("iter");
 			if (now_ms() - last_sweep > SWEEP_INTERVAL_MS) {
+				if (g_trace)
+					trace_event("sweep-pass");
 				EnterCriticalSection(&g_lock);
 				emit_drift_summaries();
 				retraced_registry_sweep(&g_reg, now_ms(),
@@ -1078,6 +1082,8 @@ int retraced_pipe_main(int argc, char **argv)
 			if (WaitForSingleObject(evt, 250) == WAIT_OBJECT_0) {
 				int slot = -1;
 				int k;
+
+				trace_event("connect");
 
 				for (k = 0; k < PIPE_AGENTS_MAX; k++) {
 					if (!conns[k].live) {
