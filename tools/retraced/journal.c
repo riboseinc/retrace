@@ -51,6 +51,12 @@ static int payload_is_durable(const char *payload)
 		 * daemon.
 		 */
 		"\"name\":\"retrace.ctl.",
+		/* Tracing narration (RETRACED_TRACE, E2E forensics):
+		 * ephemeral diagnostics -- but a trace the reader
+		 * cannot see until an unrelated flush lies by
+		 * omission; flushed while tracing.
+		 */
+		"\"name\":\"retrace.trace.",
 		/* Live drift grading (03 P1): a kernel-obs delta is
 		 * the daemon's own heartbeat-grade of sub-libc
 		 * escapes -- audit-class, never buffered away.
