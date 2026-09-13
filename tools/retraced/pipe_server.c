@@ -586,6 +586,10 @@ static void win_reap_sweep(void)
 				(unsigned long)code);
 			retraced_journal_event(&g_jr,
 				(long)time(NULL), "daemon", 0, ev);
+			printf("retraced: reaped pid %lu code %lu\n",
+				(unsigned long)g_win_children[i].pid,
+				(unsigned long)code);
+			fflush(stdout);
 		}
 		CloseHandle(g_win_children[i].h);
 		g_win_children[i].h = NULL;
@@ -1070,6 +1074,8 @@ int retraced_pipe_main(int argc, char **argv)
 		DisconnectNamedPipe(h);
 		CloseHandle(h);
 	}
+	printf("retraced: accept loop done (stop=%d)\n", g_stop);
+	fflush(stdout);
 
 	/* graceful stop: flush the routine tail + the final reap
 	 * (a fast-exiting workload's record must not wait on a

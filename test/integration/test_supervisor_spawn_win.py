@@ -89,7 +89,7 @@ def ctl_verbs(name, timeout=10.0):
     return h
 
 
-def diag(label, h, journal, pid=None):
+def diag(label, h, journal, pid=None, dlog=None):
     """failure forensics: what the journal holds (raw lines --
     a malformed line the parser dropped is visible), whether
     the daemon still answers, and whether the pid still lives"""
@@ -111,6 +111,15 @@ def diag(label, h, journal, pid=None):
     if h is not None:
         st = pipe_roundtrip(h, json.dumps({"cmd": "status"}))
         print(f"DIAG {label}: status={st}", file=sys.stderr)
+    if dlog is not None:
+        try:
+            with open(dlog, "r", errors="replace") as f:
+                tail = f.readlines()[-15:]
+            for ln in tail:
+                print(f"DIAG {label}: daemon {ln.rstrip()}",
+                      file=sys.stderr)
+        except OSError:
+            pass
 
 
 def main():
@@ -126,10 +135,12 @@ def main():
     work = tempfile.mkdtemp(prefix="spw-")
     journal = os.path.join(work, "journal.jsonl")
 
+    dlog = os.path.join(work, "daemon.log")
+    dlog_h = open(dlog, "w")
     d = subprocess.Popen(
         [daemon, "--sock", PIPE_AGENT, "--ctl", PIPE_CTL,
          "--journal", journal, "--nonce", NONCE],
-        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        stdout=dlog_h, stderr=subprocess.STDOUT)
     try:
         h = ctl_verbs(PIPE_CTL)
         if h is None:
@@ -192,7 +203,7 @@ def main():
                 os.path.isdir(markers) else []
             print(f"DIAG exit-missing: markers={marks}",
                   file=sys.stderr)
-            diag("exit-missing", h, journal, pid)
+            diag("exit-missing", h, journal, pid, dlog)
             return 1
         if exited.get("code") != 7:
             print(f"FAIL: exit code {exited.get('code')} != 7",
