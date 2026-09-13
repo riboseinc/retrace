@@ -26,6 +26,7 @@ DWORD retrace_win_inject_spawn(const char *cmdline,
 	typedef FARPROC(WINAPI *load_library_a_t)(LPCSTR);
 	load_library_a_t load_library_a;
 	DWORD exit_code = 0;
+	DWORD err = ERROR_GEN_FAILURE;
 
 	ZeroMemory(&si, sizeof(si));
 	si.cb = sizeof(si);
@@ -35,47 +36,67 @@ DWORD retrace_win_inject_spawn(const char *cmdline,
 			    CREATE_SUSPENDED,
 			    env_block != NULL ? (LPVOID)env_block : NULL,
 			    NULL, &si, &pi))
-		return 0;
+		return 0;	/* last-error intact: no intervening calls */
 
 	remote_buf = VirtualAllocEx(pi.hProcess, NULL,
 				    lstrlenA(dll_path) + 1,
 				    MEM_COMMIT | MEM_RESERVE,
 				    PAGE_READWRITE);
-	if (remote_buf == NULL)
+	if (remote_buf == NULL) {
+		err = GetLastError();
 		goto fail;
+	}
 
 	{
 		SIZE_T written = 0;
 
 		if (!WriteProcessMemory(pi.hProcess, remote_buf,
 					dll_path,
-					lstrlenA(dll_path) + 1, &written))
+					lstrlenA(dll_path) + 1, &written)) {
+			err = GetLastError();
 			goto fail;
+		}
 	}
 
 	/* LoadLibraryA lives at the same address in both processes
 	 * (same bitness, same ASLR base for kernel32).
 	 */
 	kernel32 = GetModuleHandleA("kernel32.dll");
-	if (kernel32 == NULL)
+	if (kernel32 == NULL) {
+		err = GetLastError();
 		goto fail;
+	}
 	load_library_a = (load_library_a_t)GetProcAddress(kernel32,
 							  "LoadLibraryA");
-	if (load_library_a == NULL)
+	if (load_library_a == NULL) {
+		err = GetLastError();
 		goto fail;
+	}
 
 	remote_thread = CreateRemoteThread(pi.hProcess, NULL, 0,
 		(LPTHREAD_START_ROUTINE)load_library_a,
 		remote_buf, 0, NULL);
-	if (remote_thread == NULL)
+	if (remote_thread == NULL) {
+		err = GetLastError();
 		goto fail;
+	}
 
 	/* Wait: DLL_PROCESS_ATTACH installs hooks + boots the engine
 	 * inside the child before its main() starts.
 	 */
 	WaitForSingleObject(remote_thread, INFINITE);
-	if (!GetExitCodeThread(remote_thread, &exit_code) || exit_code == 0)
+	/* a zero remote exit means LoadLibraryA returned NULL in
+	 * the child: name the module-not-found shape explicitly
+	 * (the thread's own code carries nothing here)
+	 */
+	if (!GetExitCodeThread(remote_thread, &exit_code)) {
+		err = GetLastError();
 		goto fail;
+	}
+	if (exit_code == 0) {
+		err = ERROR_MOD_NOT_FOUND;
+		goto fail;
+	}
 
 	CloseHandle(remote_thread);
 	VirtualFreeEx(pi.hProcess, remote_buf, 0, MEM_RELEASE);
@@ -89,6 +110,7 @@ DWORD retrace_win_inject_spawn(const char *cmdline,
 	return pi.dwProcessId;
 
 fail:
+	SetLastError(err);	/* the report reads one API back */
 	if (remote_thread != NULL)
 		CloseHandle(remote_thread);
 	if (remote_buf != NULL)

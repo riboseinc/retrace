@@ -353,7 +353,7 @@ static long ctl_spawn_win(const char *const *argv,
 	const char *preload, char *err_out, size_t err_cap)
 {
 	char cmdline[1024];
-	char env[1024];
+	char env[32768];
 	char dll_buf[MAX_PATH];
 	const char *dll_path;
 	int i;
@@ -382,49 +382,6 @@ static long ctl_spawn_win(const char *const *argv,
 	}
 	cmdline[o] = '\0';
 
-	/*
-	 * The environment: arm the workload exactly as the POSIX
-	 * seam does -- supervisor role, the agent pipe (its
-	 * connection target), the nonce (the threat model's
-	 * "handed to spawners"), EAGER (join without waiting for
-	 * a queued event). Injection replaces LD_PRELOAD.
-	 *
-	 * The blob is NUL-separated NAME=VALUE strings with a
-	 * double-NUL terminator -- built one segment at a time
-	 * because *printf stops at the first NUL of its format.
-	 */
-	{
-		size_t n = 0;
-		int k;
-
-		static const char *const names[] = {
-			"RETRACE_SUPERVISOR",
-			"RETRACE_SUPERVISOR_SOCK",
-			"RETRACE_SUPERVISOR_NONCE",
-			"RETRACE_SUPERVISOR_EAGER",
-		};
-		const char *vals[4];
-
-		vals[0] = "1";
-		vals[1] = g_agent_pipe_for_spawn != NULL ?
-			g_agent_pipe_for_spawn : "";
-		vals[2] = g_nonce;
-		vals[3] = "1";
-		for (k = 0; k < 4; k++) {
-			size_t l = strlen(names[k]) + 1 +
-				strlen(vals[k]) + 1;
-
-			if (n + l + 1 > sizeof(env)) {
-				snprintf(err_out, err_cap, "env too long");
-				return -1;
-			}
-			n += (size_t)snprintf(env + n, sizeof(env) - n,
-				"%s=%s", names[k], vals[k]);
-			env[n++] = '\0';
-		}
-		env[n] = '\0';		/* the terminator */
-	}
-
 	dll_path = preload != NULL && preload[0] != '\0' ?
 		preload : NULL;
 	if (dll_path == NULL) {
@@ -442,6 +399,139 @@ static long ctl_spawn_win(const char *const *argv,
 		} else {
 			dll_path = "retrace.dll";
 		}
+	}
+
+	/*
+	 * The environment: arm the workload exactly as the POSIX
+	 * seam's fork+exec arms it -- INHERIT the parent's
+	 * environment and override the arming keys (supervisor
+	 * role, the agent pipe (its connection target), the nonce
+	 * (the threat model's "handed to spawners"), EAGER (join
+	 * without waiting for a queued event)). A replaced block
+	 * would strip PATH/SystemRoot from a real workload;
+	 * inheritance is the fork+exec semantic. Injection
+	 * replaces LD_PRELOAD.
+	 *
+	 * The blob is NUL-separated NAME=VALUE strings with a
+	 * double-NUL terminator -- built one segment at a time
+	 * because *printf stops at the first NUL of its format.
+	 */
+	{
+		static const char *const names[] = {
+			"RETRACE_SUPERVISOR",
+			"RETRACE_SUPERVISOR_SOCK",
+			"RETRACE_SUPERVISOR_NONCE",
+			"RETRACE_SUPERVISOR_EAGER",
+		};
+		const char *vals[4];
+		char *env_all;
+		size_t n = 0;
+		size_t dll_dir_len;
+		int saw_path = 0;
+		int k;
+
+		vals[0] = "1";
+		vals[1] = g_agent_pipe_for_spawn != NULL ?
+			g_agent_pipe_for_spawn : "";
+		vals[2] = g_nonce;
+		vals[3] = "1";
+
+		/*
+		 * PATH gets the dll's directory PREPENDED: the
+		 * library's imports (libcrypto on the vcpkg build)
+		 * are not system DLLs and sit beside the dll -- the
+		 * loader's dependency search must reach them or
+		 * the injected LoadLibraryA fails (round 1's
+		 * ERROR_MOD_NOT_FOUND).
+		 */
+		dll_dir_len = 0;
+		{
+			const char *slash = strrchr(dll_path, '\\');
+
+			if (slash != NULL)
+				dll_dir_len = (size_t)(slash - dll_path);
+		}
+		env_all = GetEnvironmentStringsA();
+		if (env_all != NULL) {
+			const char *e = env_all;
+
+			while (*e != '\0') {
+				size_t l = strlen(e);
+				int skip = 0;
+
+				for (k = 0; k < 4; k++) {
+					size_t nl = strlen(names[k]);
+
+					if (strncmp(e, names[k], nl) ==
+					    0 && e[nl] == '=') {
+						skip = 1;
+						break;
+					}
+				}
+				if (!skip && dll_dir_len > 0 &&
+				    _strnicmp(e, "PATH=", 5) == 0) {
+					saw_path = 1;
+					/* override in place: PATH=dll_dir;old */
+					{
+						size_t need = 5 + dll_dir_len +
+							l + 3;
+
+						if (n + need >= sizeof(env)) {
+							FreeEnvironmentStringsA(
+								env_all);
+							snprintf(err_out,
+								err_cap,
+								"env too long");
+							return -1;
+						}
+					}
+					memcpy(env + n, "PATH=", 5);
+					n += 5;
+					memcpy(env + n, dll_path, dll_dir_len);
+					n += dll_dir_len;
+					env[n++] = ';';
+					memcpy(env + n, e, l + 1);
+					n += l + 1;
+					skip = 1;
+				}
+				if (!skip) {
+					if (n + l + 1 + 1 >= sizeof(env)) {
+						FreeEnvironmentStringsA(
+							env_all);
+						snprintf(err_out, err_cap,
+							"env too long");
+						return -1;
+					}
+					memcpy(env + n, e, l + 1);
+					n += l + 1;
+				}
+				e += l + 1;
+			}
+			FreeEnvironmentStringsA(env_all);
+		}
+		if (dll_dir_len > 0 && !saw_path) {
+			/* a parent without PATH still resolves imports */
+			if (n + 5 + dll_dir_len + 2 >= sizeof(env)) {
+				snprintf(err_out, err_cap, "env too long");
+				return -1;
+			}
+			memcpy(env + n, "PATH=", 5);
+			n += 5;
+			memcpy(env + n, dll_path, dll_dir_len);
+			n += dll_dir_len;
+			env[n++] = '\0';
+		}
+		for (k = 0; k < 4; k++) {
+			if (n + strlen(names[k]) + strlen(vals[k]) + 3 >=
+			    sizeof(env)) {
+				snprintf(err_out, err_cap, "env too long");
+				return -1;
+			}
+			n += (size_t)snprintf(env + n, sizeof(env) - n,
+				"%s=%s", names[k], vals[k]);
+			env[n++] = '\0';
+		}
+		env[n] = '\0';		/* the terminator */
 	}
 
 	pid = retrace_win_inject_spawn(cmdline, dll_path, env,
