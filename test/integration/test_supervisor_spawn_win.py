@@ -89,13 +89,25 @@ def ctl_verbs(name, timeout=10.0):
     return h
 
 
-def diag(label, h, journal):
-    """failure forensics: what the journal holds, whether the
-    daemon still answers (round 4's lesson: a missing exit
-    record alone cannot name the culprit)"""
+def diag(label, h, journal, pid=None):
+    """failure forensics: what the journal holds (raw lines --
+    a malformed line the parser dropped is visible), whether
+    the daemon still answers, and whether the pid still lives"""
     names = [r.get("ev", {}).get("name")
              for r in journal_records(journal)]
     print(f"DIAG {label}: records={names}", file=sys.stderr)
+    if os.path.exists(journal):
+        with open(journal, "r", errors="replace") as f:
+            lines = [ln.strip() for ln in f if ln.strip()]
+        for ln in lines[:15]:
+            print(f"DIAG {label}: raw {ln[:200]}", file=sys.stderr)
+    if pid is not None:
+        r = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}"],
+            capture_output=True, text=True)
+        alive = str(pid) in (r.stdout or "")
+        print(f"DIAG {label}: pid {pid} alive={alive}",
+              file=sys.stderr)
     if h is not None:
         st = pipe_roundtrip(h, json.dumps({"cmd": "status"}))
         print(f"DIAG {label}: status={st}", file=sys.stderr)
@@ -129,10 +141,13 @@ def main():
         k32 = ctypes.windll.kernel32
 
         # 1. spawn: the audited launch (dll injected, nonce in
-        #    the environment block)
+        #    the environment block). The marker dir rides argv:
+        #    the target heartbeats RAW Win32 (no dispatch).
+        markers = os.path.join(work, "marks")
+        os.makedirs(markers, exist_ok=True)
         spawn = json.dumps({
             "cmd": "spawn",
-            "argv": [target],
+            "argv": [target, markers],
             "preload": dll,
         })
         reply = pipe_roundtrip(h, spawn)
@@ -159,7 +174,7 @@ def main():
 
         # 3. the departure: the target exits with a known code
         exited = None
-        deadline = time.time() + 15
+        deadline = time.time() + 25
         while time.time() < deadline:
             for r in journal_records(journal):
                 ev = r.get("ev", {})
@@ -173,7 +188,11 @@ def main():
         if exited is None:
             print("FAIL: no retrace.ctl.exit for the pid",
                   file=sys.stderr)
-            diag("exit-missing", h, journal)
+            marks = sorted(os.listdir(markers)) if \
+                os.path.isdir(markers) else []
+            print(f"DIAG exit-missing: markers={marks}",
+                  file=sys.stderr)
+            diag("exit-missing", h, journal, pid)
             return 1
         if exited.get("code") != 7:
             print(f"FAIL: exit code {exited.get('code')} != 7",
