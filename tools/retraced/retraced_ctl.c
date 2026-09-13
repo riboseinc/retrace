@@ -487,6 +487,28 @@ static void verb_events(struct retraced_ctl_ctx *ctx,
 	}
 }
 
+/* Escape a C string into a JSON string literal (quotes +
+ * backslashes): a journal record carrying an unescaped Windows
+ * path is invalid JSON, and every downstream parser silently
+ * drops the line.
+ */
+static size_t json_escape(const char *in, char *out, size_t cap)
+{
+	size_t o = 0;
+
+	if (cap < 3)
+		return 0;
+	out[o++] = '"';
+	for (; *in != '\0' && o + 3 < cap; in++) {
+		if (*in == '"' || *in == '\\')
+			out[o++] = '\\';
+		out[o++] = *in;
+	}
+	out[o++] = '"';
+	out[o] = '\0';
+	return o;
+}
+
 static void verb_spawn(struct retraced_ctl_ctx *ctx,
 	JSON_Object *o)
 {
@@ -543,15 +565,16 @@ static void verb_spawn(struct retraced_ctl_ctx *ctx,
 			return;
 		}
 		{
-			char ev[256];
+			char ev[512];
+			char argv0[256];
+			const char *raw0 =
+				json_array_get_string(argv_a, 0);
 
+			json_escape(raw0 != NULL ? raw0 : "",
+				argv0, sizeof(argv0));
 			snprintf(ev, sizeof(ev),
-				"{\"name\":\"retrace.ctl.spawn\",\"pid\":%ld,\"argv0\":\"%s\"}",
-				pid,
-				json_array_get_string(argv_a, 0) !=
-					NULL ?
-					json_array_get_string(
-						argv_a, 0) : "");
+				"{\"name\":\"retrace.ctl.spawn\",\"pid\":%ld,\"argv0\":%s}",
+				pid, argv0);
 			retraced_journal_event(ctx->jr,
 				(long)time(NULL), "daemon", 0, ev);
 		}
