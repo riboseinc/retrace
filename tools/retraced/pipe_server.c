@@ -83,9 +83,26 @@ static struct {
 static const char *g_agent_pipe_for_spawn;
 /*
  * RETRACED_TRACE=1: the sweep narrates (loop liveness, table,
- * raw wait results) -- the E2E's forensics switch
+ * raw wait results) -- the E2E's forensics switch. Narration
+ * rides the JOURNAL (durable, flushed, cross-thread): stdout
+ * proved unreliable as a forensic channel.
  */
 static int g_trace;
+
+static void trace_event(const char *detail)
+{
+	char ev[256];
+
+	if (!g_trace)
+		return;
+	snprintf(ev, sizeof(ev),
+		"{\"name\":\"retrace.trace\",\"detail\":\"%s\"}",
+		detail);
+	EnterCriticalSection(&g_lock);
+	retraced_journal_event(&g_jr, (long)time(NULL), "daemon",
+		0, ev);
+	LeaveCriticalSection(&g_lock);
+}
 
 static int pipe_write_frame(HANDLE h, uint16_t type,
 	const char *payload);
@@ -582,12 +599,16 @@ static void win_reap_sweep(void)
 				g_win_children[i].h, 0);
 
 			if (w != WAIT_OBJECT_0) {
-				if (g_trace)
-					printf("retraced: reap wait pid "
-						"%lu w=%lu\n",
+				if (g_trace) {
+					char line[80];
+
+					snprintf(line, sizeof(line),
+						"wait pid=%lu w=%lu",
 						(unsigned long)
 							g_win_children[i].pid,
 						(unsigned long)w);
+					trace_event(line);
+				}
 				continue;	/* not signaled */
 			}
 		}
@@ -1035,17 +1056,17 @@ int retraced_pipe_main(int argc, char **argv)
 				if (g_trace) {
 					int kids = 0;
 					int k;
+					char line[80];
 
 					for (k = 0; k < WIN_CHILDREN_MAX;
 					     k++)
 						if (g_win_children[k].h !=
 						    NULL)
 							kids++;
-					printf("retraced: sweep t=%ld "
-						"agents=%zu kids=%d\n",
-						now_ms() / 1000,
+					snprintf(line, sizeof(line),
+						"sweep agents=%zu kids=%d",
 						g_reg.count, kids);
-					fflush(stdout);
+					trace_event(line);
 				}
 				last_sweep = now_ms();
 			}
@@ -1110,8 +1131,13 @@ int retraced_pipe_main(int argc, char **argv)
 		DisconnectNamedPipe(h);
 		CloseHandle(h);
 	}
-	printf("retraced: accept loop done (stop=%d)\n", g_stop);
-	fflush(stdout);
+	{
+		char line[48];
+
+		snprintf(line, sizeof(line),
+			"loop-done stop=%d", (int)g_stop);
+		trace_event(line);
+	}
 
 	/* graceful stop: flush the routine tail + the final reap
 	 * (a fast-exiting workload's record must not wait on a
