@@ -69,7 +69,11 @@ def main():
 
     srv = HTTPServer(("127.0.0.1", 0), _One)
     port = srv.server_address[1]
-    sctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    # server-side default context (modern negotiated protocols
+    # only; the bare PROTOCOL_TLS_SERVER constant trips the
+    # python code-scanning rule's TLSv1 heuristic)
+    sctx = ssl.create_default_context(
+        ssl.Purpose.CLIENT_AUTH)
     sctx.load_cert_chain(cert, key)
     srv.socket = sctx.wrap_socket(srv.socket, server_side=True)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
