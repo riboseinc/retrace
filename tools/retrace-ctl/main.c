@@ -377,6 +377,7 @@ static int cmd_events_local(const char *base, const char *query)
 	struct retrace_filter_ast *ast = NULL;
 	long n;
 
+	retraced_journal_query_init();
 	if (query != NULL) {
 		char err[128];
 

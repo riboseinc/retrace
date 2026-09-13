@@ -59,16 +59,27 @@ int retrace_caller_cache_lookup(void *ret_addr, rc_dl_info_t *out)
 	return 0;
 }
 
-struct RetraceRealImpls retrace_real_impls = {
-	.malloc = malloc,
-	.free = free,
-	.memset = memset,
-	.memcpy = memcpy,
-	.strcmp = strcmp,
-	.strncmp = strncmp,
-	.strlen = strlen,
-	.real_snprintf = snprintf,
-};
+struct RetraceRealImpls retrace_real_impls;
+
+/* MSVC rejects function-pointer static initializers for some
+ * CRT names (snprintf is inline there); bind at first use
+ */
+void retraced_journal_query_init(void)
+{
+	static int bound;
+
+	if (bound)
+		return;
+	bound = 1;
+	retrace_real_impls.malloc = malloc;
+	retrace_real_impls.free = free;
+	retrace_real_impls.memset = memset;
+	retrace_real_impls.memcpy = memcpy;
+	retrace_real_impls.strcmp = strcmp;
+	retrace_real_impls.strncmp = strncmp;
+	retrace_real_impls.strlen = strlen;
+	retrace_real_impls.real_snprintf = snprintf;
+}
 
 /* the declared genesis link (first line's "prev") */
 static uint64_t segment_genesis_prev(const char *path)
