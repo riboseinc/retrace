@@ -89,6 +89,18 @@ def ctl_verbs(name, timeout=10.0):
     return h
 
 
+def diag(label, h, journal):
+    """failure forensics: what the journal holds, whether the
+    daemon still answers (round 4's lesson: a missing exit
+    record alone cannot name the culprit)"""
+    names = [r.get("ev", {}).get("name")
+             for r in journal_records(journal)]
+    print(f"DIAG {label}: records={names}", file=sys.stderr)
+    if h is not None:
+        st = pipe_roundtrip(h, json.dumps({"cmd": "status"}))
+        print(f"DIAG {label}: status={st}", file=sys.stderr)
+
+
 def main():
     if len(sys.argv) != 4:
         print("usage: test_supervisor_spawn_win.py <retraced> "
@@ -161,6 +173,7 @@ def main():
         if exited is None:
             print("FAIL: no retrace.ctl.exit for the pid",
                   file=sys.stderr)
+            diag("exit-missing", h, journal)
             return 1
         if exited.get("code") != 7:
             print(f"FAIL: exit code {exited.get('code')} != 7",

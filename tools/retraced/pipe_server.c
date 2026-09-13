@@ -996,6 +996,20 @@ int retraced_pipe_main(int argc, char **argv)
 		       (deadline_local == 0 ||
 			now_ms() < deadline_local)) {
 			/*
+			 * The sweep check runs BEFORE the wait: a busy
+			 * accept (client churn) must not starve the reap
+			 * cadence (round 4's missing exit record).
+			 */
+			if (now_ms() - last_sweep > SWEEP_INTERVAL_MS) {
+				EnterCriticalSection(&g_lock);
+				emit_drift_summaries();
+				retraced_registry_sweep(&g_reg, now_ms(),
+					15000);
+				win_reap_sweep();
+				LeaveCriticalSection(&g_lock);
+				last_sweep = now_ms();
+			}
+			/*
 			 * ONE pending accept at a time (classic pattern):
 			 * the event fires when a client lands; the 250ms
 			 * cadence lets sweeps and stop run regardless.
@@ -1051,15 +1065,6 @@ int retraced_pipe_main(int argc, char **argv)
 				ov.hEvent = evt;
 				arm_accept(h, &ov);
 				continue;
-			}
-			if (now_ms() - last_sweep > SWEEP_INTERVAL_MS) {
-				EnterCriticalSection(&g_lock);
-				emit_drift_summaries();
-				retraced_registry_sweep(&g_reg, now_ms(),
-					15000);
-				win_reap_sweep();
-				LeaveCriticalSection(&g_lock);
-				last_sweep = now_ms();
 			}
 		}
 		DisconnectNamedPipe(h);
