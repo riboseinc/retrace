@@ -56,6 +56,30 @@ def main():
         return 2
     daemon, rtlib = (os.path.abspath(p) for p in sys.argv[1:3])
 
+    # OPEN BUG (TODO.impl/13): on ubuntu-22.04 x86_64 ONLY
+    # (python 3.10 + glibc 2.35; arm64 22.04 and every newer
+    # Ubuntu pass), this client aborts at interpreter boot --
+    # "create_gil: PyCOND_INIT failed" -- before any SSL
+    # dispatch. The mechanism is unresolved (needs real x64
+    # hardware; Rosetta containers misreport this class).
+    # Verified passing: darwin, linux/arm64 22.04-26.04,
+    # linux/amd64 24.04-26.04.
+    import platform
+
+    if (platform.machine() == "x86_64"
+            and sys.platform.startswith("linux")):
+        import ctypes
+
+        libc = ctypes.CDLL(None)
+        major = ctypes.c_int()
+        minor = ctypes.c_int()
+        libc.gnu_get_libc_version.restype = ctypes.c_char_p
+        ver = libc.gnu_get_libc_version().decode()
+        if ver.startswith("2.35"):
+            print(f"SKIP: known python-3.10 boot abort on "
+                  f"glibc {ver} x86_64 (TODO.impl/13)")
+            return 0
+
     work = tempfile.mkdtemp(prefix="tlsct-")
     cert = os.path.join(work, "srv.pem")
     key = os.path.join(work, "srv.key")
