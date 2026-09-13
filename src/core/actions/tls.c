@@ -44,6 +44,7 @@
 #endif
 
 #include "actions.h"
+#include "arch_spec.h"
 #include "action_utils.h"
 #include "agent.h"
 #include "logger.h"
@@ -136,10 +137,12 @@ static int ia_tls_keylog(struct ThreadContext *t_ctx,
 		return 0;	/* ctx alloc failed; nothing to arm */
 #ifndef _WIN32
 	if (setter == NULL) {
-		if (retrace_real_impls.dlsym == NULL)
-			return 0;
+		/* the as-seam resolver: RTLD_NEXT alone misses
+		 * host-loaded providers (libssl is NOT our
+		 * dependency -- the link-map walk finds it)
+		 */
 		setter = (set_keylog_cb_fn)
-			retrace_real_impls.dlsym(RTLD_NEXT,
+			retrace_as_get_real_safe(
 				"SSL_CTX_set_keylog_callback");
 		if (setter == NULL) {
 			/* providers without the slot (LibreSSL):

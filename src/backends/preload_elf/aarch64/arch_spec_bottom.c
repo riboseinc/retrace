@@ -290,6 +290,8 @@ int retrace_as_init_late(void)
 
 extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
 
+#include "real_linkmap.h"
+
 /*
  * Resolve the real (next-in-search-order) implementation of a libc symbol.
  *
@@ -304,7 +306,11 @@ extern void *_dl_sym(void *handle, const char *symbol, const void *rtraddr);
  */
 void *retrace_as_get_real_safe(const char *real_impl)
 {
-	return dlsym(RTLD_NEXT, real_impl);
+	void *p = dlsym(RTLD_NEXT, real_impl);
+
+	if (p != NULL)
+		return p;
+	return retrace_as_real_from_linkmap(real_impl);
 }
 
 /*

@@ -15,6 +15,7 @@ endif()
 set(_preload_elf_${_retrace_arch}_sources
 	${_retrace_arch}/arch_spec_top.S
 	${_retrace_arch}/arch_spec_bottom.c
+	real_linkmap.c
 	backend.c)
 
 add_library(retrace_backend_preload_elf OBJECT ${_preload_elf_${_retrace_arch}_sources})
