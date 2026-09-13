@@ -37,6 +37,11 @@
  * verified on the way through. Returns the emitted count, or
  * -1 on a broken chain / unreadable segment.
  */
+/* bind the tool's real_impls table (MSVC-safe lazy binding);
+ * call before the first compile or query
+ */
+void retraced_journal_query_init(void);
+
 long retraced_journal_query(const char *base,
 	const struct retrace_filter_ast *ast,
 	void (*sink)(const char *line, void *user), void *user);
