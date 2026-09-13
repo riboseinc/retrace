@@ -43,8 +43,8 @@ static void test_clean_runs_not_clustered(void)
 	struct FuzzReport r;
 
 	fuzz_report_init(&r);
-	CHECK(fuzz_report_fold(&r, 0, "[]", 1, NULL) == 0);
-	CHECK(fuzz_report_fold(&r, 0, NULL, 2, NULL) == 0);
+	CHECK(fuzz_report_fold(&r, 0, "[]", 1, NULL, 0) == 0);
+	CHECK(fuzz_report_fold(&r, 0, NULL, 2, NULL, 0) == 0);
 	CHECK(r.total == 2);
 	CHECK(r.crashes == 0);
 	CHECK(r.count == 0);
@@ -64,11 +64,11 @@ static void test_crashes_cluster_by_func(void)
 	a = fuzz_report_fold(&r, 0x000b, /* SIGSEGV low byte */
 		"[{\"message\":{\"func\":\"malloc\",\"params\":{"
 		"\"size\":\"64\"}}}]",
-		10, NULL);
+		10, NULL, 0);
 	b = fuzz_report_fold(&r, 0x000b,
 		"[{\"message\":{\"func\":\"malloc\",\"params\":{"
 		"\"size\":\"32\"}}}]",
-		11, NULL);
+		11, NULL, 0);
 	CHECK(r.crashes == 2);
 	CHECK(a == b);            /* same func -> same cluster */
 	CHECK(r.count == 1);
@@ -84,10 +84,10 @@ static void test_different_funcs_dont_merge(void)
 	fuzz_report_init(&r);
 	a = fuzz_report_fold(&r, 0x000b,
 		"[{\"message\":{\"func\":\"malloc\",\"params\":{}}}]",
-		1, NULL);
+		1, NULL, 0);
 	b = fuzz_report_fold(&r, 0x000b,
 		"[{\"message\":{\"func\":\"strcpy\",\"params\":{}}}]",
-		2, NULL);
+		2, NULL, 0);
 	CHECK(a != b);
 	CHECK(r.count == 2);
 	fuzz_report_free(&r);
@@ -106,7 +106,7 @@ static void test_truncated_trace_tolerated(void)
 	id = fuzz_report_fold(&r, 0x000b,
 		"[{\"message\":{\"func\":\"fopen\",\"params\":{"
 		"\"path\":\"/a\"}}},{\"message\":{\"func\":\"mall",
-		1, NULL);
+		1, NULL, 0);
 	CHECK(r.count == 1);
 	CHECK(strcmp(r.clusters[0].func, "fopen") == 0);
 	CHECK(id != 0);
@@ -118,7 +118,7 @@ static void test_empty_trace_unattributable(void)
 	struct FuzzReport r;
 
 	fuzz_report_init(&r);
-	fuzz_report_fold(&r, 0x000b, "", 1, NULL);
+	fuzz_report_fold(&r, 0x000b, "", 1, NULL, 0);
 	CHECK(r.count == 1);
 	CHECK(strcmp(r.clusters[0].func, "?") == 0);
 	fuzz_report_free(&r);
@@ -133,7 +133,7 @@ static void test_assertion_marker(void)
 	/* exit 0 but the marker in the trace = assertion */
 	id = fuzz_report_fold(&r, 0,
 		"[{\"message\":{\"text\":\"ASSERT: bad state\"}}]",
-		5, "ASSERT");
+		5, "ASSERT", 0);
 	CHECK(id != 0);
 	CHECK(r.assertions == 1);
 	CHECK(r.crashes == 0);
@@ -153,7 +153,7 @@ static void test_json_shape(void)
 	fuzz_report_init(&r);
 	fuzz_report_fold(&r, 0x000b,
 		"[{\"message\":{\"func\":\"malloc\",\"params\":{}}}]",
-		123456789012345UL, NULL);
+		123456789012345UL, NULL, 0);
 	v = fuzz_report_to_json(&r);
 	o = json_value_get_object(v);
 	CHECK(json_object_get_number(o, "iterations") == 1);
@@ -176,6 +176,63 @@ static void test_json_shape(void)
 	fuzz_report_free(&r);
 }
 
+static void test_coverage_separates_same_signature(void)
+{
+	struct FuzzReport r;
+	unsigned long a, b;
+
+	fuzz_report_init(&r);
+	/* same func, same death -- different call HISTORY: the
+	 * call-hash id splits them (TODO.impl/17)
+	 */
+	a = fuzz_report_fold(&r, 0x000b,
+		"[{\"message\":{\"func\":\"malloc\",\"params\":{}}}]",
+		1, NULL, 0xAAAAUL);
+	b = fuzz_report_fold(&r, 0x000b,
+		"[{\"message\":{\"func\":\"malloc\",\"params\":{}}}]",
+		2, NULL, 0xBBBBUL);
+	CHECK(a != b);
+	CHECK(r.count == 2);
+	CHECK(r.clusters[0].coverage == 0xAAAAUL);
+	CHECK(r.clusters[1].coverage == 0xBBBBUL);
+	fuzz_report_free(&r);
+}
+
+static void test_same_coverage_stays_merged(void)
+{
+	struct FuzzReport r;
+	unsigned long a, b;
+
+	fuzz_report_init(&r);
+	a = fuzz_report_fold(&r, 0x000b,
+		"[{\"message\":{\"func\":\"malloc\",\"params\":{}}}]",
+		1, NULL, 0xAAAAUL);
+	b = fuzz_report_fold(&r, 0x000b,
+		"[{\"message\":{\"func\":\"malloc\",\"params\":{}}}]",
+		2, NULL, 0xAAAAUL);
+	CHECK(a == b);
+	CHECK(r.count == 1);
+	fuzz_report_free(&r);
+}
+
+static void test_zero_coverage_legacy_merge(void)
+{
+	struct FuzzReport r;
+	unsigned long a, b;
+
+	fuzz_report_init(&r);
+	/* the lane carried no hash: never separates (legacy) */
+	a = fuzz_report_fold(&r, 0x000b,
+		"[{\"message\":{\"func\":\"malloc\",\"params\":{}}}]",
+		1, NULL, 0);
+	b = fuzz_report_fold(&r, 0x000b,
+		"[{\"message\":{\"func\":\"malloc\",\"params\":{}}}]",
+		2, NULL, 0);
+	CHECK(a == b);
+	CHECK(r.count == 1);
+	fuzz_report_free(&r);
+}
+
 int main(void)
 {
 	printf("fuzz cluster tests:\n");
@@ -183,6 +240,9 @@ int main(void)
 	TEST(crashes_cluster_by_func);
 	TEST(different_funcs_dont_merge);
 	TEST(truncated_trace_tolerated);
+	TEST(coverage_separates_same_signature);
+	TEST(same_coverage_stays_merged);
+	TEST(zero_coverage_legacy_merge);
 	TEST(empty_trace_unattributable);
 	TEST(assertion_marker);
 	TEST(json_shape);

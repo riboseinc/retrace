@@ -133,7 +133,8 @@ static void last_func(const char *trace_json, char *func,
 }
 
 unsigned long fuzz_report_fold(struct FuzzReport *r, int exit_status,
-	const char *trace_json, unsigned long seed, const char *marker)
+	const char *trace_json, unsigned long seed, const char *marker,
+	unsigned long coverage)
 {
 	char func[64];
 	int params = 0;
@@ -157,6 +158,17 @@ unsigned long fuzz_report_fold(struct FuzzReport *r, int exit_status,
 	id = fnv1a(func, 0x811C9DC5UL);
 	id ^= (unsigned long)params * 0x9E3779B97F4A7C15UL;
 	id *= 0x01000193UL;
+	/*
+	 * Coverage joins the signature (TODO.impl/17): two
+	 * crashes that died at the same call are ONE bug only
+	 * when the run saw the same history. The call-hash id
+	 * (the engine's per-thread rolling hash, surfaced by
+	 * RETRACE_CALL_HASH) splits same-signature, different-
+	 * path deaths; 0 (the lane carried none) never separates
+	 * -- the legacy behavior holds.
+	 */
+	id ^= coverage * 0x9E3779B97F4A7C15UL;
+	id *= 0x01000193UL;
 
 	c = find_cluster(r, id);
 	if (c == NULL) {
@@ -164,6 +176,7 @@ unsigned long fuzz_report_fold(struct FuzzReport *r, int exit_status,
 		if (c == NULL)
 			return id;
 		c->first_seed = seed;
+		c->coverage = coverage;
 	}
 	c->count++;
 	return id;
@@ -194,6 +207,9 @@ JSON_Value *fuzz_report_to_json(const struct FuzzReport *r)
 		json_object_set_string(co, "func", c->func);
 		json_object_set_number(co, "params", (double)c->params);
 		json_object_set_number(co, "count", (double)c->count);
+		if (c->coverage != 0)
+			json_object_set_number(co, "coverage",
+				(double)c->coverage);
 		{
 			char seed_s[32];
 

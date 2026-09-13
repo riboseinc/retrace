@@ -20,3 +20,21 @@ replays need only `RETRACE_FUZZ_SEED`.
 Dictionary note: token-dictionary string injection is the
 stringinjector tool's job (tools/stringinjector) -- feed its
 wordlists there; this harness owns byte-level shaping.
+
+## The custom mutator (`mutator.c`)
+
+`RETRACE_MUTATE_DICT=dictionary.txt` — the same dictionary file
+the `fuzz_str` action consumes (one token per line, `#`
+comments). The mutator splices tokens at random offsets every
+other call, mixing grammar-aware shape with libFuzzer's raw
+exploration:
+
+```sh
+clang -g -O1 -fsanitize=fuzzer -o fuzz harness.c mutator.c
+RETRACE_MUTATE_DICT=dict.txt ./fuzz corpus/
+```
+
+The coverage loop closes through `retrace-fuzz-report`: the
+workbench clusters findings by call history
+(`RETRACE_CALL_HASH`), and `--emit-corpus` minimizes back into
+this harness's corpus dir.
