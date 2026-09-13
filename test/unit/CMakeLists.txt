@@ -329,6 +329,15 @@ retrace_add_unit_test(campaign_model
 
 # The pure TLS plaintext summarizer (TODO.impl/13): standalone
 # by the card-06 law -- only tls_summary.c, no engine linkage.
+# The drift-hit matcher (TODO.impl/18): standalone by the
+# card-06 law -- only drift_hits.c, pure semantics.
+retrace_add_unit_test(drift_hits
+	STANDALONE
+	EXTRA_SOURCES
+	${CMAKE_SOURCE_DIR}/tools/retraced/drift_hits.c
+	EXTRA_INCLUDES
+	${CMAKE_SOURCE_DIR}/tools/retraced)
+
 retrace_add_unit_test(tls_summary
 	STANDALONE
 	EXTRA_SOURCES

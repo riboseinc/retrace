@@ -574,6 +574,16 @@ if(Python3_Interpreter_FOUND)
 		set_tests_properties(integration-tls-content
 			PROPERTIES LABELS "integration"
 			TIMEOUT 120)
+		# Live hit-level drift grading (TODO.impl/18): the
+		# daemon names WHAT escaped; correlate agrees offline.
+		add_test(NAME integration-drift-hit
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_drift_hit.py
+				$<TARGET_FILE:retrace_retraced>
+				$<TARGET_FILE:retrace_correlate>)
+		set_tests_properties(integration-drift-hit
+			PROPERTIES LABELS "integration"
+			TIMEOUT 120)
 		add_test(NAME integration-goretrace
 				COMMAND ${Python3_EXECUTABLE}
 					${CMAKE_SOURCE_DIR}/test/integration/test_goretrace.py
