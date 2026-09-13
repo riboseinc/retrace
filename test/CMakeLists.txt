@@ -563,7 +563,18 @@ if(Python3_Interpreter_FOUND)
 				VERBATIM)
 			add_custom_target(goretrace_fetcher ALL
 				DEPENDS ${_go_out})
-			add_test(NAME integration-goretrace
+			# The TLS content lane (TODO.impl/13): plaintext
+		# summaries + keylog under the preload; openssl-gated
+		# (the E2E mints its own cert).
+		add_test(NAME integration-tls-content
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_tls_content.py
+				$<TARGET_FILE:retrace_retraced>
+				$<TARGET_FILE:retrace_v2>)
+		set_tests_properties(integration-tls-content
+			PROPERTIES LABELS "integration"
+			TIMEOUT 120)
+		add_test(NAME integration-goretrace
 				COMMAND ${Python3_EXECUTABLE}
 					${CMAKE_SOURCE_DIR}/test/integration/test_goretrace.py
 					$<TARGET_FILE:retrace_retraced>

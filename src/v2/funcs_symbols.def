@@ -324,6 +324,15 @@ RETRACE_WRAP sendmsg
 RETRACE_WRAP recvmsg
 RETRACE_WRAP gethostbyname
 RETRACE_WRAP getaddrinfo
+
+/* OpenSSL surface (TODO.impl/13): the TLS content lane --
+   plaintext summaries + keylog injection ride SSL_read/write
+   and SSL_CTX_new. */
+RETRACE_WRAP SSL_CTX_new
+RETRACE_WRAP SSL_read
+RETRACE_WRAP SSL_write
+RETRACE_WRAP SSL_read_ex
+RETRACE_WRAP SSL_write_ex
 RETRACE_WRAP freeaddrinfo
 RETRACE_WRAP gai_strerror
 RETRACE_WRAP inet_pton

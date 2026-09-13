@@ -165,6 +165,10 @@ int retrace_datatypes_init(void)
 	return 0;
 }
 
+/*
+ * Silent by the entry law (the localeconv/vfprintf recursion):
+ * the datatype lookup runs on EVERY dispatch's param setup.
+ */
 const struct DataType *retrace_datatype_get(const char *datatype_name)
 {
 	int hash;
@@ -173,28 +177,17 @@ const struct DataType *retrace_datatype_get(const char *datatype_name)
 	hash = hash_string(datatype_name);
 	h = &dts_hash[hash];
 
-	log_dbg("Searching for datatype for '%s', hash: %d",
-		datatype_name, hash);
-
 	if (h->data_type) {
 
 		while (retrace_real_impls.strcmp(h->data_type->name,
 			datatype_name) && h->next) {
-
-			log_dbg("Passing '%s' at hash: %d", h->data_type->name, hash);
-
 			h = h->next;
 		}
 	}
 
 	if (h->data_type &&
-		!retrace_real_impls.strcmp(h->data_type->name, datatype_name)) {
-
-		log_dbg("Found '%s' at hash: %d", h->data_type->name, hash);
+		!retrace_real_impls.strcmp(h->data_type->name, datatype_name))
 		return h->data_type;
-	}
-
-	log_dbg("Not found '%s'", datatype_name);
 
 	return 0;
 }

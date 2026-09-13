@@ -42,7 +42,8 @@ set(_core_prototype_sources
 	prototypes/mman.c
 	prototypes/string.c
 	prototypes/pthread.c
-	prototypes/time.c)
+	prototypes/time.c
+	prototypes/openssl.c)
 
 set(_core_action_sources
 	actions/basic.c actions/memfuzz.c
@@ -52,7 +53,7 @@ set(_core_action_sources
 	actions/sandbox.c actions/addr_deny.c
 	actions/filter.c actions/decode_http.c actions/decode_dns.c
 	actions/capture_buffer.c actions/fuzz_dict.c
-	actions/freeze.c)
+	actions/freeze.c actions/tls.c actions/tls_summary.c)
 
 set(_core_datatype_sources
 	datatypes/basic.c datatypes/uio.c datatypes/unistd.c)

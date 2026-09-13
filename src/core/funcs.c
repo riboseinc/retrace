@@ -106,6 +106,15 @@ int retrace_funcs_init(void)
 	return 0;
 }
 
+/*
+ * The lookup is SILENT by the entry law (third strike, this
+ * one on main): a dispatch-path log_dbg reached vfprintf,
+ * whose internals call localeconv THROUGH THE PLT -- the
+ * interposed localeconv dispatched again, its own log_dbg
+ * re-entered vfprintf, and the locale lock recursed
+ * (_os_unfair_lock_recursive_abort at python's boot).
+ * Read-only lookup paths must not log.
+ */
 const struct FuncPrototype *retrace_func_get(const char *func_name)
 {
 	int hash;
@@ -114,25 +123,16 @@ const struct FuncPrototype *retrace_func_get(const char *func_name)
 	hash = hash_string(func_name);
 	h = &funcs_hash[hash];
 
-	log_dbg("Seraching for prototype for '%s', hash: %d", func_name, hash);
-
 	if (h->proto) {
 
 		while (retrace_real_impls.strcmp(h->proto->name, func_name) &&
 			h->next) {
-
-			log_dbg("Passing '%s' at hash: %d", h->proto->name, hash);
-
 			h = h->next;
 		}
 	}
 
-	if (h->proto && !retrace_real_impls.strcmp(h->proto->name, func_name)) {
-		log_dbg("Found '%s' at hash: %d", h->proto->name, hash);
+	if (h->proto && !retrace_real_impls.strcmp(h->proto->name, func_name))
 		return h->proto;
-	}
-
-	log_dbg("Not found '%s'", func_name);
 
 	return (const struct FuncPrototype *) 0;
 }
