@@ -81,6 +81,10 @@ static struct {
 	DWORD pid;
 } g_win_children[WIN_CHILDREN_MAX];
 static const char *g_agent_pipe_for_spawn;
+static struct pipe_conn g_agent_conns[PIPE_AGENTS_MAX];
+static char g_agent_pipe_name[160];
+
+static HANDLE make_pipe(const char *name);
 /*
  * RETRACED_TRACE=1: the sweep narrates (loop liveness, table,
  * raw wait results) -- the E2E's forensics switch. Narration
@@ -308,6 +312,82 @@ static DWORD WINAPI agent_thread(LPVOID arg)
 	daemon_frame_drift_summaries(&g_reg, &g_jr);
 	retraced_journal_flush(&g_jr);
 	LeaveCriticalSection(&g_lock);
+	return 0;
+}
+
+/*
+ * The agent-pipe acceptor: a DEDICATED thread doing blocking
+ * ConnectNamedPipe -- the pipe is synchronous (agent_thread's
+ * blocking reads depend on it), so an overlapped accept is not
+ * available. This is ctl_thread's own shape: blocking accept
+ * here is fine, daemon exit tears the process down anyway.
+ * The OLD design (an "overlapped" accept inside the main
+ * loop's WaitForSingleObject) silently BLOCKED inside
+ * ConnectNamedPipe on the synchronous handle after the first
+ * client -- the loop stopped turning, and every cadence riding
+ * it (drift, registry sweep, the reap) died with it.
+ */
+static DWORD WINAPI agents_accept_thread(LPVOID arg)
+{
+	while (!g_stop) {
+		HANDLE c = make_pipe(g_agent_pipe_name);
+		int slot = -1;
+		int k;
+		HANDLE th;
+
+		if (c == INVALID_HANDLE_VALUE) {
+			Sleep(500);
+			continue;
+		}
+		if (!ConnectNamedPipe(c, NULL) &&
+		    GetLastError() != ERROR_PIPE_CONNECTED) {
+			CloseHandle(c);
+			continue;
+		}
+		if (g_stop) {
+			DisconnectNamedPipe(c);
+			CloseHandle(c);
+			break;
+		}
+		trace_event("connect");
+		for (k = 0; k < PIPE_AGENTS_MAX; k++) {
+			if (!g_agent_conns[k].live) {
+				slot = k;
+				break;
+			}
+		}
+		if (slot < 0) {
+			/* full: drop the connection */
+			DisconnectNamedPipe(c);
+			CloseHandle(c);
+			continue;
+		}
+		g_agent_conns[slot].pipe = c;
+		g_agent_conns[slot].live = 1;
+		g_agent_conns[slot].helloed = 0;
+		g_agent_conns[slot].spectator = 0;
+		g_agent_conns[slot].ctl = NULL;
+		/* the broadcast registration: policy reaches
+		 * pipe agents
+		 */
+		EnterCriticalSection(&g_lock);
+		for (k = 0; k < MAX_AGENTS; k++) {
+			if (g_ctl_conns[k].io == NULL) {
+				g_ctl_conns[k].io = (void *)c;
+				g_ctl_conns[k].helloed = 0;
+				g_ctl_conns[k].spectator = 0;
+				g_ctl_conns[k].agent_id[0] = '\0';
+				g_agent_conns[slot].ctl =
+					&g_ctl_conns[k];
+				break;
+			}
+		}
+		LeaveCriticalSection(&g_lock);
+		th = CreateThread(NULL, 0, agent_thread,
+			&g_agent_conns[slot], 0, NULL);
+		if (th != NULL)
+			CloseHandle(th);
+	}
 	return 0;
 }
 
@@ -800,15 +880,6 @@ static DWORD WINAPI ctl_thread(LPVOID arg)
  * slow-leg jretrace refusal. Take the accept door immediately
  * instead (a broken handle simply fails fast in its thread).
  */
-static void arm_accept(HANDLE h, OVERLAPPED *ov)
-{
-	if (h == INVALID_HANDLE_VALUE)
-		return;
-	if (!ConnectNamedPipe(h, ov) &&
-	    GetLastError() != ERROR_IO_PENDING)
-		SetEvent(ov->hEvent);
-}
-
 
 static BOOL WINAPI on_console_ctrl(DWORD type)
 {
@@ -919,7 +990,6 @@ int retraced_pipe_main(int argc, char **argv)
 	const char *nonce_file = NULL;
 	int exit_after_s = 0;
 	long deadline;
-	struct pipe_conn conns[PIPE_AGENTS_MAX];
 	int i;
 
 	for (i = 1; i < argc; i++) {
@@ -1020,7 +1090,6 @@ int retraced_pipe_main(int argc, char **argv)
 			}
 		}
 	}
-	memset(conns, 0, sizeof(conns));
 
 	/* the ctl pipe: one instance, one client at a time */
 	g_ctl_name = ctl_name;
@@ -1028,29 +1097,28 @@ int retraced_pipe_main(int argc, char **argv)
 		NULL, 0, NULL);
 
 	printf("retraced: listening on %s (agents)\n", pipe_name);
+	snprintf(g_agent_pipe_name, sizeof(g_agent_pipe_name), "%s",
+		pipe_name);
+	CloseHandle(CreateThread(NULL, 0, agents_accept_thread,
+		NULL, 0, NULL));
 	{
 		long last_sweep = now_ms();
 		long deadline_local = deadline;
-		HANDLE evt = CreateEvent(NULL, TRUE, FALSE, NULL);
-		HANDLE h = make_pipe(pipe_name);
-		OVERLAPPED ov;
 
-		memset(&ov, 0, sizeof(ov));
-		ov.hEvent = evt;
-		arm_accept(h, &ov);
+		/* the pure cadence: drift, registry, and the reap,
+		 * unconditionally, for the daemon's whole life --
+		 * nothing that blocks on clients rides this loop
+		 * anymore (the accept owns its own thread now)
+		 */
 		while (!g_stop &&
 		       (deadline_local == 0 ||
 			now_ms() < deadline_local)) {
-			/*
-			 * The sweep check runs BEFORE the wait: a busy
-			 * accept (client churn) must not starve the reap
-			 * cadence (round 4's missing exit record).
-			 */
-			if (g_trace)
-				trace_event("iter");
+			Sleep(SWEEP_INTERVAL_MS);
+			if (g_stop ||
+			    (deadline_local != 0 &&
+			     now_ms() >= deadline_local))
+				break;
 			if (now_ms() - last_sweep > SWEEP_INTERVAL_MS) {
-				if (g_trace)
-					trace_event("sweep-pass");
 				EnterCriticalSection(&g_lock);
 				emit_drift_summaries();
 				retraced_registry_sweep(&g_reg, now_ms(),
@@ -1074,72 +1142,7 @@ int retraced_pipe_main(int argc, char **argv)
 				}
 				last_sweep = now_ms();
 			}
-			/*
-			 * ONE pending accept at a time (classic pattern):
-			 * the event fires when a client lands; the 250ms
-			 * cadence lets sweeps and stop run regardless.
-			 */
-			if (WaitForSingleObject(evt, 250) == WAIT_OBJECT_0) {
-				int slot = -1;
-				int k;
-
-				trace_event("connect");
-
-				for (k = 0; k < PIPE_AGENTS_MAX; k++) {
-					if (!conns[k].live) {
-						slot = k;
-						break;
-					}
-				}
-				if (slot >= 0) {
-					HANDLE th;
-					int cs;
-
-					conns[slot].pipe = h;
-					conns[slot].live = 1;
-					conns[slot].helloed = 0;
-					conns[slot].spectator = 0;
-					conns[slot].ctl = NULL;
-					/* the broadcast
-					 * registration: policy
-					 * reaches pipe agents
-					 */
-					EnterCriticalSection(&g_lock);
-					for (cs = 0; cs < MAX_AGENTS;
-					     cs++) {
-						if (g_ctl_conns[cs].io == NULL) {
-							g_ctl_conns[cs].io = (void *)h;
-							g_ctl_conns[cs].helloed = 0;
-							g_ctl_conns[cs].spectator = 0;
-							g_ctl_conns[cs].agent_id[0] = '\0';
-							conns[slot].ctl = &g_ctl_conns[cs];
-							break;
-						}
-					}
-					LeaveCriticalSection(&g_lock);
-					trace_event("registered");
-					th = CreateThread(NULL, 0, agent_thread,
-						&conns[slot], 0, NULL);
-					if (th != NULL)
-						CloseHandle(th);
-					trace_event("thread");
-				} else {
-					/* full: drop the connection */
-					DisconnectNamedPipe(h);
-					CloseHandle(h);
-				}
-				h = make_pipe(pipe_name);
-				trace_event("remade");
-				ResetEvent(evt);
-				memset(&ov, 0, sizeof(ov));
-				ov.hEvent = evt;
-				arm_accept(h, &ov);
-				trace_event("rearmed");
-				continue;
-			}
 		}
-		DisconnectNamedPipe(h);
-		CloseHandle(h);
 	}
 	{
 		char line[48];
