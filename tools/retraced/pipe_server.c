@@ -1117,20 +1117,24 @@ int retraced_pipe_main(int argc, char **argv)
 						}
 					}
 					LeaveCriticalSection(&g_lock);
+					trace_event("registered");
 					th = CreateThread(NULL, 0, agent_thread,
 						&conns[slot], 0, NULL);
 					if (th != NULL)
 						CloseHandle(th);
+					trace_event("thread");
 				} else {
 					/* full: drop the connection */
 					DisconnectNamedPipe(h);
 					CloseHandle(h);
 				}
 				h = make_pipe(pipe_name);
+				trace_event("remade");
 				ResetEvent(evt);
 				memset(&ov, 0, sizeof(ov));
 				ov.hEvent = evt;
 				arm_accept(h, &ov);
+				trace_event("rearmed");
 				continue;
 			}
 		}
