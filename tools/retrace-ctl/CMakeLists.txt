@@ -9,6 +9,8 @@
 # stub); tls_gate.c stays POSIX-only (socket headers).
 set(_ctl_common_sources
 	main.c
+	journal_query.c
+	${CMAKE_SOURCE_DIR}/src/core/filter_dsl.c
 	${CMAKE_SOURCE_DIR}/tools/retraced/journal_sign.c
 	${CMAKE_SOURCE_DIR}/tools/retraced/journal.c
 	${CMAKE_SOURCE_DIR}/tools/retraced/registry.c
@@ -24,11 +26,30 @@ endif()
 set_target_properties(retrace_ctl PROPERTIES
 	OUTPUT_NAME retrace-ctl)
 
+if(RETRACE_PLATFORM_LINUX)
+	if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+		set(_ctl_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_elf/aarch64)
+	else()
+		set(_ctl_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_elf/x86_64)
+	endif()
+elseif(RETRACE_PLATFORM_DARWIN)
+	if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+		set(_ctl_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_macho/aarch64)
+	else()
+		set(_ctl_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_macho/x86_64)
+	endif()
+elseif(RETRACE_PLATFORM_FREEBSD OR RETRACE_PLATFORM_OPENBSD OR RETRACE_PLATFORM_NETBSD)
+	set(_ctl_arch_include ${CMAKE_SOURCE_DIR}/src/backends/preload_bsd/x86_64)
+elseif(RETRACE_PLATFORM_WINDOWS)
+	set(_ctl_arch_include ${CMAKE_SOURCE_DIR}/src/backends/win_common)
+endif()
+
 target_include_directories(retrace_ctl PRIVATE
 	${CMAKE_SOURCE_DIR}/tools/retraced
+	${CMAKE_SOURCE_DIR}/src/core
+	${_ctl_arch_include}
 	${CMAKE_SOURCE_DIR}/src/config/json
-	${CMAKE_SOURCE_DIR}/test/property/parson_stub
-	${CMAKE_SOURCE_DIR}/src/core)
+	${CMAKE_SOURCE_DIR}/test/property/parson_stub)
 
 # sign-policy (pure OpenSSL EVP) works everywhere now that
 # tls_gate.c rides only the POSIX build

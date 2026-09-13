@@ -23,3 +23,4 @@ via a new ADR that references the old.
 | [0014](0014-public-api-matches-implementation.md) | Public API matches the implementation | accepted |
 | [0015](0015-retire-legacy-rpc.md) | Retire the legacy rpc/ subsystem | accepted |
 | [0016](0016-syscall-lane-actions-ops-seam.md) | Syscall-lane actions: the arch-spec seam made polymorphic | accepted |
+| [0017](0017-journal-series-chain-continuity.md) | The journal series: one chain, split across segments | accepted |

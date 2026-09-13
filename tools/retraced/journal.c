@@ -80,6 +80,7 @@ int retraced_journal_open(struct retraced_journal *j,
 {
 	memset(j, 0, sizeof(*j));
 	snprintf(j->path, sizeof(j->path), "%s", path);
+	snprintf(j->base, sizeof(j->base), "%s", path);
 	j->chain_broken_at = -1;
 	j->f = NULL;
 	j->clean_close = 0;
@@ -127,6 +128,199 @@ void retraced_journal_flush(struct retraced_journal *j)
 		fflush(j->f);
 }
 
+/* ---- rotation + retention (TODO.impl/10) ------------------------------- */
+
+void retraced_journal_set_rotation(struct retraced_journal *j,
+	uint64_t rotate_bytes, long rotate_seconds,
+	uint64_t budget_bytes)
+{
+	j->rotate_bytes = rotate_bytes;
+	j->rotate_seconds = rotate_seconds;
+	j->budget_bytes = budget_bytes;
+	j->seg_bytes = 0;
+	j->last_rotate_ts = (long) time(NULL);
+
+	/* resolve the live segment: the highest existing number,
+	 * else 0 (a fresh series). The lazy writer opens it on the
+	 * first append; replay reads the whole series first.
+	 */
+	if (rotate_bytes != 0 || rotate_seconds != 0) {
+		int seq = 0;
+
+		while (seq < 9999) {
+			char p[600];
+
+			retraced_journal_segment_path(j->base, seq + 1,
+				p, sizeof(p));
+			if (!retraced_journal_segment_exists(p, NULL))
+				break;
+			seq++;
+		}
+		j->segment_seq = seq;
+		retraced_journal_segment_path(j->base, seq,
+			j->path, sizeof(j->path));
+	}
+}
+
+void retraced_journal_segment_path(const char *base, int seq,
+	char *out, size_t cap)
+{
+	snprintf(out, cap, "%s.%04d", base, seq);
+}
+
+int retraced_journal_segment_exists(const char *path,
+	long long *size_out)
+{
+	FILE *f = fopen(path, "rb");
+
+	if (f == NULL)
+		return 0;
+	if (size_out != NULL) {
+		*size_out = 0;
+		if (fseek(f, 0, SEEK_END) == 0)
+			*size_out = ftell(f);
+	}
+	fclose(f);
+	return 1;
+}
+
+int retraced_journal_segment_range(const char *base,
+	int *lo_out, int *hi_out)
+{
+	int hi = -1;
+	int lo = -1;
+	int seq;
+
+	for (seq = 9999; seq >= 0 && hi < 0; seq--) {
+		char p[600];
+
+		retraced_journal_segment_path(base, seq, p,
+			sizeof(p));
+		if (retraced_journal_segment_exists(p, NULL))
+			hi = seq;
+	}
+	if (hi < 0)
+		return -1;
+	lo = retraced_journal_segment_lo(base, hi);
+	if (lo < 0)
+		return -1;
+	*lo_out = lo;
+	*hi_out = hi;
+	return 0;
+}
+
+int retraced_journal_segment_lo(const char *base, int hi)
+{
+	int seq;
+
+	for (seq = 0; seq <= hi; seq++) {
+		char p[600];
+
+		retraced_journal_segment_path(base, seq, p, sizeof(p));
+		if (retraced_journal_segment_exists(p, NULL))
+			return seq;
+	}
+	return -1;
+}
+
+/* Retention: prune OLDEST segments until the pruned set fits
+ * the budget. The live segment is never pruned; each prune is
+ * a chained record in the live segment (auditable gaps).
+ */
+static void journal_retain(struct retraced_journal *j, long ts)
+{
+	if (j->budget_bytes == 0)
+		return;
+
+	for (;;) {
+		int lo = retraced_journal_segment_lo(j->base,
+			j->segment_seq);
+		uint64_t sum = 0;
+		char p[600];
+		char ev[256];
+		long long sz;
+		int seq;
+
+		if (lo < 0 || lo >= j->segment_seq)
+			return;	/* nothing prunable left */
+
+		/* the budget caps the SUM of the closed segments */
+		for (seq = lo; seq < j->segment_seq; seq++) {
+			long long sz2;
+
+			retraced_journal_segment_path(j->base, seq,
+				p, sizeof(p));
+			if (retraced_journal_segment_exists(p, &sz2))
+				sum += (uint64_t) sz2;
+		}
+		if (sum <= j->budget_bytes)
+			return;	/* the series fits: keep it all */
+
+		/* prune the OLDEST; the record is a chained event */
+		retraced_journal_segment_path(j->base, lo, p,
+			sizeof(p));
+		if (!retraced_journal_segment_exists(p, &sz))
+			return;
+		if (remove(p) != 0)
+			return;
+		snprintf(ev, sizeof(ev),
+			"{\"name\":\"retrace.journal.segment_pruned\","
+			"\"segment\":\"%s\",\"bytes\":%lld}",
+			p, sz);
+		(void)retraced_journal_event(j, ts, "daemon", 0, ev);
+	}
+}
+
+/* Close the live segment (chained close marker with its head),
+ * run retention, open the next with a genesis link carrying
+ * the predecessor's head -- the chain continues across files.
+ */
+static void journal_rotate(struct retraced_journal *j, long ts)
+{
+	char closed[600];
+	char opened[600];
+	char ev[512];
+	uint64_t head = j->prev_hash;
+	int old_seq = j->segment_seq;
+
+	j->rotating = 1;
+	retraced_journal_segment_path(j->base, old_seq, closed,
+		sizeof(closed));
+
+	(void)snprintf(ev, sizeof(ev),
+		"{\"name\":\"retrace.journal.segment_closed\","
+		"\"segment\":\"%s\",\"head\":\"%016llx\","
+		"\"lines\":%llu}",
+		closed, (unsigned long long) head,
+		(unsigned long long) j->lines);
+	(void)retraced_journal_event(j, ts, "daemon", 0, ev);
+
+	j->segment_seq++;
+	retraced_journal_segment_path(j->base, j->segment_seq,
+		j->path, sizeof(j->path));
+	retraced_journal_segment_path(j->base, j->segment_seq,
+		opened, sizeof(opened));
+
+	if (j->f != NULL) {
+		fflush(j->f);
+		fclose(j->f);
+		j->f = NULL;
+	}
+	j->seg_bytes = 0;
+	j->lines = 0;
+	j->last_rotate_ts = ts;
+
+	journal_retain(j, ts);
+
+	(void)snprintf(ev, sizeof(ev),
+		"{\"name\":\"retrace.journal.segment_opened\","
+		"\"segment\":\"%s\",\"prev_segment\":\"%s\","
+		"\"prev_head\":\"%016llx\"}",
+		opened, closed, (unsigned long long) head);
+	(void)retraced_journal_event(j, ts, "daemon", 0, ev);
+	j->rotating = 0;
+}
+
 int retraced_journal_event(struct retraced_journal *j,
 	long ts, const char *agent_id, uint64_t seq,
 	const char *payload)
@@ -156,6 +350,20 @@ int retraced_journal_event(struct retraced_journal *j,
 
 	j->prev_hash = link;
 	j->lines++;
+	j->seg_bytes += (uint64_t) n;
+
+	if (!j->rotating &&
+	    (j->rotate_bytes != 0 || j->rotate_seconds != 0)) {
+		int rotate = 0;
+
+		if (j->rotate_bytes != 0 && j->seg_bytes >= j->rotate_bytes)
+			rotate = 1;
+		if (j->rotate_seconds != 0 &&
+		    ts - j->last_rotate_ts >= j->rotate_seconds)
+			rotate = 1;
+		if (rotate)
+			journal_rotate(j, ts);
+	}
 	return 0;
 }
 
@@ -249,21 +457,28 @@ int retraced_journal_tail(struct retraced_journal *j, size_t last_n,
 	return (int)kept;
 }
 
-int retraced_journal_replay(struct retraced_journal *j,
-	struct retraced_registry *r)
+/*
+ * One file of the replay walk. `prev` is the chain head this
+ * file must continue from (0 for a series's first segment).
+ * Tolerates a torn tail only when `last` -- a torn MIDDLE
+ * segment is corruption (fail-closed). Returns the head, or
+ * (uint64_t)-1 on a broken chain / unreadable middle file.
+ */
+static uint64_t journal_replay_file(struct retraced_journal *j,
+	struct retraced_registry *r, const char *path,
+	uint64_t prev, int last)
 {
-	FILE *f = fopen(j->path, "r");
+	FILE *f = fopen(path, "r");
 	char line[2048];
-	uint64_t prev = 0;
 	uint64_t lineno = 0;
 	int saw_torn = 0;
 
-	j->replay_ok = 0;
-	j->replay_events = 0;
-	j->chain_broken_at = -1;
-	j->clean_close = 0;
-	if (f == NULL)
-		return -1;
+	if (f == NULL) {
+		if (last)
+			return prev;
+		j->chain_broken_at = 0;
+		return (uint64_t) -1;
+	}
 
 	while (fgets(line, sizeof(line), f) != NULL) {
 		size_t len = strlen(line);
@@ -272,7 +487,6 @@ int retraced_journal_replay(struct retraced_journal *j,
 		JSON_Value *v;
 		JSON_Object *o;
 		const char *agent;
-		const char *ev;
 		double seq;
 
 		lineno++;
@@ -290,21 +504,33 @@ int retraced_journal_replay(struct retraced_journal *j,
 			break;
 		}
 		o = json_value_get_object(v);
-		stored_prev = (uint64_t)strtoull(
-			json_object_get_string(o, "prev"), NULL, 16);
+		{
+			const char *prev_str = json_object_get_string(o,
+				"prev");
+
+			/* a line without its chain link is malformed
+			 * (tampering, not a torn tail): broken
+			 */
+			if (prev_str == NULL) {
+				j->chain_broken_at = (int)lineno;
+				json_value_free(v);
+				fclose(f);
+				return (uint64_t) -1;
+			}
+			stored_prev = (uint64_t)strtoull(
+				prev_str, NULL, 16);
+		}
 		if (stored_prev != prev) {
 			j->chain_broken_at = (int)lineno;
 			json_value_free(v);
 			fclose(f);
-			return -1;
+			return (uint64_t) -1;
 		}
 		link = fnv1a(line,
 			prev ^ 0x9e3779b97f4a7c15ULL);
 
 		agent = json_object_get_string(o, "agent");
-		ev = json_object_get_string(o, "ev");
 		seq = json_object_get_number(o, "seq");
-		(void)ev;
 		if (agent != NULL) {
 			struct agent_entry *e =
 				retraced_registry_find(r, agent);
@@ -324,19 +550,88 @@ int retraced_journal_replay(struct retraced_journal *j,
 		prev = link;
 	}
 	fclose(f);
-	j->replay_ok = lineno - (saw_torn ? 1 : 0);
-	j->prev_hash = prev;
-	j->lines = lineno - (saw_torn ? 1 : 0);
-	(void)saw_torn;
-	return 0;
+	j->replay_ok += lineno - (saw_torn ? 1 : 0);
+	if (last)
+		j->lines = lineno - (saw_torn ? 1 : 0);
+	return prev;
+}
+
+int retraced_journal_replay(struct retraced_journal *j,
+	struct retraced_registry *r)
+{
+	j->replay_ok = 0;
+	j->replay_events = 0;
+	j->chain_broken_at = -1;
+	j->clean_close = 0;
+
+	/* the rotation series: oldest -> live, one chain across
+	 * all segments (each genesis carries its predecessor's
+	 * head, so continuity is verified, not assumed)
+	 */
+	if (j->rotate_bytes != 0 || j->rotate_seconds != 0) {
+		int lo = retraced_journal_segment_lo(j->base,
+			j->segment_seq);
+		uint64_t prev = 0;
+		int seq;
+
+		if (lo < 0)
+			return 0;	/* fresh series */
+		for (seq = lo; seq <= j->segment_seq; seq++) {
+			char p[600];
+
+			retraced_journal_segment_path(j->base, seq,
+				p, sizeof(p));
+			prev = journal_replay_file(j, r, p, prev,
+				seq == j->segment_seq);
+			if (prev == (uint64_t) -1)
+				return -1;
+		}
+		j->prev_hash = prev;
+		return 0;
+	}
+
+	/* the single-file journal: a missing file is a fresh boot
+	 * (the daemon's "no prior journal" path)
+	 */
+	if (!retraced_journal_segment_exists(j->path, NULL))
+		return -1;
+
+	{
+		uint64_t prev = journal_replay_file(j, r, j->path, 0, 1);
+
+		if (prev == (uint64_t) -1)
+			return -1;
+		j->prev_hash = prev;
+		return 0;
+	}
+}
+
+uint64_t retraced_journal_line_hash(const char *line,
+	uint64_t prev)
+{
+	return fnv1a(line, prev ^ 0x9e3779b97f4a7c15ULL);
 }
 
 int retraced_journal_chain_file(const char *path, size_t stop_at,
 	uint64_t *head_out, size_t *lines_out, size_t *broken_at)
 {
+	return retraced_journal_chain_file_from(path, 0, stop_at,
+		head_out, lines_out, broken_at);
+}
+
+/*
+ * The segment-aware variant (TODO.impl/10): verify one segment
+ * of a rotated series, starting from the PREDECESSOR's final
+ * head -- the chain continues across files, so a non-first
+ * segment's genesis link is that head, not zero.
+ */
+int retraced_journal_chain_file_from(const char *path,
+	uint64_t start_prev, size_t stop_at,
+	uint64_t *head_out, size_t *lines_out, size_t *broken_at)
+{
 	FILE *f = fopen(path, "r");
 	char line[2048];
-	uint64_t prev = 0;
+	uint64_t prev = start_prev;
 	size_t lines = 0;
 
 	*broken_at = 0;

@@ -38,6 +38,7 @@
 
 #include "engine.h"
 #include "real_impls.h"
+#include "caller_cache.h"
 
 /* No libc classification/conversion calls here: the parser runs
  * inside the engine (config validation at boot, first-action
@@ -770,121 +771,96 @@ retrace_filter_free(struct retrace_filter_ast *ast)
 /* Resolve an operand to a string (returns NULL when it is not
  * string-typed or the value is unavailable).
  */
-static const char *
-operand_str(const struct foperand *o, const struct ThreadContext *t_ctx,
-	    const char *func_name)
+/* ---- evaluation (resolver-driven) ---------------------------------------
+ *
+ * One tree, many value domains: the parser is domain-free and
+ * the evaluator asks a RESOLVER for name -> value. The engine
+ * installs the ThreadContext resolver below; the journal query
+ * installs a JSON-object resolver (TODO.impl/10) -- the same
+ * expression language everywhere.
+ */
+
+struct resolve_ctx {
+	const struct retrace_filter_resolver *res;
+	void *user;
+};
+
+/* Operand -> resolver name. Literals short-circuit; builtins
+ * become their own names ("func", "ret", "caller") that the
+ * domain's resolver answers -- the ThreadContext resolver
+ * knows them; a JSON event may have fields with those names.
+ */
+static int
+operand_lookup(const struct foperand *o, struct resolve_ctx *rc,
+	       int as_str, const char **sout, long long *nout)
 {
+	const char *name;
+
 	switch (o->kind) {
 	case FO_STR:
-	case FO_FUNC:
-		return o->kind == FO_FUNC ? func_name : o->str;
-	case FO_CALLER:
-		return NULL;	/* resolved by the action layer */
-	case FO_PARAM: {
-		int i;
-
-		for (i = 0; i < t_ctx->params_cnt; i++) {
-			const struct FuncParam *fp = &t_ctx->params[i];
-
-			if (STR_EQ(fp->param_meta.name, o->str)) {
-				if ((fp->param_meta.modifiers &
-				     0x1 /* CDM_POINTER */) &&
-				    fp->val != 0 &&
-				    STR_EQ(fp->param_meta.ref_type_name, "sz"))
-					return (const char *)
-						(intptr_t) fp->val;
-				return NULL;
-			}
+		if (as_str) {
+			*sout = o->str;
+			return 1;
 		}
-		return NULL;
-	}
-	default:
-		return NULL;
-	}
-}
-
-static int
-operand_num(const struct foperand *o, const struct ThreadContext *t_ctx,
-	    long long *out, int *known)
-{
-	switch (o->kind) {
+		return 0;	/* literal string is not numeric */
 	case FO_NUM:
-		*out = o->num;
-		*known = 1;
-		return 1;
-	case FO_RET:
-		*out = (long long) t_ctx->ret_val;
-		*known = 1;
-		return 1;
-	case FO_PARAM: {
-		int i;
-
-		for (i = 0; i < t_ctx->params_cnt; i++) {
-			const struct FuncParam *fp = &t_ctx->params[i];
-
-			if (STR_EQ(fp->param_meta.name, o->str)) {
-				/*
-				 * string params are compared with ~ /
-				 * == on strings, never as numbers
-				 */
-				if ((fp->param_meta.modifiers & 0x1) &&
-				    fp->val != 0 &&
-				    STR_EQ(fp->param_meta.ref_type_name,
-					   "sz"))
-					return 0;
-				*out = (long long) fp->val;
-				*known = 1;
-				return 1;
-			}
+		if (!as_str) {
+			*nout = o->num;
+			return 1;
 		}
-		*known = 0;
-		return 1;
-	}
+		return 0;
+	case FO_PARAM:
+	case FO_FUNC:
+	case FO_RET:
+	case FO_CALLER:
+		name = o->str;
+		break;
 	default:
-		return 0;	/* string-typed operand: not numeric */
+		return 0;
 	}
+
+	if (as_str)
+		return rc->res->str(rc->user, name, sout);
+	return rc->res->num(rc->user, name, nout);
 }
 
 static int
-eval_node(const struct fnode *n, const struct ThreadContext *t_ctx,
-	  const char *func_name)
+eval_node(const struct fnode *n, struct resolve_ctx *rc)
 {
 	switch (n->kind) {
 	case FN_OR:
-		return eval_node(n->u.bin.lhs, t_ctx, func_name) ||
-		       eval_node(n->u.bin.rhs, t_ctx, func_name);
+		return eval_node(n->u.bin.lhs, rc) ||
+		       eval_node(n->u.bin.rhs, rc);
 	case FN_AND:
-		return eval_node(n->u.bin.lhs, t_ctx, func_name) &&
-		       eval_node(n->u.bin.rhs, t_ctx, func_name);
+		return eval_node(n->u.bin.lhs, rc) &&
+		       eval_node(n->u.bin.rhs, rc);
 	case FN_NOT:
-		return !eval_node(n->u.child, t_ctx, func_name);
+		return !eval_node(n->u.child, rc);
 	case FN_CMP: {
 		const struct foperand *lhs = &n->u.cmp.lhs;
 		const struct foperand *rhs = &n->u.cmp.rhs;
 		enum fop_kind op = n->u.cmp.op;
 		long long l, r;
-		int lknown = 1, rknown = 1;
+		const char *ls = NULL;
 
 		switch (op) {
 		case FO_GLOB:
 		case FO_NGLOB: {
-			const char *s = operand_str(lhs, t_ctx, func_name);
 			int m;
 
-			if (s == NULL)
+			if (!operand_lookup(lhs, rc, 1, &ls, NULL) ||
+			    ls == NULL)
 				return 0;
-			m = retrace_filter_glob_match(rhs->str, s);
+			m = retrace_filter_glob_match(rhs->str, ls);
 			return op == FO_GLOB ? m : !m;
 		}
 		default:
 			break;
 		}
 
-		if (!operand_num(lhs, t_ctx, &l, &lknown) ||
-		    !operand_num(rhs, t_ctx, &r, &rknown))
-			return 0;	/* string vs relational/typed mix */
-		if (!lknown || !rknown)
-			return 0;	/* unknown param: no match */
+		if (!operand_lookup(lhs, rc, 0, NULL, &l) ||
+		    !operand_lookup(rhs, rc, 0, NULL, &r))
+			return 0;	/* unknown / not numeric: no match */
 
 		switch (op) {
 		case FO_EQ: return l == r;
@@ -901,13 +877,115 @@ eval_node(const struct fnode *n, const struct ThreadContext *t_ctx,
 }
 
 int
-retrace_filter_eval(const struct retrace_filter_ast *ast,
-		    const struct ThreadContext *t_ctx,
-		    const char *func_name)
+retrace_filter_eval_resolved(const struct retrace_filter_ast *ast,
+	const struct retrace_filter_resolver *resolver, void *user)
 {
+	struct resolve_ctx rc;
+
 	if (ast == NULL)
 		return 1;
+	rc.res = resolver;
+	rc.user = user;
+	return eval_node(ast->root, &rc);
+}
+
+/* ---- the ThreadContext resolver (the engine's domain) ------------------- */
+
+struct tctx_user {
+	const struct ThreadContext *t_ctx;
+	const char *func_name;
+};
+
+static int
+tctx_str(void *user, const char *name, const char **out)
+{
+	struct tctx_user *u = (struct tctx_user *) user;
+
+	*out = NULL;
+	if (STR_EQ(name, "func")) {
+		*out = u->func_name;
+		return 1;
+	}
+	if (STR_EQ(name, "caller")) {
+		rc_dl_info_t info;
+
+		if (u->t_ctx->ret_addr == NULL)
+			return 1;
+		if (!retrace_caller_cache_lookup(u->t_ctx->ret_addr,
+						 &info))
+			return 1;
+		*out = info.dli_sname;
+		return 1;
+	}
+
+	{
+		int i;
+
+		for (i = 0; i < u->t_ctx->params_cnt; i++) {
+			const struct FuncParam *fp = &u->t_ctx->params[i];
+
+			if (STR_EQ(fp->param_meta.name, name)) {
+				if ((fp->param_meta.modifiers &
+				     0x1 /* CDM_POINTER */) &&
+				    fp->val != 0 &&
+				    STR_EQ(fp->param_meta.ref_type_name, "sz"))
+					*out = (const char *)
+						(intptr_t) fp->val;
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
+
+static int
+tctx_num(void *user, const char *name, long long *out)
+{
+	struct tctx_user *u = (struct tctx_user *) user;
+
+	if (STR_EQ(name, "ret")) {
+		*out = (long long) u->t_ctx->ret_val;
+		return 1;
+	}
+
+	{
+		int i;
+
+		for (i = 0; i < u->t_ctx->params_cnt; i++) {
+			const struct FuncParam *fp = &u->t_ctx->params[i];
+
+			if (STR_EQ(fp->param_meta.name, name)) {
+				/*
+				 * string params are compared with ~ /
+				 * == on strings, never as numbers
+				 */
+				if ((fp->param_meta.modifiers & 0x1) &&
+				    fp->val != 0 &&
+				    STR_EQ(fp->param_meta.ref_type_name,
+					   "sz"))
+					return 0;
+				*out = (long long) fp->val;
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
+
+static const struct retrace_filter_resolver tctx_resolver = {
+	.num = tctx_num,
+	.str = tctx_str,
+};
+
+int
+retrace_filter_eval(const struct retrace_filter_ast *ast,
+	const struct ThreadContext *t_ctx, const char *func_name)
+{
+	struct tctx_user u;
+
 	if (t_ctx == NULL)
 		return 0;
-	return eval_node(ast->root, t_ctx, func_name);
+	u.t_ctx = t_ctx;
+	u.func_name = func_name;
+	return retrace_filter_eval_resolved(ast, &tctx_resolver, &u);
 }

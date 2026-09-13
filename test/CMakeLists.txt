@@ -392,6 +392,19 @@ if(Python3_Interpreter_FOUND)
 		LABELS "integration"
 		TIMEOUT 120)
 
+	# The journal lifecycle (TODO.impl/10): rotation to a
+	# numbered segment series, retention under a byte budget
+	# (chained prune records), verify across segments, and the
+	# query == grep parity -- driven through the real daemon.
+	add_test(NAME integration-journal-lifecycle
+		COMMAND ${Python3_EXECUTABLE}
+			${CMAKE_SOURCE_DIR}/test/integration/test_journal_lifecycle.py
+			$<TARGET_FILE:retrace_retraced>
+			$<TARGET_FILE:retrace_ctl>)
+	set_tests_properties(integration-journal-lifecycle PROPERTIES
+		LABELS "integration"
+		TIMEOUT 60)
+
 	# The filter expression language (TODO.impl/08): only
 	# matching calls reach the log; a bad expression refuses
 	# the config at boot. Runs on every preload lane.

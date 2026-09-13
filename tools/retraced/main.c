@@ -580,6 +580,9 @@ int main(int argc, char **argv)
 {
 	const char *sock_path = "/tmp/retraced.agent.sock";
 	const char *journal_path = "retraced-journal.jsonl";
+	uint64_t journal_rotate_bytes = 0;
+	long journal_rotate_seconds = 0;
+	uint64_t journal_budget_bytes = 0;
 	const char *policy_path = NULL;
 	const char *ctl_path = NULL;
 	const char *signing_key = NULL;
@@ -620,6 +623,18 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[i], "--journal") == 0 &&
 			 i + 1 < argc)
 			journal_path = argv[++i];
+		else if (strcmp(argv[i], "--journal-rotate-bytes") == 0 &&
+			 i + 1 < argc)
+			journal_rotate_bytes = strtoull(argv[++i],
+				NULL, 10);
+		else if (strcmp(argv[i], "--journal-rotate-seconds") == 0 &&
+			 i + 1 < argc)
+			journal_rotate_seconds = strtol(argv[++i],
+				NULL, 10);
+		else if (strcmp(argv[i], "--journal-budget-bytes") == 0 &&
+			 i + 1 < argc)
+			journal_budget_bytes = strtoull(argv[++i],
+				NULL, 10);
 		else if (strcmp(argv[i], "--policy") == 0 &&
 			 i + 1 < argc)
 			policy_path = argv[++i];
@@ -734,6 +749,8 @@ int main(int argc, char **argv)
 
 	retraced_registry_init(&reg);
 	retraced_journal_open(&jr, journal_path);
+	retraced_journal_set_rotation(&jr, journal_rotate_bytes,
+		journal_rotate_seconds, journal_budget_bytes);
 	{
 		int rc = retraced_journal_replay(&jr, &reg);
 

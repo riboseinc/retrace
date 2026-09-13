@@ -80,6 +80,34 @@ struct retrace_filter_ast *retrace_filter_compile(
 
 void retrace_filter_free(struct retrace_filter_ast *ast);
 
+/*
+ * The resolver seam (TODO.impl/10): one parser, one tree, many
+ * value domains. A resolver answers name -> value lookups with
+ * dynamic typing (a name may resolve to a number, a string,
+ * both, or nothing). The engine installs the ThreadContext
+ * resolver; the journal query installs a JSON-object resolver
+ * -- the expression language stays identical everywhere.
+ */
+struct retrace_filter_resolver {
+	/* Fill *out for `name` as a number. Returns 1 when the
+	 * name resolves (numerically), 0 when unknown/not numeric.
+	 */
+	int (*num)(void *user, const char *name, long long *out);
+	/* Fill *out for `name` as a string (NULL when the name
+	 * resolves but is not a string). Returns 1 when the name
+	 * resolves, 0 when unknown.
+	 */
+	int (*str)(void *user, const char *name, const char **out);
+};
+
+/* Evaluate the tree against a resolver's value domain.
+ * Returns 1 (match) or 0 (no match). NULL ast matches
+ * everything (zero-cost when absent).
+ */
+int retrace_filter_eval_resolved(
+	const struct retrace_filter_ast *ast,
+	const struct retrace_filter_resolver *resolver, void *user);
+
 /* Evaluate against a call. `func_name` is the intercepted
  * function (t_ctx->prototype->name on the engine path).
  * Returns 1 (match -- continue the script) or 0 (no match).
