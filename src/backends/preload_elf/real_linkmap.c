@@ -46,8 +46,15 @@ void *retrace_as_real_from_linkmap(const char *name)
 		void *h;
 		void *p;
 
-		if (lm->l_addr == 0)
-			continue;	/* the main executable */
+		/* the main executable: non-PIE carries l_addr == 0;
+		 * PIE carries a nonzero bias AND an empty l_name.
+		 * Either shape must be skipped -- a dlsym on the
+		 * main handle follows its dependency chain, and the
+		 * preload sits at its head: the "real" impl would be
+		 * our own wrapper (the infinite recursion)
+		 */
+		if (lm->l_addr == 0 || lm->l_name[0] == '\0')
+			continue;
 		if ((void *)lm->l_addr == self_base)
 			continue;	/* ourselves: our export IS the wrapper */
 		h = dlopen(lm->l_name, RTLD_LAZY | RTLD_NOLOAD);
