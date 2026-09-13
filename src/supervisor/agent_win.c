@@ -66,6 +66,9 @@ static struct {
 	CONDITION_VARIABLE cv;
 } w_agent;
 
+/* EAGER arming (TODO.impl/11): join at boot, not first dispatch */
+static int w_eager_wanted;
+
 static void w_set_reason(char *out, size_t cap, const char *msg)
 {
 	if (out != NULL && cap > 0)
@@ -449,7 +452,24 @@ int retrace_agent_init(void)
 	snprintf(w_agent.sock_path, sizeof(w_agent.sock_path), "%s",
 		sock);
 	w_agent.enabled = 1;
+	{
+		const char *eager = retrace_real_impls.getenv(
+			"RETRACE_SUPERVISOR_EAGER");
+
+		w_eager_wanted = eager != NULL && eager[0] == '1';
+	}
 	return 0;
+}
+
+void retrace_agent_boot(void)
+{
+	/* the boot-time eager join: retrace_core_boot's tail calls
+	 * this AFTER retrace_inited -- the engine is whole, and a
+	 * workload that never dispatches still HELLOs
+	 */
+	if (!w_agent.enabled || !w_eager_wanted)
+		return;
+	retrace_agent_kick();
 }
 
 void retrace_agent_kick(void)

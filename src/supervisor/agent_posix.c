@@ -1003,6 +1003,17 @@ int retrace_agent_init(void)
  */
 static _Atomic int g_kick_done;
 
+void retrace_agent_boot(void)
+{
+	/*
+	 * EAGER joins at the first kick on this platform: kick owns
+	 * the thread spawn and its dlsym/atfork sequence is only
+	 * safe inside the engine's reentrancy guard -- a boot-time
+	 * spawn would resolve outside any guard and cycle the
+	 * dispatch path (the documented stack overflow).
+	 */
+}
+
 void retrace_agent_kick(void)
 {
 	if (atomic_load_explicit(&g_kick_done, memory_order_relaxed))
