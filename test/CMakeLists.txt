@@ -542,6 +542,38 @@ if(Python3_Interpreter_FOUND)
 			PROPERTIES LABELS "integration"
 			TIMEOUT 120)
 
+		# goretrace (TODO.impl/12): the Go runtime lane. The
+		# fetcher is a cgo build (name resolution = the libc
+		# lane beside the runtime lane). Go-gated: the test
+		# self-skips where the toolchain is absent.
+		find_program(GO_EXECUTABLE go)
+		if(GO_EXECUTABLE AND Python3_Interpreter_FOUND)
+			set(_go_src ${CMAKE_SOURCE_DIR}/test/go/gofetch)
+			set(_go_out
+				${CMAKE_BINARY_DIR}/test/go/gofetch)
+			add_custom_command(OUTPUT ${_go_out}
+				COMMAND ${CMAKE_COMMAND} -E make_directory
+					${CMAKE_BINARY_DIR}/test/go
+				COMMAND ${GO_EXECUTABLE} build -tags netcgo
+					-o ${_go_out} .
+				WORKING_DIRECTORY ${_go_src}
+				DEPENDS ${_go_src}/main.go
+					${_go_src}/go.mod
+				COMMENT "building the go lane E2E target"
+				VERBATIM)
+			add_custom_target(goretrace_fetcher ALL
+				DEPENDS ${_go_out})
+			add_test(NAME integration-goretrace
+				COMMAND ${Python3_EXECUTABLE}
+					${CMAKE_SOURCE_DIR}/test/integration/test_goretrace.py
+					$<TARGET_FILE:retrace_retraced>
+					${_go_out}
+					$<TARGET_FILE:retrace_v2>)
+			set_tests_properties(integration-goretrace
+				PROPERTIES LABELS "integration"
+				TIMEOUT 180)
+		endif()
+
 		# TLS fleet transport (TODO.supervisor/08 P1 /
 		# TODO.beyond-libc/05): mTLS + claim scopes. Needs
 		# OpenSSL both at build (daemon linked) and at test
