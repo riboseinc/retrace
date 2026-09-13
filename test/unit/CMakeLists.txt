@@ -327,6 +327,15 @@ retrace_add_unit_test(campaign_model
                    ${CMAKE_SOURCE_DIR}/src/config/json
                    ${CMAKE_SOURCE_DIR}/test/property/parson_stub)
 
+# The pure TLS plaintext summarizer (TODO.impl/13): standalone
+# by the card-06 law -- only tls_summary.c, no engine linkage.
+retrace_add_unit_test(tls_summary
+	STANDALONE
+	EXTRA_SOURCES
+	${CMAKE_SOURCE_DIR}/src/core/actions/tls_summary.c
+	EXTRA_INCLUDES
+	${CMAKE_SOURCE_DIR}/src/core/actions)
+
 retrace_add_unit_test(journal_chain
 	EXTRA_SOURCES
 	${CMAKE_SOURCE_DIR}/tools/retraced/journal.c
