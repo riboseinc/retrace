@@ -74,6 +74,7 @@ def main():
     # python code-scanning rule's TLSv1 heuristic)
     sctx = ssl.create_default_context(
         ssl.Purpose.CLIENT_AUTH)
+    sctx.minimum_version = ssl.TLSVersion.TLSv1_2
     sctx.load_cert_chain(cert, key)
     srv.socket = sctx.wrap_socket(srv.socket, server_side=True)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
