@@ -25,7 +25,8 @@
  * iteration is the FNV-1a of the seed file's CONTENT (same
  * seed file -> same fuzz sequence). memory_fuzz reads the env
  * seed when its config has no explicit fuzz_seed (>= 2.21.0).
- * Exit 1 when any crash cluster exists (CI-able).
+ * Exit 1 when ANY failure cluster exists -- crashes AND
+ * assertion markers (CI-able).
  *
  * POSIX only in v1 (fork/exec); Windows honestly refused.
  */
@@ -44,6 +45,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 #include "parson.h"
@@ -231,20 +233,63 @@ static const char *find_lib(const char *arg)
 }
 
 /* run one iteration; returns waitpid status; trace read back */
+/*
+ * The iteration's COVERAGE id: the engine's per-thread
+ * call-hashes (RETRACE_CALL_HASH) combine by XOR -- order-free
+ * and commutative, so the id names the run's CALL HISTORY
+ * (TODO.impl/17). Two same-signature deaths with different
+ * histories separate in the cluster report. Absent hashes
+ * (lane off, crash before the destructor) leave 0: legacy
+ * behavior, never separates.
+ */
+static unsigned long parse_call_hashes(const char *stderr_text)
+{
+	unsigned long cov = 0;
+	const char *p = stderr_text != NULL ? stderr_text : "";
+
+	while ((p = strstr(p, "thread hash: 0x")) != NULL) {
+		cov ^= strtoul(p + strlen("thread hash: 0x"), NULL,
+			16);
+		p++;
+	}
+	return cov;
+}
+
+static char *read_file(const char *path, size_t *len);
+
+/* the --config, handed to every iteration's child */
+static const char *g_fuzz_config;
+
 static int run_iter(char *const argv[], const char *lib,
-	unsigned long seed, const char *trace_path)
+	unsigned long seed, const char *trace_path,
+	const char *stderr_path, unsigned long *coverage)
 {
 	pid_t pid = fork();
 	int status = 0;
 	char seed_env[32];
 
+	*coverage = 0;
 	if (pid < 0)
 		return -1;
 	if (pid == 0) {
 		char logenv[1024];
+		int efd = open(stderr_path, O_WRONLY | O_CREAT |
+			O_TRUNC, 0600);
 
+		if (efd >= 0) {
+			dup2(efd, 2);
+			close(efd);
+		}
 		snprintf(seed_env, sizeof(seed_env), "%lu", seed);
 		setenv("RETRACE_FUZZ_SEED", seed_env, 1);
+		setenv("RETRACE_CALL_HASH", "1", 1);
+		/* the SAME config every iteration rides: the tool
+		 * read --config for its own baseline but never
+		 * handed it to the target (the coverage E2E caught
+		 * the gap: zero dispatches, zero clusters)
+		 */
+		if (g_fuzz_config != NULL)
+			setenv("RETRACE_JSON_CONFIG", g_fuzz_config, 1);
 		snprintf(logenv, sizeof(logenv), "%s",
 			trace_path);
 		setenv("RETRACE_LOGGER_DEF_FN", logenv, 1);
@@ -260,6 +305,14 @@ static int run_iter(char *const argv[], const char *lib,
 	}
 	if (waitpid(pid, &status, 0) < 0)
 		return -1;
+	{
+		size_t sl = 0;
+		char *se = read_file(stderr_path, &sl);
+
+		*coverage = parse_call_hashes(se);
+		free(se);
+		remove(stderr_path);
+	}
 	return status;
 }
 
@@ -464,9 +517,11 @@ int main(int argc, char **argv)
 		for (k = 0; k < nn; k++) {
 			char seed_path[1024];
 			char trace_path[1100];
+			char stderr_path[1100];
 			char *content;
 			size_t clen = 0;
 			unsigned long seed;
+			unsigned long coverage;
 			int status;
 			char *trace = NULL;
 			unsigned long cid;
@@ -475,16 +530,19 @@ int main(int argc, char **argv)
 				seeds_dir, names[k]);
 			snprintf(trace_path, sizeof(trace_path),
 				"%s-trace-%zu.json", work, k);
+			snprintf(stderr_path, sizeof(stderr_path),
+				"%s-stderr-%zu.txt", work, k);
 			content = read_file(seed_path, &clen);
 			if (content == NULL)
 				continue;
 			seed = fnv1a_buf(content, clen, 0x811C9DC5UL);
 			free(content);
 
-			status = run_iter(cmd, lib, seed, trace_path);
+			status = run_iter(cmd, lib, seed, trace_path,
+				stderr_path, &coverage);
 			trace = read_file(trace_path, NULL);
 			cid = fuzz_report_fold(&rep, status, trace, seed,
-				marker);
+				marker, coverage);
 			if (cid != 0) {
 				printf("  seed %s -> cluster %lu (%s)\n",
 					names[k], cid,
@@ -630,7 +688,11 @@ int main(int argc, char **argv)
 			fprintf(stderr,
 "retrace-fuzz-report: findings exported to %s\n", endpoint);
 		}
-		if (rep.crashes > 0)
+		/* ANY failure cluster gates CI (TODO.impl/17): an
+		 * assertion cluster is a found bug exactly like a
+		 * signal death -- exiting 0 for it hid findings
+		 */
+		if (rep.crashes > 0 || rep.assertions > 0)
 			exit_code = 1;
 		fuzz_report_free(&rep);
 	}

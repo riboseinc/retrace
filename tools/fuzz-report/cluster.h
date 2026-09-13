@@ -25,6 +25,7 @@ struct FuzzCluster {
 	char func[64];          /* last-called function */
 	int params;             /* its param count */
 	size_t count;           /* iterations in this cluster */
+	unsigned long coverage; /* the call-hash id (0 = none) */
 	unsigned long first_seed; /* reproducer seed */
 	int is_crash;           /* 1: signal death; 0: assertion */
 };
@@ -47,10 +48,14 @@ void fuzz_report_free(struct FuzzReport *r);
  * the iteration's trace text (may be NULL/empty). seed: the
  * RETRACE_FUZZ_SEED value used. marker: assertion substring
  * found in the trace (NULL disables assertion classification).
+ * coverage: the iteration's call-hash id (RETRACE_CALL_HASH's
+ * per-thread hashes, combined); 0 = the lane carried none
+ * (legacy behavior: coverage never separates).
  * Returns the cluster id the iteration landed in.
  */
 unsigned long fuzz_report_fold(struct FuzzReport *r, int exit_status,
-	const char *trace_json, unsigned long seed, const char *marker);
+	const char *trace_json, unsigned long seed, const char *marker,
+	unsigned long coverage);
 
 /* Serialize (owned JSON object; caller frees). */
 JSON_Value *fuzz_report_to_json(const struct FuzzReport *r);

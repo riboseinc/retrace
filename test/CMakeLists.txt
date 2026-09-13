@@ -576,6 +576,26 @@ if(Python3_Interpreter_FOUND)
 			TIMEOUT 120)
 		# Live hit-level drift grading (TODO.impl/18): the
 		# daemon names WHAT escaped; correlate agrees offline.
+		# The coverage-guided bridge (TODO.impl/17):
+		# same-signature deaths separate by call history;
+		# minimized corpus reported. POSIX-only (the tool's
+		# own v1 boundary).
+		add_executable(retrace_fuzz_cov_target
+			smoke/fuzz_cov_target.c)
+		set_target_properties(retrace_fuzz_cov_target
+			PROPERTIES
+			OUTPUT_NAME fuzz-cov-target
+			RUNTIME_OUTPUT_DIRECTORY
+				"${CMAKE_BINARY_DIR}/test/smoke")
+		add_test(NAME integration-fuzz-cov
+			COMMAND ${Python3_EXECUTABLE}
+				${CMAKE_SOURCE_DIR}/test/integration/test_fuzz_cov.py
+				$<TARGET_FILE:retrace_fuzz_report>
+				$<TARGET_FILE:retrace_v2>
+				$<TARGET_FILE:retrace_fuzz_cov_target>)
+		set_tests_properties(integration-fuzz-cov
+			PROPERTIES LABELS "integration"
+			TIMEOUT 180)
 		add_test(NAME integration-drift-hit
 			COMMAND ${Python3_EXECUTABLE}
 				${CMAKE_SOURCE_DIR}/test/integration/test_drift_hit.py
