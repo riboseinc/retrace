@@ -5,6 +5,8 @@
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
 	set(_retrace_arch aarch64)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "mips64")
+	set(_retrace_arch mips64)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
 	set(_retrace_arch x86_64)
 else()

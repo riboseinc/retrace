@@ -31,6 +31,8 @@ if(RETRACE_PLATFORM_DARWIN AND CMAKE_OSX_ARCHITECTURES)
 	endif()
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
 	set(_v2_arch aarch64)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "mips64")
+	set(_v2_arch mips64)
 else()
 	set(_v2_arch x86_64)
 endif()
@@ -39,6 +41,16 @@ if(EXISTS "${_v2_backend_dir}/${_v2_arch}/funcs_symbols.S")
 	set(_v2_trampoline_sources ${_v2_backend_dir}/${_v2_arch}/funcs_symbols.S)
 else()
 	set(_v2_trampoline_sources funcs_symbols.S)
+endif()
+
+# MIPS n64: the odd FP argument registers ($f13..$f19) only
+# assemble under -mfp64 -- the in-file `.set fp=64` directive
+# does not flip gas's register-bank model (the Debian cross-as
+# finding). The flags ride the trampoline TU only.
+if(_v2_arch STREQUAL "mips64")
+	set_source_files_properties(${_v2_trampoline_sources}
+		PROPERTIES COMPILE_OPTIONS
+		"-march=mips64r2;-mabi=64;-mfp64")
 endif()
 
 add_library(retrace_v2 SHARED ${_v2_trampoline_sources})
