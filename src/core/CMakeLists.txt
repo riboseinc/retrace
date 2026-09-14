@@ -102,6 +102,8 @@ add_library(retrace_core OBJECT
 if(RETRACE_PLATFORM_LINUX)
 	if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
 		set(_retrace_arch_dir aarch64)
+	elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "mips64")
+		set(_retrace_arch_dir mips64)
 	else()
 		set(_retrace_arch_dir x86_64)
 	endif()
