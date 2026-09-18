@@ -167,7 +167,9 @@ jobs:
           # record, and it carries everything asserted here.
           [ "$rc" -eq 0 ]
           echo "$out" | grep -qF '"func": "open"'
-          echo "$out" | grep -qF '"/etc/hosts"'
+          # parson escapes forward slashes on the wire: the
+          # trace renders \/etc\/hosts
+          echo "$out" | grep -qF '\\/etc\\/hosts'
           # the int param must survive the big-endian slot addressing
           echo "$out" | grep -qF '"fd": "4"'
           echo "$out" | grep -qF '"func": "read"'
