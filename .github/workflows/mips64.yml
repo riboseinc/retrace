@@ -151,13 +151,14 @@ jobs:
           export LD_PRELOAD="$PWD/build/src/v2/libretrace.so"
 
           out="$(${QEMU} -L /usr/${CROSS} ./probe)"
+          unset LD_PRELOAD
           echo "$out"
           echo "$out" | grep -q '^len=4$'
           echo "$out" | grep -q '^fd='
           # the int param must survive the big-endian slot addressing
-          grep -qF '"func": "read"' trace.log
-          grep -qF '"fd": "4"' trace.log
-          grep -qF '"/etc/hosts"' trace.log
+          echo "$out" | grep -qF '"func": "read"'
+          echo "$out" | grep -qF '"fd": "4"'
+          echo "$out" | grep -qF '"/etc/hosts"'
 
       - name: E2E - policy denial enforced under qemu
         run: |
@@ -176,6 +177,7 @@ jobs:
           export LD_PRELOAD="$PWD/build/src/v2/libretrace.so"
 
           out="$(${QEMU} -L /usr/${CROSS} ./probe)"
+          unset LD_PRELOAD
           echo "$out"
           # open() denied: the probe must not print its fd line
           echo "$out" | grep -q '^len=4$'
@@ -183,4 +185,4 @@ jobs:
                   echo "ERROR: open was not denied" >&2
                   exit 1
           fi
-          grep -qF 'modify_return_value_int' deny.log
+          echo "$out" | grep -qF 'modify_return_value_int'
