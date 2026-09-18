@@ -87,6 +87,15 @@
  */
 .macro WRAPPER_ENTRY_MIPS64 func_name
 	.text
+	/* 4-byte instruction alignment is NOT optional: the
+	 * previous expansion ends with the .asciz name string,
+	 * and an odd-length name ("malloc" -> 7 bytes) leaves the
+	 * location counter odd. An odd FUNC symbol value IS the
+	 * MIPS microMIPS ISA-mode bit -- ld propagates it into
+	 * dynsym and GOT, and the runtime literally switches
+	 * ISA mode on call (the qemu exception-0xc crash).
+	 */
+	.align  2
 	.global \func_name\()_retrace_wrapper
 	.global \func_name
 	.type   \func_name\()_retrace_wrapper, @function
@@ -130,23 +139,35 @@
 	sw      $0, OFFS_RET_IS_FP($sp)
 
 	/* C call: $4 = name string, $5 = frame.
-	 * PC-relative load (the bal trick): %highest/%hi/%lo
-	 * against the local .rodata name fail as shared-object
-	 * relocations, and the GOT forms need $gp this early-
-	 * called wrapper cannot assume. $31 is ALREADY saved in
-	 * the frame, so bal may clobber it.
+	 *
+	 * MIPS n64 PIC law: a callee derives $gp from $t9
+	 * (.cpsetup). A bare `jal` leaves $t9 stale, so the
+	 * engine's prologue computed a garbage $gp and died on
+	 * its first global access (the qemu misaligned-pc crash).
+	 * So set $t9 = &retrace_engine_wrapper and jalr. Both the
+	 * callee address and the name string are loaded
+	 * PC-relatively (bal + same-section local-delta %hi/%lo):
+	 * the GOT/_gp_disp forms are rejected by ld from an ASM
+	 * TU, and a cross-TU delta cannot be folded at all. The
+	 * callee address rides the .text data word
+	 * retrace_engine_wrapper_addr (funcs_symbols.S), a hidden
+	 * link-time constant. $31 is ALREADY saved in the frame,
+	 * so the bal and the jalr may both clobber it.
 	 */
 	.set    noreorder
 1:
 	bal     2f
 	nop
 2:
+	daddiu  $5, $sp, 0
+	lui     $15, %hi(retrace_engine_wrapper_addr - 2b)
+	daddiu  $15, $15, %lo(retrace_engine_wrapper_addr - 2b)
+	daddu   $15, $15, $31
+	ld      $25, 0($15)
 	lui     $4, %hi(\func_name\()_real_name - 2b)
 	daddiu  $4, $4, %lo(\func_name\()_real_name - 2b)
 	daddu   $4, $4, $31
-	daddiu  $5, $sp, 0
-
-	jal     retrace_engine_wrapper
+	jalr    $25
 	nop
 
 	/* reload call_real_flag */

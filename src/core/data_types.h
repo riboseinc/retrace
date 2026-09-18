@@ -26,6 +26,8 @@
 #ifndef SRC_RETRACE_V2_DATA_TYPES_H_
 #define SRC_RETRACE_V2_DATA_TYPES_H_
 
+#include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include "arch_spec_macros.h"
 
@@ -111,6 +113,18 @@ struct DataType {
 	enum PrintfFmtBasicTypes pa_basic_type;
 	enum PrintfFmtMods pa_flag;
 
+	/*
+	 * Byte width of the C object this datatype's printers
+	 * deref, when a param's val slot is handed over as
+	 * &param->val (retrace_datatype_val_addr resolves the
+	 * address). 0 = the printer reads the whole slot (8-byte
+	 * scalars, pointers, composites) or never receives a val
+	 * slot. Big-endian targets need the width to address
+	 * narrow scalars: a 4-byte value sign-extended into a
+	 * 64-bit slot has its bytes in the slot's tail, not head.
+	 */
+	size_t value_size;
+
 	/**
 	 * @brief serializes data object to C-string
 	 *
@@ -141,6 +155,28 @@ struct DataType {
 };
 
 const struct DataType *retrace_datatype_get(const char *datatype_name);
+
+/*
+ * Address of the value object a datatype printer should deref,
+ * given the param's val slot. Printers deref the datatype's own
+ * width (see value_size); a narrow scalar inside the 64-bit
+ * intptr_t slot aliases at the slot's tail on big-endian and at
+ * its head on little-endian. Widths of 0 or the full slot are
+ * the identity. No-op at compile time on little-endian.
+ */
+static inline const void *retrace_datatype_val_addr(
+	const void *val_slot, const struct DataType *data_type)
+{
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	if (data_type != NULL && data_type->value_size != 0 &&
+		data_type->value_size < sizeof(intptr_t))
+		return (const char *) val_slot +
+			(sizeof(intptr_t) - data_type->value_size);
+#else
+	(void) data_type;
+#endif
+	return val_slot;
+}
 
 /* as defined by parse_printf_format */
 const struct DataType *retrace_datatype_printf_to_dt(int argtype);

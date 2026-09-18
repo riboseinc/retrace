@@ -114,6 +114,13 @@ int retrace_dlopen_guard_active(void);
 /* not thread safe */
 int retrace_engine_init(void);
 
+/*
+ * Hidden visibility: the MIPS n64 trampoline embeds this address
+ * as a hidden link-time data word (.text .dword), which ld folds
+ * statically only for symbols that can never be interposed.
+ * Nothing outside the .so may call it (public_api.c wraps it).
+ */
+__attribute__((visibility("hidden")))
 void retrace_engine_wrapper(char *func_name, void *arch_spec_ctx);
 
 #endif /* ENGINE_H_ */

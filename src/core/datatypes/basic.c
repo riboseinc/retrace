@@ -606,6 +606,7 @@ int retrace_ptr_get_size(const void *data,
 retrace_datatype_define_prototypes(basic) = {
 	{
 		.name = "int",
+		.value_size = 4,
 		.struct_members[0] = {.name = ""},
 		.pa_basic_type = PBT_INT,
 		.pa_flag = PFM_UNK,
@@ -616,6 +617,7 @@ retrace_datatype_define_prototypes(basic) = {
 	},
 	{
 		.name = "unsigned int",
+		.value_size = 4,
 		.struct_members[0] = {.name = ""},
 		.to_sz = retrace_uint_to_sz,
 		.get_sz_size = retrace_uint_get_sz_size,
@@ -624,6 +626,7 @@ retrace_datatype_define_prototypes(basic) = {
 	},
 	{
 		.name = "int16_t",
+		.value_size = 2,
 		.struct_members[0] = {.name = ""},
 		.pa_basic_type = PBT_INT,
 		.pa_flag = PFM_SHORT,
@@ -634,6 +637,7 @@ retrace_datatype_define_prototypes(basic) = {
 	},
 	{
 		.name = "long",
+		.value_size = 8,
 		.struct_members[0] = {.name = ""},
 		.pa_basic_type = PBT_INT,
 		.pa_flag = PFM_LONG,
@@ -644,6 +648,7 @@ retrace_datatype_define_prototypes(basic) = {
 	},
 	{
 		.name = "unsigned long",
+		.value_size = 8,
 		.struct_members[0] = {.name = ""},
 		.to_sz = retrace_ulong_to_sz,
 		.get_sz_size = retrace_ulong_get_sz_size,
@@ -652,6 +657,7 @@ retrace_datatype_define_prototypes(basic) = {
 	},
 	{
 		.name = "long long",
+		.value_size = 8,
 		.struct_members[0] = {.name = ""},
 		.pa_basic_type = PBT_INT,
 		.pa_flag = PFM_LONG_LONG,
@@ -662,6 +668,7 @@ retrace_datatype_define_prototypes(basic) = {
 	},
 	{
 		.name = "sz",
+		.value_size = 8,
 		.struct_members[0] = {.name = ""},
 		.to_sz = retrace_sz_to_sz,
 		.get_sz_size = retrace_sz_get_sz_size,
@@ -670,6 +677,7 @@ retrace_datatype_define_prototypes(basic) = {
 	},
 	{
 		.name = "size_t",
+		.value_size = 8,
 		.struct_members[0] = {.name = ""},
 		.to_sz = retrace_size_t_to_sz,
 		.get_sz_size = retrace_size_t_get_sz_size,
@@ -678,6 +686,7 @@ retrace_datatype_define_prototypes(basic) = {
 	},
 	{
 		.name = "char",
+		.value_size = 1,
 		.struct_members[0] = {.name = ""},
 		.pa_basic_type = PBT_CHAR,
 		.pa_flag = PFM_UNK,
@@ -688,6 +697,7 @@ retrace_datatype_define_prototypes(basic) = {
 	},
 	{
 		.name = "ptr",
+		.value_size = 8,
 		.struct_members[0] = {.name = ""},
 		.pa_basic_type = PBT_POINTER,
 		.pa_flag = PFM_UNK,
@@ -698,6 +708,7 @@ retrace_datatype_define_prototypes(basic) = {
 	},
 	{
 		.name = "intptr_t",
+		.value_size = 8,
 		.struct_members[0] = {.name = ""},
 		.to_sz = retrace_ptr_to_sz,
 		.get_sz_size = retrace_ptr_get_sz_size,
