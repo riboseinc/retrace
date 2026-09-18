@@ -49,7 +49,13 @@ env:
 jobs:
   e2e:
     name: cross-build + qemu-user E2E
-    runs-on: ubuntu-24.04
+    # ARM runner, not x64: qemu-user's MIPS emulation on the
+    # x86_64 TCG backend mis-emulates the LL/SC atomics the
+    # guest's exit path exercises (stdio locks in _IO_cleanup),
+    # intermittently skipping the flush and scrambling the exit
+    # code. Reproduced 40/40 under amd64-hosted qemu vs 0/200
+    # under arm64-hosted, identical binaries.
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
