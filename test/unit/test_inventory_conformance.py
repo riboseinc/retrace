@@ -104,6 +104,10 @@ def main():
          ["src/backends/preload_macho/aarch64", "src/v2"], darwin),
         ("src/backends/preload_elf/aarch64/funcs_symbols.S",
          ["src/backends/preload_elf/aarch64", "src/v2"], []),
+        ("src/backends/preload_elf/mips64/funcs_symbols.S",
+         ["src/backends/preload_elf/mips64", "src/v2"], []),
+        ("src/backends/preload_elf/riscv64/funcs_symbols.S",
+         ["src/backends/preload_elf/riscv64", "src/v2"], []),
     ]
 
     failures = 0

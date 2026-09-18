@@ -1,0 +1,205 @@
+# Copyright (c) 2017, [Ribose Inc](https://www.ribose.com).
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
+# BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+# RISC-V rv64 (little-endian, lp64d) cross build + qemu-user E2E.
+# See TODO.impl/20-riscv-ppc.md.
+#
+# Kept separate from build.yml because:
+#   - Cross toolchain (gcc-riscv64-linux-gnu), not a native runner.
+#   - The E2E runs rv64 binaries under qemu-user with the preload
+#     library -- a lane no other workflow exercises.
+
+name: RISCV64
+
+on:
+  push:
+    branches: [ main, 'release/**' ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref_name }}'
+  cancel-in-progress: true
+
+env:
+  CROSS: riscv64-linux-gnu
+  QEMU: qemu-riscv64-static
+
+jobs:
+  e2e:
+    name: cross-build + qemu-user E2E
+    # ARM runner, not x64 (the TODO.impl/19 law): qemu-user on
+    # the x86_64 TCG backend mis-emulates the guest exit path,
+    # and RISC-V's own LR/SC atomics are the same class of risk.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross toolchain + qemu
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            gcc-${CROSS} cmake ninja-build qemu-user-static file python3
+
+      - name: Configure + build libretrace.so
+        run: |
+          cat > toolchain.cmake <<EOT
+          set(CMAKE_SYSTEM_NAME Linux)
+          set(CMAKE_SYSTEM_PROCESSOR riscv64)
+          set(CMAKE_C_COMPILER ${CROSS}-gcc)
+          set(CMAKE_CXX_COMPILER ${CROSS}-g++)
+          set(CMAKE_FIND_ROOT_PATH /usr/${CROSS})
+          set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+          set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+          set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+          EOT
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DRETRACE_BUILD_TESTS=OFF \
+            -DRETRACE_BUILD_CLI=OFF \
+            -DRETRACE_BUILD_EXAMPLES=OFF
+          cmake --build build --target retrace_v2
+          ${CROSS}-readelf -h build/src/v2/libretrace.so | grep -E "Class|Data|Machine"
+          ${CROSS}-readelf -h build/src/v2/libretrace.so > elf.info
+          grep -q "ELF64" elf.info
+          grep -q "little endian" elf.info
+          grep -q "RISC-V" elf.info
+
+      - name: Trampoline alignment invariant
+        # A RISC-V function address is at least 2-byte aligned
+        # (the C extension's smallest instruction); an ODD FUNC
+        # dynsym value is always corruption. The trampoline macro
+        # aligns every entry; this gate keeps it aligned forever.
+        run: |
+          python3 - <<EOT
+          import subprocess
+          out = subprocess.check_output([
+              "${CROSS}-readelf", "--dyn-syms", "-W",
+              "build/src/v2/libretrace.so"], text=True)
+          funcs = []
+          for l in out.splitlines():
+              parts = l.split()
+              if len(parts) > 3 and parts[3] == "FUNC":
+                  funcs.append((parts[1], l))
+          odd = [l for v, l in funcs if int(v, 16) % 2 != 0]
+          print(f"exported FUNC dynsyms: {len(funcs)}, odd values: {len(odd)}")
+          assert len(funcs) > 300, "trampolines missing from dynsym"
+          assert not odd, "odd FUNC values:\n" + "\n".join(odd[:10])
+          EOT
+
+      - name: E2E - log_params + call_real under qemu
+        run: |
+          cat > probe.c <<EOT
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <string.h>
+          #include <unistd.h>
+          #include <fcntl.h>
+          int main(void)
+          {
+                  const char *path = getenv("RETRACE_PROBE_STR");
+                  char buf[64];
+                  int fd;
+                  memset(buf, 0, sizeof(buf));
+                  snprintf(buf, sizeof(buf), "len=%zu",
+                          strlen(path ? path : "none"));
+                  fd = open("/etc/hosts", O_RDONLY);
+                  if (fd >= 0) {
+                          char r[16];
+                          ssize_t n = read(fd, r, sizeof(r));
+                          close(fd);
+                          printf("fd=%d n=%zd\n", fd, n);
+                  }
+                  free(malloc(128));
+                  printf("%s\n", buf);
+                  return 0;
+          }
+          EOT
+          ${CROSS}-gcc -O1 -o probe probe.c
+
+          cat > conf.json <<EOT
+          {"intercept_scripts": [
+            {"func_name": "*",
+             "actions": [
+               {"action_name": "log_params"},
+               {"action_name": "call_real"}]}]}
+          EOT
+
+          export RETRACE_PROBE_STR=abcd
+          export RETRACE_JSON_CONFIG="$PWD/conf.json"
+          export RETRACE_LOGGER_DEF_ENA=1
+          export RETRACE_LOGGER_DEF_FN="$PWD/trace.log"
+          export LD_PRELOAD="$PWD/build/src/v2/libretrace.so"
+
+          out="$(${QEMU} -L /usr/${CROSS} ./probe 2>probe.err)"
+          rc=$?
+          unset LD_PRELOAD
+          echo "probe rc=$rc"
+          cat probe.err
+          echo "$out"
+          # the probe's own stdio output is flush-racy under
+          # interposition -- the JSON trace is the deterministic
+          # record, and it carries everything asserted here.
+          [ "$rc" -eq 0 ]
+          echo "$out" | grep -qF '"func": "open"'
+          # parson escapes forward slashes on the wire: the
+          # trace renders \/etc\/hosts
+          echo "$out" | grep -qF '\/etc\/hosts'
+          # the int param must survive the big-endian slot addressing
+          echo "$out" | grep -qF '"fd": "4"'
+          echo "$out" | grep -qF '"func": "read"'
+          echo "$out" | grep -qF '"len=4"'
+
+      - name: E2E - policy denial enforced under qemu
+        run: |
+          cat > deny.json <<EOT
+          {"intercept_scripts": [
+            {"func_name": "open",
+             "actions": [
+               {"action_name": "log_params"},
+               {"action_name": "modify_return_value_int",
+                "action_params": {"retval_int": -13}}]}]}
+          EOT
+
+          export RETRACE_JSON_CONFIG="$PWD/deny.json"
+          export RETRACE_LOGGER_DEF_ENA=1
+          export RETRACE_LOGGER_DEF_FN="$PWD/deny.log"
+          export LD_PRELOAD="$PWD/build/src/v2/libretrace.so"
+
+          out="$(${QEMU} -L /usr/${CROSS} ./probe 2>probe.err)"
+          rc=$?
+          unset LD_PRELOAD
+          echo "probe rc=$rc"
+          cat probe.err
+          echo "$out"
+          # the deny script has no call_real: open() must never
+          # reach it, and modify_return_value_int must run.
+          [ "$rc" -eq 0 ]
+          echo "$out" | grep -qF '"func": "open"'
+          echo "$out" | grep -qF 'modify_return_value_int'
+          if echo "$out" | grep -qF 'Running action call_real, for open'; then
+                  echo "ERROR: open was not denied" >&2
+                  exit 1
+          fi
