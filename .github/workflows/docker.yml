@@ -9,6 +9,10 @@ on:
       - Dockerfile
       - .github/workflows/docker.yml
 
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref_name }}'
+  cancel-in-progress: true
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
