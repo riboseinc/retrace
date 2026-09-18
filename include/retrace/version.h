@@ -38,10 +38,10 @@
 
 #define RETRACE_VERSION_MAJOR 2
 #define RETRACE_VERSION_MAJOR 2
-#define RETRACE_VERSION_MINOR 100
+#define RETRACE_VERSION_MINOR 101
 #define RETRACE_VERSION_PATCH 0
 
-#define RETRACE_VERSION_STRING "2.100.0"
+#define RETRACE_VERSION_STRING "2.101.0"
 
 #define RETRACE_VERSION_ATLEAST(maj, min, pat)                  \
 	(RETRACE_VERSION_MAJOR > (maj) ||                       \
