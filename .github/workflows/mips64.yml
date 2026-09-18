@@ -78,7 +78,11 @@ jobs:
             -DRETRACE_BUILD_CLI=OFF \
             -DRETRACE_BUILD_EXAMPLES=OFF
           cmake --build build --target retrace_v2
-          file build/src/v2/libretrace.so | grep -q "ELF 64-bit MSB"
+          ${CROSS}-readelf -h build/src/v2/libretrace.so | grep -E "Class|Data|Machine"
+          ${CROSS}-readelf -h build/src/v2/libretrace.so > elf.info
+          grep -q "ELF64" elf.info
+          grep -q "big endian" elf.info
+          grep -q "MIPS" elf.info
 
       - name: Trampoline alignment invariant
         # An odd FUNC dynsym value IS the MIPS microMIPS ISA-mode
