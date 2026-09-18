@@ -150,9 +150,11 @@ jobs:
           export RETRACE_LOGGER_DEF_FN="$PWD/trace.log"
           export LD_PRELOAD="$PWD/build/src/v2/libretrace.so"
 
-          out="$(${QEMU} -L /usr/${CROSS} ./probe)"
+          out="$(${QEMU} -L /usr/${CROSS} ./probe 2>probe.err)"
           rc=$?
           unset LD_PRELOAD
+          echo "probe rc=$rc"
+          cat probe.err
           echo "$out"
           # the probe's own stdio output is flush-racy under
           # interposition -- the JSON trace is the deterministic
@@ -181,9 +183,11 @@ jobs:
           export RETRACE_LOGGER_DEF_FN="$PWD/deny.log"
           export LD_PRELOAD="$PWD/build/src/v2/libretrace.so"
 
-          out="$(${QEMU} -L /usr/${CROSS} ./probe)"
+          out="$(${QEMU} -L /usr/${CROSS} ./probe 2>probe.err)"
           rc=$?
           unset LD_PRELOAD
+          echo "probe rc=$rc"
+          cat probe.err
           echo "$out"
           # the deny script has no call_real: open() must never
           # reach it, and modify_return_value_int must run.
