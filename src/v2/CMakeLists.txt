@@ -46,11 +46,14 @@ endif()
 # MIPS n64: the odd FP argument registers ($f13..$f19) only
 # assemble under -mfp64 -- the in-file `.set fp=64` directive
 # does not flip gas's register-bank model (the Debian cross-as
-# finding). The flags ride the trampoline TU only.
+# finding). -fPIC must be explicit: CMake adds no PIC option for
+# ASM TUs, and without the object's PIC flag ld rejects the
+# trampoline's `_gp_disp` relocations. The flags ride the
+# trampoline TU only.
 if(_v2_arch STREQUAL "mips64")
 	set_source_files_properties(${_v2_trampoline_sources}
 		PROPERTIES COMPILE_OPTIONS
-		"-march=mips64r2;-mabi=64;-mfp64")
+		"-march=mips64r2;-mabi=64;-mfp64;-fPIC")
 endif()
 
 add_library(retrace_v2 SHARED ${_v2_trampoline_sources})

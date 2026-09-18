@@ -23,3 +23,16 @@
 #define RETRACE_WRAP WRAPPER_ENTRY_MIPS64
 #include "funcs_symbols.def"
 #undef RETRACE_WRAP
+
+	/* The engine's entry address as link-time data: the
+	 * trampoline loads it PC-relatively (the same-section
+	 * local-delta %hi/%lo pattern the name strings use). A
+	 * hidden absolute data word -- NOT a GOT form: ld rejects
+	 * _gp_disp from an ASM TU, and a cross-TU delta cannot be
+	 * folded. The pointee is hidden (engine.h), so the word
+	 * resolves statically with no dynamic relocation.
+	 */
+	.text
+	.align  3
+retrace_engine_wrapper_addr:
+	.dword  retrace_engine_wrapper

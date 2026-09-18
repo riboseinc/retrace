@@ -29,6 +29,7 @@
 retrace_datatype_define_prototypes(unistd) = {
 	{
 		.name = "useconds_t",
+		.value_size = 8,
 		.struct_members[0] = {.name = ""},
 		.to_sz = retrace_ulong_to_sz,
 		.get_sz_size = retrace_ulong_get_sz_size,
@@ -37,6 +38,7 @@ retrace_datatype_define_prototypes(unistd) = {
 	},
 	{
 		.name = "gid_t",
+		.value_size = 4,
 		.struct_members[0] = {.name = ""},
 		.to_sz = retrace_uint_to_sz,
 		.get_sz_size = retrace_uint_get_sz_size,
@@ -45,6 +47,7 @@ retrace_datatype_define_prototypes(unistd) = {
 	},
 	{
 		.name = "pid_t",
+		.value_size = 4,
 		.struct_members[0] = {.name = ""},
 		.to_sz = retrace_uint_to_sz,
 		.get_sz_size = retrace_uint_get_sz_size,
@@ -53,6 +56,7 @@ retrace_datatype_define_prototypes(unistd) = {
 	},
 	{
 		.name = "uid_t",
+		.value_size = 4,
 		.struct_members[0] = {.name = ""},
 		.to_sz = retrace_uint_to_sz,
 		.get_sz_size = retrace_uint_get_sz_size,
@@ -61,6 +65,7 @@ retrace_datatype_define_prototypes(unistd) = {
 	},
 	{
 		.name = "off_t",
+		.value_size = 4,
 		.struct_members[0] = {.name = ""},
 		/* FIXME: This is probably a bug, need to define spec funcs */
 		.to_sz = retrace_int_to_sz,

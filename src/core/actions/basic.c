@@ -134,13 +134,15 @@ static int ia_log_params
 			(long)(param->data_type != NULL));
 
 		sz_size = param->data_type->get_sz_size(
-			(const void *) &param->val,
+			retrace_datatype_val_addr(&param->val,
+				param->data_type),
 			param->data_type);
 
 		sz = (char *) retrace_real_impls.malloc(sz_size + 1);
 
 		param->data_type->to_sz(
-			(const void *) &param->val,
+			retrace_datatype_val_addr(&param->val,
+				param->data_type),
 			param->data_type,
 			sz);
 
@@ -231,7 +233,9 @@ static int ia_log_params
 				arr_cnt_param = &t_ctx->params[cnt_param_idx];
 
 				ret = arr_cnt_param->data_type->to_size_t(
-					(const void *) &arr_cnt_param->val,
+					retrace_datatype_val_addr(
+						&arr_cnt_param->val,
+						arr_cnt_param->data_type),
 					&arr_size);
 
 				if (ret) {
