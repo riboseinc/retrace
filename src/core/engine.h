@@ -115,12 +115,20 @@ int retrace_dlopen_guard_active(void);
 int retrace_engine_init(void);
 
 /*
- * Hidden visibility: the MIPS n64 trampoline embeds this address
- * as a hidden link-time data word (.text .dword), which ld folds
- * statically only for symbols that can never be interposed.
- * Nothing outside the .so may call it (public_api.c wraps it).
+ * ELF hidden visibility; a no-op on non-GNU/Clang toolchains
+ * (MSVC has no visibility attribute). The MIPS n64 trampoline
+ * embeds retrace_engine_wrapper's address as a hidden link-time
+ * data word (.text .dword), which ld folds statically only for
+ * symbols that can never be interposed. Nothing outside the .so
+ * may call it (public_api.c wraps it).
  */
-__attribute__((visibility("hidden")))
+#if defined(__GNUC__) || defined(__clang__)
+#define RETRACE_ENGINE_HIDDEN __attribute__((visibility("hidden")))
+#else
+#define RETRACE_ENGINE_HIDDEN
+#endif
+
+RETRACE_ENGINE_HIDDEN
 void retrace_engine_wrapper(char *func_name, void *arch_spec_ctx);
 
 #endif /* ENGINE_H_ */
