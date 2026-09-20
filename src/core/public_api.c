@@ -53,7 +53,14 @@ RETRACE_API retrace_status_t retrace_list_functions(
 	if (out_names == NULL || out_count == NULL)
 		return RETRACE_ERR_INVAL;
 
+#ifdef __ANDROID__
+	/* section names outside the reserved __-namespace for
+	 * bionic/lld __start_/__stop_ synthesis
+	 */
+	retrace_as_get_section_info("DATA", "retrace_funcs", &p, &size);
+#else
 	retrace_as_get_section_info("__DATA", "__retrace_funcs", &p, &size);
+#endif
 	return retrace_names_from_section(p, size, sizeof(*p),
 		&g_fn_names, &g_fn_count, out_names, out_count);
 }

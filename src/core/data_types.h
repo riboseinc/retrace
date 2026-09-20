@@ -195,6 +195,13 @@ int retrace_datatypes_init(void);
 #ifdef RETRACE_WIN_PE_REGISTRY
 #define retrace_as_define_var_in_datatypes(type, name) \
 	retrace_win_declare_(".rtrD", type, name)
+#elif defined(__ANDROID__)
+/* bionic/lld: no __start_/__stop_ synthesis for section
+ * names in the reserved __-prefix namespace
+ */
+#define retrace_as_define_var_in_datatypes(type, name) \
+	retrace_as_define_var_in_sec(type, name[], \
+		"DATA", "retrace_dt")
 #else
 #define retrace_as_define_var_in_datatypes(type, name) \
 	retrace_as_define_var_in_sec(type, name[], \
