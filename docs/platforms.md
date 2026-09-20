@@ -13,6 +13,9 @@ THIS platform not do. Output shapes are documented in
 | Windows x64 + arm64 (MSVC + MinGW) | injected DLL (`retrace-win-run`) | `retrace-profile capture --` | ETW script (admin) or procmon CSV, ntdll layer | yes |
 | FreeBSD | `LD_PRELOAD` | `retrace-profile capture --` | truss | yes |
 | OpenBSD / NetBSD | `LD_PRELOAD` (build) | — | ktrace converter: gap | yes |
+| MIPS64 n64 (big-endian) | `LD_PRELOAD` (cross-built) | qemu-user E2E lane on CI | qemu-user strace | — |
+| RISC-V rv64 | `LD_PRELOAD` (cross-built) | qemu-user E2E lane on CI | qemu-user strace | — |
+| Android arm64 (bionic) | preload (debug build/root); see [android.md](android.md) | — | — | — |
 | OHOS arm64 | preload via NDK | — | — | — |
 
 ## Linux
@@ -94,6 +97,49 @@ retrace-profile capture -o profile.json -- ./app args
 
 Kernel truth: `truss -f -o truss.log ./app`, then
 `retrace-truss2retrace -o kernel.json truss.log`.
+
+## Cross-arch: mips64, riscv64
+
+The engine and trampolines are portable across the ELF
+SysV world; the per-arch assembly backends
+(`src/backends/preload_elf/{mips64,riscv64}/`) ship full
+interposition — arguments, returns, denial — verified live
+under qemu-user:
+
+```sh
+# cross-build (Debian/Ubuntu cross toolchains)
+sudo apt-get install gcc-mips64-linux-gnuabi64 gcc-riscv64-linux-gnu
+cmake -B build-mips -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchain-mips.cmake
+cmake --build build-mips --target retrace_v2
+
+# run under qemu-user with the cross sysroot
+qemu-mips64-static -L /usr/mips64-linux-gnuabi64 \
+    LD_PRELOAD=$PWD/build-mips/src/v2/libretrace.so ./target
+```
+
+CI lanes (`.github/workflows/mips64.yml`, `riscv64.yml`)
+build each backend, assert the trampoline-alignment invariant
+on the ELF, and run a log + policy-denial E2E under qemu on
+ARM runners (MIPS-on-x64 TCG mis-emulates the guest exit
+path's LL/SC atomics — an emulator law, not a code bug).
+Big-endian scalars are printed correctly end to end: the
+datatype layer carries per-type widths
+(`DataType.value_size`) so printers address the narrow value
+inside its 8-byte slot. The ppc64le port is written and
+parked pending validation on real hardware.
+
+## Android (bionic)
+
+`libretrace.so` cross-builds with the NDK and runs on bionic:
+binaries complete under the preload with the JSON trace
+flowing end to end. Bionic's weak-override rule means
+exported trampolines would interpose the dynamic linker
+itself mid-load, so on Android the trampolines are weak and
+hidden — v1 semantics are self-interposition (the engine's
+own libc calls route through the trampolines) plus the
+explicit registry API; auto-interposing the target's calls
+(post-init PLT rewriting) is future work. Full guide:
+[android.md](android.md).
 
 ## Packaged apps (snap / flatpak / AppImage / containers)
 

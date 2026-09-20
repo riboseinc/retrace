@@ -6,6 +6,889 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.104.0] — 2026-09-20
+
+**Android E2E -- the library runs on bionic**
+
+Weak+hidden trampolines (android.ver global: *;) plus the
+linker-free real-impl resolver (real_linkmap.c __ANDROID__
+branch: /proc/self/maps + direct DT_GNU_HASH parse, no dlsym)
+let binaries run to completion under LD_PRELOAD on the bionic
+runtime: config parses, the JSON trace flows end to end, rc=0.
+Android v1 tracing semantics are self-interposition plus the
+explicit registry API.
+
+- android: the library runs on bionic -- hidden trampolines, linker-free resolution
+
+## [2.103.0] — 2026-09-20
+
+**The Android/bionic cross-build lands (#848): four root fixes**
+
+in shared code -- the dl_iterate_phdr real-impl fallback for
+bionic (plus the mmap-floor dlsym guard and vdso skip now
+shared by both implementations), weak trampoline binding for
+crtbegin's atexit/pthread_atfork, plain section names for
+lld's __start_/__stop_ synthesis, and --no-gc-sections for
+the registry sections. Runtime bring-up under qemu follows.
+
+- android: the bionic preload library cross-builds
+
+## [2.102.0] — 2026-09-18
+
+**The RISC-V rv64 preload backend ships: full interposition under**
+
+qemu-user verified live, the conformance gate now enforces the
+whole .def on all four ELF backends (the mips64 entry had been
+silently missing), and the rv64 qemu lane runs permanently on
+CI.
+
+- riscv64: the rv64 preload backend
+
+## [2.101.0] — 2026-09-18
+
+**The MIPS64 (big-endian n64) backend comes alive: the n64**
+
+trampoline runs under qemu-user with full log_params +
+call_real interposition, policy denial enforced, the
+trampoline-alignment gate green, and the qemu E2E lane
+permanently on CI (.github/workflows/mips64.yml, ARM runners).
+Carries the DataType.value_size big-endian param fix and the
+hidden-visibility engine addressing the trampoline needed.
+
+- mips64: one backslash, not two, in the escaped-path grep
+- mips64: assert the wire form of the path (parson \/-escapes)
+- mips64: the qemu lane runs on ARM runners
+- mips64: capture the probe's rc and stderr in the E2E
+- mips64: the E2E asserts on the JSON trace only
+- mips64: the E2E asserts on the stdout rendering
+- ... and 4 more (see git history)
+
+## [2.100.0] — 2026-09-18
+
+**Card 17 (TODO.impl/17): coverage joins the fuzz-report**
+
+signature. The engine's per-thread call-hash (RETRACE_CALL_HASH)
+folds into the cluster id -- same-signature deaths with
+different call histories separate; a lane carrying no hash
+never separates. Two tool gaps fixed on the way: --config
+never reached the child, and assertion clusters exited 0 (a
+CI gate must fail on any finding). The E2E separates two
+same-signature deaths by history and reports the minimized
+corpus; the libFuzzer custom-mutator template pulls tokens
+from the fuzz_str dictionary format -- one vocabulary for the
+workbench and libFuzzer.
+
+- fuzz-report: coverage joins the signature -- the loop closes
+
+## [2.99.0] — 2026-09-14
+
+**Card 18 (TODO.impl/18): live hit-level drift grading. The**
+
+daemon names WHAT escaped beside the counts -- retrace.drift.hit
+carries the op and path of every kernel observation no libc
+claim covers, deduped so a hot escaping loop names itself once.
+The matcher is pure (standalone unit); the seam is daemon_frame's
+EVENT arm with suffix-rule key extraction, one site for both
+transports. The E2E runs both grading planes on one corpus:
+the live daemon names the escape; retrace-correlate, offline,
+agrees.
+
+- retraced: live hit-level drift grading -- the daemon names WHAT escaped
+
+## [2.98.0] — 2026-09-14
+
+**Card 13 (TODO.impl/13): the TLS content lane -- what was**
+
+exfiltrated, not just where. The OpenSSL surface joins the
+inventory (SSL_CTX_new, SSL_read/write and the _ex variants
+that carry OpenSSL 3's data path); tls_content summarizes the
+plaintext through the redaction-aware agent fan-out; tls_keylog
+injects SSL_CTX_set_keylog_callback so every secret line lands
+in RETRACE_TLS_KEYLOG.
+
+Two real main bugs fixed on the way: the dispatch-path lookups
+logged (func_get, datatype_get) and re-entered vfprintf through
+the interposed localeconv -- the locale lock recursed and any
+python trapped at boot; and the real-impl seam could not see
+host-loaded providers (RTLD_NEXT searches only the caller's
+dependency chain) -- the link-map walk resolves them, skipping
+the PIE main whose empty name slips the l_addr guard.
+
+Open bug recorded on the card: the TLS E2E client aborts at
+python's create_gil on ubuntu-22.04 x86_64 only (loud scoped
+skip; every other flavor passes).
+
+- tls E2E: a loud, scoped skip for the known 22.04-x64 cell
+- linkmap walk: the PIE main executable has a name (none) and a bias
+- tls E2E: the client joins lazily
+- the real-impl seam learns host-loaded providers (the link-map walk)
+- tls E2E: name the server's protocol floor
+- tls E2E: the server context takes the code-scanning-safe form
+- ... and 1 more (see git history)
+
+## [2.97.0] — 2026-09-14
+
+**Card 12 (TODO.impl/12): the Go runtime lane. goretrace speaks**
+
+the same RTRD protocol as the Python/Node/JVM agents on a
+cgo-free hook surface -- Supervise/HookHTTP/Emit, both
+transports (UDS + the named pipe as a file). The E2E runs one
+netcgo process through both evidence lanes: runtime HTTP
+events journaled as a full peer, preload-scoped libc calls
+beside them (the cross-platform lane is cgo marshaling --
+malloc/free; darwin also routes writes through libSystem).
+
+Known gap recorded on the card: full-inventory interposition
+under a cgo Go binary trips value-result hazards (getsockopt
+EFAULT, interposed getaddrinfo breaks resolution) -- the
+out-param prototypes need work in retrace core before
+interposition-heavy Go tracing.
+
+- test: the Go libc lane rides cgo traffic, not platform quirk
+- goretrace: the Go runtime lane
+
+## [2.96.0] — 2026-09-13
+
+**Card 11 (TODO.impl/11): the audited launch plane on Windows --**
+
+lifecycle parity with the POSIX seam. The daemon's spawn verb
+drives the win-run injection machinery (the inject split: a
+non-blocking spawn with an env block), the workload joins
+through the pipe with EAGER (now a boot-time join on Windows),
+and every departure lands in the journal through the handle
+reap (SIGCHLD's analogue).
+
+The card also surfaced and fixed three older defects: the
+journal's argv0 was not JSON-escaped (a Windows path made the
+record unparseable), EAGER existed only in the POSIX agent,
+and -- the big one -- the pipe daemon's accept loop blocked in
+ConnectNamedPipe on its synchronous handle after the first
+client, killing every cadence riding that loop (drift,
+registry sweep, reap). The accept now owns a dedicated thread;
+the main loop is the pure sweep cadence.
+
+- retraced: the agent accept owns its thread; the cadence owns the loop
+- retraced: the connect branch bisects itself under trace
+- retraced: the accept loop traces every turn (RETRACED_TRACE)
+- test: the spawn E2E reads the workload's last words, and the liveness probe proves its own honesty
+- retraced: tracing rides the journal, not stdout
+- retraced: the sweep narrates when asked (RETRACED_TRACE)
+- ... and 6 more (see git history)
+
+## [2.95.0] — 2026-09-13
+
+**Campaign orchestration (PR #831): the farm arm.**
+
+retrace-campaign turns a manifest into a matrix of runs --
+samples x policies x repeats, validated whole, expanded in a
+deterministic order -- driven through the daemon's public
+surface with pid-keyed verdicts (CLEAN/FAIL/CRASH from the
+journal's reap records) and indexed per-run evidence queries.
+Building it also delivered the filter DSL's string equality
+(dynamic like-typed comparison, no coercion) and shell-safe
+command construction. Recipe 45.
+
+- the farm arm: campaign orchestration
+
+## [2.94.0] — 2026-09-13
+
+**The journal lifecycle (PR #829, ADR-0017): one**
+
+chain, split across segment files. Rotation (size/time
+triggers) closes and opens segments as chained records;
+retention prunes the oldest under a byte budget with every
+prune a chained record -- gaps auditable, never silent; the
+query arm speaks the filter expression language over the
+series, chain-verified on the way through. Recipe 44.
+
+- ctl: bind the tool's real_impls lazily -- MSVC's constant rule
+- one chain, split across files: the journal lifecycle
+
+## [2.93.0] — 2026-09-13
+
+**The filter expression language (PR #827): queries as**
+
+config. The filter action's expr param speaks a small predicate
+language -- params, globs, comparisons, and/or/not -- compiled
+once and validated at config load, with a bad expression
+refusing the whole file. Recipe 43, the action reference, a
+seeded property suite, and a live E2E on every preload lane.
+
+- queries as config: the filter expression language
+
+## [2.92.0] — 2026-09-13
+
+**The syscall-lane actions (PR #825, ADR-0016): the**
+
+arch-spec seam made polymorphic, and with it the ptrace lane
+gains its actions -- a static detonation is now contained, not
+merely watched. sandbox denies open("/etc/shadow") with
+-EACCES at the syscall stop from the same JSON scripts the
+preload lanes run; call_real means allow (the kernel IS the
+real implementation); modify-after-allow lands at the exit
+stop; log_params reads paths out of the tracee. The skip rides
+a benign getpid rewrite delivered at syscall-exit -- immune to
+the container seccomp filters that turn invalid syscall
+numbers into ENOSYS. Recipe 42, platforms.md, and the deepest
+spec set of the arc: the standalone seam unit plus the live
+deny E2E on every Linux leg.
+
+- syscall-lane skip: the benign syscall, on every kernel
+- ptrace lane: the skip value logs at INFO
+- ptrace lane: evidence for the skip value; E2E skips where ptrace is refused
+- deny translation moves to the seam: -1 -> -ret_errno before the ops
+- test: dump the evidence tail when the deny E2E fails
+- test: as-ops goes standalone -- no engine, no interposition
+- ... and 5 more (see git history)
+
+## [2.91.0] — 2026-09-12
+
+**The developer persona trail (PR #823): the fifth**
+
+audience card on the site -- debugging, the root persona --
+with the replay pin flow, the cookbook's debugging set
+surfaced on the docs page, and the recipe count stated
+honestly at 41.
+
+- the developer persona returns: the root trail, back on the map
+
+## [2.90.0] — 2026-09-12
+
+**The qemu cross-arch recipe (PR #821): arm64 samples**
+
+detonate on x64 farms via qemu-user and the aarch64 preload,
+with the kernel-lane caveat spelled out -- verified live.
+
+- qemu cross-arch detonation: the arm64-on-x64-farm recipe, verified
+
+## [2.89.0] — 2026-09-12
+
+**The reference compose stack (PR #819): otelcol,**
+
+retraced, and a supervised detonation in one docker compose
+up -- denials live in the collector, chained in the journal,
+CI-validated on every PR.
+
+- supervisor-compose: the whole story, one docker compose up
+
+## [2.88.0] — 2026-09-12
+
+**The sanitizer compatibility matrix (PR #817):**
+
+retrace's fault injection on sanitizer-instrumented targets --
+supported on gcc-13+/clang with the runtime-first incantation,
+categorically fatal on macOS dyld, hanging on gcc-11 -- with
+an integration tripwire that proves every cell.
+
+- sanitizer matrix: the hang boundary is the TOOLCHAIN -- gcc-11, both arches
+- sanitizer matrix: the arm64/gcc-11 cell hangs -- a verdict, not a mystery
+- sanitizer matrix: gcc names its runtime libasan -- and a directory is not a file
+- sanitizer matrix: the Linux cell's incantation -- runtime first
+- sanitizer matrix: the fuzzing persona's combo, supported where it holds
+
+## [2.87.0] — 2026-09-11
+
+**Journal signing (PR #814): --signing-key seals every**
+
+graceful close with ed25519 over the chain's head and line
+count, and retrace-ctl verify-journal walks the chain and
+checks the seal -- trust anchors for external auditors. Also
+the replay E2E's thread-race fix (PR #815): the determinism
+claim is asserted on a main-thread seam.
+
+- journal signing: the Windows link and the honest skip
+- journal signing: the seal -- trust anchors for external auditors
+- replay E2E: a main-thread seam -- the logger's own mallocs race the seed stream
+
+## [2.86.0] — 2026-09-09
+
+**The replay slice (PR #812): RETRACE_REPLAY_OUT**
+
+records the resolved seed and every synthesized outcome;
+RETRACE_REPLAY_IN forces the seed back and verifies each
+outcome -- the 3am failure reproduces at 9am, seedlessly, and
+a tampered record names its drift.
+
+- replay slice: the 3am failure reproduces at 9am, seedlessly
+
+## [2.85.0] — 2026-09-09
+
+**Docker2inside (PR #810): a docker save tarball**
+
+becomes the inside.json declared set -- layers in manifest
+order, AUFS whiteouts and opaque dirs, PAX long names -- and
+the whole capture/grading/hardening rail applies to containers
+unchanged.
+
+- docker2inside: the image IS the declared set -- containers join the audit
+
+## [2.84.0] — 2026-09-09
+
+**Evidence redaction (PR #808): patterns of tokens that**
+
+never leave the process -- one transform at the evidence
+fan-out covers stdout, files, OTLP, and the journal, on both
+OSes. Also repairs the retraced load_policy error formats that
+CodeQL gated.
+
+- test: keep the redaction markers out of failure prints -- CodeQL reads tests too
+- retraced: repair the load_policy error formats -- CodeQL's two highs
+- evidence redaction: secrets never leave the process
+
+## [2.83.0] — 2026-09-08
+
+**The drift read verb (PR #806): retrace-ctl drift**
+
+answers the two-layer verdict over the control plane -- per
+session, the libc agents, the observers' seats, the kernel
+observation totals, and the live delta. One X-macro row;
+dispatch, scope, usage, and conformance all derive.
+
+- ctl drift: the two-layer verdict as a read verb
+
+## [2.82.0] — 2026-09-08
+
+**The supervisor policy templates (PR #803) -- the arc's**
+
+last open card: four ready-to-push holds under
+share/policy-templates/ with a push-smoke guard, plus the
+daemon now unlinking its ctl socket at exit (a stale file
+connected CLIs to a dead inode). Also retries the checkpatch
+downloads (PR #804) so a 429 is not a style verdict.
+
+- ci: retry the checkpatch downloads -- a 429 is not a style verdict
+- policy templates: the holds the playbooks reference, ready to push
+
+## [2.81.0] — 2026-09-07
+
+**The quickstart on the launch arm (PR #801): the**
+
+canonical tour is now every control-plane verb -- policy at
+boot, spawn for the specimen, kill with the departure
+journaled, and the complete bundle on graceful close.
+
+- quickstart rides the launch arm: every step a control-plane verb
+
+## [2.80.0] — 2026-09-07
+
+**The ctl feed seam (PR #799): bytes, lines, and verbs**
+
+are one module's pipeline -- the connection's framing state
+moves into the ctx behind retraced_ctl_feed, main.c keeps the
+transport, and the framing contract (split lines, batched
+commands, partial silence, oversized refusal) is finally
+testable.
+
+- ctl feed: the byte layer joins its module -- the seam, cut through
+
+## [2.79.0] — 2026-09-07
+
+**The website catch-up to v2.78 (PR #797): the feed,**
+
+badge, and about card now carry the launch arm and its audit
+trail -- spawn, the reap doctrine, the verb table, the
+recursive session tree, and mmap.
+
+- website catches up to v2.78: the launch arm and its audit trail
+
+## [2.78.0] — 2026-09-07
+
+**The reap doctrine (PR #795): spawned workloads'**
+
+departures are journal records -- a SIGCHLD self-pipe routes
+every child death to the poll loop, which reaps and records
+retrace.ctl.exit, with retrace.ctl.* joining the journal's
+durable classes so an exit is visible without an unrelated
+flush.
+
+- ctl exit statuses: the reap doctrine -- departures are journal records
+
+## [2.77.0] — 2026-09-06
+
+**The ctl verb table (PR #793): one X-macro list is the**
+
+SSOT the daemon dispatch, the scope gate, and the CLI usage all
+derive from -- a verb is one list line plus one handler. Also
+fixes the events reply truncating at 64 bytes (a dead sizing
+variable, found by the extraction).
+
+- ctl verbs: the X-macro table -- one list, every surface derives
+
+## [2.76.0] — 2026-09-06
+
+**Ctl spawn (PR #791): retrace-ctl spawn forks workloads**
+
+armed to join the daemon -- supervisor env, nonce, EAGER connect,
+caller-chosen preload -- with the launch journaled before the
+child can act and the child taking a full (never spectator) seat.
+
+- ctl spawn: launch workloads that join the daemon themselves
+
+## [2.75.0] — 2026-09-06
+
+**V2.75.0: the sessions tree walker goes recursive --**
+
+depth stops lying at level 4, with the binding path driven
+for real and the nesting asserted by parsing the reply.
+
+- sessions: the tree walker goes recursive -- depth stops lying at level 4
+
+## [2.74.0] — 2026-09-03
+
+**V2.74.0: mmap/munmap interception -- the prototypes**
+
+PR #414 asked for in 2019, shipped on today's rails. Fault
+injection reaches the memory level: fail_first on mmap is
+deterministic OOM at the page, below every allocator.
+
+- mmap/munmap: the prototypes PR #414 asked for, on today's rails
+- website catches up to v2.73: the evidence plane leads
+
+## [2.73.0] — 2026-09-03
+
+**V2.73.0: retrace-ctl events -- the evidence read arm**
+
+over the control plane. The journal's tail, chain verdict
+riding the reply; evidence pulled over a network carries its
+own integrity statement.
+
+- retrace-ctl events: the evidence read arm over the control plane
+
+## [2.72.0] — 2026-09-03
+
+**V2.72.0: retrace-ctl sessions -- the session tree as**
+
+a tree (per token, nested by parent, spectators marked), plus
+two CI root fixes: the qemu leg skips emulated perf benches,
+and the noderetrace gate treats probe trouble as a skip.
+
+- noderetrace gate: probe trouble is a skip, never a failure
+- alpine qemu leg: the perf benches measure the emulator
+- retrace-ctl sessions: the tree the registry always carried
+
+## [2.71.0] — 2026-09-02
+
+**V2.71.0: fail_first -- the transient-fault action, the**
+
+retry-path primitive. The first N invocations return the
+chosen value with the real call never made; every call after
+runs for real. Fault injection can finally verify resilient
+code, not just break it.
+
+- fail_first: the transient-fault action -- the retry-path primitive
+
+## [2.70.0] — 2026-09-02
+
+**V2.70.0: noderetrace -- the Node runtime agent, the**
+
+lane's third adapter. Three independent implementations,
+three hook systems, one protocol: the conformance claim's
+strongest evidence, and the runtime lane covers the three
+runtimes that dominate dynamic deployments.
+
+- noderetrace: the Node runtime agent -- the lane's third adapter
+
+## [2.69.0] — 2026-09-01
+
+**V2.69.0: agent.c becomes two files. One TU per**
+
+platform, selected by CMake like tools/retraced selects its
+transports -- no behavior change, every platform edit starts
+in the right file, and the preprocessor dead zones that hid
+type errors from the compiling host are gone.
+
+- agent.c becomes two files: one TU per platform
+
+## [2.68.0] — 2026-09-01
+
+**Publish: the rpm glob (the artifacts/-prefixed set)**
+
+The v2.68.0 rpms built, validated, and reached the artifact
+store -- the publish step's glob list carries the artifacts/
+prefix and missed the rpm lines the upload set gained. Both
+lists are separate surfaces; carry the shape in each.
+
+- rpm artifacts join the release: the hosted runners can build them after all
+- docs and site catch up to v2.67: the packaging story
+
+## [2.67.0] — 2026-09-01
+
+**Alpine release leg rides the packaging module**
+
+The container job still hand-staged lib/include-only tarballs
+-- the shape the matrix jobs shed in v2.67.0 -- so a musl
+user's download carried no bin/: no retraced, no converters,
+on the platform whose static-linking story needs them most.
+cpack -G TGZ, same as every other leg; the hand-staging block
+deletes outright.
+
+- release: the publish globs carry the packaging module's new artifacts
+- CPack becomes the packaging module; the artifacts finally carry the tools
+- one pipe harness: the integration tests stop carrying five folk copies
+
+## [2.66.0] — 2026-08-31
+
+**V2.66.0: one ring. The agent's twin event queues**
+
+become a pure caller-locked module -- the Windows drop-count
+drift heals, the POSIX peek-overwrite race closes, and the
+queue gains its first unit surface.
+
+- one ring: the agent's twin queues become a pure module
+
+## [2.65.0] — 2026-08-31
+
+**V2.65.0: one frame codec. The Windows agent's frame**
+
+send/recv adopt the shared retrace_rpc_frame_encode/decode
+with the POSIX agent's 2048-byte cap -- closing the silent
+loss path where an oversized Windows event was dropped whole
+by the daemon's receiver. The conformance suite now pins both
+agent halves to one codec.
+
+- one frame codec: the Windows agent adopts the module it already had
+
+## [2.64.0] — 2026-08-31
+
+**V2.64.0: one policy ladder. POLICY_SET validation**
+
+moves to policy_sig.c as retrace_policy_validate -- shared by
+both agent halves, with the install staying where the process
+state lives. The Windows copy's drift heals: expired policies
+are refused there too. Six ladder cases join the policy_sig
+unit test.
+
+- policy_sig: time.h for the ladder's expiry guard
+- one policy ladder: validation moves in with its verifier
+
+## [2.63.0] — 2026-08-31
+
+**V2.63.0: the broadcast seam -- policy crosses the**
+
+pipe. retraced_ctl_push_policy sends through an installed
+conn_send sink over transport-opaque conn handles, the Windows
+daemon registers its pipe agents into the control plane, and
+policy_push reaches Windows agents for the first time. The
+codebase's last extern-as-interface retires; the broadcast is
+unit-testable through a fake sink (full peer pushed, spectator
+skipped).
+
+- the broadcast seam: policy crosses the pipe
+
+## [2.62.0] — 2026-08-31
+
+**The Windows activation arc lands**
+
+The pipe daemon, the SCM service lifecycle, the named-pipe transports, and the everywhere-set build conformance: a retraced that builds and runs natively on Windows, with every agent and gate symmetric across both worlds.
+
+- 23 follow-up commits in this release; see the git history for the arc.
+
+## [2.61.0] — 2026-08-30
+
+**Jretrace crosses to the pipe (PR #752) and the conformance gate**
+
+follows -- both reference runtime agents and the third-party
+acceptance suite now run on POSIX and Windows alike. Minor bump:
+new platform capability.
+
+- jretrace crosses to the pipe; the conformance gate follows
+
+## [2.60.0] — 2026-08-30
+
+**Pyretrace pipe-native (PR #750) completes the runtime lane's**
+
+Windows symmetry, and the docs interface catches up to five
+releases of shipped capability. Minor bump: new platform
+capability.
+
+- pyretrace goes pipe-native + the docs catch up to v2.59
+
+## [2.59.0] — 2026-08-30
+
+**The kernel-observation agents speak the named pipe natively on**
+
+Windows (PR #748) and sign-policy works for the Windows fleet. Minor
+bump: new platform capability.
+
+- kernel-observation agents go pipe-native on Windows + sign-policy follows
+
+## [2.58.0] — 2026-08-30
+
+**Retrace-ctl on Windows (PR #746): the fleet CLI over the ctl named**
+
+pipe -- the roundtrip seam's second adapter, the whole command
+surface on both OSes, Windows E2E green on the runners. Minor bump:
+new platform capability.
+
+- retrace-ctl on Windows: the fleet CLI over the ctl pipe
+
+## [2.57.0] — 2026-08-29
+
+**Policy key rotation and the Windows agent heap fallback (PR #744):**
+
+multi-key pinning lets old and new verification keys overlap during
+rotation, and oversize agent events ride the heap instead of dropping.
+Minor bump: new capability.
+
+- policy key rotation + the Win agent heap fallback (review A+B)
+
+## [2.56.0] — 2026-08-29
+
+**Retraced as a Windows service (PR #742): the SCM lifecycle --**
+
+StartServiceCtrlDispatcher with console fallback, stop requests
+routing to the graceful shutdown path, flags on the binPath, the
+real sc create/start/stop/delete E2E on elevated runners. With it,
+TODO.supervisor is complete: daemon, sessions, policy epochs,
+conformance, fleet CLI, TLS transport, playbooks, pipes, ACLs, and
+now the service. Minor bump: new platform capability.
+
+- retraced as a Windows service: the SCM lifecycle (supervisor/12 P1)
+
+## [2.55.0] — 2026-08-29
+
+**The hang-incident hardening (PR #740): poll-set hygiene (listener**
+
+POLLNVAL = journaled fatal exit, connection POLLNVAL = drop), a
+10,000-iteration spin backstop, and --exit-after self-termination on
+both daemons, wired into the fd-activation test. A daemon that cannot
+make progress now dies loudly, and an orphaned test daemon can never
+outlive its harness. Minor bump: new hardening capability.
+
+- retraced: full spin guards + --exit-after (the hang-incident hardening)
+
+## [2.54.0] — 2026-08-29
+
+**The daemon-seam deepening (PR #738): one frame state machine behind**
+
+both transports, drift counting on the registry entry (fixing the
+Windows count/summary split), the shared policy loader seam, and the
+POSIX POLICY_ACK epoch update carried to Windows. Minor bump:
+architecture deepening + a behavioral fix on Windows.
+
+- deepen the daemon seam: one frame state machine + one policy loader
+
+## [2.53.0] — 2026-08-28
+
+**Pipe ACL hardening (supervisor/12 P1, PR #736): explicit owner-only**
+
+DACLs on both named pipes -- token owner, Administrators, SYSTEM, and
+no world grant; the E2E inspects the DACL and fails on any world
+identity. Minor bump: hardening of a shipped capability.
+
+- retraced pipes: explicit owner-only DACLs (supervisor/12 P1 hardening)
+
+## [2.52.0] — 2026-08-28
+
+**Signed policies (supervisor/05, PR #734): Ed25519-wrapped POLICY_SET**
+
+-- the signature covers the exact blob bytes, agents verify against a
+pinned RETRACE_SUPERVISOR_PUBKEY and refuse invalid or partial
+wrappers fail-closed, and retrace-ctl sign-policy emits wrappers for
+policy authors. Minor bump: new capability, ABI unchanged.
+
+- signed policies: Ed25519-wrapped POLICY_SET, fail-closed on a pinned key (supervisor/05)
+
+## [2.51.0] — 2026-08-28
+
+**The supervised loop completes on Windows: the in-process agent speaks**
+
+the supervisor protocol over the named pipe (PR #732) -- HELLO with
+the env nonce seats a full peer, POLICY_SET applies again, heartbeats
+and the bounded final drain + BYE mirror the POSIX agent, with the
+same fail-open liveness and counted-loss discipline. Minor bump: new
+platform capability, ABI unchanged.
+
+- agent on Windows: the pipe half of the supervised loop (supervisor/12 P0)
+
+## [2.50.0] — 2026-08-28
+
+**The named-pipe transport lands: retraced on Windows**
+
+(supervisor/12 P0) -- the same RTRD protocol, registry, journal,
+nonce/spectator discipline, ctl surface, and live drift grading over
+\\.\pipe\, with the POSIX loop untouched. Minor bump: new platform
+capability, ABI unchanged.
+
+- retraced on Windows: the named-pipe transport (TODO.supervisor/12 P0)
+- docs + website: the supervisor arc is the product, not the roadmap
+
+## [2.49.0] — 2026-08-28
+
+**The beyond-libc completion release: P1 wave (sandbox-exec + dual-path,**
+
+live drift grading, TLS fleet + scopes, jretrace), P2 wave (audited
+artifacts, ETW agent, socket activation + privilege drop, agent guide),
+and follow-ups (Ed25519 audit signatures, the Windows AppContainer
+backend). Also repairs the version.h STRING drift (2.39.0) so release
+artifacts finally carry the tag's version.
+
+- 16 follow-up commits in this release; see the git history for the arc.
+
+## [2.48.0] — 2026-08-27
+
+**Kernel-observation agent: the eBPF lane goes live (TODO.beyond-libc/03)**
+
+retrace-ebpf-agent: a supervisor-protocol agent (the reference-
+stub skeleton -- no retrace headers, no C linkage) feeding the
+journal kernel-source events. Doctrine: kernel agents are
+OBSERVERS -- the agent HELLOs WITHOUT the nonce deliberately, so
+the daemon seats it as a spectator: evidence ALWAYS, policy
+NEVER (a seated-as-full warning fires if a future daemon drifts).
+
+Sources:
+- --synthetic: demonstration events on an interval (no BPF
+  privileges; the CI path and the protocol proof)
+- --loader: wraps the ebpf-bridge loader, converting its retrace
+  JSON stdout into kernel-source events (root/CAP_BPF hosts)
+
+integration-ebpf-agent E2E: 3 kernel observations journaled,
+spectator seat asserted, zero policy reach asserted -- the
+libc-lane and kernel-lane now share one hash-chained journal.
+
+
+## [2.47.0] — 2026-08-27
+
+**Pyretrace: the Python runtime agent (TODO.beyond-libc/04)**
+
+A third-party implementation of the supervisor protocol on the
+reference-stub skeleton (no retrace headers, no C linkage):
+sys.audit hooks give the runtime's own syscall-ish boundary,
+attributed to the layer a libc interposer sees only as 'an open
+from pid N'.
+
+- pyretrace.supervise(): joins RETRACE_SUPERVISOR env (sock +
+  nonce); a no-op when absent (the preload plane's gating
+  doctrine). Registers as source=runtime, a FULL peer when
+  nonce'd -- the journal shows runtime-attributed events in the
+  same session.
+- audit coverage: file reads/writes (with path), socket
+  creation, subprocess/os.system exec; pyretrace.emit() for
+  explicit runtime events.
+- integration-pyretrace E2E: HELLO/WELCOME(full), a python
+  open() journaled as py.file.read, socket() as
+  py.socket.create, a direct emit -- all asserted from the
+  journal after a graceful daemon stop (the durability
+  contract).
+
+- kernel enforcement compile (TODO.beyond-libc/01): retrace-profile enforce + retrace-enforce
+- conformance: the reference stub agent (TODO.supervisor/11 P0)
+
+## [2.46.0] — 2026-08-27
+
+**Perf: respect the engine-entry law in the folded lookup**
+
+The first cut resolved the prototype inside the entry lookup --
+but the self-heal's func_get logs through log_dbg, whose
+formatter dispatches malloc/snprintf; before the reentrance guard
+that recursion is unbounded (the Linux CI stack overflow: every
+preloaded target SIGSEGV'd). The entry now resolves only the
+SLOT (hash + probe + real, all member-law calls); the dispatch
+tail, post guard, reads the prototype from the same slot and runs
+the self-heal there. Same one-probe win (19.5 -> 10.6 ns/op),
+entry law intact. Also: the slot lookup guards a NULL real_out
+(the proto-only wrapper crashed the bench).
+
+- perf: one probe, two answers -- the folded name lookup (1.8x)
+- sandbox: compiled path sets -- membership in one bucket, not a walk
+- agent: the stack formatter takes the emit path's const kv type
+- retraced: the ctl plane as a module (the command surface, unit-tested)
+
+## [2.45.0] — 2026-08-27
+
+**Evidence pipeline: zero-alloc emit + loss signaling; policy acks are...**
+
+The emit path paid 7 mallocs + 7 frees per event (two jesc per
+attribute) exactly when the target was busiest. The queue slots
+now own inline storage: the common event formats straight from
+the stack into the slot -- zero allocations -- and the escaping/
+oversize cases fall back to the heap path (jesc) unchanged. The
+formatter is exported and unit-pinned (decline contract).
+
+Loss signaling: queue drops were counted but invisible -- a hole
+in audit evidence nobody saw. Each drain now reports the drop
+delta as a retrace.agent.dropped event (the slots freed by the
+drain make room for the marker), so the journal records its own
+gaps -- the same doctrine as the journal's unclean marker.
+
+One contract fix surfaced by the local suite (masked on CI by
+timing): POLICY_ACK records carry no name field, so the journal
+writer's buffering classed them as routine telemetry -- a
+refusal ack sat in the stdio buffer for the whole audit window.
+Policy decisions (applied or refused) are control-plane records:
+the durable classes now match the ack shape too.
+
+- evidence pipeline: zero-alloc emit + loss signaling; policy acks are durable
+- journal: open once, flush at durability points, record the gaps
+- supervisor playbooks P0 (TODO.supervisor/09)
+
+## [2.44.0] — 2026-08-27
+
+**Freeze: the quiet hold -- pure timeouts pass through**
+
+A wildcard freeze fabricated returns for EVERY intercepted call,
+including sleep()/usleep(): a frozen polling loop never slept, spun
+at full CPU, and every spin iteration was another dispatch -- the
+hold AMPLIFIED the load it was meant to stop (found running the
+cookbook-39 flow; the recipe had to document freeze-then-kill-fast
+as a workaround).
+
+Pure timeouts are inert by definition: passing them through keeps
+the specimen quiet while everything else stays frozen.
+nanosleep/clock_nanosleep never reach an action (no prototype ->
+call real), so only the two wrapped time calls need naming.
+
+Unit tests: fabricated returns per type (ptr -> NULL, int -> -1) and
+the exemption for sleep/usleep.
+
+- tests: the wrong-uid probe accepts both refusal flavors
+- tests: retrace daemon E2E accepts the auth-record attribution
+- tests: expect the auth journal event; skip uid probe without sudo
+- retraced: fix pollfd/slot mismatch after a disconnect
+- control-plane transport auth P0 (TODO.supervisor/08)
+- perf: the dispatch tail's prototype lookup joins the name cache -- 143x
+- ... and 2 more (see git history)
+
+## [2.43.0] — 2026-08-26
+
+**Perf release: real-impl cache (132x dispatch resolve), hashed**
+
+config-cache index, agent kick fast path, daemon per-agent RSS
+fix, MSVC cache-key port.
+
+- perf: MSVC port -- volatile fallback for the cache key + stdint
+- perf: 69x dispatch resolve + hashed config cache + kick fast path + daemon RSS
+
+## [2.42.0] — 2026-08-26
+
+**Agent: kick is one-shot -- atfork registration once per image**
+
+The ubuntu-22.04 (glibc 2.35) and Alpine (musl) session hang: fork's
+prepare handler locks g_agent.mu through the INTERPOSED
+pthread_mutex_lock, which runs a full engine dispatch whose kick
+re-registered via __register_atfork -- blocking on the atfork_lock
+that the very same fork() holds. Self-deadlock at every target fork.
+Newer glibc dedups duplicate handlers and hid it; 2.35 and musl do
+not (musl instead deadlocks relocking g_agent.mu across duplicate
+handlers in one prepare pass).
+
+The one-shot flag registers exactly once per image; fork children
+inherit the registration and spawn their agent through emit's
+pid-ownership reset, as before. Verified: 4/4 supervisor E2Es pass;
+diag loop on ubuntu-22.04 under load.
+
+- retrace-ctl: add the binary and its E2E
+- otlp: fleet labels (TODO.supervisor/06) -- session_id + agent_id on every span
+- v2.43.0: retrace-ctl -- the fleet CLI (TODO.supervisor/07, P0)
+
+## [2.41.0] — 2026-08-26
+
+**Sessions and trees (plan 04): the session token, the fork half-agent, and the tree E2E**
+
+The daemon mints a 128-bit session token at first HELLO; agents stamp it into the environment so children inherit the session; tokenless children link to their parent and the registry carries the tree. Fork children reset their agent state (close the inherited socket, drain, re-HELLO under the child's pid). The E2E walks the full detonation tree: root, fork children, env-scrubbed re-links, exec holes.
+
+- 55 follow-up commits in this release; see the git history for the arc.
+
 ## [2.39.0] — 2026-08-25
 
 **retraced slice 3: the in-process control agent**
