@@ -102,6 +102,19 @@
 #ifdef RETRACE_ANDROID_WEAK
 	.weak \func_name\()_retrace_wrapper
 	.weak \func_name
+	/*
+	 * and HIDDEN: bionic lets a weak preload definition
+	 * override libc's strong one, so an exported trampoline
+	 * interposes for the dynamic linker and libc themselves
+	 * mid-load -- their GOT calls land in an engine whose
+	 * real-impl table is empty and the process dies (the
+	 * putenv->strlen->NULL class). Android v1 therefore does
+	 * NOT interpose via LD_PRELOAD at all: tracing goes
+	 * through the explicit registry API
+	 * (retrace_* in include/retrace/retrace.h).
+	 */
+	.hidden \func_name\()_retrace_wrapper
+	.hidden \func_name
 #else
 	.global \func_name\()_retrace_wrapper
 	.global \func_name

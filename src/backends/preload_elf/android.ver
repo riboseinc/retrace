@@ -1,0 +1,16 @@
+/*
+ * Android/bionic link policy for the retrace preload library
+ * (TODO.impl/21).
+ *
+ * The trampolines are emitted weak (crtbegin_so.o strongly
+ * defines atexit/pthread_atfork; lld rejects the duplicates)
+ * and HIDDEN (bionic lets a weak preload definition override
+ * libc's strong one, so any exported trampoline interposes
+ * for the dynamic linker itself mid-load and the process
+ * dies before main). Android v1 therefore does not
+ * interpose via LD_PRELOAD: tracing goes through the
+ * explicit registry API (include/retrace/retrace.h).
+ */
+{
+  global: *;
+};

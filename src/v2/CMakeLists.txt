@@ -74,7 +74,9 @@ if(_v2_arch STREQUAL "aarch64" AND CMAKE_SYSTEM_NAME STREQUAL "Android")
 	# the NDK injects --gc-sections, which drops registry sections
 	# referenced only through __start_/__stop_ (lld pitfall);
 	# the later flag wins.
-	target_link_options(retrace_v2 PRIVATE "-Wl,--no-gc-sections")
+	target_link_options(retrace_v2 PRIVATE
+		"-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../backends/preload_elf/android.ver"
+		"-Wl,--no-gc-sections")
 endif()
 
 
