@@ -5,6 +5,72 @@
 
 const shipped = [
   {
+    title: "Android, end to end",
+    detail: "libretrace.so runs on bionic: binaries complete under the preload with the JSON trace flowing end to end. The two bionic laws are paid in full -- trampolines are weak and hidden so nothing interposes the linker mid-load, and the real-impl resolver parses /proc/self/maps and the ELF dynamic sections directly, never touching dlsym inside the loader lock.",
+    accent: "see",
+    tag: "v2.104.0",
+  },
+  {
+    title: "Two more architectures",
+    detail: "MIPS64 n64 (big-endian) and RISC-V rv64 preload backends ship, full interposition verified live under qemu-user -- arguments, returns, denials -- with permanent CI lanes. Big-endian scalars print correctly by construction now: the datatype layer carries per-type widths. The ppc64le port is written and parked pending real hardware.",
+    accent: "see",
+    tag: "v2.101-103",
+  },
+  {
+    title: "What escaped, named live",
+    detail: "Live hit-level drift grading: the daemon matches claims against observations as events arrive and journals retrace.drift.hit -- the two planes (live daemon, offline correlate) now agree on the same corpus. Coverage joins the crash-cluster signature, so the minimized corpus separates 'same bug' from 'same symptom'.",
+    accent: "control",
+    tag: "v2.99-100",
+  },
+  {
+    title: "TLS in the open, Go in the fleet",
+    detail: "The TLS content lane: first-line summaries of what crossed the wire (redaction applies) and SSLKEYLOGFILE injection that survives TLS 1.3 -- with the _ex variants CPython binds. And goretrace: the Go runtime agent, one binary speaking the supervisor protocol natively over UDS or pipes.",
+    accent: "see",
+    tag: "v2.97-98",
+  },
+  {
+    title: "The Windows lifecycle, complete",
+    detail: "Audited launches on Windows: non-blocking inject-spawn with canonical argv quoting, join-poll over the control plane, and the reap sweep that turns every departure -- natural exit, crash, or kill -- into its own journaled record. The finding that unlocked it: an 'overlapped' pipe accept is only overlapped if the handle was; blocking accepts moved to their own thread.",
+    accent: "control",
+    tag: "v2.96.0",
+  },
+  {
+    title: "One journal, many segments; one manifest, many runs",
+    detail: "The journal grows up: rotation and retention are ordinary chained records, verification walks pruned series honestly, and the filter DSL now queries the evidence. On top of it, retrace-campaign: a manifest fans out across a bounded worker pool, verdicts read from journaled exits, evidence queries per run.",
+    accent: "control",
+    tag: "v2.94-95",
+  },
+  {
+    title: "Filters you can write",
+    detail: "The filter expression language: func/caller/return builtins, comparisons, globs, and/or/not -- one grammar for live dispatch filtering and journal queries alike, compiled once and cached. A bad expression refuses the config at boot instead of failing silently mid-run.",
+    accent: "see",
+    tag: "v2.93.0",
+  },
+  {
+    title: "The syscall lane",
+    detail: "The engine's five frame verbs became a polymorphic seam (ADR-0016): lanes publish an ops table, the engine never changes. The ptrace lane runs the same JSON action scripts at syscall stops -- the kernel IS the real implementation, denial returns -errno, and statically-linked binaries finally fall under policy.",
+    accent: "break",
+    tag: "v2.92.0",
+  },
+  {
+    title: "Sealed evidence, mapped cells",
+    detail: "Journal signing: --signing-key seals the graceful close with Ed25519 over the chain head, and verify-journal re-derives everything it checks -- transplanted seals name themselves. Plus the sanitizer compatibility matrix, measured cell by cell: what runs under ASAN, where, and what categorically cannot.",
+    accent: "control",
+    tag: "v2.87-88",
+  },
+  {
+    title: "Evidence hygiene",
+    detail: "Redaction as a first-class config surface (whole-token globs, applied once at the fan-out so every sink sees the same redacted text); docker2inside (a docker save tarball becomes an inside.json declared-set); and the replay slice: RETRACE_REPLAY_OUT records the resolved seed and every synthesized outcome, RETRACE_REPLAY_IN pins the seed back and names any drift.",
+    accent: "see",
+    tag: "v2.84-86",
+  },
+  {
+    title: "The supervisor at cruise",
+    detail: "The quickstart teaches only verbs now (spawn, wait for policy, freeze, bundle); policy templates ship in share/policy-templates; retrace-ctl drift reads the two-layer verdict per session over the control plane; and the ctl feed seam made the framing testable byte by byte.",
+    accent: "control",
+    tag: "v2.80-83",
+  },
+  {
     title: "Departures are journal records",
     detail: "The reap doctrine: a SIGCHLD self-pipe routes every spawned workload's death to the daemon's poll loop, which reaps and journals retrace.ctl.exit {pid, how, code}. A specimen that crashes, is killed, or leaves on its own is never a silent gap in the audit trail -- and never a zombie either.",
     accent: "control",

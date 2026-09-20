@@ -46,7 +46,33 @@ Android uses Bionic libc (not glibc or musl). Key differences:
   is auto-set to 0; the musl shim handles scanf format parsing.
 - **No `libpthread.so`.** pthreads are in libc. retrace handles this
   (the `dlopen("libpthread.so.0")` call returns NULL and is ignored).
-- **`dlsym(RTLD_NEXT, ...)` works** on Bionic for standard symbols.
+- **Weak definitions override.** On bionic, a weak definition in a
+  preloaded `.so` beats libc's strong one — exported trampolines would
+  interpose the dynamic linker's and libc's own calls mid-load, before
+  the engine finished init. retrace therefore emits its trampolines
+  weak AND hidden on Android (`RETRACE_ANDROID_WEAK`): nothing
+  interposes at load time.
+- **No unresolved-symbol tolerance.** Bionic refuses to load a `.so`
+  with unresolvable symbols (glibc resolves them lazily and ignores
+  failures). The Android link uses a version script that keeps the
+  export surface exact.
+- **No loader calls before init.** retrace's real-implementation
+  resolver on bionic parses `/proc/self/maps` and the mapped ELFs'
+  dynamic sections directly (GNU-hash lookup, no `dlsym`) — resolving
+  a real impl must never reenter the linker lock.
+
+## Tracing semantics on Android (v2.104.0+)
+
+The library loads, initializes, reads its JSON config, and emits
+its trace on bionic (verified end to end under the emulator
+runtime). Because the trampolines are hidden, `LD_PRELOAD` does
+not redirect the target's own libc calls yet: the working lane
+today is self-interposition — the engine's internal calls route
+through the trampolines and are captured with full arguments.
+Redirecting the target's calls (post-init PLT/GOT rewriting) is
+tracked as future work; the general helper APIs
+(`retrace_attach_process`, config validation) are available as
+on every platform.
 
 ## Use cases
 
@@ -64,5 +90,7 @@ Android uses Bionic libc (not glibc or musl). Key differences:
   use `LD_PRELOAD`.
 - Java/Kotlin code is NOT intercepted (retrace only sees JNI/native
   libc calls).
+- Target-call interposition is not yet active (see "Tracing
+  semantics" above) — v1 captures the engine's own dispatches.
 - Some Bionic-specific symbols may not be in the prototype registry.
   File an issue if you find a gap.
