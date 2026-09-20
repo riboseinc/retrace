@@ -91,8 +91,21 @@
  */
 .macro WRAPPER_ENTRY_AARCH64 func_name
 	.text
+	/* bionic's crtbegin_so.o strongly defines atexit and
+	 * pthread_atfork; a shared library defining them strongly
+	 * fails the lld link. When RETRACE_ANDROID_WEAK is given
+	 * (--defsym), emit weak definitions instead: the linker is
+	 * satisfied (crtbegin's win statically) and dynamic
+	 * interposition is unaffected -- preload scope order, not
+	 * binding, decides resolution at runtime.
+	 */
+#ifdef RETRACE_ANDROID_WEAK
+	.weak \func_name\()_retrace_wrapper
+	.weak \func_name
+#else
 	.global \func_name\()_retrace_wrapper
 	.global \func_name
+#endif
 	.type   \func_name\()_retrace_wrapper, @function
 	.type   \func_name, @function
 

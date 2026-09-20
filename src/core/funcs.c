@@ -60,7 +60,14 @@ int retrace_funcs_init(void)
 	unsigned int i;
 	unsigned long hash;
 
+#ifdef __ANDROID__
+	/* section names outside the reserved __-namespace for
+	 * bionic/lld __start_/__stop_ synthesis
+	 */
+	retrace_as_get_section_info("DATA", "retrace_funcs", &p, &size);
+#else
 	retrace_as_get_section_info("__DATA", "__retrace_funcs", &p, &size);
+#endif
 	for (i = 0; i != size / sizeof(struct FuncPrototype); i++, p++) {
 
 		hash = hash_string(p->name);

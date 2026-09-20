@@ -26,7 +26,14 @@ RETRACE_API retrace_status_t retrace_list_actions(
 	if (out_names == NULL || out_count == NULL)
 		return RETRACE_ERR_INVAL;
 
+#ifdef __ANDROID__
+	/* section names outside the reserved __-namespace for
+	 * bionic/lld __start_/__stop_ synthesis
+	 */
+	retrace_as_get_section_info("DATA", "retrace_acts", &p, &size);
+#else
 	retrace_as_get_section_info("__DATA", "__retrace_acts", &p, &size);
+#endif
 	return retrace_names_from_section(p, size, sizeof(*p),
 		&g_act_names, &g_act_count, out_names, out_count);
 }

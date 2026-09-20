@@ -23,7 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-.include "arch_spec_top.S"
+#include "arch_spec_top.S"
 
 /*
  * The common function list lives in funcs_symbols.def (DRY --

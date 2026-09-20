@@ -35,6 +35,8 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "mips64")
 	set(_v2_arch mips64)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "riscv64")
 	set(_v2_arch riscv64)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le|powerpc64le")
+	set(_v2_arch ppc64)
 else()
 	set(_v2_arch x86_64)
 endif()
@@ -58,8 +60,23 @@ if(_v2_arch STREQUAL "mips64")
 		"-march=mips64r2;-mabi=64;-mfp64;-fPIC")
 endif()
 
+
 add_library(retrace_v2 SHARED ${_v2_trampoline_sources})
 add_library(retrace::v2 ALIAS retrace_v2)
+
+# Android/bionic: crtbegin_so.o defines atexit/pthread_atfork;
+# a shared lib redefining them strongly fails the lld link
+# (duplicate symbol). The trampolines are emitted weak instead
+# (see arch_spec_top.S) -- dynamic interposition is unaffected.
+if(_v2_arch STREQUAL "aarch64" AND CMAKE_SYSTEM_NAME STREQUAL "Android")
+	set_source_files_properties(${_v2_trampoline_sources}
+		PROPERTIES COMPILE_DEFINITIONS "RETRACE_ANDROID_WEAK=1")
+	# the NDK injects --gc-sections, which drops registry sections
+	# referenced only through __start_/__stop_ (lld pitfall);
+	# the later flag wins.
+	target_link_options(retrace_v2 PRIVATE "-Wl,--no-gc-sections")
+endif()
+
 
 # Pull in the modules.
 target_link_libraries(retrace_v2 PRIVATE

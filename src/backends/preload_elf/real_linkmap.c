@@ -28,6 +28,62 @@
 #include <link.h>
 
 #include "real_linkmap.h"
+#include "real_impls.h"
+
+#ifdef __ANDROID__
+/*
+ * Bionic has no dlinfo/RTLD_DI_LINKMAP: enumerate loaded
+ * objects with dl_iterate_phdr (bionic provides it) and
+ * probe each by name -- the same NOLOAD+dlsym discipline as
+ * the link_map walk below.
+ */
+struct android_walk_ctx {
+	const char *name;
+	void *self_base;
+	void *found;
+};
+
+static int android_probe_cb(struct dl_phdr_info *info,
+	size_t size, void *data)
+{
+	struct android_walk_ctx *ctx = data;
+	void *h;
+	void *p;
+
+	(void) size;
+	if (info->dlpi_name == NULL || info->dlpi_name[0] == '\0')
+		return 0;	/* main executable */
+	if ((void *) info->dlpi_addr == ctx->self_base)
+		return 0;	/* ourselves */
+	if (retrace_real_impls.strncmp != NULL &&
+		retrace_real_impls.strncmp(info->dlpi_name,
+			"linux-vdso", 10) == 0)
+		return 0;
+	h = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
+	if (h == NULL)
+		return 0;
+	p = dlsym(h, ctx->name);
+	if (p != NULL && (unsigned long) p >= 0x100000000UL) {
+		ctx->found = p;
+		return 1;
+	}
+	return 0;
+}
+
+void *retrace_as_real_from_linkmap(const char *name)
+{
+	Dl_info di;
+	struct android_walk_ctx ctx;
+
+	if (dladdr((void *)&retrace_as_real_from_linkmap, &di) == 0)
+		return NULL;
+	ctx.name = name;
+	ctx.self_base = di.dli_fbase;
+	ctx.found = NULL;
+	dl_iterate_phdr(android_probe_cb, &ctx);
+	return ctx.found;
+}
+#else /* glibc / musl link_map chain */
 
 void *retrace_as_real_from_linkmap(const char *name)
 {
@@ -57,12 +113,27 @@ void *retrace_as_real_from_linkmap(const char *name)
 			continue;
 		if ((void *)lm->l_addr == self_base)
 			continue;	/* ourselves: our export IS the wrapper */
+		/* the vdso: its (qemu-provided) symtab is not a
+		 * full symbol table -- under qemu-user gdb itself
+		 * reports "corrupt string table index" for it, and
+		 * dlsym against it returned garbage offsets that the
+		 * call_real tail then jumped to (the 0x22325c ghost)
+		 */
+		if (retrace_real_impls.strncmp != NULL &&
+			retrace_real_impls.strncmp(lm->l_name,
+				"linux-vdso", 10) == 0)
+			continue;
 		h = dlopen(lm->l_name, RTLD_LAZY | RTLD_NOLOAD);
 		if (h == NULL)
 			continue;
 		p = dlsym(h, name);
-		if (p != NULL)
+		/* same sanity floor as get_real_safe: the loader's
+		 * lookup paths have been observed returning low
+		 * garbage under qemu-ppc64le preloads
+		 */
+		if (p != NULL && (unsigned long) p >= 0x100000000UL)
 			return p;
 	}
 	return NULL;
 }
+#endif /* __ANDROID__ */
