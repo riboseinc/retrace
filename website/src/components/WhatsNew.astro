@@ -5,6 +5,12 @@
 
 const shipped = [
   {
+    title: "PPC64LE, the fifth ELF backend",
+    detail: "The port runs end to end -- validated natively on a real ppc64le kernel. Two ELFv2 ABI laws fell on the way: the trampoline kept the caller's return address in the slot every C callee writes its own into (SP+16), and the tail restored a garbage TOC for our library's own local-entry calls. Trampolines are 16-byte aligned with a CI gate; the link keeps sysv hashing and unversioned exports; the lane runs cross-build + alignment + log and denial E2E on ARM runners.",
+    accent: "see",
+    tag: "v2.106.0",
+  },
+  {
     title: "Android, end to end",
     detail: "libretrace.so runs on bionic: binaries complete under the preload with the JSON trace flowing end to end. The two bionic laws are paid in full -- trampolines are weak and hidden so nothing interposes the linker mid-load, and the real-impl resolver parses /proc/self/maps and the ELF dynamic sections directly, never touching dlsym inside the loader lock.",
     accent: "see",
@@ -12,7 +18,7 @@ const shipped = [
   },
   {
     title: "Two more architectures",
-    detail: "MIPS64 n64 (big-endian) and RISC-V rv64 preload backends ship, full interposition verified live under qemu-user -- arguments, returns, denials -- with permanent CI lanes. Big-endian scalars print correctly by construction now: the datatype layer carries per-type widths. The ppc64le port is written and parked pending real hardware.",
+    detail: "MIPS64 n64 (big-endian) and RISC-V rv64 preload backends ship, full interposition verified live under qemu-user -- arguments, returns, denials -- with permanent CI lanes. Big-endian scalars print correctly by construction now: the datatype layer carries per-type widths.",
     accent: "see",
     tag: "v2.101-103",
   },
