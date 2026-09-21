@@ -15,6 +15,7 @@ THIS platform not do. Output shapes are documented in
 | OpenBSD / NetBSD | `LD_PRELOAD` (build) | — | ktrace converter: gap | yes |
 | MIPS64 n64 (big-endian) | `LD_PRELOAD` (cross-built) | qemu-user E2E lane on CI | qemu-user strace | — |
 | RISC-V rv64 | `LD_PRELOAD` (cross-built) | qemu-user E2E lane on CI | qemu-user strace | — |
+| PPC64LE (ELFv2) | `LD_PRELOAD` (cross-built) | qemu-user E2E lane on CI | qemu-user strace | — |
 | Android arm64 (bionic) | preload (debug build/root); see [android.md](android.md) | — | — | — |
 | OHOS arm64 | preload via NDK | — | — | — |
 
@@ -125,8 +126,17 @@ path's LL/SC atomics — an emulator law, not a code bug).
 Big-endian scalars are printed correctly end to end: the
 datatype layer carries per-type widths
 (`DataType.value_size`) so printers address the narrow value
-inside its 8-byte slot. The ppc64le port is written and
-parked pending validation on real hardware.
+inside its 8-byte slot. The ppc64le port ships with the same
+lane shape, validated natively on a real ppc64le kernel
+(qemu-system): two ELFv2 ABI laws were fixed on the way — the
+trampoline keeps the caller's LR past the ABI-volatile zone
+(SP+16 belongs to the callee), and the tail restores the
+caller's TOC only for global-entry callers (local-entry
+callers pass r2 through). Trampoline entries are 16-byte
+aligned with a CI gate; the link keeps `--hash-style=sysv`
+and unversioned exports (the binutils-2.42 GNU-hash bloom
+defect; strlen stays local — it is STT_GNU_IFUNC on
+ppc64le glibc).
 
 ## Android (bionic)
 
