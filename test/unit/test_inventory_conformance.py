@@ -108,6 +108,8 @@ def main():
          ["src/backends/preload_elf/mips64", "src/v2"], []),
         ("src/backends/preload_elf/riscv64/funcs_symbols.S",
          ["src/backends/preload_elf/riscv64", "src/v2"], []),
+        ("src/backends/preload_elf/ppc64/funcs_symbols.S",
+         ["src/backends/preload_elf/ppc64", "src/v2"], []),
     ]
 
     failures = 0
