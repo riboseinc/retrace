@@ -1,0 +1,25 @@
+/*
+ * PPC64LE link policy for the retrace preload library
+ * (TODO.impl/20).
+ *
+ * global: *      -- every trampoline interposes, unversioned
+ *                   (a bare export would inherit the ref's
+ *                   GLIBC version tag and the loader's
+ *                   versioned lookups then indexed l_versions
+ *                   out of bounds -- the init-time SIGSEGV).
+ *
+ * local: strlen   -- glibc ppc64le exports strlen as
+ *                    STT_GNU_IFUNC. A plain trampoline def
+ *                    of an ifunc-backed name breaks: dlsym's
+ *                    ifunc resolution under interposition
+ *                    returns garbage and the call_real tail
+ *                    jumps into it (stack-execution SIGSEGV;
+ *                    earlier it manifested as the parser
+ *                    stack smash). The trampoline still
+ *                    exists for inventory conformance; the
+ *                    name simply does not interpose here.
+ */
+{
+  global: *;
+  local: strlen;
+};

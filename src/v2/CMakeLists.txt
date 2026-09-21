@@ -80,6 +80,20 @@ if(_v2_arch STREQUAL "aarch64" AND CMAKE_SYSTEM_NAME STREQUAL "Android")
 endif()
 
 
+# ppc64le: two proven-ld-defect keepers (TODO.impl/20): the
+# binutils 2.42 GNU-hash bloom is broken for our symbol count
+# (--hash-style=sysv removes gnu.hash entirely), and every
+# exported trampoline must be unversioned (ppc64.ver) or the
+# loader's versioned lookups index l_versions out of bounds
+# at init. strlen stays local -- it is STT_GNU_IFUNC on
+# ppc64le glibc and a plain-FUNC trampoline of an ifunc name
+# breaks resolution (the parser stack smash).
+if(_v2_arch STREQUAL "ppc64" AND RETRACE_PLATFORM_LINUX)
+	target_link_options(retrace_v2 PRIVATE
+		"-Wl,--version-script=${CMAKE_SOURCE_DIR}/src/backends/preload_elf/ppc64/ppc64.ver"
+		"-Wl,--hash-style=sysv")
+endif()
+
 # Pull in the modules.
 target_link_libraries(retrace_v2 PRIVATE
 	retrace_core
