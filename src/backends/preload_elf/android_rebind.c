@@ -64,12 +64,14 @@ struct rebind_ctx {
 	int rebound;
 };
 
-/* find a module's base + extent from /proc/self/maps: the
+/*
+ * find a module's base + extent from /proc/self/maps: the
  * executable is the first named executable mapping that is
  * neither ours nor a system lib/bin; our library is whichever
- * mapping contains this function's own address. dl_iterate_phdr
- * under qemu+bionic never reaches the callback -- the maps walk
- * is the proven path (real_linkmap.c).
+ * mapping contains this function's own address.
+ * dl_iterate_phdr under qemu+bionic never reaches the
+ * callback -- the maps walk is the proven path
+ * (real_linkmap.c).
  */
 static void maps_walk(struct rebind_ctx *ctx)
 {
