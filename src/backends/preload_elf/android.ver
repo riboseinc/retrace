@@ -1,16 +1,25 @@
 /*
- * Android/bionic link policy for the retrace preload library
- * (TODO.impl/21).
+ * PPC64-style link policy for the ANDROID preload library
+ * (TODO.impl/24).
  *
- * The trampolines are emitted weak (crtbegin_so.o strongly
- * defines atexit/pthread_atfork; lld rejects the duplicates)
- * and HIDDEN (bionic lets a weak preload definition override
- * libc's strong one, so any exported trampoline interposes
- * for the dynamic linker itself mid-load and the process
- * dies before main). Android v1 therefore does not
- * interpose via LD_PRELOAD: tracing goes through the
- * explicit registry API (include/retrace/retrace.h).
+ * global: __retrace_wrap_*  -- ONLY the post-init rebind
+ *                   aliases are exported. Each alias is the
+ *                   same address as its trampoline; nothing in
+ *                   any target references the name, so nothing
+ *                   interposes at load time.
+ *
+ * local: *           -- the bare trampoline names (malloc,
+ *                   strlen, ...) stay HIDDEN: bionic's
+ *                   weak-override law means an exported
+ *                   trampoline interposes the loader and libc
+ *                   themselves mid-load (the pre-main PC=0
+ *                   crash class). The lld version script
+ *                   overrides .hidden, so the hiding MUST live
+ *                   here. The rebind resolves the aliases by
+ *                   name after the boot completes and points
+ *                   the target's GOT slots at them.
  */
 {
-  global: *;
+  global: __retrace_wrap_*;
+  local: *;
 };
