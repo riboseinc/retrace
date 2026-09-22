@@ -235,8 +235,10 @@ static void handle_plain(int client, const char *first_chunk,
 		return;
 	}
 
-	/* proxies receive absolute-form targets; upstreams want
-	 * origin-form -- rewrite http://host/... to /... */
+	/*
+	 * proxies receive absolute-form targets; upstreams want
+	 * origin-form -- rewrite http://host/... to /...
+	 */
 	{
 		const char *target = strchr(buf, ' ');
 		char fwd[BUF_SIZE];

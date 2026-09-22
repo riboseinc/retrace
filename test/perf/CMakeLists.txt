@@ -78,6 +78,23 @@ function(add_retrace_bench name source)
 endfunction()
 
 add_retrace_bench(bench_script_resolve bench_script_resolve.c)
+
+# END-TO-END dispatch overhead (GH #866, card 22): a PLAIN
+# binary -- no engine linkage -- so the preload does the real
+# interposing. The runner script executes it three ways (no
+# preload / no-match config / capture config) and prints the
+# F2 verdict datum: the tail's share of a realistic dispatch.
+add_executable(retrace_perf_dispatch_overhead
+	bench_dispatch_overhead.c)
+if(RETRACE_BUILD_TESTS AND UNIX)
+	add_test(NAME perf-dispatch_overhead
+		COMMAND ${CMAKE_COMMAND}
+			-DBENCH=$<TARGET_FILE:retrace_perf_dispatch_overhead>
+			-DLIB=$<TARGET_FILE:retrace_v2>
+			-P ${CMAKE_CURRENT_SOURCE_DIR}/dispatch_overhead.cmake)
+	set_tests_properties(perf-dispatch_overhead
+		PROPERTIES LABELS "perf")
+endif()
 add_retrace_bench(bench_caller_match bench_caller_match.c)
 add_retrace_bench(bench_action_log_params bench_action_log_params.c)
 add_retrace_bench(bench_action_call_real bench_action_call_real.c)
