@@ -359,12 +359,14 @@ void retrace_engine_wrapper(char *func_name,
 	 * passes straight through to its real implementation,
 	 * before any resolve that could recurse into the loader.
 	 * The frame's saved LR (offset 16) is the original
-	 * caller's return address. */
+	 * caller's return address.
+	 */
 	if (retrace_android_exec_base() != 0 &&
 			arch_spec_ctx != NULL) {
 		/* aarch64 frame: OFFS_REAL_LR = 240 (the ppc64 layout
 		 * keeps its LR at 16 -- reading 16 here zeroed every
-		 * caller and wrongly exempted all rebound names) */
+		 * caller and wrongly exempted all rebound names)
+		 */
 		unsigned long caller = *(unsigned long *)
 			((unsigned long) arch_spec_ctx + 240);
 
@@ -374,7 +376,8 @@ void retrace_engine_wrapper(char *func_name,
 			/* pass through with the real impl recorded at
 			 * rebind time -- no dlsym here: dlsym itself
 			 * calls getenv/strlen (rebound) and the
-			 * resolve recursed into the loader (#864) */
+			 * resolve recursed into the loader (#864)
+			 */
 			const void *real =
 				retrace_android_real_for(func_name);
 

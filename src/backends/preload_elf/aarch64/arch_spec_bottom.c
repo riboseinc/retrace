@@ -292,7 +292,8 @@ int retrace_as_init_late(void)
 	/* Android v2 tracing (TODO.impl/24): the boot is complete
 	 * and the trampolines are safe to point at -- rebind the
 	 * target's PLT/GOT so its own calls enter the engine. The
-	 * bionic weak-override law forbids anything earlier. */
+	 * bionic weak-override law forbids anything earlier.
+	 */
 	retrace_android_rebind();
 #endif
 	return 0;
