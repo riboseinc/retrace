@@ -69,7 +69,8 @@ struct rebind_ctx {
  * neither ours nor a system lib/bin; our library is whichever
  * mapping contains this function's own address. dl_iterate_phdr
  * under qemu+bionic never reaches the callback -- the maps walk
- * is the proven path (real_linkmap.c). */
+ * is the proven path (real_linkmap.c).
+ */
 static void maps_walk(struct rebind_ctx *ctx)
 {
 	static char buf[16384];
@@ -217,7 +218,8 @@ static void rebind_table(struct rebind_ctx *ctx,
 				(uintptr_t) ours >= ctx->self_end)
 			continue;
 		/* bionic's relocator biases r_offset in place: the
-		 * stored value is already absolute */
+		 * stored value is already absolute.
+	 */
 		if (rela[i].r_offset < 0x1000UL)
 			continue;
 		slot = (void **) rela[i].r_offset;
