@@ -40,4 +40,19 @@ set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF)
 set(CPACK_RPM_PACKAGE_LICENSE "BSD-2-Clause")
 set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
 
+# Cross builds: CPack derives the package architecture from the
+# HOST (dpkg on the builder), not from CMAKE_SYSTEM_PROCESSOR --
+# a ppc64le cross build on an arm64 runner would stamp arm64
+# packages. Name the architecture explicitly from the target.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le|powerpc64le")
+	set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE ppc64le)
+	set(CPACK_RPM_PACKAGE_ARCHITECTURE ppc64le)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+	set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE arm64)
+	set(CPACK_RPM_PACKAGE_ARCHITECTURE aarch64)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+	set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE amd64)
+	set(CPACK_RPM_PACKAGE_ARCHITECTURE x86_64)
+endif()
+
 include(CPack)
