@@ -128,6 +128,13 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq cmake ninja-build libssl-dev rpm
           [ -z "${{ matrix.cross }}" ] ||             sudo apt-get install -y -qq gcc-${{ matrix.cross }}               cpp-${{ matrix.cross }}
+          if [ -n "${{ matrix.cross }}" ]; then
+            # rpmbuild's __os_install_post runs the HOST strip on
+            # the buildroot -- it cannot parse cross-compiled
+            # binaries and fails the %install script. The packages
+            # ship unstripped (CPACK_STRIP_FILES is off anyway).
+            echo '%__os_install_post %{nil}' > ~/.rpmmacros
+          fi
 
       - name: Install deps (macOS)
         if: matrix.os == 'macos'
