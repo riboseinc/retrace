@@ -47,6 +47,9 @@
 #endif
 
 #include "engine.h"
+#ifdef __ANDROID__
+#include "../backends/preload_elf/android_rebind.h"
+#endif
 #include "funcs.h"
 #include "agent.h"
 #include "real_impls.h"
@@ -348,6 +351,41 @@ void retrace_engine_wrapper(char *func_name,
 	func_name = strip_darwin_extsn(func_name, clean_name,
 		sizeof(clean_name));
 
+#ifdef __ANDROID__
+	/* Android v2 (TODO.impl/24): with the rebind active, the
+	 * loader's and libc's own boot-time calls also land in the
+	 * trampolines (the flood). Route by CALLER: only the
+	 * executable's own calls are captured -- everything else
+	 * passes straight through to its real implementation,
+	 * before any resolve that could recurse into the loader.
+	 * The frame's saved LR (offset 16) is the original
+	 * caller's return address. */
+	if (retrace_android_exec_base() != 0 &&
+			arch_spec_ctx != NULL) {
+		/* aarch64 frame: OFFS_REAL_LR = 240 (the ppc64 layout
+		 * keeps its LR at 16 -- reading 16 here zeroed every
+		 * caller and wrongly exempted all rebound names) */
+		unsigned long caller = *(unsigned long *)
+			((unsigned long) arch_spec_ctx + 240);
+
+		if (caller < retrace_android_exec_base() ||
+				caller >= retrace_android_exec_base() +
+					0x100000000UL) {
+			/* pass through with the real impl recorded at
+			 * rebind time -- no dlsym here: dlsym itself
+			 * calls getenv/strlen (rebound) and the
+			 * resolve recursed into the loader (#864) */
+			const void *real =
+				retrace_android_real_for(func_name);
+
+			if (real != NULL) {
+				retrace_as_sched_real(NULL, arch_spec_ctx,
+					(void *) real);
+				goto out;
+			}
+		}
+	}
+#endif
 	name_slot = name_slot_lookup(func_name, &real_impl);
 	if (!retrace_inited) {
 		/* No context exists yet (and none may be allocatable
