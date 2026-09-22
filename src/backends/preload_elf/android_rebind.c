@@ -37,6 +37,10 @@
 #include "android_rebind.h"
 #include "logger.h"
 
+extern void *retrace_as_get_real_safe(const char *real_impl);
+
+static void reals_add(const char *name, void *real);
+
 #ifdef __ANDROID__
 
 /*
@@ -136,13 +140,19 @@ static void maps_walk(struct rebind_ctx *ctx)
 		if (*p == '\n')
 			p++;
 
-		if (perms[2] != 'x' || from == 0)
+		if (from == 0)
 			continue;
 		if (here >= from && here < to) {
 			ctx->self_base = from;
 			ctx->self_end = to;
 			continue;
 		}
+		/* the exec anchor: the FIRST named mapping whose page
+		 * validates as an aarch64 ELF header. Modern PIE
+		 * layouts put an r-- header page BELOW the r-x text,
+		 * so an x-only anchor lands one page high and every
+		 * base-relative GOT write lands one page off (the
+		 * writes verified against the WRONG page). */
 		if (ctx->exec_base == 0 && path != NULL &&
 				strstr(path, "libretrace") == NULL &&
 				strstr(path, "/bin/") == NULL &&
@@ -170,6 +180,42 @@ static int page_write(void *slot, unsigned long value)
 			PROT_READ | PROT_WRITE) != 0)
 		return -1;
 	*(unsigned long *) slot = value;
+	return 0;
+}
+
+/* loader-support functions: rebinding them breaks the loader
+ * itself (pthread_once's control word lives in the loader's
+ * RELRO -- libc's pthread_once writing it faults; the dlopen
+ * family recurses the resolver; the exit family breaks test
+ * exits). The target calls these via libc directly and they
+ * are never captured. */
+static const char *const rebind_excluded[] = {
+	"pthread_once",
+	"dlopen", "dlsym", "dlclose", "dladdr",
+	"dl_iterate_phdr", "dlerror",
+	"__loader_dlopen", "__loader_dlsym", "__loader_dlclose",
+	"__loader_dladdr", "__loader_dl_iterate_phdr",
+	"__loader_dlerror",
+	"__cxa_atexit", "__cxa_finalize", "atexit",
+	"exit", "_exit", "_Exit",
+};
+
+static int rebind_excluded_name(const char *name)
+{
+	size_t i;
+
+	for (i = 0; i < sizeof(rebind_excluded) /
+			sizeof(rebind_excluded[0]); i++) {
+		const char *a = rebind_excluded[i];
+		const char *b = name;
+
+		while (*a != '\0' && *a == *b) {
+			a++;
+			b++;
+		}
+		if (*a == '\0' && *b == '\0')
+			return 1;
+	}
 	return 0;
 }
 
@@ -201,14 +247,28 @@ static void rebind_table(struct rebind_ctx *ctx,
 		name = strtab + sym->st_name;
 		if (name[0] == '\0')
 			continue;
+		if (rebind_excluded_name(name))
+			continue;
 		{
 			/* the visible alias: __retrace_wrap_<func> */
 			char alias[96];
-			const char *suffix = "__retrace_wrap_";
-			size_t k = 0, n = 0;
+			size_t n = 0, k = 0;
 
-			while (suffix[n] != '\0' && n < sizeof(alias) - 1)
-				alias[n++] = suffix[n++];
+			alias[n++] = '_';
+			alias[n++] = '_';
+			alias[n++] = 'r';
+			alias[n++] = 'e';
+			alias[n++] = 't';
+			alias[n++] = 'r';
+			alias[n++] = 'a';
+			alias[n++] = 'c';
+			alias[n++] = 'e';
+			alias[n++] = '_';
+			alias[n++] = 'w';
+			alias[n++] = 'r';
+			alias[n++] = 'a';
+			alias[n++] = 'p';
+			alias[n++] = '_';
 			while (name[k] != '\0' && n < sizeof(alias) - 1)
 				alias[n++] = name[k++];
 			alias[n] = '\0';
@@ -224,7 +284,22 @@ static void rebind_table(struct rebind_ctx *ctx,
 	 */
 		if (rela[i].r_offset < 0x1000UL)
 			continue;
-		slot = (void **) rela[i].r_offset;
+		/* resolve the real implementation NOW (during our
+		 * constructor, the proven-safe window) and record it:
+		 * the pass-through path must never call dlsym at
+		 * dispatch time -- dlsym itself calls getenv/strlen,
+		 * which are rebound, and that recursion killed the
+		 * boot (#864) */
+		{
+			void *real = retrace_as_get_real_safe(name);
+
+			if (real == NULL)
+				continue;
+			reals_add(name, real);
+		}
+		/* the exec's r_offsets are FILE-RELATIVE: runtime
+		 * slot = base + offset */
+		slot = (void **) (ctx->exec_base + rela[i].r_offset);
 		if (*slot == ours)
 			continue;
 		if (page_write(slot, (unsigned long) ours) == 0)
@@ -311,6 +386,66 @@ static long unpack_packed(const unsigned char *blob, size_t blobsz,
 	return (long) cnt;
 }
 
+static uintptr_t g_exec_base;
+
+uintptr_t retrace_android_exec_base(void)
+{
+	return g_exec_base;
+}
+
+/* name -> real implementation, captured at rebind time. The
+ * engine's pass-through path looks entries up by name with a
+ * plain byte compare -- NO dispatch, so a rebound strcmp
+ * cannot recurse into the exemption itself. */
+struct rebind_real {
+	char name[40];
+	void *real;
+};
+
+static struct rebind_real g_reals[512];
+static int g_reals_cnt;
+
+static void reals_add(const char *name, void *real)
+{
+	size_t k = 0;
+
+	if (g_reals_cnt >= (int) (sizeof(g_reals) /
+			sizeof(g_reals[0])))
+		return;
+	while (name[k] != '\0' && k < sizeof(g_reals[0].name) - 1) {
+		g_reals[g_reals_cnt].name[k] = name[k];
+		k++;
+	}
+	g_reals[g_reals_cnt].name[k] = '\0';
+	g_reals[g_reals_cnt].real = real;
+	g_reals_cnt++;
+}
+
+const void *retrace_android_real_for(const char *name)
+{
+	int i;
+
+	if (name == NULL)
+		return NULL;
+	for (i = 0; i < g_reals_cnt; i++) {
+		const char *a = g_reals[i].name;
+		const char *b = name;
+		int match = 1;
+
+		while (*a != '\0' || *b != '\0') {
+			if (*a != *b) {
+				match = 0;
+				break;
+			}
+			a++;
+			b++;
+		}
+		if (match)
+			return g_reals[i].real;
+	}
+	return NULL;
+}
+
 void retrace_android_rebind(void)
 {
 	struct rebind_ctx ctx;
@@ -337,6 +472,7 @@ void retrace_android_rebind(void)
 	maps_walk(&ctx);
 	if (ctx.exec_base == 0 || ctx.self_base == 0)
 		return;
+	g_exec_base = ctx.exec_base;
 	{
 		Elf64_Ehdr *eh = (Elf64_Ehdr *) ctx.exec_base;
 		ElfW(Phdr) *ph = (ElfW(Phdr) *) (ctx.exec_base +

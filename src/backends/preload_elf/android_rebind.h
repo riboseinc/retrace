@@ -37,4 +37,13 @@
 
 void retrace_android_rebind(void);
 
+/* the executable's base once the rebind has walked the maps
+ * (0 before that) -- the engine uses it to route calls by
+ * caller: only the executable's own calls are captured */
+uintptr_t retrace_android_exec_base(void);
+
+/* the real implementation recorded for name at rebind time
+ * (NULL if the name was never rebound) */
+const void *retrace_android_real_for(const char *name);
+
 #endif /* ANDROID_REBIND_H_ */
