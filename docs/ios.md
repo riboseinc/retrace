@@ -34,17 +34,51 @@ engine from userspace without a preload:
   evidence rides the supervisor protocol to a retraced daemon
   (on your workstation, over USB/Wi-Fi).
 
-Setup and limitations are documented in the bridge's README;
-treat the throughput as debugging-grade, not farm-grade.
+### Installing on-device
+
+Build the .deb on any host and install with your package
+manager (Cydia/Sileo/Zebra):
+
+```sh
+frida-bridge/packaging/build-deb.sh .   # dpkg-deb, or ar+tar
+# copy retrace-frida_<ver>_iphoneos-arm.deb to the device, then:
+# dpkg -i retrace-frida_<ver>_iphoneos-arm.deb
+```
+
+The payload installs `/usr/share/retrace/retrace-frida.js`.
+TrollStore (no package manager): extract the .deb (it is an
+`ar` archive: `ar x` then `tar xzf data.tar.gz`) or just copy
+`retrace-frida.js` anywhere readable, e.g.
+`/var/jb/usr/share/retrace/`, and point `frida -l` at it.
+
+Then capture:
+
+```sh
+frida -l /usr/share/retrace/retrace-frida.js -n YourApp > trace.json
+echo ']' >> trace.json   # close the JSON array
+```
+
+Treat the throughput as debugging-grade, not farm-grade.
 
 ## Stock devices (network observer)
 
-For stock devices the observation point moves off-device: run
-the tool's protocol decoders as a local proxy
-(`decode_http`/`decode_dns` shapes) and point the device's
-proxy at it. You get the network-truth layer of a trace (no
-libc calls, no jail semantics) — still useful for exfiltration
-and C2 surveys.
+For stock devices the observation point moves off-device:
+`retrace-netobserve` is a local forward proxy that records
+observed HTTP traffic in the retrace trace shape (the same
+record text the `decode_http` action emits), so the evidence
+grades with every retrace tool:
+
+```sh
+retrace-netobserve 0.0.0.0 8080 > nettrace.jsonl
+# on the device: Settings > Wi-Fi > Proxy > Manual:
+#   host = <your host>, port = 8080
+```
+
+Plain HTTP is inspected (request line + upstream host); HTTPS
+is a CONNECT tunnel — opaque bytes, but the TARGET is
+recorded (network truth, not content). You get the
+network-truth layer of a trace (no libc calls, no jail
+semantics) — still useful for exfiltration and C2 surveys.
 
 ## What is not possible
 
