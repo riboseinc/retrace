@@ -9,6 +9,9 @@
 
 #ifdef __ANDROID__
 #include <elf.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
@@ -134,11 +137,16 @@ static int android_scan_mods(struct android_mod *mods, int max)
 	ssize_t n;
 	int cnt = 0;
 
-	fd = open("/proc/self/maps", O_RDONLY);
+	/* raw syscalls: the resolver runs before init AND, once
+	 * the v2 rebind is active (TODO.impl/24), the target's
+	 * open/read/close land back in the engine -- the
+	 * resolver's own I/O must never dispatch */
+	fd = (int) syscall(SYS_openat, AT_FDCWD, "/proc/self/maps",
+		O_RDONLY, 0);
 	if (fd < 0)
 		return 0;
-	n = read(fd, buf, sizeof(buf) - 1);
-	close(fd);
+	n = syscall(SYS_read, fd, buf, sizeof(buf) - 1);
+	syscall(SYS_close, fd);
 	if (n <= 0)
 		return 0;
 	buf[n] = '\0';

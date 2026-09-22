@@ -109,12 +109,19 @@
 	 * mid-load -- their GOT calls land in an engine whose
 	 * real-impl table is empty and the process dies (the
 	 * putenv->strlen->NULL class). Android v1 therefore does
-	 * NOT interpose via LD_PRELOAD at all: tracing goes
-	 * through the explicit registry API
-	 * (retrace_* in include/retrace/retrace.h).
+	 * NOT interpose via LD_PRELOAD at all.
+	 *
+	 * Android v2 (TODO.impl/24): the post-init rebind needs
+	 * to FIND each trampoline, so a STRONG, VISIBLE alias
+	 * rides alongside -- __retrace_wrap_<func>. Nothing in
+	 * the target references that name, so load-time binding
+	 * is unaffected; the rebind resolves it by name after
+	 * the boot completes.
 	 */
 	.hidden \func_name\()_retrace_wrapper
 	.hidden \func_name
+	.globl __retrace_wrap_\func_name
+	.type __retrace_wrap_\func_name, @function
 #else
 	.global \func_name\()_retrace_wrapper
 	.global \func_name
@@ -124,6 +131,9 @@
 
 \func_name:
 \func_name\()_retrace_wrapper:
+#ifdef RETRACE_ANDROID_WEAK
+__retrace_wrap_\func_name:
+#endif
 	/* Allocate the frame. 256 B keeps sp 16-aligned. */
 	sub     sp, sp, #FRAME_SIZE
 

@@ -24,6 +24,15 @@ set(_preload_elf_${_retrace_arch}_sources
 	real_linkmap.c
 	backend.c)
 
+if(ANDROID)
+	# Android v2 tracing: the post-init PLT/GOT rebind
+	# (TODO.impl/24). The bionic weak-override law keeps the
+	# trampolines hidden at load; this module points the
+	# target's own calls at them once the boot completes.
+	list(APPEND _preload_elf_${_retrace_arch}_sources
+		android_rebind.c)
+endif()
+
 add_library(retrace_backend_preload_elf OBJECT ${_preload_elf_${_retrace_arch}_sources})
 target_include_directories(retrace_backend_preload_elf
 	PRIVATE
