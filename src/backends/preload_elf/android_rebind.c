@@ -152,7 +152,8 @@ static void maps_walk(struct rebind_ctx *ctx)
 		 * layouts put an r-- header page BELOW the r-x text,
 		 * so an x-only anchor lands one page high and every
 		 * base-relative GOT write lands one page off (the
-		 * writes verified against the WRONG page). */
+		 * writes verified against the WRONG page).
+		 */
 		if (ctx->exec_base == 0 && path != NULL &&
 				strstr(path, "libretrace") == NULL &&
 				strstr(path, "/bin/") == NULL &&
@@ -289,7 +290,8 @@ static void rebind_table(struct rebind_ctx *ctx,
 		 * the pass-through path must never call dlsym at
 		 * dispatch time -- dlsym itself calls getenv/strlen,
 		 * which are rebound, and that recursion killed the
-		 * boot (#864) */
+		 * boot (#864)
+		 */
 		{
 			void *real = retrace_as_get_real_safe(name);
 
@@ -298,7 +300,8 @@ static void rebind_table(struct rebind_ctx *ctx,
 			reals_add(name, real);
 		}
 		/* the exec's r_offsets are FILE-RELATIVE: runtime
-		 * slot = base + offset */
+		 * slot = base + offset
+		 */
 		slot = (void **) (ctx->exec_base + rela[i].r_offset);
 		if (*slot == ours)
 			continue;
@@ -461,7 +464,8 @@ void retrace_android_rebind(void)
 
 	{
 		/* OPT-IN until the boot-phase interposition
-		 * semantics are characterized (TODO.impl/24) */
+		 * semantics are characterized (TODO.impl/24)
+		 */
 		const char *env = getenv("RETRACE_ANDROID_REBIND");
 
 		if (env == NULL || env[0] != '1')
