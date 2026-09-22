@@ -23,6 +23,7 @@ install, quick start, and platform support.
 | Understand the engine, backends, and actions | [Architecture](architecture.md) |
 | Add retrace to a Dockerfile or compose stack | [Docker guide](docker.md) |
 | Trace an Android app via `wrap.sh` or Magisk | [Android guide](android.md) |
+| Observe an iOS app (simulator / jailbroken / network) | [iOS lane](ios.md) |
 | Understand a design decision | [Architecture decisions (ADR)](adr/README.md) |
 | Run the supervisor, fleet CLI, or kernel enforcement | [Supervisor reference](supervisor.md) — retraced, retrace-ctl, enforce, the lanes |
 | Read the public API | [`include/retrace/`](../include/retrace/) |
@@ -50,6 +51,7 @@ docs/
 │   └── 21-mock-ssl-verify.md
 ├── docker.md              ← container integration patterns
 ├── android.md             ← Android cross-compile + deploy
+├── ios.md                 ← The observer-only iOS lane
 └── adr/                   ← architecture decision records
     ├── README.md
     ├── 0001-cmake-as-primary-build.md

@@ -6,6 +6,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 (see `docs/adr/0006-semantic-versioning.md`).
 
+## [2.108.0] — 2026-09-22
+
+**cards 24-26: android rebind infra, ios lane doc, ppc64le packages**
+
+android_rebind.{c,h}: the target-call PLT/GOT rebind, opt-in
+via RETRACE_ANDROID_REBIND=1 — the maps-walk module finder,
+the APA1 packed-reloc unpacker, and the __retrace_wrap_<func>
+alias scheme with the export policy inverted
+(global: __retrace_wrap_*; local: *;). docs/ios.md: the
+observer-only iOS lane (simulator / frida-bridge / network
+observer). Packaging: ppc64le deb/rpm stamped from the target
+arch with a cross-build release leg (44 assets, 6 packages).
+
+## [2.107.0] — 2026-09-22
+
+**the docs and site catch up to v2.106.0**
+
+PPC64LE in the platform matrix and the cross-arch docs; the
+site feed, badge, and about page current through v2.106.0.
+
+## [2.106.0] — 2026-09-21
+
+**ppc64le -- the fifth ELF backend runs end to end**
+
+Two ELFv2 ABI laws fixed (the caller-LR slot at SP+16 is the
+callee's; the local-entry TOC restore), 16-byte trampoline
+alignment with a CI gate, the sysv-hash + version-script link
+keepers, the inventory-conformance entry, and the ppc64le CI
+lane. Validated natively on a real ppc64le kernel.
+
+## [2.105.0] — 2026-09-20
+
+**the docs and site catch up to v2.104.0**
+
+CHANGELOG entries 2.41.0 through 2.104.0; platform docs for
+mips64, rv64, and Android/bionic; the website feed, badge,
+about paragraph, and docs page current.
+
 ## [2.104.0] — 2026-09-20
 
 **Android E2E -- the library runs on bionic**
