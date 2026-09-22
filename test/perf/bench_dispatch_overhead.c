@@ -50,9 +50,11 @@ int main(int argc, char **argv)
 	double t0;
 	size_t i;
 
+
 	/* the workload: cheap, plentiful libc calls -- the class
 	 * a farm target makes millions of; strlen and malloc/free
-	 * are both in the intercept inventory */
+	 * are both in the intercept inventory
+	 */
 	memset(buf, 'x', sizeof(buf));
 	buf[sizeof(buf) - 1] = '\0';
 
