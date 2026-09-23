@@ -144,6 +144,48 @@ captured bytes as a `capture_buffer: <param>[N]=<value>` entry.
 Pair with `decode_http` / `decode_dns` (recipe 22) when you want
 structured fields instead of raw bytes.
 
+#### `tls_content`
+
+(>= 2.98.0, OpenSSL only) Logs a printable first line of the
+plaintext from `SSL_read` / `SSL_write` (and the `_ex` pair —
+what CPython's `_ssl` binds). The buffer is bounded by the
+caller-supplied length (TLS buffers are not NUL-terminated); an
+HTTP request line or header rides the event, binary payloads
+contribute their length. Emitted through the agent fan-out, so
+the redaction transform applies — secrets in evidence are a
+feature; leaked secrets are not.
+
+```json
+{ "func_name": "SSL_write_ex",
+  "actions": [
+    { "action_name": "tls_content",
+      "action_params": { "dir": "w" } },
+    { "action_name": "call_real" } ] }
+```
+
+| Param  | Type   | Required | Notes                                        |
+|--------|--------|----------|----------------------------------------------|
+| `dir`  | string | no       | Direction tag recorded with the entry (`r`/`w`). |
+
+#### `tls_keylog`
+
+(>= 2.98.0, OpenSSL only) After `call_real`, the context
+returned by `SSL_CTX_new` gets retrace's
+`SSL_CTX_set_keylog_callback` — the same injection point
+`SSLKEYLOGFILE` uses internally. Every secret line the
+application's OpenSSL would log (TLS 1.3
+`HANDSHAKE_TRAFFIC_SECRET` family included) lands in the file
+named by `RETRACE_TLS_KEYLOG` (default `retrace-keylog.log`).
+Providers without the callback (LibreSSL) are named in the log
+and skipped — never fatal.
+
+```json
+{ "func_name": "SSL_CTX_new",
+  "actions": [
+    { "action_name": "call_real" },
+    { "action_name": "tls_keylog" } ] }
+```
+
 ### Modify
 
 Actions that rewrite the call's arguments or return value.

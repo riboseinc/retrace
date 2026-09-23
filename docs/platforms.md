@@ -85,8 +85,8 @@ the logger's own write path into the engine until stack death;
 content-level read/write truth belongs to ETW/procmon). One
 correctness item remains open: the `NtCreateFile` trampoline
 breaks the hooked call's success path on current images (the
-call returns failure; tracked in TODO.trace-profile/28) -- path
-observation under it is unreliable until that lands. CRT-level argument mutation remains
+call returns failure — an open issue; path
+observation under it is unreliable until it lands). CRT-level argument mutation remains
 impossible for static CRTs (no `fopen` symbol to interpose).
 Breadcrumbs for your own debugging: `RETRACE_WIN_DIAG=1`.
 
@@ -179,8 +179,8 @@ network off when the profile shows none. Runnable demo:
 
 ## Sanitizer-instrumented targets
 
-The fuzzing persona's matrix (TODO.impl/05; the integration
-test `sanitizer-compat` is its tripwire):
+The fuzzing persona's matrix (supported since v2.88.0; the
+integration test `sanitizer-compat` is its tripwire):
 
 | Target built with | Linux (LD_PRELOAD) | macOS (DYLD_INSERT) |
 |---|---|---|
@@ -247,11 +247,17 @@ module (CPack over the install surface):
   sudo apt install ./retrace-2.67.0-linux-x86_64.deb
   ```
 
+- **`.rpm` packages** (`-linux-x86_64.rpm`, `-linux-aarch64.rpm`)
+  ship in the release assets alongside the debs for yum/dnf-based
+  fleets; since 2.108.0 the set also includes
+  **PowerPC64le (little-endian)** — `linux-ppc64le` tarball plus
+  `.deb` and `.rpm`, cross-built and validated on emulated ppc64le
+  during the port (the ELFv2 ABI notes are in `docs/adr/` and the
+  platform table above).
 - **Checksums**: every asset ships a `.sha256` sidecar
   (`sha256sum -c retrace-2.67.0-linux-x86_64.tar.gz.sha256`).
-- **RPM** is configured in `cmake/Packaging.cmake` for source builds
-  (`cd build && cpack -G RPM`); the hosted CI runners carry no
-  `rpmbuild`, so release-side rpm artifacts await a repository channel.
+- **RPM** source builds remain available via
+  `cmake/Packaging.cmake` (`cd build && cpack -G RPM`).
 - **Building your own** from a checkout:
 
   ```sh

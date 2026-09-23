@@ -1,7 +1,8 @@
 # Control-plane threat model (retraced / retrace agent)
 
-Status: P0 (local transport) shipped — TODO.supervisor/08.
-P1 (TLS fleet transport) planned. This document answers the
+Status: local UDS transport and the TLS fleet transport
+(mutual-auth, opt-in) shipped. Remote-by-default remains
+gated on an external TLS hardening review. This document answers the
 adversary table; every row names the control that answers it.
 
 retrace supervises untrusted code. The control plane (the
@@ -23,7 +24,7 @@ itself must be harder to subvert than the workloads it guards.
 | Adversary | Capability attempted | Control |
 |---|---|---|
 | The traced process | Talk to the agent socket directly; forge HELLOs to impersonate an agent | The UDS is mode 0660 (same-uid/group only). A forged HELLO without the channel nonce registers as a **spectator**: events accepted (evidence flows), policy and commands never sent. The nonce is minted by the daemon and handed to spawners out-of-band (`--nonce-file`, mode 0600). HONEST LIMIT (P0): the nonce rides the spawn environment, so the traced process itself can read it; when the deployment must defend against the tracee, the sandbox `deny_env`/`allow_env` jail hides `RETRACE_*` from the traced code at exec. A nonce-armed tracee can additionally forge events into the journal under its own pid's agent id (it cannot alter history: the chain detects rewrites, and policy never flows to it unless it is a legitimate agent). P1 binds the role to the connection (per-connection nonce issued in WELCOME), closing impersonation fully. |
-| The traced process | Replay a captured POLICY_SET to confuse epochs | Per-agent policy epochs; agents accept only strictly-greater epochs (TODO.supervisor/05; replay refusal is covered by its tests). |
+| The traced process | Replay a captured POLICY_SET to confuse epochs | Per-agent policy epochs; agents accept only strictly-greater epochs (replay refusal is covered by the policy tests). |
 | A local unprivileged user | Connect to the agent or ctl socket | Accept-time peer credential check (`SO_PEERCRED` / `LOCAL_PEERCRED`): only the daemon's euid or root. Refusals are closed and journaled (`retrace.auth.refused` with peer uid). The ctl socket is 0600 on top. |
 | A local unprivileged user (OpenBSD) | Same | No credential query exists on OpenBSD local sockets: the daemon fails OPEN on the liveness plane (agents may connect) — the 0660 mode still gates reachability — and the journal records that the platform gate was unavailable. The ctl plane stays 0600. (Failing closed here would mean refusing all agents on a platform where the mode gate already excludes other users.) |
 | A network attacker | Reach the control plane | There is no TCP listener. Local AF_UNIX only (P0). Remote mode (P1) will be TLS 1.3 mutual-auth only; no plaintext remote transport exists or will. |

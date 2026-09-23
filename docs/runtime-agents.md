@@ -127,6 +127,6 @@ emit, on both transports.
 
 Kernel-observation agents (`retrace-ebpf-agent`,
 `retrace-etw-agent`) speak the same framing as spectators with
-`source: kernel`. The Windows named-pipe transport
-(TODO.supervisor/12) carries the same protocol; until it lands, the
-ETW lane rides the `etw2retrace` loader path.
+`source: kernel`. The Windows named-pipe transport (the ETW
+pipes agent) carries the same protocol; the ETW lane also rides
+the `etw2retrace` loader path.

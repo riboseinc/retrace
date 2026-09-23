@@ -128,4 +128,3 @@ Without the per-thread `ThreadContext`, two threads could clobber each other's g
 - `src/core/engine.c` -- the orchestrator (state machine implementation)
 - `docs/adr/0013-engine-mece-split.md` -- the architectural decision
 - `docs/architecture.md` -- higher-level architecture overview
-- `TODO.complete/13-engine-mece-refactor.md` -- the tactical plan that drove the split

@@ -201,7 +201,9 @@ $ sudo cp myteam.json /usr/local/share/retrace/policies/
 ## Caveats
 
 - `path_contains` is a substring match (case-sensitive). For
-  regex-based predicates, wait for the filter DSL (TODO.complete/20).
+  richer predicates use the filter DSL in the engine config
+  ([recipe 43](43-filter-expr.md)); the audit policy format
+  itself stays substring-based.
 - The matcher scans every string value in each log entry. Traces
   with very large string args (e.g. base64 blobs) may take longer.
 - SARIF output includes the full log entry as evidence; large traces

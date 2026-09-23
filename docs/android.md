@@ -65,14 +65,48 @@ Android uses Bionic libc (not glibc or musl). Key differences:
 
 The library loads, initializes, reads its JSON config, and emits
 its trace on bionic (verified end to end under the emulator
-runtime). Because the trampolines are hidden, `LD_PRELOAD` does
-not redirect the target's own libc calls yet: the working lane
-today is self-interposition — the engine's internal calls route
-through the trampolines and are captured with full arguments.
-Redirecting the target's calls (post-init PLT/GOT rewriting) is
-tracked as future work; the general helper APIs
-(`retrace_attach_process`, config validation) are available as
-on every platform.
+runtime). The general helper APIs (`retrace_attach_process`,
+config validation) are available as on every platform.
+
+### Capturing the target's own calls (v2.109.0+)
+
+Because the trampolines are hidden symbols (the bionic
+weak-override law), `LD_PRELOAD` alone does not redirect the
+executable's own libc calls. Set the opt-in gate before the run:
+
+```sh
+RETRACE_ANDROID_REBIND=1 RETRACE_JSON_CONFIG=conf.json \
+  LD_PRELOAD=libretrace.so ./target
+```
+
+After the engine finishes booting, retrace walks
+`/proc/self/maps` (bionic's `dl_iterate_phdr` is not reliable
+under emulation), finds the executable's dynamic section, and
+rewrites the executable's PLT/GOT slots for every trampolined
+symbol to point at the exported `__retrace_wrap_<func>`
+aliases. From that moment the target's own libc calls are
+captured with full arguments, and denial actions (sandbox,
+`addr_deny`, `modify_*`) apply to them like any other call.
+
+Details worth knowing:
+
+- **Only the executable's calls are captured.** The engine
+  routes by caller: calls made from retrace itself or from
+  system libraries are exempt, so the trace stays the target's
+  story.
+- **Loader-support functions stay out of scope** (the
+  `pthread_once` RELRO control, the `dlopen` family, the
+  `exit` family) — rebinding them breaks the loader, not the
+  target.
+- **Off is byte-identical.** Without `RETRACE_ANDROID_REBIND=1`
+  no slot is touched and behavior matches v2.104 semantics —
+  the gate exists because with the rebind active the loader's
+  own boot-time calls also reach the engine, which is noisy and
+  can exit the process before `main` on some targets.
+- Resolving real implementations never goes through `dlsym`
+  (the linker-lock reentrancy trap): the resolver reads
+  `/proc/self/maps` and the mapped ELFs' dynamic sections
+  directly.
 
 ## Use cases
 
@@ -90,7 +124,8 @@ on every platform.
   use `LD_PRELOAD`.
 - Java/Kotlin code is NOT intercepted (retrace only sees JNI/native
   libc calls).
-- Target-call interposition is not yet active (see "Tracing
-  semantics" above) — v1 captures the engine's own dispatches.
+- Target-call capture is opt-in (`RETRACE_ANDROID_REBIND=1`, see
+  above); without the gate only the engine's own dispatches are
+  captured.
 - Some Bionic-specific symbols may not be in the prototype registry.
   File an issue if you find a gap.

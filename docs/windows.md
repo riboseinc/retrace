@@ -135,7 +135,7 @@ the Win32-direct depth at the ntdll boundary.
 | Capability | windows-x64 | windows-arm64 (MSVC) | windows-arm64 (MinGW/Clang) |
 |---|---|---|---|
 | Engine + registries (PE-section walk) | yes | yes | yes |
-| ucrt/ntdll inline hooks + wrappers | yes (MASM) | yes (armasm64, TODO.trace-profile/08) | yes (gas dialect) |
+| ucrt/ntdll inline hooks + wrappers | yes (MASM) | yes (armasm64) | yes (gas dialect) |
 | `retrace-profile capture` | yes (delegates to retrace-win-run) | yes | yes |
 | Offline tools (profile, correlate, procmon2retrace, strace2retrace) | yes | yes | yes |
 | ptrace attach | n/a (Linux backend) | n/a | n/a |

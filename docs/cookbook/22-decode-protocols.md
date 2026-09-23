@@ -136,4 +136,4 @@ lines.
 
 - Recipe 15 — Capture network traffic (raw byte logging)
 - Recipe 21 — Mock OpenSSL verify (for plaintext TLS interception)
-- TODO.complete/23 — Protocol decoders roadmap
+- `tls_content` / `tls_keylog` actions ([configuration.md](../configuration.md)) — post-handshake plaintext summaries and keylog capture
