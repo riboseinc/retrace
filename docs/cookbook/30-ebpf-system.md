@@ -127,7 +127,7 @@ bpf_probe_read_user_str(path, sizeof(path), (void *)ctx->filename);
 ```
 
 This requires a larger `event_t` struct and per-syscall handling —
-left as a TODO in the MVP. See TODO.complete/29 for the roadmap.
+left as a TODO in the MVP.
 
 ## Caveats
 

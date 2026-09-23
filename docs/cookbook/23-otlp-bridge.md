@@ -144,10 +144,12 @@ document has:
 
 ## Caveats
 
-- `retrace-to-otlp` is a post-processing tool. If you need real-time
-  streaming into a collector, wait for TODO.complete/22 (real-time
-  WebSocket streaming) or use `tail -f` on the log file piped into
-  the converter.
+- `retrace-to-otlp` is a post-processing tool. For real-time
+  streaming use the live lanes: `RETRACE_OTLP_ENDPOINT` streams
+  spans and security events straight from the traced process
+  ([recipe 36](36-live-otlp-stream.md)), or `retrace-ws` +
+  `tail -f` feeds a browser dashboard
+  ([recipe 28](28-live-stream.md)).
 - The `traceId` is derived from the first entry's timestamp; reruns
   get different IDs. For deterministic IDs across reruns (e.g. for
   regression testing), patch `g_trace_id` in the converter source.
@@ -159,4 +161,4 @@ document has:
 - Recipe 04 -- Time each call (for the underlying timing data).
 - Recipe 22 -- Decode HTTP and DNS (to enrich spans with protocol
   fields).
-- TODO.complete/21 -- OTel bridge roadmap.
+- [tools.md](../tools.md) -- the `retrace-to-otlp` tool reference.

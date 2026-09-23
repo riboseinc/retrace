@@ -137,4 +137,5 @@ reserving `symbol` for setup/teardown phases.
 - [Recipe 02: Filter by function](02-filter-by-function.md)
 - [Recipe 12: Fail specific syscalls](12-fail-specific.md)
 - [Recipe 16: Multi-function script](16-multi-script.md)
-- TODO.complete/17-per-return-address-routing.md (design)
+- [Recipe 43: Filter expressions](43-filter-expr.md) — the
+  predicate language for whole-script gating
