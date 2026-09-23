@@ -1,0 +1,236 @@
+---
+// Supervisor — the fleet plane: retraced (daemon), retrace-ctl (CLI),
+// sessions, the two-plane rule, fail-open / fail-closed. The full
+// reference lives in the repo's docs/supervisor.md.
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+const flagRows = [
+  ["--sock", "Agent socket (UDS; default /tmp/retraced.agent.sock)."],
+  ["--journal", "The hash-chained JSONL journal."],
+  ["--policy FILE", "A policy file pushed to every registering agent."],
+  ["--ctl", "Local controller socket; PEERCRED-gated."],
+  ["--nonce / --nonce-file", "Agent channel nonce. No nonce → spectator: evidence, never policy."],
+  ["--tls-* (all four)", "Fleet control plane: TLS 1.3 mutual auth only. Certs carry claim scopes in URI SAN. No plaintext remote mode exists."],
+  ["--user / --group", "Privilege drop after every bind; a failed drop exits elevated never silently."],
+  ["--fd N", "Socket activation (systemd LISTEN_FDS). Inherited listeners never unlinked."],
+  ["--exit-after N", "Harness guard. An orphaned daemon cannot outlive its CI run."],
+];
+
+const ctlCmds = [
+  ["status", "Daemon health + active sessions summary."],
+  ["ps", "Live session table -- pids, ppids, host/role, uptime."],
+  ["drift", "Per-session libc-vs-kernel drift verdicts since last push."],
+  ["policy-push FILE", "Sign + relay a POLICY_SET to every full seat."],
+  ["freeze / thaw", "Suspend and resume deny emission (snapshot tests)."],
+  ["kill PID", "Reap a workload through the control plane."],
+  ["spawn --preload LIB -- ARGV...", "Fork the workload armed to join the daemon itself."],
+];
+---
+
+<Layout title="Supervisor — the retrace fleet plane" description="retraced daemon, retrace-ctl fleet CLI, sessions and trees, two-plane rule, fail-open / fail-closed, signed policy, kernel enforcement.">
+  <Nav />
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">SUPERVISOR</p>
+        <h1>The fleet plane.</h1>
+        <p class="lede">
+          retrace grew past one process. <code>retraced</code> owns every
+          traced binary on a host &mdash; registry, versioned policy, a
+          hash-chained journal, and a live command channel &mdash; while
+          telemetry keeps flowing over the existing OTLP plane. The CLI
+          (<code>retrace-ctl</code>) speaks to it; the kernel enforcement
+          compiler (<code>retrace-profile enforce</code>) takes its last
+          word.
+        </p>
+      </div>
+    </section>
+
+    <section class="sec" id="doctrine">
+      <div class="wrap">
+        <h2>1 &middot; The doctrine</h2>
+        <div class="cols">
+          <div>
+            <h3>Two planes</h3>
+            <p>
+              Control (low-rate, request/response + events, UDS locally,
+              TLS remotely) is <em>separate</em> from telemetry (OTLP,
+              unchanged). The supervisor never builds a second telemetry
+              protocol &mdash; it attaches session id, policy epoch, host
+              as an OTLP relay.
+            </p>
+          </div>
+          <div>
+            <h3>Fail-open liveness, fail-closed policy</h3>
+            <p>
+              A dead supervisor <em>never</em> kills a traced process;
+              that is the same bounded, never-block discipline as the
+              live-stream thread. The last-applied jail policy stays in
+              force forever. Agent code lives off the engine hot path so
+              any agent bug degrades to "no control channel" &mdash; never
+              to a target crash.
+            </p>
+          </div>
+          <div>
+            <h3>Find with kernel truth, act with the preload</h3>
+            <p>
+              Kernel observation (eBPF on Linux, ETW on Windows) is
+              <em>spectator only</em>; kernel enforcement (Landlock,
+              seccomp, Seatbelt, AppContainer) is fail-closed; only the
+              preload plane rewrites arguments. The three planes are
+              graded against each other, never conflated.
+            </p>
+          </div>
+          <div>
+            <h3>The nonce doctrine</h3>
+            <p>
+              A HELLO without the spawner's nonce seats as a spectator:
+              evidence always, policy never. A nonce-carrying HELLO
+              takes a full seat and participates in policy.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="daemon">
+      <div class="wrap">
+        <h2>2 &middot; <code>retraced</code> &mdash; the daemon</h2>
+        <pre class="cmd">retraced [--sock PATH] [--journal PATH] [--policy FILE] [--ctl PATH]
+         [--nonce HEX32 | --nonce-file PATH]
+         [--tls-listen HOST:PORT --tls-cert PEM --tls-key PEM --tls-ca PEM]
+         [--user NAME] [--group NAME] [--fd N]
+         [--exit-after N]</pre>
+        <div class="table">
+          {flagRows.map(([n, d]) => (
+            <div class="row">
+              <code>{n}</code>
+              <span>{d}</span>
+            </div>
+          ))}
+        </div>
+        <p class="tip">
+          The journal is append-only and hash-chained. Control-plane
+          records flush the moment they are written; routine telemetry
+          is buffered; an unclean shutdown leaves a recorded gap
+          (<code>retrace.journal.unclean</code>) &mdash; never a silent
+          one. Reboot replays; a broken chain refuses to start.
+        </p>
+      </div>
+    </section>
+
+    <section class="sec" id="ctl">
+      <div class="wrap">
+        <h2>3 &middot; <code>retrace-ctl</code> &mdash; the fleet CLI</h2>
+        <pre class="cmd">retrace-ctl [--sock PATH] COMMAND              <span class="c"># local UDS controller</span>
+retrace-ctl --tls-host H:P --tls-cert PEM --tls-key PEM --tls-ca CA COMMAND   <span class="c"># fleet, mTLS</span></pre>
+        <div class="table">
+          {ctlCmds.map(([n, d]) => (
+            <div class="row">
+              <code>{n}</code>
+              <span>{d}</span>
+            </div>
+          ))}
+        </div>
+        <p>
+          Every command maps to a claim scope (a URI SAN bit like
+          <code>retrace:scope:status+ps+policy+kill</code>). A peer
+          whose cert lacks the scope is refused with
+          <code>scope denied</code> and the attempt is journaled as
+          <code>retrace.auth.overscope</code>. Local UDS peers hold all
+          scopes (PEERCRED already gates the accept).
+        </p>
+      </div>
+    </section>
+
+    <section class="sec" id="sessions">
+      <div class="wrap">
+        <h2>4 &middot; Sessions &amp; trees</h2>
+        <pre class="cmd"><span class="c"># 1. fork the workload armed to join the daemon itself</span>
+retrace-ctl --sock /tmp/retraced.ctl.sock \
+    spawn --preload /usr/lib/libretrace.so -- /usr/bin/detonation arg
+
+<span class="c"># 2. inspect the live tree (depth-recursive; no fixed scan level)</span>
+retrace-ctl ps --tree
+
+<span class="c"># 3. push a new jail policy to every full seat</span>
+retrace-ctl policy-push strict-jail.json
+
+<span class="c"># 4. reap any session through the control plane</span>
+retrace-ctl kill &lt;pid&gt;</pre>
+        <p>
+          Every departure &mdash; natural exit, crash, or kill &mdash; is
+          journaled (<code>retrace.ctl.exit</code>: pid, how, code) by
+          the reap doctrine. A specimen that crashes, is killed, or
+          leaves on its own is never a silent gap in the audit trail
+          and never a zombie either. The session tree the registry
+          carries is the tree the CLI prints, at every depth.
+        </p>
+      </div>
+    </section>
+
+    <section class="sec last" id="enforce">
+      <div class="wrap">
+        <h2>5 &middot; Kernel enforcement &amp; signed audit</h2>
+        <pre class="cmd"><span class="c"># 1. observed-set -&gt; policy</span>
+retrace-profile capture -o profile.json -- ./target
+
+<span class="c"># 2. profile + declared set -&gt; executable spec</span>
+retrace-profile enforce profile.json --inside declared.json -o spec.json
+
+<span class="c"># 3. the spec seals with Ed25519 and runs under retrace-enforce</span>
+retrace-enforce --audit trail.jsonl --audit-key ed.pem spec.json -- ./target</pre>
+        <p>
+          One declared-set, four enforcement planes &mdash; Landlock,
+          seccomp, Seatbelt, AppContainer &mdash; each exec bound to a
+          hash-chained, Ed25519-signed audit trail that fails closed on
+          tamper. A verify-audit chain re-derives everything it reads;
+          swapping a seal or a key names itself.
+        </p>
+        <ul class="links">
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/supervisor.md">Full reference</a> &mdash; verbs, scopes, journal record shapes</li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/threat-model-control-plane.md">Threat model</a> &mdash; the adversary table, every row answered</li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/37-detonation-farm.md">Cookbook 37</a> &mdash; detonation farm end-to-end</li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/44-journal-lifecycle.md">Cookbook 44</a> &mdash; journal lifecycle, rotation, verification</li>
+          <li><a href="https://github.com/riboseinc/retrace/blob/main/docs/cookbook/45-campaign.md">Cookbook 45</a> &mdash; the manifest &rarr; correlated evidence</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  .hero { padding: 96px 0 40px; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .22em; color: var(--color-dim); margin-bottom: 14px; }
+  h1 { font-size: clamp(30px, 5vw, 46px); letter-spacing: -0.02em; margin: 0 0 14px; }
+  .lede { color: var(--color-dim); max-width: 640px; font-size: 16px; line-height: 1.6; }
+  .lede code { font-family: var(--font-mono); font-size: 13px; color: var(--color-text); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 3px; }
+  .sec { padding: 44px 0; border-top: 1px solid rgba(255,255,255,.05); scroll-margin-top: 80px; }
+  .sec.last { padding-bottom: 80px; }
+  h2 { font-size: 22px; margin: 0 0 18px; letter-spacing: -0.01em; }
+  h3 { font-size: 14px; margin: 0 0 10px; color: var(--color-text); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+  .cols p { margin: 0; }
+  .cols > div > h3 + p { color: var(--color-dim); font-size: 13.5px; line-height: 1.65; }
+  .cmd { background: rgba(7,9,13,.75); border: 1px solid rgba(255,255,255,.07); border-radius: 8px; padding: 14px 16px; font-family: var(--font-mono); font-size: 12px; color: var(--color-text); overflow-x: auto; line-height: 1.65; margin: 0 0 14px; }
+  .cmd .c { color: var(--color-dim); }
+  .cmd code, p code { font-family: var(--font-mono); font-size: 12px; color: var(--color-text); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 3px; }
+  p { color: var(--color-dim); font-size: 13.5px; line-height: 1.65; }
+  .tip { border-left: 2px solid rgba(242,180,65,.4); padding: 4px 0 4px 14px; margin-top: 14px; }
+  .tip p { margin: 0; }
+  .table { border: 1px solid rgba(255,255,255,.07); border-radius: 10px; overflow: hidden; margin: 0 0 14px; }
+  .row { display: grid; grid-template-columns: 240px 1fr; gap: 14px; padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,.05); align-items: baseline; }
+  .row:last-child { border-bottom: none; }
+  .row code { font-family: var(--font-mono); font-size: 11.5px; color: var(--color-see); }
+  .row span { color: var(--color-dim); font-size: 12.5px; line-height: 1.5; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr; gap: 3px; } }
+  .links { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 10px; }
+  .links a { font-family: var(--font-mono); font-size: 13px; color: var(--color-see); text-decoration: none; }
+  .links a:hover { text-decoration: underline; }
+  a { color: var(--color-see); }
+</style>

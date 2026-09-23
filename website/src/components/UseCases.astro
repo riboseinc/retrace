@@ -177,6 +177,13 @@ const personas = [
     what: "Debug a Python/C++ native binding. Trace the interpreter's libc calls to find which model-loading step is bottlenecked on disk I/O vs. computation.",
     cmd: "retrace trace fopen,read,mmap -- python3 train.py",
   },
+  {
+    tag: "fleet",
+    accent: "control",
+    who: "Detonation-farm / SOC operator",
+    what: "Run a whole lab of traced specimens under one supervisor. Spawn, re-policy, freeze, and kill any session; every launch and departure lands in a hash-chained journal.",
+    cmd: "retrace-ctl spawn --preload libretrace.so -- ./detonation",
+  },
 ];
 ---
 
@@ -184,7 +191,7 @@ const personas = [
   <div class="wrap">
     <div class="section-head reveal">
       <div class="eyebrow">Who uses retrace</div>
-      <h2>Twenty-five jobs. One shared library.</h2>
+      <h2>Twenty-six jobs. One shared library.</h2>
       <p>
         retrace is small enough to slip into a one-off debugging session, generic enough to anchor a
         CI fuzzing pipeline, principled enough to back a security audit. Below: every audience that
