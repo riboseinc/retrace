@@ -5,6 +5,18 @@
 
 const shipped = [
   {
+    title: "Android captures the target's own calls",
+    detail: "The last big interception gap on bionic closes: with RETRACE_ANDROID_REBIND=1, after boot retrace rewrites the executable's PLT/GOT slots to its exported __retrace_wrap_<func> aliases, so the app's own libc calls enter the engine with full arguments -- denial actions included. Caller-routing keeps the trace the target's story; loader-support symbols stay out of scope; gate-off is byte-identical.",
+    accent: "see",
+    tag: "v2.109.0",
+  },
+  {
+    title: "The iOS lane, and a proxy for phones you can't touch",
+    detail: "On-device install for the frida bridge (.deb packaging with a TrollStore path), plus retrace-netobserve: a stock-device HTTP observer that records request lines and CONNECT targets in the retrace trace shape, so device traffic grades with every retrace tool. And the F2 verdict datum: end-to-end, the dispatch tail is 1.0ns -- 1.7% of capture cost -- so ID-keyed dispatch stays not-worth-it by measurement.",
+    accent: "see",
+    tag: "v2.110.0",
+  },
+  {
     title: "PPC64LE, the fifth ELF backend",
     detail: "The port runs end to end -- validated natively on a real ppc64le kernel. Two ELFv2 ABI laws fell on the way: the trampoline kept the caller's return address in the slot every C callee writes its own into (SP+16), and the tail restored a garbage TOC for our library's own local-entry calls. Trampolines are 16-byte aligned with a CI gate; the link keeps sysv hashing and unversioned exports; the lane runs cross-build + alignment + log and denial E2E on ARM runners.",
     accent: "see",
@@ -252,8 +264,8 @@ const roadmap = [
     accent: "control",
   },
   {
-    title: "Brew + rpm channels",
-    detail: "The .deb ships from the releases (dpkg-validated in CI) and cpack builds rpm from source; the remaining channels are a Homebrew tap and an rpm repository so package managers see updates.",
+    title: "Brew tap + rpm repository channels",
+    detail: "The release assets now carry both .deb and .rpm for x86_64, aarch64, and ppc64le (dpkg-validated in CI). What remains is the distribution plumbing: a Homebrew tap and an rpm repository so package managers see updates automatically.",
     eta: "next",
     accent: "break",
   },
@@ -261,9 +273,9 @@ const roadmap = [
 
 const stats = [
   { value: "13",   label: "platforms" },
-  { value: "12",   label: "actions" },
-  { value: "317",  label: "functions" },
-  { value: "21",   label: "cookbook recipes" },
+  { value: "21",   label: "actions" },
+  { value: "324",  label: "functions" },
+  { value: "44",   label: "cookbook recipes" },
   { value: "0",    label: "external deps" },
 ];
 ---
@@ -294,7 +306,7 @@ const stats = [
 
     <div class="shipped-block">
       <header class="block-head reveal">
-        <div class="block-tag accent-control">SHIPPED: v2.38 - v2.73</div>
+        <div class="block-tag accent-control">SHIPPED: v2.38 - v2.110</div>
         <h3>The arc that made retrace a supervised instrument: daemon, fleet control, enforcement, three observation lanes, and the Windows lane made real.</h3>
       </header>
       <div class="shipped-grid">
