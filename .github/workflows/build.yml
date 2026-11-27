@@ -70,7 +70,6 @@ jobs:
           - { runner: macos-15-intel, platform: macos-x64   }
           - { runner: macos-26-intel, platform: macos-x64,  experimental: true }
           # --- macOS Apple Silicon ---
-          - { runner: macos-14,       platform: macos-arm64 }
           - { runner: macos-15,       platform: macos-arm64 }
           - { runner: macos-26,       platform: macos-arm64, experimental: true }
           # --- Windows x64 MSVC ---

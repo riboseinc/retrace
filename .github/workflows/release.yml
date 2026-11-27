@@ -103,7 +103,7 @@ jobs:
             os: linux
             cross: powerpc64le-linux-gnu
           - platform: macos-arm64
-            runner: macos-14
+            runner: macos-15
             os: macos
           - platform: macos-x86_64
             runner: macos-15-intel
