@@ -66,7 +66,7 @@ jobs:
           msystem: ${{ matrix.sys }}
           update: false
           install: git flex bison gettext-devel
-          pacboy: cmake:p python3:p ninja:p curl:p pkgconf:p gcc:p openssl:p
+          pacboy: cmake:p python:p ninja:p curl:p pkgconf:p gcc:p openssl:p
 
       - name: Checkout
         uses: actions/checkout@v4
